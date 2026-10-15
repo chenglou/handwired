@@ -622,6 +622,19 @@ export function makeDocument(random: Random, request: DocumentRequest = {}): Gen
 // sensor, rows of an export, chunks of an answer. Their times and counters grow from record to record.
 export const recordTypes = ['event', 'reading', 'row', 'chunk', 'pair', 'value'] as const
 export type RecordType = typeof recordTypes[number]
+// Texts that a model streams in pieces: sentences, and answers with JSON in them, whose quotes, braces and line feeds
+// end up inside the pieces.
+const streamedTexts = ['Hello world!', 'The ferry leaves at nine.', 'Sure, here it is:\n{"ok": true}', 'Done. 3 files changed.', '{"city": "Lisbon", "days": 2}', 'Yes.\n\nAnything else?', 'It costs 12.50 EUR (plus tax).'] as const
+
+// A text cut into `count` consecutive pieces of at least one character each, as a stream delivers it.
+function piecesOf(random: Random, text: string, count: number): string[] {
+  const characters = Array.from(text)
+  const cuts = new Set<number>()
+  while (cuts.size < Math.min(count, characters.length) - 1) cuts.add(random.integer(1, characters.length - 1))
+  const bounds = [0, ...[...cuts].sort((left, right) => left - right), characters.length]
+  return bounds.slice(0, -1).map((start, index) => characters.slice(start, bounds[index + 1]).join(''))
+}
+
 export function makeRecords(random: Random, type: RecordType, count: number): Json[] {
   const start = 1_790_000_000 + random.integer(0, 9_000_000)
   const hour = random.integer(0, 22)
@@ -629,8 +642,9 @@ export function makeRecords(random: Random, type: RecordType, count: number): Js
   const service = random.pick(services)
   const date = `2026-${pad(random.integer(1, 12))}-${pad(random.integer(1, 28))}`
   const sensor = random.integer(0, sensors.length - 1)
-  // One record in some streams is odd: it has one more key, a nested object or a much longer text.
+  // One record in some streams is odd: it has one more key or a nested object.
   const oddRecord = random.chance(0.2) ? random.integer(0, count - 1) : -1
+  const pieces = type === 'chunk' ? piecesOf(random, random.pick(streamedTexts), count) : []
   return Array.from({length: count}, (_, index): Json => {
     const odd = index === oddRecord
     switch (type) {
@@ -646,7 +660,7 @@ export function makeRecords(random: Random, type: RecordType, count: number): Js
       case 'row':
         return {id: index + 1, name: person(random), active: random.chance(0.7), ...(odd ? {roles: [random.pick(roles), random.pick(roles)]} : {})}
       case 'chunk':
-        return {delta: odd ? sentence(random, 9) : random.pick(fragments), index}
+        return {delta: pieces[index] ?? '', index, ...(odd ? {logprobs: null} : {})}
       case 'pair':
         return [start + index, random.integer(0, 99), ...(odd ? [null] : [])]
       case 'value':
