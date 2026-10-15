@@ -1,5 +1,5 @@
 // Between the dataset's tables and the experiment's. The dataset writes tables as ParserTables, the layout of
-// ../table-parser.ts, e.g. its three hand rules in ../hand-rules.ts. The experiment runs RecoveryTables, which have a
+// ../table-parser.ts, e.g. its four hand rules in ../hand-rules.ts. The experiment runs RecoveryTables, which have a
 // stack action per grammar cell and masks of open cells.
 //
 // The two parsers are not the same parser, also with the same cells:
@@ -18,9 +18,9 @@ import {type RecoveryTables, actionByToken, actionOfToken, addStates, asIsTables
 // Tables of the dataset's layout as tables of the experiment, with the stack action `by token` in every grammar cell,
 // e.g. recoveryTablesOf(handRuleTables('words')). The tables have to have today's classes, contexts, tokens and depth
 // changes, and today's display table for today's grammar states. They may have more tokenizer states and more
-// grammar states than today's, e.g. a hand rule with a state of its own after a string that a line feed ended: the
-// added states come after today's, as addStates puts them, and an added grammar state's column of the display table
-// is the one that the tables hold. Throws when the tables change a frozen cell.
+// grammar states than today's, e.g. the hand rule `lines`, which has a state of its own after a string that a line
+// feed ended: the added states come after today's, as addStates puts them, and an added grammar state's column of
+// the display table is the one that the tables hold. Throws when the tables change a frozen cell.
 export function recoveryTablesOf(plain: ParserTables): RecoveryTables {
   const addedLexerStates = plain.lexerNext.length / plain.classCount - today.lexerStateCount
   const addedGrammarStates = plain.grammarStateCount - today.grammarStateCount

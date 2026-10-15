@@ -375,10 +375,9 @@ export function todaysTablesWithTheStatesOf(tables: RecoveryTables): RecoveryTab
 
 // The tables that every arm is read against, each with the tables it started from, which are today's:
 // - the parser as it is,
-// - the dataset's hand rules (../../hand-rules.ts), three today, as tables of the experiment, with the stack action
-//   `by token` in every grammar cell. The list follows the dataset's `handRules`, so a hand rule that a later commit
-//   of the dataset adds gets a row by itself. The base of a hand rule with a state of its own is today's tables with
-//   that state added,
+// - the dataset's hand rules (../../hand-rules.ts), four today: stay, resync, words and lines. Each as tables of the
+//   experiment, with the stack action `by token` in every grammar cell. The list follows the dataset's `handRules`.
+//   The base of a hand rule with a state of its own, as `lines` has one, is today's tables with that state added,
 // - the 35 hand-written rules of ../handwritten/rules.ts as they are.
 //
 // For the dataset's hand rules and for the hand-written rules no split counts as unseen: the hand rules were chosen

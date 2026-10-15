@@ -10,11 +10,11 @@
 //    containers in other ways, a real stack and a running sum, and after a closing bracket that does not match they
 //    can disagree about the innermost container. The grammar then reads another context, so the display kind can
 //    differ from there on too. Up to the first code point that reads another context, everything is the same, and the
-//    check counts what differs after it. The three are tables of the plain table parser, and the hand-written 35
+//    check counts what differs after it. The four are tables of the plain table parser, and the hand-written 35
 //    rules are not. And the cells that the dataset takes for read by valid JSON are the experiment's frozen cells,
 //    cell by cell, so the dataset's first condition and the experiment's first ground rule are the same rule.
-//    Tables of the dataset's layout with one more tokenizer state convert too, with the same depth at every code
-//    point: a later commit of the dataset has a hand rule with such a state.
+//    The hand rule `lines` has a tokenizer state of its own: code points are read in that state, and the record of
+//    its tables counts the cells changed against today's tables with the same state added.
 // 2. The record. For today's tables: its row "all" is the row of scoreTables, it has a row for each of the six
 //    groups and for the kinds of damage, no cell is changed, the ground rules hold, and the depth of valid JSON that
 //    is too deep is right. For the hand-written tables, whose score is not their base's: every row is the row of
@@ -42,7 +42,7 @@ import {join} from 'node:path'
 import {handRuleTables, handRules} from '../../hand-rules.ts'
 import {cellsThatValidJsonReads} from '../../limits.ts'
 import {createRandom} from '../../random.ts'
-import {classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from '../../table-parser.ts'
+import {runTableParser} from '../../table-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {type Samples, datasetKey, groupNames, heldOutByKind, heldOutByTemplate, loadSamples, refuseUnknownOptions, standardRange, textOf} from '../data.ts'
 import {handwrittenTables} from '../handwritten/rules.ts'
@@ -85,6 +85,15 @@ const errorOf = async (run: () => unknown): Promise<string | undefined> => {
   return undefined
 }
 
+// The cells in which two tables with the same layout differ, counted from the arrays.
+const cellsThatDiffer = (left: RecoveryTables, right: RecoveryTables) => {
+  let cells = 0
+  for (let cell = 0; cell < left.lexerNext.length; cell++) if (left.lexerNext[cell] !== right.lexerNext[cell] || left.lexerEvent[cell] !== right.lexerEvent[cell]) cells++
+  for (let cell = 0; cell < left.grammarNext.length; cell++) if (left.grammarNext[cell] !== right.grammarNext[cell] || left.grammarAction[cell] !== right.grammarAction[cell]) cells++
+  for (let entry = 0; entry < left.display.length; entry++) if (left.display[entry] !== right.display[entry]) cells++
+  return cells
+}
+
 // 1. The hand rules.
 {
   // The dataset's cells that valid JSON reads against the experiment's frozen cells.
@@ -108,7 +117,7 @@ const errorOf = async (run: () => unknown): Promise<string | undefined> => {
     for (let entry = 0; entry < plain.display.length; entry++) if (tables.display[entry] !== plain.display[entry]) otherCells++
     check(tables.lexerNext.length === plain.lexerNext.length && tables.grammarNext.length === plain.grammarNext.length && tables.display.length === plain.display.length && otherCells === 0,
       `the hand rule ${rule}: ${otherCells} cells of the converted tables are not the hand rule's cell with the stack action \`by token\`, or the tables have other sizes`)
-    const tally = {texts: 0, codePoints: 0, otherDepth: 0, differentBeforeAnotherContext: 0, textsWithAnotherContext: 0, otherContainer: 0, otherKind: 0}
+    const tally = {texts: 0, codePoints: 0, otherDepth: 0, differentBeforeAnotherContext: 0, textsWithAnotherContext: 0, otherContainer: 0, otherKind: 0, inAddedState: 0}
     for (let place = 0; place < samples.sampleCount; place++) {
       if (samples.firstDamage[place] === -1) continue
       tally.texts++
@@ -125,6 +134,7 @@ const errorOf = async (run: () => unknown): Promise<string | undefined> => {
           tally.textsWithAnotherContext++
         }
         if (trace.depthAfter[position] !== expected.depthAfter[position]) tally.otherDepth++
+        if (trace.lexerStateBefore[position]! >= today.lexerStateCount) tally.inAddedState++
         const otherKind = trace.displayKind[position] !== expected.displayKind[position]
         const otherContainer = trace.containerAfter[position] !== expected.containerAfter[position]
         if (otherKind) tally.otherKind++
@@ -139,50 +149,27 @@ const errorOf = async (run: () => unknown): Promise<string | undefined> => {
     check(plainParserProblems(tables).length === 0, `the hand rule ${rule} is no setting of the plain table parser: ${plainParserProblems(tables)[0]}`)
     const share = (count: number) => `${count} (${(100 * count / tally.codePoints).toFixed(2)}%)`
     console.log(`   The hand rule ${rule} as tables of the experiment: all ${plain.lexerNext.length} tokenizer cells, ${plain.grammarNext.length} grammar cells and ${plain.display.length} entries of the display table are the hand rule's, with \`by token\` in every grammar cell. On ${tally.texts} broken texts, ${tally.codePoints} code points, the exact parser gives the depth of the dataset's plain table parser at every one. In ${tally.textsWithAnotherContext} texts the real stack and the running sum disagree about a container. From the first code point that reads another context on, the container differs at ${share(tally.otherContainer)} code points and the display kind at ${share(tally.otherKind)}. Before it nothing differs.`)
-  }
-  // Tables of the dataset's layout with one more tokenizer state, as the hand rule `lines` of a later commit of the
-  // dataset has it: the state after a string that a line feed ended, whose row is the row of the state between,
-  // but for an opening brace, which gets the event of a comma.
-  {
-    const words = handRuleTables('words')
-    const classCount = defaultTables.classCount
-    const between = lexerStateNames.indexOf('between')
-    const addedState = lexerStateNames.length
-    const lexerNext = [...words.lexerNext]
-    const lexerEvent = [...words.lexerEvent]
-    for (let characterClass = 0; characterClass < classCount; characterClass++) {
-      lexerNext.push(lexerNext[between * classCount + characterClass]!)
-      lexerEvent.push(lexerEvent[between * classCount + characterClass]!)
+    // A hand rule with a tokenizer state of its own, which `lines` has. As a baseline, its base is today's tables
+    // with that state added. Every cell of the added state differs from today's parser, which has no such state,
+    // and against the base only the cells that hold something else than addStates put there.
+    const addedStates = tables.lexerStateCount - today.lexerStateCount
+    if (addedStates === 0) {
+      check(tally.inAddedState === 0, `the hand rule ${rule} has today's states, and ${tally.inAddedState} code points are read in another one`)
+      continue
     }
-    lexerNext[lexerStateNames.indexOf('string') * classCount + classNames.indexOf('lineFeed')] = addedState
-    lexerEvent[addedState * classCount + classNames.indexOf('openBrace')] = eventNames.indexOf('comma')
-    lexerNext[addedState * classCount + classNames.indexOf('openBrace')] = between
-    const plain = {...words, lexerNext, lexerEvent}
-    const tables = recoveryTablesOf(plain)
-    let codePoints = 0
-    let otherDepth = 0
-    let inAddedState = 0
-    for (let place = 0; place < samples.sampleCount; place++) {
-      if (samples.firstDamage[place] === -1) continue
-      const start = samples.start[place]!
-      const length = samples.start[place + 1]! - start
-      const expected = runTableParser(textOf(samples, place), plain)
-      runRecoveryParserInto(trace, samples.codePoints, start, length, false, tables, length)
-      for (let position = 0; position < length; position++) {
-        codePoints++
-        if (trace.depthAfter[position] !== expected.depthAfter[position]) otherDepth++
-        if (trace.lexerStateBefore[position] === addedState) inAddedState++
-      }
-    }
-    check(tables.lexerStateCount === addedState + 1 && otherDepth === 0 && inAddedState > 0 && plainParserProblems(tables).length === 0, `tables with one more tokenizer state: ${otherDepth} of ${codePoints} code points have another depth than in the plain table parser, ${inAddedState} are read in the added state, and plainParserProblems says ${plainParserProblems(tables)[0] ?? 'nothing'}`)
-    check(throws(() => recoveryTablesOf({...words, lexerNext: words.lexerNext.slice(0, -1)})), 'recoveryTablesOf takes tables whose tokenizer table is no whole number of states')
-    // Such tables as a baseline: their base is today's tables with the same added state, and they get a record.
     const base = todaysTablesWithTheStatesOf(tables)
     const record = recordOf(tables, base)
-    check(base.lexerStateCount === tables.lexerStateCount && record.structure.lexerStates === addedState + 1 && record.cellsChangedAgainstBase.total > 1000 && record.cellsChangedAgainstBase.total < record.cellsThatDifferFromToday.total + 1,
-      `tables with one more tokenizer state get a record with ${record.cellsChangedAgainstBase.total} cells changed against today's tables with that state, and ${record.cellsThatDifferFromToday.total} that differ from today's parser`)
-    console.log(`   Tables of the dataset's layout with one more tokenizer state convert too: ${tables.lexerStateCount} tokenizer states, ${inAddedState} code points are read in the added state, and the depth is the plain table parser's at every code point. Their record counts ${record.cellsChangedAgainstBase.total} cells changed against today's tables with the same added state.`)
+    const changedHere = cellsThatDiffer(base, tables)
+    const todaysCells = today.lexerNext.length
+    let addedCellsAsInBase = 0
+    for (let cell = todaysCells; cell < tables.lexerNext.length; cell++) if (tables.lexerNext[cell] === base.lexerNext[cell] && tables.lexerEvent[cell] === base.lexerEvent[cell]) addedCellsAsInBase++
+    check(tally.inAddedState > 0 && record.structure.lexerStates === tables.lexerStateCount && changedHere > 1000 && record.cellsChangedAgainstBase.total === changedHere && record.cellsThatDifferFromToday.total === changedHere + addedCellsAsInBase,
+      `the hand rule ${rule} has ${addedStates} tokenizer state of its own: ${tally.inAddedState} code points are read in it, and its record counts ${record.cellsChangedAgainstBase.total} cells changed against today's tables with that state and ${record.cellsThatDifferFromToday.total} that differ from today's parser, where a count made here finds ${changedHere} and ${changedHere + addedCellsAsInBase}`)
+    console.log(`   The hand rule ${rule} has ${addedStates} tokenizer state of its own, so ${tables.lexerStateCount} in all: ${tally.inAddedState} code points are read in it. Its record counts ${record.cellsChangedAgainstBase.total} cells changed against today's tables with the same state added, as a count made here finds them, and ${record.cellsThatDifferFromToday.total} that differ from today's parser: ${addedCellsAsInBase} cells of the added state hold what addStates put there.`)
   }
+  check(handRules.some(rule => handRuleTables(rule).lexerNext.length > today.lexerNext.length), 'no hand rule of the dataset has a tokenizer state of its own, so the check of such tables ran on none')
+  const words = handRuleTables('words')
+  check(throws(() => recoveryTablesOf({...words, lexerNext: words.lexerNext.slice(0, -1)})), 'recoveryTablesOf takes tables whose tokenizer table is no whole number of states')
   const handwrittenProblems = plainParserProblems(handwrittenTables().tables)
   check(handwrittenProblems.length === 1 && handwrittenProblems[0]!.includes('stack action'), `the hand-written tables: ${handwrittenProblems.join('; ')}`)
   check(plainParserProblems(asIsTables()).length === 0, 'today\'s tables are no tables of the plain table parser')
@@ -202,14 +189,6 @@ const sameRow = (left: ScoreRow, right: ScoreRow) => JSON.stringify(left) === JS
 const rowsAreThoseOf = (record: ArmRecord, tables: RecoveryTables) => {
   const expected = scoreTables(tables, validation).rows
   return record.rows.length === expected.length && expected.every(row => sameRow(rowNamed(record, row.name), row))
-}
-// The cells in which two tables with the same layout differ, counted from the arrays.
-const cellsThatDiffer = (left: RecoveryTables, right: RecoveryTables) => {
-  let cells = 0
-  for (let cell = 0; cell < left.lexerNext.length; cell++) if (left.lexerNext[cell] !== right.lexerNext[cell] || left.lexerEvent[cell] !== right.lexerEvent[cell]) cells++
-  for (let cell = 0; cell < left.grammarNext.length; cell++) if (left.grammarNext[cell] !== right.grammarNext[cell] || left.grammarAction[cell] !== right.grammarAction[cell]) cells++
-  for (let entry = 0; entry < left.display.length; entry++) if (left.display[entry] !== right.display[entry]) cells++
-  return cells
 }
 {
   const record = recordOf(asIsTables(), asIsTables())

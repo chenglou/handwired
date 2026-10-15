@@ -1,5 +1,5 @@
 // The rows that every arm is read against, through the same record as an arm's tables: the parser as it is, the
-// dataset's three hand rules as tables of the experiment, and the 35 hand-written rules.
+// dataset's four hand rules as tables of the experiment, and the 35 hand-written rules.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-parser/learn/arms/baselines.ts
