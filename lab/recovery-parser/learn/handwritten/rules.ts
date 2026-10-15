@@ -115,7 +115,8 @@ export const rules: readonly Rule[] = [
     reason: 'Inside a word every character but a colon, a comma, a bracket and a line feed is part of the word, spaces and quotes included, so that \'Ada Lovelace\' and ObjectId("507f") are one word each.',
     example: '{\'name\': \'Ada Lovelace\', "_id": ObjectId("507f")}',
     cells: set => {
-      for (const characterClass of [...wordClasses, 'space', 'tabOrCarriageReturn'] as const) set.lexer(word, characterClass, word, 'stringContent')
+      // A backslash is shown as an escape, as it is inside a string, e.g. the two of 'ACME\\jdoe'.
+      for (const characterClass of [...wordClasses, 'space', 'tabOrCarriageReturn'] as const) set.lexer(word, characterClass, word, characterClass === 'backslash' ? 'escape' : 'stringContent')
     },
   },
   {

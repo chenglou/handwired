@@ -8,28 +8,28 @@ The rules were written from JSON's grammar and from reading samples of the train
 
 ## Result
 
-On the validation split, over the labeled code points at or after the first damage, the share with all three labels right goes from 40.8% to 94.3%. On the train split it goes from 41.0% to 94.5%.
+On the validation split, over the labeled code points at or after the first damage, the share with all three labels right goes from 40.8% to 94.4%. On the train split it goes from 41.0% to 94.5%.
 
 | group | broken samples | nothing to recover | all three, as it is | all three, hand-written | display kind | depth | container | whole samples |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| all | 5203 | 368 | 40.8 | 94.3 | 47.7 → 98.0 | 74.6 → 96.0 | 88.4 → 99.3 | 11.6 → 72.0 |
-| source: damage | 4061 | 285 | 37.8 | 93.9 | 45.5 → 97.8 | 72.0 → 95.8 | 87.0 → 99.2 | 9.8 → 68.3 |
+| all | 5203 | 368 | 40.8 | 94.4 | 47.7 → 98.1 | 74.6 → 96.0 | 88.4 → 99.3 | 11.6 → 72.0 |
+| source: damage | 4061 | 285 | 37.8 | 94.0 | 45.5 → 97.9 | 72.0 → 95.8 | 87.0 → 99.2 | 9.8 → 68.3 |
 | source: typing | 1142 | 83 | 59.2 | 96.9 | 61.7 → 99.3 | 90.7 → 97.2 | 97.0 → 99.6 | 18.3 → 85.4 |
-| reachable: yes | 4046 | 368 | 39.9 | 97.7 | 44.9 → 98.1 | 74.8 → 99.4 | 87.4 → 99.8 | 15.1 → 78.6 |
+| reachable: yes | 4046 | 368 | 39.9 | 97.7 | 44.9 → 98.2 | 74.8 → 99.4 | 87.4 → 99.8 | 15.1 → 78.6 |
 | reachable: line rule | 652 | 0 | 60.2 | 91.8 | 66.6 → 99.3 | 90.0 → 92.4 | 98.0 → 99.7 | 1.4 → 81.1 |
 | reachable: no | 505 | 0 | 20.0 | 69.0 | 44.5 → 95.2 | 50.3 → 71.5 | 83.3 → 94.3 | 0.0 → 12.5 |
-| needs a class | 588 | 0 | 7.9 | 94.9 | 14.0 → 95.1 | 53.6 → 99.3 | 80.9 → 99.7 | 0.0 → 23.1 |
+| needs a class | 588 | 0 | 7.9 | 95.1 | 14.0 → 95.3 | 53.6 → 99.3 | 80.9 → 99.7 | 0.0 → 23.1 |
 | needs no class | 4615 | 368 | 48.2 | 94.2 | 55.4 → 98.7 | 79.4 → 95.2 | 90.1 → 99.2 | 13.3 → 78.8 |
 | debatable | 472 | 15 | 33.1 | 81.3 | 51.5 → 97.3 | 65.6 → 83.4 | 90.5 → 98.3 | 5.3 → 48.1 |
-| not debatable | 4731 | 353 | 41.7 | 95.9 | 47.3 → 98.1 | 75.7 → 97.4 | 88.2 → 99.4 | 12.3 → 74.5 |
+| not debatable | 4731 | 353 | 41.7 | 95.9 | 47.3 → 98.2 | 75.7 → 97.4 | 88.2 → 99.4 | 12.3 → 74.5 |
 | family: half typed | 1621 | 14 | 55.5 | 96.8 | 58.2 → 99.2 | 90.3 → 97.4 | 97.1 → 99.7 | 10.8 → 83.5 |
 | family: cut off | 494 | 310 | 35.3 | 64.5 | 63.0 → 99.0 | 56.8 → 65.0 | 87.1 → 95.2 | 7.1 → 52.2 |
 | family: separator | 1496 | 0 | 51.2 | 97.3 | 56.4 → 98.7 | 82.7 → 98.4 | 92.0 → 99.7 | 18.9 → 84.6 |
 | family: bracket | 254 | 15 | 20.0 | 60.8 | 67.5 → 97.6 | 32.4 → 61.0 | 81.7 → 94.4 | 6.7 → 15.1 |
-| family: comment | 569 | 4 | 52.7 | 98.4 | 56.5 → 99.4 | 88.0 → 98.9 | 94.1 → 99.6 | 6.5 → 81.8 |
-| family: other notation | 1017 | 0 | 13.8 | 95.7 | 21.7 → 96.2 | 55.4 → 99.1 | 81.0 → 99.7 | 2.8 → 35.4 |
+| family: comment | 569 | 4 | 52.7 | 98.5 | 56.5 → 99.4 | 88.0 → 98.9 | 94.1 → 99.6 | 6.5 → 81.8 |
+| family: other notation | 1017 | 0 | 13.8 | 95.8 | 21.7 → 96.4 | 55.4 → 99.1 | 81.0 → 99.7 | 2.8 → 35.4 |
 | family: inside a string | 246 | 0 | 31.3 | 89.6 | 36.2 → 93.5 | 79.5 → 95.3 | 93.2 → 97.6 | 1.2 → 38.2 |
-| family: wrapper | 643 | 25 | 38.0 | 97.6 | 48.1 → 99.1 | 59.3 → 98.2 | 69.5 → 99.4 | 6.8 → 81.9 |
+| family: wrapper | 643 | 25 | 38.0 | 97.7 | 48.1 → 99.1 | 59.3 → 98.2 | 69.5 → 99.4 | 6.8 → 81.9 |
 | family: several documents | 165 | 0 | 39.9 | 78.7 | 55.2 → 100.0 | 58.7 → 78.7 | 78.2 → 99.3 | 4.2 → 73.9 |
 
 The first two number columns are the main number, as it is and hand-written. The other columns show "as it is → hand-written". The held-out kinds and the held-out template are only in the test split, so they have no row here.
@@ -104,7 +104,7 @@ Some states get a second meaning through their open cells. No state is added, so
 
 The rules set 648 of the 710 open tokenizer cells and 267 of the 616 open grammar cells, and rely on 13 and 20 more as they are. On the train and validation splits, 3 open cells that no rule names are read, 16 times in all, by texts with color codes at depth 16.
 
-`report.ts --without-each-rule` prints the main number without each rule. Read it with care: the cells of a rule that is left out hold today's choice, which for most grammar cells is the state `error`, and the rules give that state a meaning. So a text often recovers by accident, e.g. without "trailing comma" the main number only falls from 94.3 to 93.6.
+`report.ts --without-each-rule` prints the main number without each rule. Read it with care: the cells of a rule that is left out hold today's choice, which for most grammar cells is the state `error`, and the rules give that state a meaning. So a text often recovers by accident, e.g. without "trailing comma" the main number only falls from 94.4 to 93.7.
 
 ## Per kind of damage
 
@@ -125,18 +125,18 @@ The validation split, the main number. A sample with several kinds is in the row
 | trailingComma | 809 | 45.9 | 97.6 | 2.4 | Nothing of its own. |
 | extraComma | 61 | 54.9 | 99.3 | 0.7 | Nothing of its own. |
 | missingColon | 26 | 67.2 | 94.4 | 5.6 | Before a string value, the string reads as the next key, because the rule for a key without a colon has the cell. It is shown as a key, and the comma after it puts the grammar back. |
-| foreignKeySeparator | 18 | 2.8 | 71.1 | 28.9 | The = or => and the value after it are one word, which reads as the next key and is shown as a key. Depth and container are right. |
+| foreignKeySeparator | 18 | 2.8 | 71.6 | 28.4 | The = or => and the value after it are one word, which reads as the next key and is shown as a key. Depth and container are right. |
 | missingCloser | 173 | 17.4 | 63.1 | 36.9 | Mostly out of reach without the indentation: after a removed closer the next entry reads as one more entry of the container that is still open. Recovered: a key right after an array's items, and a nested container that is still open when the bracket of the container around it comes and a comma follows. |
 | strayCloser | 54 | 12.3 | 35.4 | 64.6 | A stray closer inside the document reads as a real one. Recovered: a stray closer after the document's end, and the members after a comma when the document closed too early. |
 | wrongCloser | 27 | 67.0 | 100.0 | 0.0 | Nothing in this split. On the train split 88.5%: a mistyped closer of a nested container with a comma after it is read as the closer of the container around it, so two levels close where one was meant. |
 | lineComment | 520 | 53.6 | 98.6 | 1.4 | A comment is a word, not a state of its own. Left: a comment with a comma and then a colon inside a nested array, where the colon closes the array, and a comment with a bracket that has no partner. |
 | blockComment | 91 | 55.2 | 97.2 | 2.8 | As lineComment. The lines of a comment over several lines are words, which a key state takes as keys without a colon. |
 | hashComment | 21 | 33.4 | 96.4 | 3.6 | As lineComment, and a # comment is a plain word, so its colon counts. |
-| unquotedKey | 356 | 6.2 | 97.3 | 2.7 | The first letter of a key that starts with t, f or n is shown as a literal: the cell that reads it is frozen. |
-| singleQuotedString | 430 | 4.4 | 95.7 | 4.3 | Read as words, since the apostrophe has no class. Left: a colon, a comma or a bracket inside the string ends the word, and True, False and None in the same texts are shown as strings. |
-| curlyQuotes | 64 | 6.6 | 89.6 | 10.4 | As singleQuotedString. Most of what is left comes from the no-break spaces in the same samples. |
-| nonBreakingSpace | 31 | 2.3 | 78.5 | 21.5 | A no-break space has the class of a letter, so it starts a word: the indentation is shown as part of the key that follows it. |
-| foreignLiteral | 251 | 13.2 | 94.5 | 5.5 | True, None, undefined and the like are shown as strings, not as literals: a word is a string to the tokenizer, and its display kind cannot depend on where it stands. |
+| unquotedKey | 356 | 6.2 | 97.4 | 2.6 | The first letter of a key that starts with t, f or n is shown as a literal: the cell that reads it is frozen. |
+| singleQuotedString | 430 | 4.4 | 95.9 | 4.1 | Read as words, since the apostrophe has no class. Left: a colon, a comma or a bracket inside the string ends the word, and True, False and None in the same texts are shown as strings. |
+| curlyQuotes | 64 | 6.6 | 89.8 | 10.2 | As singleQuotedString. Most of what is left comes from the no-break spaces in the same samples. |
+| nonBreakingSpace | 31 | 2.3 | 78.7 | 21.3 | A no-break space has the class of a letter, so it starts a word: the indentation is shown as part of the key that follows it. |
+| foreignLiteral | 251 | 13.2 | 94.6 | 5.4 | True, None, undefined and the like are shown as strings, not as literals: a word is a string to the tokenizer, and its display kind cannot depend on where it stands. |
 | unquotedValue | 45 | 26.4 | 93.4 | 6.6 | Nothing of its own. The rest is the first letter of keys without quotes, and other damage. |
 | numberFormat | 64 | 29.1 | 99.9 | 0.1 | Nothing of its own. |
 | callWrapper | 85 | 19.0 | 95.8 | 4.2 | ObjectId("…") is one word and shown as a string, which is right. A colon inside the call, e.g. in the time of ISODate("…T03:27:21Z"), ends the word, and the digits of NumberLong(15) are shown as a string. |
@@ -149,7 +149,7 @@ The validation split, the main number. A sample with several kinds is in the row
 | rawLineFeedInString | 63 | 34.2 | 82.8 | 17.2 | The opposite rule is in force: a string ends at the line feed. The rest of the string is a word, which reads as the next key. |
 | rawTabInString | 16 | 62.7 | 99.4 | 0.6 | Nothing of its own. |
 | missingOpeningQuote | 14 | 18.9 | 95.6 | 4.4 | Nothing of its own: the word runs to the comma, and its closing quote is a word character. |
-| doubledQuote | 15 | 20.9 | 73.1 | 26.9 | The second quote opens a string that runs to the line feed, and swallows a bracket or a colon on its way. |
+| doubledQuote | 15 | 20.9 | 73.2 | 26.8 | The second quote opens a string that runs to the line feed, and swallows a bracket or a colon on its way. |
 | codeFence | 285 | 66.0 | 99.4 | 0.6 | Nothing of its own. |
 | proseAround | 147 | 64.5 | 98.1 | 1.9 | A sentence with a bracket or a quote that has no partner. |
 | statementWrapper | 196 | 7.1 | 98.9 | 1.1 | Nothing of its own. |
@@ -157,7 +157,7 @@ The validation split, the main number. A sample with several kinds is in the row
 | byteOrderMark | 29 | 3.3 | 97.6 | 2.4 | Nothing of its own. |
 | textAfterEnd | 21 | 59.1 | 96.1 | 3.9 | 17 of the 21 samples have nothing to recover. |
 | ansiColorCodes | 10 | 1.2 | 0.0 | 100.0 | Out of reach. The [ of every color code opens an array. A fix needs a state after the escape character, and a class for the letter that ends the code. |
-| backslashEscapedDocument | 20 | 0.0 | 93.6 | 6.4 | Read as words: \"id\" is a key without quotes. Left: the \n and the indentation after it are part of the word, and a colon inside a string ends the word. |
+| backslashEscapedDocument | 20 | 0.0 | 94.2 | 5.8 | Read as words: \"id\" is a key without quotes. Left: the \n and the indentation after it are part of the word, and a colon inside a string ends the word. |
 | htmlEntities | 10 | 2.0 | 99.2 | 0.8 | Nothing of its own: &quot;id&quot; is a word. |
 | newlineDelimited | 123 | 49.0 | 70.7 | 29.3 | One document per line works. What is left is the cut line of cutOff in the same samples. |
 | commaSeparatedRecords | 12 | 71.8 | 100.0 | 0.0 | Nothing. |
@@ -165,13 +165,13 @@ The validation split, the main number. A sample with several kinds is in the row
 
 ## What the cells cannot express
 
-Each entry names what is missing, the kinds of damage it would help, and how many of the 5,203 broken validation samples have these kinds. "Wrong code points" is a rough count from `where-wrong.ts --split validation --causes`, which guesses the cause of a sample from its first wrong code point. In all, 38,628 of the 681,596 labeled code points are wrong.
+Each entry names what is missing, the kinds of damage it would help, and how many of the 5,203 broken validation samples have these kinds. "Wrong code points" is a rough count from `where-wrong.ts --split validation --causes`, which guesses the cause of a sample from its first wrong code point. In all, 38,331 of the 681,596 labeled code points are wrong.
 
-- **A class for the apostrophe and for the curly quotes, and a tokenizer state for a string between them.** The rules read such strings as words, which breaks at a colon, a comma or a bracket inside the string, e.g. `'2026-11-08T03:27:21Z'`. Kinds: singleQuotedString (430 samples), curlyQuotes (64), quotedDocument (17), and callWrapper (85) for the same colon. About 1,150 wrong code points for the colon alone.
-- **A class for the no-break space.** It has the class of a letter, so it starts a word. Kind: nonBreakingSpace (31 samples), about 1,730 wrong code points.
-- **A display kind for a word that stands for a literal.** The tokenizer does not know whether a word stands where a key or where a value may come, and the display table shows a string's events as a key or as a string only. So `True` is shown as a string. An event of its own for words, shown as a key before a colon and as a literal elsewhere, would do. Kinds: foreignLiteral (251 samples), and nonFiniteNumber in the test split. About 2,320 wrong code points.
-- **Open entries of the display table.** The core keeps the display table fixed. Its entries for a literal's or a number's characters before a colon, e.g. (literalStart, colon), are read only after an error. With these open, the `t` of `tags:` could be shown as a key. Kind: unquotedKey (356 samples), about 1,220 wrong code points.
-- **A token for a word, apart from the token for a string.** The grammar cannot tell `= "x"` after a key from the next key in quotes, nor a word right after a closing quote from the next key. Kinds: foreignKeySeparator (18 samples, about 1,220 wrong code points), unescapedQuote (67) and rawLineFeedInString (63) (about 2,070 for a word after a complete string).
+- **A class for the apostrophe and for the curly quotes, and a tokenizer state for a string between them.** The rules read such strings as words, which breaks at a colon, a comma or a bracket inside the string, e.g. `'2026-11-08T03:27:21Z'`. Kinds: singleQuotedString (430 samples), curlyQuotes (64), quotedDocument (17), and callWrapper (85) for the same colon. About 1,110 wrong code points for the colon alone.
+- **A class for the no-break space.** It has the class of a letter, so it starts a word. Kind: nonBreakingSpace (31 samples), about 1,700 wrong code points.
+- **A display kind for a word that stands for a literal.** The tokenizer does not know whether a word stands where a key or where a value may come, and the display table shows a string's events as a key or as a string only. So `True` is shown as a string. An event of its own for words, shown as a key before a colon and as a literal elsewhere, would do. Kinds: foreignLiteral (251 samples), and nonFiniteNumber in the test split. About 2,290 wrong code points.
+- **Open entries of the display table.** The core keeps the display table fixed. Its entries for a literal's or a number's characters before a colon, e.g. (literalStart, colon), are read only after an error. With these open, the `t` of `tags:` could be shown as a key. Kind: unquotedKey (356 samples), about 1,200 wrong code points.
+- **A token for a word, apart from the token for a string.** The grammar cannot tell `= "x"` after a key from the next key in quotes, nor a word right after a closing quote from the next key. Kinds: foreignKeySeparator (18 samples, about 1,200 wrong code points), unescapedQuote (67) and rawLineFeedInString (63) (about 2,070 for a word after a complete string).
 - **A stack action that pops twice.** A closing bracket of the other kind inside a nested container should close two containers in one step. The rules close the second one at the comma after it, with the grammar states `error` and `end` as the memory. So the bracket itself keeps a wrong depth, and when no comma follows, e.g. at the end of the text, so does the rest. Kind: missingCloser (173 samples), and the typing replays in which a container is still open.
 - **Whether a token is the first on its line.** A line feed is white space to the grammar. With such a bit: an opening brace at the start of a line after a cut line starts a new document (cutOff with newlineDelimited, 43 samples, about 6,070 wrong code points), the string on the next line after a colon without a value is the next key (colonWithoutValue, 354 samples, about 680 wrong code points), and a string on the same line after a key is its value (missingColon, 26 samples).
 - **The column of a line's first token.** Without the indentation, a removed closing bracket leaves no sign, and a stray one reads as a real one. Kinds: missingCloser (173 samples, about 6,700 wrong code points, the largest cause that is left), strayCloser (54 samples, about 2,880).

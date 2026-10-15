@@ -2,7 +2,7 @@
 
 `rules.ts` uses only the open cells of the tables as they are. This note lists the structures that a programmer would add to the parser next, in the order of what they gain for what they cost. Nothing here is built. The later arms can use the list to judge whether training finds the same structures, e.g. when an arm adds tokenizer states and one of them turns out to be "inside a string in apostrophes".
 
-The gains are estimates from the validation split, not measurements. They come from `where-wrong.ts --split validation --causes`, which guesses the cause of each wrong sample from its first wrong code point and its kinds of damage, and counts every wrong code point of the sample for that cause. A gain is given in points of the main number, i.e. the share of the 681,596 labeled code points at or after the first damage. The hand-written rules have 94.3 points, so 5.7 are left. Every number is preliminary, as the dataset is a snapshot.
+The gains are estimates from the validation split, not measurements. They come from `where-wrong.ts --split validation --causes`, which guesses the cause of each wrong sample from its first wrong code point and its kinds of damage, and counts every wrong code point of the sample for that cause. A gain is given in points of the main number, i.e. the share of the 681,596 labeled code points at or after the first damage. The hand-written rules have 94.4 points, so 5.6 are left. Every number is preliminary, as the dataset is a snapshot.
 
 ## The list
 
@@ -18,7 +18,7 @@ The gains are estimates from the validation split, not measurements. They come f
 | 8 | a comment state in the tokenizer | a comment with a bracket that has no partner, or with a comma and then a colon | lineComment 520, blockComment 91, hashComment 21 | under 0.1 |
 | 9 | a state after the escape character, and a class for the letter that ends a color code | color codes of a terminal | ansiColorCodes 10 | 0.15 |
 
-The first six together are worth about 3.5 to 4 of the 5.7 points. The rest is out of reach for a parser that reads from left to right without looking ahead: a string that is open by mistake in the middle of a line (0.75 points), a text that starts inside the document (0.3), a stray closer in a one-line text, an inner quote without a backslash.
+The first six together are worth about 3.5 to 4 of the 5.6 points. The rest is out of reach for a parser that reads from left to right without looking ahead: a string that is open by mistake in the middle of a line (0.75 points), a text that starts inside the document (0.3), a stray closer in a one-line text, an inner quote without a backslash.
 
 ## 1. The first token on its line
 
@@ -44,7 +44,7 @@ This is the most expensive structure of the list: a counter, a stack of numbers,
 
 ## 3. Strings in apostrophes and in curly quotes
 
-The apostrophe and the curly quotes have the class `other`, the class of most letters. The hand-written rules read `'name'` as a word. That is right in 95.7% of the code points of the samples with single quotes, because most such strings hold no colon, comma or bracket. It fails for `'2026-11-08T03:27:21Z'`, `'https://example.com'` and `'expected "}" but found "]"'`.
+The apostrophe and the curly quotes have the class `other`, the class of most letters. The hand-written rules read `'name'` as a word. That is right in 95.9% of the code points of the samples with single quotes, because most such strings hold no colon, comma or bracket. It fails for `'2026-11-08T03:27:21Z'`, `'https://example.com'` and `'expected "}" but found "]"'`.
 
 The structure: a class for the apostrophe, one for the two curly quotes, and per kind of quote a tokenizer state "inside the string" and one "after a backslash". The cells mirror the ones of the state `string`. An apostrophe inside a string in double quotes stays content, as today.
 
@@ -86,4 +86,4 @@ U+00A0 has the class `other`. A text that was copied from a web page has it in t
 
 - With added tokenizer states: a comment state (8), a state after the escape character without the class of the final letter (9, in part), a copy of `between` after a line feed (1, with the brace shown as an error). Not 3 and not 6, which need classes.
 - With added grammar states: fresh states for what the rules put into `error`, `end`, and the states that no text reaches at depth 0. That should give the same score as the hand-written rules, not a higher one, since the rules found a free state for each of these.
-- With neither: nothing beyond the hand-written rules is known to me. If an arm without added states scores clearly above 94.3 on validation, it found a reading that these rules miss, and its cells are worth reading one by one with `differencesOf`.
+- With neither: nothing beyond the hand-written rules is known to me. If an arm without added states scores clearly above 94.4 on validation, it found a reading that these rules miss, and its cells are worth reading one by one with `differencesOf`.

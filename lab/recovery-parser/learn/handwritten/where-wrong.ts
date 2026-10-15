@@ -4,11 +4,12 @@
 //
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/handwritten/where-wrong.ts [--split train] [--kind missingCloser] [--typing]
-//       [--top 30] [--examples 1] [--causes] [--tables <file.json>] [--scratch <folder>]
+//       [--top 30] [--examples 1] [--causes] [--cause <text>] [--tables <file.json>] [--scratch <folder>]
 // --split is train or validation: this script never reads the test split. --kind counts only the samples that have
 // the kind, --typing only the typing replays. --tables reads saved tables in place of the hand-written ones.
 // --causes adds a second table: the wrong code points per cause, where the cause of a sample is a guess from its
 // first wrong code point and its kinds of damage, see `causes` below. rules-with-structure.md takes its counts from it.
+// --cause lists only the samples whose guessed cause has the text in its name, e.g. --cause "another wrong depth".
 //
 // A line reads e.g. "23304 wrong in 213 samples  depth +1  (between, comma) (commaOrClose, comma, depth 2 to 15,
 // object)": in 213 samples the first wrong code point is a comma that the tokenizer read between tokens and the
@@ -55,6 +56,7 @@ if (import.meta.main) {
   const top = Number(optionOf('--top') ?? 30)
   const exampleCount = Number(optionOf('--examples') ?? 1)
   const tablesFile = optionOf('--tables')
+  const onlyCause = optionOf('--cause')
   const tables = tablesFile === undefined ? handwrittenTables().tables : loadTables(tablesFile).tables
   const samples = loadStandardSamples(cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const trace = createTrace()
@@ -98,6 +100,7 @@ if (import.meta.main) {
     const cause = causes.findIndex(([, fits]) => fits(what, lexerCell, grammarCell, sampleKinds))
     wrongOfCause[cause]! += wrong
     samplesOfCause[cause]!++
+    if (onlyCause !== undefined && !causes[cause]![0].includes(onlyCause)) continue
     const key = `${what}  ${lexerCell} ${grammarCell}`
     const entry = tally.get(key) ?? {samples: 0, wrong: 0, examples: []}
     entry.samples++
