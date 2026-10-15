@@ -43,7 +43,7 @@ const messages = [
   'connection reset by peer', 'slow query on table orders', 'token expired, refreshing', 'wrote 3 files to C:\\temp\\out', 'line 1\nline 2',
   'expected "}" but found "]"', 'Error: boom\n    at main (app.js:3:9)', 'user said "no", skipping', 'parsed [1, 2, 3] in 4 ms', 'config: {retries: 3, verbose: true}',
   'don\'t retry', 'loaded C:\\Users\\ada\\notes.txt', 'matched ^\\d{3}-\\d{4}$ twice', 'value was null, expected true or false', 'disk at 91%, see /var/log',
-  'saved to D:\\backup\\', 'step 1\tok\nstep 2\tfailed',
+  'saved to D:\\backup\\', 'step 1\tok\nstep 2\tfailed', 'wrote report.txt\r\n', 'progress 100%\r', 'bell\b', 'page 1\fpage 2',
 ]
 const tags = ['urgent', 'draft', 'billing', 'ops', 'mobile', 'web', 'beta', 'internal', 'archived', 'eu-west', 'canary']
 const themes = ['Solarized Dark', 'Solarized Light', 'Monokai', 'GitHub Light', 'Nord', 'Gruvbox']
@@ -85,11 +85,74 @@ const translationEntries: [string, string][] = [
   ['hint', 'Press Ctrl+S to save, Esc to cancel'], ['pattern', '^\\d+\\.\\d+$'], ['path', 'C:\\Program Files\\Harbor\\bin'], ['multiline', 'first line\nsecond line'],
   ['tabbed', 'name\tvalue'], ['link', '<a href="/docs">docs</a>'], ['json', '{"id": 1, "tags": []}'], ['quote', 'She said "wait", then left'], ['slash', 'and/or'],
   ['unicode', 'café ☕ naïve'], ['list', '- milk\n- eggs'], ['formula', '\\alpha + \\beta'], ['account', 'ACME\\jdoe'], ['size', '5\' 11"'],
-  ['folder', 'C:\\temp\\'], ['address', '12 Harbor Rd\nLisbon'], ['row', 'MG-204\t2\t12.50'],
+  ['folder', 'C:\\temp\\'], ['address', '12 Harbor Rd\nLisbon'], ['row', 'MG-204\t2\t12.50'], ['letter', 'Dear {name},\r\n\r\nThank you.'],
 ]
 const treeKeys = ['id', 'name', 'type', 'value', 'items', 'children', 'meta', 'data', 'tags', 'enabled', 'count', 'label', 'options', 'next', 'total', 'title', 'flags', 'rate', 'config', 'result', 'user-agent', 'x', 'y', 'first name', '$ref', '_id', '2nd', 'a.b']
 
 const sentence = (random: Random, wordCount: number) => Array.from({length: wordCount}, () => random.pick(words)).join(' ')
+
+// Free text as a person types it into a field such as a note, a bio or a message: mostly plain words, and in four
+// texts of ten something that a serializer must escape or that means something in JSON. The damage kinds inside
+// strings take their strings from here, so what follows an inner quote or a line feed is different from text to text:
+// a letter, a digit, a quote, a bracket, spaces, a line that looks like a member.
+export function freeText(random: Random, wordCount: number): string {
+  const count = Math.max(2, wordCount)
+  const texts = Array.from({length: count}, () => random.pick(words))
+  const feature = random.weighted([['plain', 60], ['quoted', 13], ['lines', 10], ['tabs', 3], ['backslashes', 5], ['apostrophe', 5], ['marks', 4]] as const)
+  switch (feature) {
+    case 'plain':
+      return texts.join(' ')
+    case 'quoted': {
+      // One to three phrases between quotes, each one to three words, with a comma or a period after some.
+      for (let phrase = random.integer(1, 3), from = 0; phrase > 0 && from < texts.length; phrase--) {
+        const first = random.integer(from, texts.length - 1)
+        const last = Math.min(texts.length - 1, first + random.weighted([[0, 5], [1, 3], [2, 2]]))
+        texts[first] = `"${texts[first]!}`
+        texts[last] = `${texts[last]!}"${random.weighted([['', 7], [',', 2], ['.', 1]])}`
+        from = last + 2
+      }
+      return texts.join(' ')
+    }
+    case 'lines': {
+      // One to four line feeds. What starts the next line is drawn anew for each.
+      const lineCount = random.integer(2, Math.min(5, count))
+      const lineEnd = random.chance(0.12) ? '\r\n' : '\n'
+      const lines: string[] = []
+      for (let line = 0; line < lineCount; line++) {
+        const body = texts.slice(Math.floor(line * count / lineCount), Math.floor((line + 1) * count / lineCount)).join(' ')
+        const start = line === 0 ? '' : random.weighted([
+          ['', 30], ['- ', 12], [`${random.integer(1, 9)}. `, 8], [`${random.integer(2, 40)} `, 6], ['  ', 8], ['    ', 6], ['"', 8], ['[', 5], ['{', 3], ['> ', 4],
+          [`"${random.pick(words)}": `, 6], ['at ', 4],
+        ])
+        lines.push(start === '"' ? `"${body}"` : start === '[' ? `[${random.integer(1, 9)}] ${body}` : start === '{' ? `{${random.pick(words)}} ${body}` : `${start}${body}`)
+      }
+      return lines.join(lineEnd)
+    }
+    case 'tabs':
+      return [texts.slice(0, Math.ceil(count / 2)).join(' '), texts.slice(Math.ceil(count / 2)).join(' '), ...(random.chance(0.4) ? [String(random.integer(0, 999))] : [])].join('\t')
+    case 'backslashes': {
+      const name = random.pick(words)
+      const path = random.pick([
+        `C:\\Users\\${name}\\${random.pick(words)}.txt`, `D:\\${name}\\`, `\\\\${name}\\share\\${random.pick(words)}`, `C:\\Program Files\\${name}`, `^\\d{${random.integer(2, 4)}}-\\w+$`,
+        `\\b${name}\\b`, `${name}\\${random.pick(words)}`, `C:\\${name}\\new\\${random.pick(words)}`,
+      ])
+      const place = random.integer(0, texts.length)
+      return [...texts.slice(0, place), path, ...texts.slice(place)].join(' ')
+    }
+    case 'apostrophe': {
+      const place = random.integer(0, texts.length - 1)
+      texts[place] = random.pick(['it\'s', 'don\'t', 'can\'t', `${texts[place]!}'s`, 'O\'Brien', '\'quoted\''])
+      return texts.join(' ')
+    }
+    case 'marks': {
+      const place = random.integer(0, texts.length)
+      const mark = random.pick([`[${random.integer(1, 9)}, ${random.integer(1, 9)}]`, `{${random.pick(words)}: ${random.integer(1, 9)}}`, `${random.pick(words)}: ${random.pick(words)},`, '{}', `(${random.pick(words)})`, 'true', 'null', `${random.integer(1, 99)}%`, 'a/b', '<b>'])
+      return [...texts.slice(0, place), mark, ...texts.slice(place)].join(' ')
+    }
+  }
+}
+// The templates that hold free text, for the kinds of damage that need a string with a quote, a line feed or a tab in it.
+export const freeTextTemplates = ['packageManifest', 'userRecord', 'logEvent', 'order', 'mapFeature', 'apiResponse', 'remoteCall', 'databaseRecord', 'messages', 'table', 'scalar'] as const
 const pad = (value: number) => String(value).padStart(2, '0')
 const time = (random: Random) => `2026-${pad(random.integer(1, 12))}-${pad(random.integer(1, 28))}T${pad(random.integer(0, 23))}:${pad(random.integer(0, 59))}:${pad(random.integer(0, 59))}Z`
 const hexId = (random: Random, digits: number) => Array.from({length: digits}, () => '0123456789abcdef'[random.integer(0, 15)]).join('')
@@ -147,7 +210,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
     return someKeys(random, {
       name: random.chance(0.4) ? `@${random.pick(scopes)}/${name}` : name,
       version: version(random),
-      description: sentence(random, 2 + Math.round(size * 6)),
+      description: freeText(random, 2 + Math.round(size * 6)),
       type: 'module',
       main: 'dist/index.js',
       scripts: Object.fromEntries(scripts.filter(() => random.chance(0.2 + 0.4 * size))),
@@ -173,7 +236,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       lastLogin: random.chance(0.85) ? time(random) : null,
       balance: amount(random, -1000, 3000),
       manager: random.chance(0.3) ? null : random.integer(1, 99_999),
-      bio: sentence(random, 3 + Math.round(size * 14)),
+      bio: freeText(random, 3 + Math.round(size * 14)),
     }, 3, size)
   },
   logEvent(random, size) {
@@ -182,7 +245,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       ts: time(random),
       level,
       service: random.pick(services),
-      msg: random.pick(messages),
+      msg: random.chance(0.5) ? random.pick(messages) : freeText(random, random.integer(2, 7)),
       durationMs: Math.round(random.next() * 250_000) / 100,
       status: random.pick([200, 201, 204, 301, 400, 404, 429, 500, 502]),
       requestId: hexId(random, 16),
@@ -190,7 +253,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       tags: Array.from({length: Math.round(size * 4)}, () => random.pick(tags)),
       error: level === 'error' || level === 'fatal' ? {code: random.pick(['ETIMEDOUT', 'ECONNRESET', 'E_VALIDATION']), retryable: random.chance(0.5), attempts: random.integer(1, 5)} : null,
       sampleRate: random.pick<Json>([1, 0.5, 0.01, 1e-4, 2.5e-7, raw('1E-3'), raw('1.0')]),
-      context: {region: random.pick(tags), build: hexId(random, 7), detail: sentence(random, Math.round(size * 10))},
+      context: {region: random.pick(tags), build: hexId(random, 7), detail: freeText(random, Math.round(size * 10))},
     }, 4, size)
   },
   settings(random, size) {
@@ -213,7 +276,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       paid: random.chance(0.9),
       customer: {name: person(random), city: random.pick(cities)},
       shippedAt: random.chance(0.6) ? time(random) : null,
-      notes: random.pick(notes),
+      notes: random.chance(0.5) ? random.pick(notes) : freeText(random, random.integer(2, 8)),
       discount: random.chance(0.3) ? -Math.round(random.next() * 2000) / 100 : 0,
     }, 3, size)
   },
@@ -230,7 +293,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
         area: random.pick<Json>([1.5e3, 8.25e2, raw('6.02e+23'), 3e-9, raw('1.5E3')]),
         capital: random.chance(0.2),
         tags: Array.from({length: Math.round(size * 3)}, () => random.pick(tags)),
-        note: sentence(random, 2 + Math.round(size * 8)),
+        note: freeText(random, 2 + Math.round(size * 8)),
       }, 1, size),
     }
   },
@@ -312,7 +375,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   // A response with an outer object around a list, and the same response when the request failed.
   apiResponse(random, size) {
     if (random.chance(0.2)) {
-      return {data: null, error: {code: random.pick([400, 401, 404, 429, 500]), message: random.pick(messages), details: random.pick<Json>([[], [{field: 'email', issue: 'required'}], null])}}
+      return {data: null, error: {code: random.pick([400, 401, 404, 429, 500]), message: random.chance(0.5) ? random.pick(messages) : freeText(random, random.integer(2, 8)), details: random.pick<Json>([[], [{field: 'email', issue: 'required'}], null])}}
     }
     const row = (index: number): Json => someKeys(random, {
       id: index + 1, name: person(random), email: random.chance(0.8) ? `user${random.integer(1, 999)}@example.com` : null, active: random.chance(0.7), score: amount(random, 0, 100),
@@ -350,14 +413,14 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   remoteCall(random, size) {
     const id: Json = random.pick<Json>([random.integer(1, 999), `req-${hexId(random, 6)}`, null])
     const params: Json = random.pick<Json>([
-      {name: random.pick(toolNames), arguments: {query: sentence(random, 2 + Math.round(size * 4)), limit: random.integer(1, 50)}},
+      {name: random.pick(toolNames), arguments: {query: freeText(random, 2 + Math.round(size * 4)), limit: random.integer(1, 50)}},
       [random.integer(1, 9), random.pick(words), random.chance(0.5)],
       {textDocument: {uri: 'file:///src/main.ts'}, position: {line: random.integer(0, 400), character: random.integer(0, 80)}},
       {},
     ])
     const roll = random.next()
     if (roll < 0.45) return {jsonrpc: '2.0', id, method: random.pick(methods), params}
-    if (roll < 0.8) return {jsonrpc: '2.0', id, result: random.pick<Json>([{content: [{type: 'text', text: sentence(random, 3 + Math.round(size * 9))}], isError: false}, [], null, true, {capabilities: {tools: {}, resources: {subscribe: true}}}])}
+    if (roll < 0.8) return {jsonrpc: '2.0', id, result: random.pick<Json>([{content: [{type: 'text', text: freeText(random, 3 + Math.round(size * 9))}], isError: false}, [], null, true, {capabilities: {tools: {}, resources: {subscribe: true}}}])}
     return {jsonrpc: '2.0', id, error: {code: random.pick([-32700, -32600, -32601, -32000]), message: random.pick(['Parse error', 'Invalid Request', 'Method not found', 'Server error']), data: random.pick<Json>([null, {retryAfter: random.integer(1, 60)}])}}
   },
   // A document as a database stores it: an id of 24 hexadecimal digits, times, and numbers kept as strings.
@@ -374,11 +437,14 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       updatedAt: random.chance(0.7) ? time(random) : null,
       warehouse: {code: random.pick(['A', 'B', 'C']), stock: [random.integer(0, 90), random.integer(0, 90)]},
       views: random.integer(0, 2_000_000),
+      note: freeText(random, 2 + Math.round(size * 6)),
     }, 3, size)
   },
   // Texts of an interface: strings that hold quotes, brackets, colons, commas, backslashes, and the words true, false, null.
   messages(random, size) {
+    // Texts of the list above, and one text in three written anew under a key of its own.
     const entries = random.shuffled(translationEntries).slice(0, 2 + Math.round(size * 9))
+      .map((entry, index): [string, string] => random.chance(0.33) ? [`${random.pick(['title', 'body', 'tooltip', 'help', 'banner', 'footer', 'label', 'error'])}${index + 1}`, freeText(random, random.integer(2, 7))] : entry)
     const half = Math.ceil(entries.length / 2)
     return random.chance(0.5)
       ? Object.fromEntries(entries)
@@ -415,9 +481,16 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   table(random, size) {
     const rows = 1 + Math.round(size * 6)
     if (random.chance(0.5)) {
-      return [['id', 'name', 'city', 'active'], ...Array.from({length: rows}, (_, index): Json => [index + 1, person(random), random.chance(0.8) ? random.pick(cities) : null, random.chance(0.5)])]
+      // One table in three has a column of free text, so that an array holds strings with quotes and line feeds too.
+      const withNote = random.chance(0.33)
+      return [['id', 'name', 'city', 'active', ...(withNote ? ['note'] : [])], ...Array.from({length: rows}, (_, index): Json => [
+        index + 1, person(random), random.chance(0.8) ? random.pick(cities) : null, random.chance(0.5), ...(withNote ? [freeText(random, random.integer(2, 5))] : []),
+      ])]
     }
-    return Array.from({length: rows}, (_, index): Json => ({id: index + 1, name: random.pick(firstNames), done: random.chance(0.5), ...(random.chance(0.3) ? {note: random.pick(notes)} : {}), ...(random.chance(0.2) ? {parent: null} : {})}))
+    return Array.from({length: rows}, (_, index): Json => ({
+      id: index + 1, name: random.pick(firstNames), done: random.chance(0.5),
+      ...(random.chance(0.3) ? {note: random.chance(0.5) ? random.pick(notes) : freeText(random, random.integer(2, 6))} : {}), ...(random.chance(0.2) ? {parent: null} : {}),
+    }))
   },
   // A value of any type inside any type, for token sequences the modeled templates don't have.
   tree(random, size) {
@@ -448,7 +521,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   // A document that is one value, or a container with nothing or little in it.
   scalar(random) {
     return random.weighted<() => Json>([
-      [() => random.pick(messages), 2], [() => sentence(random, random.integer(1, 12)), 2], [() => random.pick(translationEntries)[1], 2],
+      [() => random.pick(messages), 2], [() => freeText(random, random.integer(2, 12)), 2], [() => random.pick(translationEntries)[1], 2],
       [() => random.integer(-999, 99_999), 2], [() => raw(random.pick(['0', '-0', '0.5', '-12.75', '1e10', '2.5E-3', '1E+5', '0.0', '-0.0e0'])), 2],
       [() => true, 1], [() => false, 1], [() => null, 1],
       [() => [], 1], [() => ({}), 1], [() => '', 1], [() => [[]], 0.5], [() => [{}], 0.5], [() => ({a: {}}), 0.5], [() => ({list: []}), 0.5],
@@ -458,12 +531,15 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
 }
 
 // How a document is written.
-export const styles = ['compact', 'spaced', 'indented', 'tabbed', 'padded'] as const
+export const styles = ['compact', 'spaced', 'indented', 'tabbed', 'padded', 'wrapped'] as const
 // compact: {"a":1,"b":[1,2]}, as JSON.stringify writes it.
 // spaced: {"a": 1, "b": [1, 2]}, as Python's json.dumps writes it.
 // indented: one entry per line, with 2 or 4 spaces per level. tabbed: the same with one tab per level.
 // padded: { "a": 1, "b": [ 1, 2 ] }, with {} and [] for empty containers, as Node prints an object and as some tools
 // write JSON. It is rare among the documents, and the damage kinds that start from a printed object ask for it.
+// wrapped: the spaced text with a line feed after a comma wherever a line has reached a width, as a person or a tool
+// wraps a long line. Its lines start in the middle of containers, so that neither the start of a line nor its
+// indentation says anything about the structure.
 export type Style = typeof styles[number]
 export type Layout = {
   style: Style
@@ -485,6 +561,14 @@ export type Layout = {
   paddedShort?: boolean
   // White space before the document, e.g. the empty line at the top of some files. Mostly none.
   leading?: string
+  // For the style wrapped: the width that a line reaches before the next comma ends it. `indent` is what every line
+  // after the first starts with.
+  wrapWidth?: number
+  // A space before every colon as well as after it, e.g. "key" : 1, as Jackson's pretty printer and the old MongoDB
+  // shell write it. Only valid samples and the old shell's documents have it.
+  spaceBeforeColon?: boolean
+  // What ends a line. Only valid samples have '\r\n'.
+  lineEnd?: '\n' | '\r\n'
 }
 
 function writeString(value: string, escapes: Layout['escapes']) {
@@ -505,8 +589,37 @@ function writeString(value: string, escapes: Layout['escapes']) {
 const isScalar = (value: Json) => value === null || typeof value !== 'object' || value instanceof RawNumber
 const isContainerOfScalars = (value: Json) => !isScalar(value) && (Array.isArray(value) ? value : Object.values(value)).every(isScalar)
 
+// The spaced text of a document with a line feed in place of the space after a comma, wherever the line has reached
+// `width` code points. Commas inside strings stay as they are.
+function wrapped(text: string, width: number, indent: string) {
+  let result = ''
+  let lineLength = 0
+  let inString = false
+  const characters = Array.from(text)
+  for (let index = 0; index < characters.length; index++) {
+    const character = characters[index]!
+    if (inString && character === '\\') {
+      result += character + characters[index + 1]!
+      lineLength += 2
+      index++
+      continue
+    }
+    if (character === '"') inString = !inString
+    if (!inString && character === ',' && characters[index + 1] === ' ' && lineLength + 1 >= width) {
+      result += `,\n${indent}`
+      lineLength = indent.length
+      index++
+      continue
+    }
+    result += character
+    lineLength++
+  }
+  return result
+}
+
 export function serialize(value: Json, layout: Layout): string {
   const {style, escapes} = layout
+  const colonInLine = layout.spaceBeforeColon === true ? ' : ' : ': '
   const oneLine = (item: Json, comma: string, colon: string, padding: string): string => {
     if (item instanceof RawNumber) return item.text
     if (Array.isArray(item)) return item.length === 0 ? '[]' : `[${padding}${item.map(entry => oneLine(entry, comma, colon, padding)).join(comma)}${padding}]`
@@ -517,22 +630,25 @@ export function serialize(value: Json, layout: Layout): string {
     return typeof item === 'string' ? writeString(item, escapes) : JSON.stringify(item)
   }
   const lines = (item: Json, indentation: string, isRow: boolean): string => {
-    if (isScalar(item)) return oneLine(item, ', ', ': ', '')
+    if (isScalar(item)) return oneLine(item, ', ', colonInLine, '')
     const entries: [string | null, Json][] = Array.isArray(item) ? item.map(entry => [null, entry]) : Object.entries(item)
     if (entries.length === 0) return Array.isArray(item) ? '[]' : '{}'
     if (isContainerOfScalars(item)) {
-      const short = oneLine(item, ', ', ': ', layout.paddedShort === true ? ' ' : '')
+      const short = oneLine(item, ', ', colonInLine, layout.paddedShort === true ? ' ' : '')
       if ((isRow && layout.rowsOnOneLine && !Array.isArray(item)) || (layout.shortOnOneLine && Array.from(short).length <= 48)) return short
     }
     const inner = indentation + layout.indent
-    const written = entries.map(([key, entry]) => `${inner}${key === null ? '' : `${writeString(key, escapes)}: `}${lines(entry, inner, Array.isArray(item))}`)
+    const written = entries.map(([key, entry]) => `${inner}${key === null ? '' : `${writeString(key, escapes)}${colonInLine}`}${lines(entry, inner, Array.isArray(item))}`)
     return `${Array.isArray(item) ? '[' : '{'}\n${written.join(',\n')}\n${indentation}${Array.isArray(item) ? ']' : '}'}`
   }
   const text = style === 'compact' ? oneLine(value, ',', ':', '')
-    : style === 'spaced' ? oneLine(value, ', ', ': ', '')
-    : style === 'padded' ? oneLine(value, ', ', ': ', ' ')
+    : style === 'spaced' ? oneLine(value, ', ', colonInLine, '')
+    : style === 'padded' ? oneLine(value, ', ', colonInLine, ' ')
+    : style === 'wrapped' ? wrapped(oneLine(value, ', ', colonInLine, ''), layout.wrapWidth ?? 60, layout.indent)
     : lines(value, '', false)
-  return `${layout.leading ?? ''}${text}${layout.finalLineFeed ? '\n' : ''}`
+  // A string holds no raw line feed, so every line feed of the text is one that the layout wrote.
+  const written = `${layout.leading ?? ''}${text}${layout.finalLineFeed ? '\n' : ''}`
+  return layout.lineEnd === '\r\n' ? written.replaceAll('\n', '\r\n') : written
 }
 
 export function codePointLength(text: string) {
@@ -555,6 +671,9 @@ export type DocumentRequest = {
   styles?: readonly Style[]
   // Fields of the layout that the caller fixes, e.g. {escapes: 'plain'} for a text that must hold no \u escape.
   layout?: Partial<Layout>
+  // Numbers as a program prints them from memory, and not as a source wrote them: no exponent, no 12.50, no -0. For
+  // the documents that a kind turns into the print of a program.
+  plainNumbers?: boolean
 }
 export type GeneratedDocument = {text: string, value: Json, template: Template, layout: Layout}
 
@@ -564,7 +683,7 @@ const templateWeights: Record<Template, number> = {
   serviceConfig: 7, apiResponse: 5, chatChunk: 4, remoteCall: 4, databaseRecord: 4, messages: 5, lockfile: 3, numberGrid: 5, table: 4, tree: 6,
   deepNesting: 4, scalar: 2.5,
 }
-const styleWeights: Record<Style, number> = {compact: 21, spaced: 21, indented: 43, tabbed: 11, padded: 4}
+const styleWeights: Record<Style, number> = {compact: 20, spaced: 20, indented: 41, tabbed: 10, padded: 4, wrapped: 7}
 
 export function drawTemplate(random: Random, allowed: readonly Template[] = templates): Template {
   return random.weighted(allowed.map(template => [template, templateWeights[template]] as const))
@@ -575,14 +694,36 @@ export function drawLayout(random: Random, allowedStyles: readonly Style[] = def
   const style = random.weighted(allowedStyles.map(allowed => [allowed, styleWeights[allowed]] as const))
   return {
     style,
-    indent: style === 'tabbed' ? '\t' : random.chance(0.15) ? '    ' : '  ',
+    indent: style === 'tabbed' ? '\t' : style === 'wrapped' ? random.weighted([['', 45], [' ', 25], ['  ', 20], ['    ', 10]]) : random.chance(0.15) ? '    ' : '  ',
     shortOnOneLine: random.chance(0.45),
     rowsOnOneLine: random.chance(0.3),
     escapes: random.weighted<Layout['escapes']>([['plain', 78], ['nonAscii', 12], ['nonAsciiUpperCase', 2], ['slash', 4], ['html', 4]]),
-    finalLineFeed: (style === 'indented' || style === 'tabbed') && random.chance(0.3),
+    finalLineFeed: (style === 'indented' || style === 'tabbed' || style === 'wrapped') && random.chance(0.3),
     leading: random.weighted([['', 96], ['\n', 2.5], [' ', 1], ['\n\n', 0.5]]),
+    wrapWidth: random.integer(24, 76),
     ...fixed,
   }
+}
+
+// The layout of a valid sample: as any document's, and in a few of them a space before every colon, or lines that
+// end with a carriage return and a line feed. The tables read these through cells that only white space reaches, and
+// the valid samples are there to show that valid JSON is still read as before.
+export function drawValidLayout(random: Random): Layout {
+  const layout = drawLayout(random)
+  return {...layout, spaceBeforeColon: layout.style !== 'compact' && random.chance(0.06), lineEnd: random.chance(0.06) ? '\r\n' : '\n'}
+}
+
+// A value with its numbers as a program prints them: see DocumentRequest.plainNumbers.
+function withPlainNumbers(value: Json): Json {
+  if (value instanceof RawNumber || typeof value === 'number') {
+    const number = value instanceof RawNumber ? Number(value.text) : value
+    // A number that would print with an exponent keeps its digits and loses the exponent, e.g. 6.02 for 6.02e+23.
+    const plain = /e/.test(String(number)) ? Number(number.toExponential().split('e')[0]) : number
+    return Object.is(plain, -0) ? 0 : plain
+  }
+  if (Array.isArray(value)) return value.map(withPlainNumbers)
+  if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]): [string, Json] => [key, withPlainNumbers(entry)]))
+  return value
 }
 
 // How deep a value nests: 0 for a scalar, 1 for a container of scalars.
@@ -602,7 +743,7 @@ export function makeDocumentOf(random: Random, template: Template, layout: Layou
   let size = random.chance(0.16) ? random.next() * 0.25 : random.next()
   let currentLayout = layout
   for (let attempt = 0; ; attempt++) {
-    const value = builders[template](random, size)
+    const value = request.plainNumbers === true ? withPlainNumbers(builders[template](random, size)) : builders[template](random, size)
     const text = serialize(value, currentLayout)
     if (codePointLength(text) <= maximumLength && nestingOf(value) <= maximumDepth) return {text, value, template, layout: currentLayout}
     size = attempt >= 8 ? 0 : size * 0.6
@@ -642,8 +783,9 @@ export function makeRecords(random: Random, type: RecordType, count: number): Js
   const service = random.pick(services)
   const date = `2026-${pad(random.integer(1, 12))}-${pad(random.integer(1, 28))}`
   const sensor = random.integer(0, sensors.length - 1)
-  // One record in some streams is odd: it has one more key or a nested object.
-  const oddRecord = random.chance(0.2) ? random.integer(0, count - 1) : -1
+  // One record in four streams of ten is odd: it has one more key or a nested object. So the records after the first
+  // are not all copies of its tokens.
+  const oddRecord = random.chance(0.4) ? random.integer(0, count - 1) : -1
   const pieces = type === 'chunk' ? piecesOf(random, random.pick(streamedTexts), count) : []
   return Array.from({length: count}, (_, index): Json => {
     const odd = index === oddRecord
