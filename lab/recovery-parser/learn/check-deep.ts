@@ -12,8 +12,8 @@
 // - "nothing after": after the innermost container closes, only closing brackets and white space follow, e.g.
 //   [1, [2, [3]]]. The members of every container come before its nested container.
 // - "members after": members follow the nested containers, e.g. [[[3], 2], 1], so after a closing bracket the text
-//   goes on with a comma and a value or a member. Tables that pass the first form can fail this one: the trainer's
-//   tables of the first runs had no wrong depth in the first form and 2.1% in this one.
+//   goes on with a comma and a value or a member. Tables that pass the first form can fail this one: the tables of
+//   the smoke run `display` of structure/smoke.ts have no wrong depth in the first form and 0.6% in this one.
 //
 // A valid JSON text of more than 512 code points needs no such check: its first error is at position 512, after
 // every code point that is shown.

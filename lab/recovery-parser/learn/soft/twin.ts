@@ -379,9 +379,9 @@ export type LossOptions = {
   containerWeight?: number
   // Extra targets from intended.ts: the cross-entropy of the tokenizer state after a code point, of the event, and of
   // the grammar state after it. The default is 0 each. They are only used at the code points that data.ts marks with
-  // codePointCanFollow, where a parser of the broken text can be in the intended state. Elsewhere no choice of the
-  // open cells leads to the intended state, e.g. at the space after a removed comma, where frozen cells keep the
-  // grammar state.
+  // codePointCanFollow, where a parser of the broken text can be in the intended state. Elsewhere a parser is seldom
+  // in the intended state, e.g. at the space after a removed comma, where frozen cells keep the grammar state and no
+  // choice of the open cells leads to it.
   intendedLexerWeight?: number
   intendedEventWeight?: number
   intendedGrammarWeight?: number

@@ -108,7 +108,7 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
   const result = objective(model, runner, data, everyPlace, setting.options, mixes, mixGradients, weightGradients)
   const value = () => objective(model, runner, data, everyPlace, setting.options, mixes).value
   console.log(`Setting ${settingIndex + 1}: ${setting.name}.`)
-  console.log(`  ${data.sampleCount} samples, ${result.tally.positions} steps, ${result.tally.codePoints} labeled code points, ${result.tally.replaced} states replaced, objective ${result.value.toFixed(6)}`)
+  console.log(`  ${data.sampleCount} samples, ${result.tally.positions} steps, ${result.tally.codePoints} scored code points, ${result.tally.replaced} states replaced, objective ${result.value.toFixed(6)}`)
   for (const group of groupNames) {
     const gradient = weightGradients[group].slice()
     const weights = model.weights[group]

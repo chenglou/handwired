@@ -10,7 +10,8 @@
 //    can disagree about the innermost container. The grammar then reads another context, so the display kind can
 //    differ from there on too. Up to the first code point that reads another context, everything is the same, and the
 //    check counts what differs after it. The three are tables of the plain table parser, and the hand-written 35
-//    rules are not.
+//    rules are not. And the cells that the dataset takes for read by valid JSON are the experiment's frozen cells,
+//    cell by cell, so the dataset's first condition and the experiment's first ground rule are the same rule.
 // 2. The record of today's tables: its row "all" is the row of scoreTables, it has a row for each of the six groups
 //    and for the kinds of damage, no cell is changed, the ground rules hold, and the depth of valid JSON that is too
 //    deep is right. Tables with a changed frozen cell get no record.
@@ -22,6 +23,7 @@
 import {existsSync, readFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {handRuleTables, handRules} from '../../hand-rules.ts'
+import {cellsThatValidJsonReads} from '../../limits.ts'
 import {createRandom} from '../../random.ts'
 import {runTableParser} from '../../table-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
@@ -50,6 +52,14 @@ const throws = (run: () => unknown) => {
 
 // 1. The hand rules.
 {
+  // The dataset's cells that valid JSON reads against the experiment's frozen cells.
+  const readByValidJson = cellsThatValidJsonReads()
+  const today = asIsTables()
+  let otherCells = 0
+  for (let cell = 0; cell < today.lexerOpen.length; cell++) if (readByValidJson.tokenizer[cell] !== 1 - today.lexerOpen[cell]!) otherCells++
+  for (let cell = 0; cell < today.grammarOpen.length; cell++) if (readByValidJson.grammar[cell] !== 1 - today.grammarOpen[cell]!) otherCells++
+  check(readByValidJson.tokenizer.length === today.lexerOpen.length && readByValidJson.grammar.length === today.grammarOpen.length && otherCells === 0, `${otherCells} cells are frozen here and not read by valid JSON for the dataset, or the other way round`)
+  console.log(`1. The cells that the dataset's limits.ts takes for read by valid JSON are the frozen cells of the experiment: ${today.lexerOpen.length} tokenizer cells and ${today.grammarOpen.length} grammar cells, ${otherCells} differ.`)
   const samples = loadSamples(standardRange.seed, 0, 6000)
   const trace = createTrace()
   for (const rule of handRules) {
@@ -85,7 +95,7 @@ const throws = (run: () => unknown) => {
     check(tally.differentBeforeAnotherContext === 0, `the hand rule ${rule}: ${tally.differentBeforeAnotherContext} code points have another display kind before the two parsers read another context`)
     check(plainParserProblems(tables).length === 0, `the hand rule ${rule} is no setting of the plain table parser: ${plainParserProblems(tables)[0]}`)
     const share = (count: number) => `${count} (${(100 * count / tally.codePoints).toFixed(2)}%)`
-    console.log(`1. The hand rule ${rule} as tables of the experiment: on ${tally.texts} broken texts, ${tally.codePoints} code points, the exact parser gives the depth of the dataset's plain table parser at every one. In ${tally.textsWithAnotherContext} texts the real stack and the running sum disagree about a container. From the first code point that reads another context on, the container differs at ${share(tally.otherContainer)} code points and the display kind at ${share(tally.otherKind)}. Before it nothing differs.`)
+    console.log(`   The hand rule ${rule} as tables of the experiment: on ${tally.texts} broken texts, ${tally.codePoints} code points, the exact parser gives the depth of the dataset's plain table parser at every one. In ${tally.textsWithAnotherContext} texts the real stack and the running sum disagree about a container. From the first code point that reads another context on, the container differs at ${share(tally.otherContainer)} code points and the display kind at ${share(tally.otherKind)}. Before it nothing differs.`)
   }
   const handwrittenProblems = plainParserProblems(handwrittenTables().tables)
   check(handwrittenProblems.length === 1 && handwrittenProblems[0]!.includes('stack action'), `the hand-written tables: ${handwrittenProblems.join('; ')}`)
