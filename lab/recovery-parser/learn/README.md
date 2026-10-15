@@ -7,7 +7,7 @@ The files at the top of this folder are what every arm of the experiment shares.
 - `handwritten/`: a recovery written by hand, as 35 rules that set open cells.
 - `search/`: the open cells filled without gradients, by votes of the train samples and by a search that tries one cell at a time.
 - `soft/`: the trainable twin of the parser and its trainer. No arm is run yet.
-- `structure/`: what an arm can add to the tables besides states, e.g. a character class for the apostrophe, or open entries of the display table. This README describes the tables without any of it.
+- `structure/`: what an arm can add to the tables besides states: character classes, e.g. one for the apostrophe, open entries of the display table, and a bit that tells the grammar whether a token is the first on its line. This README describes the tables without any of it.
 
 **Every number in this folder is preliminary.** The dataset in `lab/recovery-parser/` is a snapshot that a reviewed version will replace. Every number has to be made again then, with the commands at the end.
 
@@ -121,7 +121,7 @@ Do not read the files of dumped samples that `lab/recovery-parser/dump.ts` wrote
 
 ## Files
 
-- `recovery-tables.ts`: the type `RecoveryTables` (sizes, the tokenizer's next state and event per cell, the grammar's next state and stack action per cell, the fixed tables, the masks of open cells). `asIsTables()` returns today's tables. `checkTables`, `saveTables` and `loadTables` (JSON), `lexerCellName` and `grammarCellName`, `differencesOf` for the cells in which two tables differ, `addStates` for tables with more tokenizer states and grammar states, `addClasses` for tables with more classes, `openDisplayEntries` for tables whose display table may change, `randomizeOpenCells`.
+- `recovery-tables.ts`: the type `RecoveryTables` (sizes, the tokenizer's next state and event per cell, the grammar's next state and stack action per cell, the fixed tables, the masks of open cells). `asIsTables()` returns today's tables. `checkTables`, `saveTables` and `loadTables` (JSON), `lexerCellName` and `grammarCellName`, `differencesOf` for the cells in which two tables differ, `addStates` for tables with more tokenizer states and grammar states, `addClasses` for tables with more classes, `openDisplayEntries` for tables whose display table may change, `addFirstOnLineBit` for tables whose grammar reads whether a token is the first on its line, `randomizeOpenCells`.
 - `recovery-parser.ts`: `runRecoveryParser`, and `runRecoveryParserInto` for loops, which allocates nothing and does not check the tables.
 - `intended.ts`: `intendedOf(sample)`, the intended states and the mark of the ones that can be followed.
 - `data.ts`: `loadSamples(seed, from, to)` holds the samples in typed arrays: code points, labels, flags, intended states, and per sample the split, the kinds, the families, reachable, needsClass, debatable, heldOut and the source. `standardRange` is seed 20261015, samples 0 to 59,999. `trainPart`, `validationPart` and `testPart` return the parts. The cache folder comes from `RECOVERY_SCRATCH`, and passing `null` as the cache folder makes the samples without a cache.

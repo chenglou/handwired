@@ -28,8 +28,8 @@ export type AddedClass = {name: string, codePoints: readonly number[]}
 
 export type RecoveryTables = {
   // Sizes. Today there are 33 classes, 26 tokenizer states, 25 events, 11 tokens, 8 contexts and 8 grammar states.
-  // Tables may have more tokenizer states and more grammar states, see addStates, and more classes, see addClasses.
-  // The other sizes are fixed.
+  // Tables may have more tokenizer states and more grammar states, see addStates, more classes, see addClasses, and
+  // 16 contexts, see addFirstOnLineBit. The other sizes are fixed.
   classCount: number
   lexerStateCount: number
   eventCount: number
@@ -60,7 +60,9 @@ export type RecoveryTables = {
   lexerNext: Uint8Array
   lexerEvent: Uint8Array
   lexerOpen: Uint8Array
-  // The grammar's cells, [(grammar state × tokenCount + token) × contextCount + context]: the next grammar state, the
+  // The grammar's cells, [(grammar state × tokenCount + token) × contextCount + context]. A context is depth class × 2
+  // + [the innermost open container is an object], and with 16 contexts, + 8 when the token is the first on its line.
+  // Per cell: the next grammar state, the
   // stack action, and 1 where the cell is open.
   grammarNext: Uint8Array
   grammarAction: Uint8Array
@@ -175,18 +177,26 @@ function classesWith(addedClasses: readonly AddedClass[]) {
 // A step without an error also reads an entry of the display table, (event, grammar state after), so the search
 // finds the frozen entries of that table too. E.g. (literalStart, commaOrClose) is what the t of [true] reads, and no
 // step without an error reads (literalStart, colon), since valid JSON has no literal as a key.
+//
+// With `firstOnLine`, the grammar's cells have 16 contexts, and a configuration also holds the bit "the next token is
+// the first on its line", which a line feed sets and the first token after it clears. E.g. the cell (value, string)
+// with the bit is read by valid JSON whose value starts its own line, so it is frozen.
 const kindCount = 3
 const classEnd = classNames.indexOf('end')
-function searchFrozenCells(classToday: Uint8Array) {
+const classLineFeed = classNames.indexOf('lineFeed')
+const tokenNone = tokenNames.indexOf('none')
+function searchFrozenCells(classToday: Uint8Array, firstOnLine: boolean) {
   const classes = classToday.length
-  const configurationOf = (lexerState: number, grammarState: number, depth: number, kind: number) =>
-    ((lexerState * grammarStateCount + grammarState) * (maximumDepth + 1) + depth) * kindCount + kind
+  const contexts = firstOnLine ? 2 * contextCount : contextCount
+  const bitCount = firstOnLine ? 2 : 1
+  const configurationOf = (lexerState: number, grammarState: number, depth: number, kind: number, bit: number) =>
+    (((lexerState * grammarStateCount + grammarState) * (maximumDepth + 1) + depth) * kindCount + kind) * bitCount + bit
   // For every configuration the search reached: the configuration it came from and the class that led to it. -2
   // where the search did not reach, -1 at the start.
-  const cameFrom = new Int32Array(lexerStateCount * grammarStateCount * (maximumDepth + 1) * kindCount).fill(-2)
+  const cameFrom = new Int32Array(lexerStateCount * grammarStateCount * (maximumDepth + 1) * kindCount * bitCount).fill(-2)
   const cameByClass = new Uint8Array(cameFrom.length)
   const lexerFrozen = new Uint8Array(lexerStateCount * classes)
-  const grammarFrozen = new Uint8Array(grammarStateCount * tokenCount * contextCount)
+  const grammarFrozen = new Uint8Array(grammarStateCount * tokenCount * contexts)
   const displayFrozen = new Uint8Array(eventCount * grammarStateCount)
   // For every frozen cell: a configuration from which a class reads the cell without an error, and that class.
   const lexerReadFrom = new Int32Array(lexerFrozen.length).fill(-1)
@@ -194,7 +204,7 @@ function searchFrozenCells(classToday: Uint8Array) {
   const grammarReadByClass = new Uint8Array(grammarFrozen.length)
   const displayReadFrom = new Int32Array(displayFrozen.length).fill(-1)
   const displayReadByClass = new Uint8Array(displayFrozen.length)
-  const queue = [configurationOf(0, 0, 0, containerNone)]
+  const queue = [configurationOf(0, 0, 0, containerNone, 0)]
   cameFrom[queue[0]!] = -1
   // The steps that end in a guessed kind: the configuration before, the class, and the configuration after.
   const guesses: [from: number, characterClass: number, to: number][] = []
@@ -208,20 +218,22 @@ function searchFrozenCells(classToday: Uint8Array) {
   }
   for (let head = 0; head < queue.length; head++) {
     const configuration = queue[head]!
-    const kind = configuration % kindCount
-    const depth = Math.floor(configuration / kindCount) % (maximumDepth + 1)
-    const grammarState = Math.floor(configuration / (kindCount * (maximumDepth + 1))) % grammarStateCount
-    const lexerState = Math.floor(configuration / (kindCount * (maximumDepth + 1) * grammarStateCount))
+    const bit = configuration % bitCount
+    const withoutBit = Math.floor(configuration / bitCount)
+    const kind = withoutBit % kindCount
+    const depth = Math.floor(withoutBit / kindCount) % (maximumDepth + 1)
+    const grammarState = Math.floor(withoutBit / (kindCount * (maximumDepth + 1))) % grammarStateCount
+    const lexerState = Math.floor(withoutBit / (kindCount * (maximumDepth + 1) * grammarStateCount))
     for (let characterClass = 0; characterClass < classes; characterClass++) {
       const lexerCellToday = lexerState * classCount + classToday[characterClass]!
       const event = today.lexerEvent[lexerCellToday]!
       const token = today.tokenOfEvent[event]!
-      const context = today.depthClass[depth]! * 2 + Number(kind === containerObject)
-      const grammarCell = (grammarState * tokenCount + token) * contextCount + context
-      const grammarAfter = today.grammarNext[grammarCell]!
+      const contextToday = today.depthClass[depth]! * 2 + Number(kind === containerObject)
+      const grammarAfter = today.grammarNext[(grammarState * tokenCount + token) * contextCount + contextToday]!
       // A step into the error state is a first error. It freezes nothing.
       if (grammarAfter === errorState) continue
       const lexerCell = lexerState * classes + characterClass
+      const grammarCell = (grammarState * tokenCount + token) * contexts + contextToday + bit * contextCount
       if (lexerFrozen[lexerCell] === 0) {
         lexerFrozen[lexerCell] = 1
         lexerReadFrom[lexerCell] = configuration
@@ -245,11 +257,13 @@ function searchFrozenCells(classToday: Uint8Array) {
       const depthAfter = depth + (action === actionPushObject || action === actionPushArray ? 1 : action === actionPop ? -1 : 0)
       if (depthAfter < 0 || depthAfter > maximumDepth) throw new Error('a step without an error left the depths 0 to 16')
       const lexerAfter = today.lexerNext[lexerCellToday]!
+      // A line feed sets the bit, and any other code point with a token clears it.
+      const bitAfter = !firstOnLine ? 0 : characterClass === classLineFeed ? 1 : token === tokenNone ? bit : 0
       if (action === actionPop && depthAfter > 0) {
-        guesses.push([configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, containerObject)], [configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, containerArray)])
+        guesses.push([configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, containerObject, bitAfter)], [configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, containerArray, bitAfter)])
       } else {
         const kindAfter = action === actionPushObject ? containerObject : action === actionPushArray ? containerArray : action === actionPop ? containerNone : kind
-        reach(configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, kindAfter))
+        reach(configuration, characterClass, configurationOf(lexerAfter, grammarAfter, depthAfter, kindAfter, bitAfter))
       }
     }
     // Every step without a guess is used up: go on from the guessed configurations that are still not reached.
@@ -271,40 +285,41 @@ function searchFrozenCells(classToday: Uint8Array) {
   }
 }
 
-// The search's result for the classes of some tables, made once per list of classes. `lexerFrozen`, `grammarFrozen`
-// and `displayFrozen` hold 1 per frozen cell or entry of today's states. `lexerWitness(cell)`, `grammarWitness(cell)`
+// The search's result for the classes and the contexts of some tables, made once per list of classes, with the bit
+// and without. `lexerFrozen`, `grammarFrozen` and `displayFrozen` hold 1 per frozen cell or entry of today's states. `lexerWitness(cell)`, `grammarWitness(cell)`
 // and `displayWitness(entry)` give, for a frozen one, the classes of a text whose last class makes the parser read
 // it, with no error up to and including that step, and `undefined` for one that the search did not find. When the
 // last class is `end`, the text ends before it. `reachedByGuessAlone` is how many configurations the search reached
 // only by guessing the kind of a container.
 const frozenSearches = new Map<string, ReturnType<typeof searchFrozenCells>>()
-export function frozenSearchOf(tables: {classToday: Uint8Array}) {
-  const key = tables.classToday.join(',')
+export function frozenSearchOf(tables: {classToday: Uint8Array, contextCount: number}) {
+  const key = `${tables.classToday.join(',')} ${tables.contextCount}`
   let search = frozenSearches.get(key)
   if (search === undefined) {
-    search = searchFrozenCells(tables.classToday)
+    search = searchFrozenCells(tables.classToday, tables.contextCount > contextCount)
     frozenSearches.set(key, search)
   }
   return search
 }
 
-// What tables can have besides today's classes and today's fixed display table, as far as the masks of open cells
-// depend on it: the class of today's for every class, and whether the display table has open entries.
-type AddedStructure = {classToday: Uint8Array, openDisplay: boolean}
-const structureOf = (tables: RecoveryTables): AddedStructure => ({classToday: tables.classToday, openDisplay: tables.displayOpen.includes(1)})
+// What tables can have besides today's classes, today's 8 contexts and today's fixed display table, as far as the
+// masks of open cells depend on it: the class of today's for every class, the number of contexts, and whether the
+// display table has open entries.
+type AddedStructure = {classToday: Uint8Array, contextCount: number, openDisplay: boolean}
+const structureOf = (tables: RecoveryTables): AddedStructure => ({classToday: tables.classToday, contextCount: tables.contextCount, openDisplay: tables.displayOpen.includes(1)})
 
 // The masks of open cells for tables with the given numbers of states: today's cells as the search found them, and
 // every cell of an added state, since only an open cell can lead into an added state. Without `added`, the masks of
-// tables with today's classes and no open entry of the display table.
+// tables with today's classes, today's contexts and no open entry of the display table.
 //
 // With `added.openDisplay`, an entry of the display table is open when the search did not find it, and so is every
 // entry of an added grammar state. The rows of the three events of a text's end stay as they are, in every column:
 // they are what the cells after a text read, and `pastEnd` is no choice of an open entry.
-export function openMasks(lexerStates: number, grammarStates: number, added: AddedStructure = {classToday: todaysClasses, openDisplay: false}) {
+export function openMasks(lexerStates: number, grammarStates: number, added: AddedStructure = {classToday: todaysClasses, contextCount, openDisplay: false}) {
   const search = frozenSearchOf(added)
   const lexerOpen = new Uint8Array(lexerStates * added.classToday.length).fill(1)
   for (let cell = 0; cell < search.lexerFrozen.length; cell++) lexerOpen[cell] = 1 - search.lexerFrozen[cell]!
-  const grammarOpen = new Uint8Array(grammarStates * tokenCount * contextCount).fill(1)
+  const grammarOpen = new Uint8Array(grammarStates * tokenCount * added.contextCount).fill(1)
   for (let cell = 0; cell < search.grammarFrozen.length; cell++) grammarOpen[cell] = 1 - search.grammarFrozen[cell]!
   const displayOpen = new Uint8Array(eventCount * grammarStates)
   if (added.openDisplay) {
@@ -371,6 +386,29 @@ export function addClasses(tables: RecoveryTables, classes: readonly AddedClass[
   return {
     ...copyTables(tables), classCount: classesAfter, addedClasses, classToday, classOfCodePoint, lexerNext, lexerEvent,
     lexerOpen: openMasks(tables.lexerStateCount, tables.grammarStateCount, {...structureOf(tables), classToday}).lexerOpen,
+  }
+}
+
+// A copy of `tables` in which the grammar also reads the bit "the token is the first on its line". A line feed sets
+// the bit, and the first code point after it whose token is not `none` reads it and clears it. E.g. in
+//   "version":⏎  "license": "MIT"
+// the quote of "license" reads its grammar cell with the bit, and the quote of "MIT" without. The contexts double
+// from 8 to 16: context + 8 is the context with the bit. A cell with the bit starts as a copy of the cell without, so
+// the copy reads every text as `tables` do, until a cell with the bit is changed. Which cells with the bit are open
+// comes from the search for frozen cells, run over the bit too, see searchFrozenCells.
+export function addFirstOnLineBit(tables: RecoveryTables): RecoveryTables {
+  if (tables.contextCount !== contextCount) throw new Error('these tables have the bit "first on its line" already')
+  const contexts = 2 * contextCount
+  const grammarNext = new Uint8Array(tables.grammarStateCount * tables.tokenCount * contexts)
+  const grammarAction = new Uint8Array(grammarNext.length)
+  for (let cell = 0; cell < grammarNext.length; cell++) {
+    const from = Math.floor(cell / contexts) * contextCount + cell % contextCount
+    grammarNext[cell] = tables.grammarNext[from]!
+    grammarAction[cell] = tables.grammarAction[from]!
+  }
+  return {
+    ...copyTables(tables), contextCount: contexts, grammarNext, grammarAction,
+    grammarOpen: openMasks(tables.lexerStateCount, tables.grammarStateCount, {...structureOf(tables), contextCount: contexts}).grammarOpen,
   }
 }
 
@@ -455,8 +493,9 @@ const sameArray = (left: ArrayLike<number>, right: ArrayLike<number>) => {
 // an event, an action or a display kind that exists.
 export function problemsOf(tables: RecoveryTables): string[] {
   const problems: string[] = []
-  const fixedSizes = [['classCount', tables.classCount, classCount + tables.addedClasses.length], ['eventCount', tables.eventCount, eventCount], ['tokenCount', tables.tokenCount, tokenCount], ['contextCount', tables.contextCount, contextCount], ['errorState', tables.errorState, errorState]] as const
+  const fixedSizes = [['classCount', tables.classCount, classCount + tables.addedClasses.length], ['eventCount', tables.eventCount, eventCount], ['tokenCount', tables.tokenCount, tokenCount], ['errorState', tables.errorState, errorState]] as const
   for (const [name, actual, expected] of fixedSizes) if (actual !== expected) problems.push(`${name} is ${actual}, and has to be ${expected}`)
+  if (tables.contextCount !== contextCount && tables.contextCount !== 2 * contextCount) problems.push(`contextCount is ${tables.contextCount}, and has to be ${contextCount}, or ${2 * contextCount} with the bit "first on its line"`)
   if (tables.lexerStateCount < lexerStateCount || tables.lexerStateCount > 255) problems.push(`lexerStateCount is ${tables.lexerStateCount}, and has to be from ${lexerStateCount} to 255`)
   if (tables.grammarStateCount < grammarStateCount || tables.grammarStateCount > 255) problems.push(`grammarStateCount is ${tables.grammarStateCount}, and has to be from ${grammarStateCount} to 255`)
   if (problems.length > 0) return problems
@@ -470,7 +509,7 @@ export function problemsOf(tables: RecoveryTables): string[] {
   if (!sameArray(tables.classToday, classes.classToday)) problems.push('classToday is not what the added classes give')
   if (problems.length > 0) return problems
   const lexerCells = tables.lexerStateCount * tables.classCount
-  const grammarCells = tables.grammarStateCount * tokenCount * contextCount
+  const grammarCells = tables.grammarStateCount * tokenCount * tables.contextCount
   const displayEntries = eventCount * tables.grammarStateCount
   const lengths = [['lexerNext', tables.lexerNext.length, lexerCells], ['lexerEvent', tables.lexerEvent.length, lexerCells], ['lexerOpen', tables.lexerOpen.length, lexerCells], ['grammarNext', tables.grammarNext.length, grammarCells], ['grammarAction', tables.grammarAction.length, grammarCells], ['grammarOpen', tables.grammarOpen.length, grammarCells], ['display', tables.display.length, displayEntries], ['displayOpen', tables.displayOpen.length, displayEntries]] as const
   for (const [name, actual, expected] of lengths) if (actual !== expected) problems.push(`${name} has ${actual} entries, and has to have ${expected}`)
@@ -505,7 +544,9 @@ export function problemsOf(tables: RecoveryTables): string[] {
   }
   for (let cell = 0; cell < grammarCells; cell++) {
     if (masks.grammarOpen[cell] === 0) {
-      if (tables.grammarNext[cell] !== today.grammarNext[cell] || tables.grammarAction[cell] !== actionByToken) problems.push(`the frozen grammar cell ${grammarCellName(tables, cell)} holds ${grammarChoiceName(tables, cell)}`)
+      // A frozen cell with the bit "first on its line" holds what today's cell of the same context without the bit holds.
+      const cellToday = Math.floor(cell / tables.contextCount) * contextCount + cell % contextCount
+      if (tables.grammarNext[cell] !== today.grammarNext[cellToday] || tables.grammarAction[cell] !== actionByToken) problems.push(`the frozen grammar cell ${grammarCellName(tables, cell)} holds ${grammarChoiceName(tables, cell)}`)
     } else if (tables.grammarNext[cell]! >= tables.grammarStateCount || tables.grammarAction[cell]! >= actionCount) {
       problems.push(`the grammar cell ${grammarCellName(tables, cell)} holds the state ${tables.grammarNext[cell]} and the action ${tables.grammarAction[cell]}`)
     }
@@ -535,11 +576,13 @@ export const className = (tables: RecoveryTables, characterClass: number) => cla
 export function lexerCellName(tables: RecoveryTables, cell: number) {
   return `(${lexerStateName(Math.floor(cell / tables.classCount))}, ${className(tables, cell % tables.classCount)})`
 }
+// The name of a context, e.g. "depth 1, object", or "depth 1, object, first on its line" for a context with the bit.
+export const contextName = (context: number) => `${contextNames[context % contextCount]}${context >= contextCount ? ', first on its line' : ''}`
 // The name of a grammar cell, e.g. "(commaOrClose, string, depth 1, object)".
 export function grammarCellName(tables: RecoveryTables, cell: number) {
   const state = Math.floor(cell / (tables.tokenCount * tables.contextCount))
   const token = Math.floor(cell / tables.contextCount) % tables.tokenCount
-  return `(${grammarStateName(state)}, ${tokenNames[token]}, ${contextNames[cell % tables.contextCount]})`
+  return `(${grammarStateName(state)}, ${tokenNames[token]}, ${contextName(cell % tables.contextCount)})`
 }
 // What a cell holds, e.g. "string, stringStart" for a tokenizer cell and "commaOrClose, by token" for a grammar cell.
 export const lexerChoiceName = (tables: RecoveryTables, cell: number) => `${lexerStateName(tables.lexerNext[cell]!)}, ${eventNames[tables.lexerEvent[cell]!] ?? `event ${tables.lexerEvent[cell]}`}`
@@ -564,24 +607,27 @@ export type CellDifference = {
   after: string
 }
 
-// `tables` with the classes of `like`, which may have added classes that `tables` do not have, e.g. today's tables
-// next to tables with a class for the apostrophe. The cells of a missing class are copies, see addClasses.
-function withClassesOf(tables: RecoveryTables, like: RecoveryTables): RecoveryTables {
+// `tables` with the classes and the contexts of `like`, which may have added classes and the bit "first on its line"
+// where `tables` do not, e.g. today's tables next to tables with a class for the apostrophe. The cells of a missing
+// class and of the contexts with the bit are copies, see addClasses and addFirstOnLineBit.
+function inLayoutOf(tables: RecoveryTables, like: RecoveryTables): RecoveryTables {
   const sameClass = (left: AddedClass | undefined, right: AddedClass) => left !== undefined && left.name === right.name && sameArray(left.codePoints, right.codePoints)
   const shared = tables.addedClasses.length
-  if (shared > like.addedClasses.length || !tables.addedClasses.every((added, index) => sameClass(like.addedClasses[index], added))) {
-    throw new Error('two tables can only be compared when the added classes of the first are the first added classes of the second')
+  if (shared > like.addedClasses.length || !tables.addedClasses.every((added, index) => sameClass(like.addedClasses[index], added)) || tables.contextCount > like.contextCount) {
+    throw new Error('two tables can only be compared when the second have what was added to the first: its added classes as their first added classes, and the bit "first on its line" when the first have it')
   }
-  return shared === like.addedClasses.length ? tables : addClasses(tables, like.addedClasses.slice(shared))
+  const withClasses = shared === like.addedClasses.length ? tables : addClasses(tables, like.addedClasses.slice(shared))
+  return withClasses.contextCount === like.contextCount ? withClasses : addFirstOnLineBit(withClasses)
 }
 
 // The cells in which two tables differ, tokenizer cells first, then grammar cells, then entries of the display table,
-// which the list names like cells. When the second tables have added classes that the
-// first do not have, the first are compared as addClasses makes them: a cell of an added class with the cell of the
-// class that its code points came from. So differencesOf(asIsTables(), tables) lists the cells of `tables` that do
-// something else than today's parser.
+// which the list names like cells. When the second tables have added classes or the bit
+// "first on its line" and the first do not, the first are compared as addClasses and addFirstOnLineBit make them: a
+// cell of an added class with the cell of the class that its code points came from, and a cell with the bit with the
+// cell without. So differencesOf(asIsTables(), tables) lists the cells of `tables` that do something else than
+// today's parser.
 export function differencesOf(beforeAsGiven: RecoveryTables, after: RecoveryTables): CellDifference[] {
-  const before = withClassesOf(beforeAsGiven, after)
+  const before = inLayoutOf(beforeAsGiven, after)
   const differences: CellDifference[] = []
   const wider = (left: RecoveryTables, right: RecoveryTables, cells: (tables: RecoveryTables) => Uint8Array) => cells(left).length >= cells(right).length ? left : right
   const lexerTables = wider(before, after, tables => tables.lexerNext)

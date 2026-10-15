@@ -13,8 +13,9 @@
 // twice: with a range that holds every depth the exact parser reaches in that run, where every position has to be
 // equal, and with the range that training uses, -8 to 24, where the check counts the runs that leave the range.
 //
-// The same comparison runs for tables with added structure, see ../structure/README.md: with added classes, and
-// with open entries of the display table, with today's choices in every cell and with random settings.
+// The same comparison runs for tables with added structure, see ../structure/README.md: with added classes, with
+// open entries of the display table, with the bit "first on its line", and with all three, each with today's choices
+// in every cell and with random settings. The context that the comparison checks at every position holds the bit.
 //
 // It also checks the intended stacks of twin-data.ts against the exact parser on the originals of the first 2,000
 // samples that are not in the test split.
@@ -23,7 +24,7 @@ import {defaultSeed, sampleAt} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
 import {type RecoveryTrace, containerObject, createTrace, positionCount, runRecoveryParser, runRecoveryParserInto} from '../recovery-parser.ts'
-import {type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from '../recovery-tables.ts'
+import {type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from '../recovery-tables.ts'
 import {intendedObjectsOf, packForTwin, placesForTwin} from './twin-data.ts'
 import {type TwinData, type TwinRunner, createCellArrays, createTally, createTwinRunner, defaultDepthHigh, defaultDepthLow, exactMixesInto, shapeOf} from './twin.ts'
 
@@ -183,6 +184,8 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
   const variants: {name: string, make: () => RecoveryTables}[] = [
     {name: `${classesOfTheChecks.length} added classes`, make: () => addClasses(asIsTables(), classesOfTheChecks)},
     {name: 'open entries of the display table', make: () => openDisplayEntries(asIsTables())},
+    {name: 'the bit "first on its line"', make: () => addFirstOnLineBit(asIsTables())},
+    {name: 'all three', make: () => addFirstOnLineBit(openDisplayEntries(addClasses(asIsTables(), classesOfTheChecks)))},
   ]
   for (const variant of variants) {
     const data = packForTwin(samples, places, undefined, variant.make())

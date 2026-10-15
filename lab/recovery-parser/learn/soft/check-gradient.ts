@@ -6,8 +6,8 @@
 // Every open cell is trainable and its weights are random, so every mix is a random mix. For each setting of the
 // options below, the backward pass gives the gradient of the objective by every weight. The last settings run tables
 // with added structure, see ../structure/README.md: with added classes, two added tokenizer states, an added
-// grammar state and open entries of the display table, whose mixes are a fifth group of weights, on samples of
-// which half need a class. The check compares the gradient with
+// grammar state, open entries of the display table, whose mixes are a fifth group of weights, and the bit "first on
+// its line", on samples of which half need a class. The check compares the gradient with
 // central differences of the fourth order, (-f(2h) + 8 f(h) - 8 f(-h) + f(-2h)) / 12h, in two ways per group of weights:
 //
 // - Along random directions: every trainable weight of the group moves by +h or -h at once, and the difference is
@@ -25,7 +25,7 @@ import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
-import {type RecoveryTables, addClasses, addStates, asIsTables, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
+import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective, trainableOf} from './twin.ts'
 
@@ -61,8 +61,8 @@ const todays = setupOf(asIsTables(), [...short.slice(0, sampleCount - 2), ...lon
 // With added structure, half of the short samples are ones that need a class, so that the cells of the added classes
 // are read.
 const needsClass = short.filter(place => samples.needsClass[place] === 1).slice(0, Math.floor((sampleCount - 2) / 2))
-const added = `${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state and open entries of the display table`
-const withStructure = setupOf(openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 2, [grammarStateNames.indexOf('colon')])), [...needsClass, ...short.filter(place => samples.needsClass[place] === 0).slice(0, sampleCount - 2 - needsClass.length), ...long])
+const added = `${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit "first on its line"`
+const withStructure = setupOf(addFirstOnLineBit(openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 2, [grammarStateNames.indexOf('colon')]))), [...needsClass, ...short.filter(place => samples.needsClass[place] === 0).slice(0, sampleCount - 2 - needsClass.length), ...long])
 
 type Setting = {name: string, setup: ReturnType<typeof setupOf>, added: boolean, options: ObjectiveOptions, depthLow: number, depthHigh: number, weightScale: number}
 const everyOption: ObjectiveOptions = {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.3, onTrackSeed: 7, temperature: 0.7, sharpnessCost: 0.05}
@@ -77,6 +77,7 @@ const settings: Setting[] = [
     options: {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.4, onTrackSeed: 13, intendedEverywhere: true}},
   {name: `${added}: the three label losses alone`, setup: withStructure, added: true, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
   {name: `${added}: every option on`, setup: withStructure, added: true, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
+  {name: `${added}: sharp mixes, on track with probability 0.5, a narrow depth range`, setup: withStructure, added: true, depthLow: -1, depthHigh: 17, weightScale: 6, options: {onTrackProbability: 0.5, onTrackSeed: 11, sharpnessCost: 0.2}},
 ]
 
 // A normal random number from two uniform ones.

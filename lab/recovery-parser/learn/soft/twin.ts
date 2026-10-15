@@ -2,7 +2,8 @@
 // possibility instead of one index, and every table cell as a mix over its choices instead of one choice.
 //
 // - The tokenizer state is 26 shares, the grammar state 8, the depth one share per depth of a range, and every level
-//   1 to 16 of the stack holds the share of "this level is an object".
+//   1 to 16 of the stack holds the share of "this level is an object". With tables of 16 contexts, one more share is
+//   the bit "the token is the first on its line".
 // - A cell holds a mix: a share per choice. A tokenizer cell has a mix over its next state and a mix over its event. A
 //   grammar cell has a mix over its next state and a mix over its stack action. A cell that is not trained holds its
 //   one choice as exact 0 and 1. An open entry of the display table holds a mix over the display kinds, and every
@@ -19,12 +20,20 @@
 // README.md of this folder says where treating the parts of the state as independent loses information.
 import {createRandom} from '../../random.ts'
 import {capacity, containerArray, containerNone, containerObject, maximumDepth, positionCount} from '../recovery-parser.ts'
-import {type RecoveryTables, actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, copyTables, displayKindCount, displayKindNames, today} from '../recovery-tables.ts'
+import {
+  type RecoveryTables, actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, classNames, copyTables, displayKindCount, displayKindNames, today, tokenNames,
+} from '../recovery-tables.ts'
 
 // The bits of TwinData.flags, as in data.ts.
 const codePointLabeled = 1
 const codePointKindScored = 2
 const codePointCanFollow = 8
+
+const classLineFeed = classNames.indexOf('lineFeed')
+const tokenNone = tokenNames.indexOf('none')
+// The contexts of tables without the bit "first on its line": 8. With the bit there are 16, and context + 8 is the
+// context of a token that is the first on its line.
+const contextsWithoutBit = today.contextCount
 
 // The sizes and the fixed tables of a set of tables, which is all a step needs besides the cells' mixes.
 export type TwinShape = {
@@ -47,7 +56,7 @@ export type TwinShape = {
 }
 
 export function shapeOf(tables: RecoveryTables): TwinShape {
-  if (tables.contextCount !== 8) throw new Error(`the twin is written for 8 contexts, and these tables have ${tables.contextCount}`)
+  if (tables.contextCount !== contextsWithoutBit && tables.contextCount !== 2 * contextsWithoutBit) throw new Error(`the twin is written for ${contextsWithoutBit} contexts, or ${2 * contextsWithoutBit} with the bit "first on its line", and these tables have ${tables.contextCount}`)
   return {
     classCount: tables.classCount, lexerStateCount: tables.lexerStateCount, eventCount: tables.eventCount, tokenCount: tables.tokenCount,
     contextCount: tables.contextCount, grammarStateCount: tables.grammarStateCount, displayKindCount,
@@ -300,9 +309,11 @@ export function sharpnessOf(model: TwinModel, mixes: CellArrays) {
 // SharedArrayBuffers, so that worker threads read the same memory.
 export type TwinData = {
   sampleCount: number
-  // The number of classes of the tables that the samples were packed for, see packForTwin. A twin of tables with
-  // other classes would read other cells.
+  // The numbers of classes and of contexts of the tables that the samples were packed for, see packForTwin. A twin
+  // of tables with other classes would read other cells, and one with the bit "first on its line" needs the bit at
+  // the first error.
   classCount: number
+  contextCount: number
   // The sample's index in the dataset, e.g. for the random draws of one sample.
   index: Int32Array
   // The code points of sample s are the entries start[s] to start[s + 1] - 1 of the arrays per code point.
@@ -310,11 +321,13 @@ export type TwinData = {
   firstDamage: Int32Array
   // The position of the first error, where the twin starts, and the exact parser's state before that position: the
   // tokenizer state, the grammar state, the depth, and bit l - 1 of startObjects is 1 when level l is an object.
+  // startFirstOnLine is the bit "first on its line" there, 0 for tables without the bit.
   firstError: Int32Array
   startLexerState: Uint8Array
   startGrammarState: Uint8Array
   startDepth: Int8Array
   startObjects: Uint16Array
+  startFirstOnLine: Uint8Array
   // Per code point: its class, and the flags, labels and intended states of data.ts.
   classes: Uint8Array
   flags: Uint8Array
@@ -346,6 +359,8 @@ export type LossOptions = {
   // Keeping the run on track: after a code point with the mark codePointCanFollow, with this probability, the twin's
   // state is replaced by the intended state, i.e. the state of today's parser after the code point's counterpart in
   // the original. Gradients do not cross a replaced state. The default is 0. It needs TwinData.intendedObjects.
+  // The bit "first on its line" is not replaced: it follows from the line feeds of the broken text, and the bit of
+  // the original can be one that no parser of the broken text has, e.g. after a removed line feed.
   onTrackProbability?: number
   // True uses the intended states at every kept code point, with or without the mark, as the first version of the
   // twin did. It is only here to measure what the mark changes: a run that is put on a state that the parser cannot
@@ -409,6 +424,10 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   const grammarBefore = numbers(grammarStateCount)
   const depthBefore = numbers(depthCount)
   const objectsBefore = numbers(levelCount)
+  // With the bit "first on its line": the bit's share before and after each position.
+  const hasFirstOnLine = contextCount > contextsWithoutBit
+  const firstOnLineBefore = numbers(1)
+  const firstOnLineAfter = numbers(1)
   // What each step computes: the mixes of the event, the token, the context and the stack action (entries 1 to 4:
   // none, push an array, push an object, pop, and entry 0, `by token`, stays 0 since its share goes to what the token
   // does), the state after, and the mixes of the display kind and of the container after (none, object, array).
@@ -444,6 +463,9 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   let grammarGradientBefore = new Float64Array(grammarStateCount)
   let depthGradientBefore = new Float64Array(depthCount)
   let objectsGradientBefore = new Float64Array(levelCount)
+  // The gradient by the bit "first on its line": by the bit after the step before stepBackward, by the bit before the
+  // step after it.
+  const firstOnLineGradient = new Float64Array(1)
   const eventGradient = new Float64Array(eventCount)
   const kindGradient = new Float64Array(displayKindCount)
   const containerGradient = new Float64Array(3)
@@ -451,7 +473,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   const contextGradient = new Float64Array(contextCount)
   const actionGradient = new Float64Array(actionCount)
 
-  const depthClassCount = contextCount / 2
+  const depthClassCount = contextsWithoutBit / 2
   const classShare = new Float64Array(depthClassCount)
   const classObjectShare = new Float64Array(depthClassCount)
 
@@ -483,6 +505,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     for (let index = 0; index < depthCount; index++) depthBefore[depthBase + depthCount + index] = depthAfter[depthBase + index]!
     const objectsBase = position * levelCount
     for (let level = 0; level < levelCount; level++) objectsBefore[objectsBase + levelCount + level] = objectsAfter[objectsBase + level]!
+    firstOnLineBefore[position + 1] = firstOnLineAfter[position]!
   }
 
   // One step: from the state before `position` and the class of its code point to everything the step computes.
@@ -538,6 +561,18 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     for (let depthClass = 0; depthClass < depthClassCount; depthClass++) {
       contexts[contextBase + depthClass * 2] = classShare[depthClass]! - classObjectShare[depthClass]!
       contexts[contextBase + depthClass * 2 + 1] = classObjectShare[depthClass]!
+    }
+    // The bit "first on its line": its share of every context goes to the context with the bit, 8 further on. After
+    // the step the bit is 1 at a line feed, and otherwise the share before times the share of the token `none`, the
+    // one token that leaves the bit as it is.
+    if (hasFirstOnLine) {
+      const bit = firstOnLineBefore[position]!
+      for (let context = 0; context < contextsWithoutBit; context++) {
+        const withBit = contexts[contextBase + context]! * bit
+        contexts[contextBase + contextsWithoutBit + context] = withBit
+        contexts[contextBase + context]! -= withBit
+      }
+      firstOnLineAfter[position] = characterClass === classLineFeed ? 1 : bit * tokens[tokenBase + tokenNone]!
     }
 
     // The grammar: the next state's mix and the stack action's mix are the sums over (grammar state, token, context) of
@@ -790,6 +825,24 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       }
     }
 
+    // The bit "first on its line": back to the bit before the step, to the share of the token `none`, and from the
+    // contexts with and without the bit to the contexts before the bit split them.
+    if (hasFirstOnLine) {
+      const bit = firstOnLineBefore[position]!
+      let gradientByBit = 0
+      if (characterClass !== classLineFeed) {
+        gradientByBit = firstOnLineGradient[0]! * tokens[tokenBase + tokenNone]!
+        tokenGradient[tokenNone]! += firstOnLineGradient[0]! * bit
+      }
+      for (let context = 0; context < contextsWithoutBit; context++) {
+        const without = contextGradient[context]!
+        const difference = contextGradient[contextsWithoutBit + context]! - without
+        gradientByBit += difference * (contexts[contextBase + context]! + contexts[contextBase + contextsWithoutBit + context]!)
+        contextGradient[context] = without + difference * bit
+      }
+      firstOnLineGradient[0] = gradientByBit
+    }
+
     // The context.
     const readsObjects = position !== capacity
     for (let index = 0; index < depthCount; index++) {
@@ -836,11 +889,17 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     objectsGradientBefore = swap
   }
 
-  function clearStateGradients() {
+  // Clears the gradients by the state that a replaced state stands in for: everything but the bit "first on its
+  // line", which is not replaced.
+  function clearReplacedGradients() {
     lexerGradient.fill(0)
     grammarGradient.fill(0)
     depthGradient.fill(0)
     objectsGradient.fill(0)
+  }
+  function clearStateGradients() {
+    clearReplacedGradients()
+    firstOnLineGradient[0] = 0
   }
   function clearOutputGradients() {
     eventGradient.fill(0)
@@ -852,7 +911,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   // `end` given, e.g. 513 for the positions after the text too. Adds the sample's loss to `tally`, and with
   // `gradients`, the gradients of the loss by the cells' mixes to it. Neither is divided by the number of code points.
   function runSample(data: TwinData, place: number, options: LossOptions, tally: LossTally, gradients?: CellArrays, end?: number) {
-    if (data.classCount !== classCount) throw new Error(`the samples were packed for tables with ${data.classCount} classes, and the twin's tables have ${classCount}: give packForTwin the twin's tables`)
+    if (data.classCount !== classCount || data.contextCount !== contextCount) throw new Error(`the samples were packed for tables with ${data.classCount} classes and ${data.contextCount} contexts, and the twin's tables have ${classCount} and ${contextCount}: give packForTwin the twin's tables`)
     const start = data.start[place]!
     const length = data.start[place + 1]! - start
     const first = data.firstError[place]!
@@ -873,6 +932,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
 
     tally.samples++
     setStateBefore(first, data.startLexerState[place]!, data.startGrammarState[place]!, data.startDepth[place]!, data.startObjects[place]!)
+    firstOnLineBefore[first] = data.startFirstOnLine[place]!
     for (let position = first; position < stop; position++) {
       const inText = position < length
       const at = start + position
@@ -929,8 +989,12 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
         tally.replaced++
       }
       if (position + 1 < stop) {
-        if (replace) setStateBefore(position + 1, data.intendedLexerAfter[at]!, data.intendedGrammarAfter[at]!, data.labelDepth[at]!, data.intendedObjects[at]!)
-        else carry(position)
+        if (replace) {
+          setStateBefore(position + 1, data.intendedLexerAfter[at]!, data.intendedGrammarAfter[at]!, data.labelDepth[at]!, data.intendedObjects[at]!)
+          firstOnLineBefore[position + 1] = firstOnLineAfter[position]!
+        } else {
+          carry(position)
+        }
       }
     }
     if (gradients === undefined) return
@@ -938,8 +1002,8 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     clearStateGradients()
     for (let position = stop - 1; position >= first; position--) {
       clearOutputGradients()
-      // A replaced state is a constant: nothing after it depends on this step.
-      if (replaced[position] === 1) clearStateGradients()
+      // A replaced state is a constant: nothing after it depends on this step, but for the bit "first on its line".
+      if (replaced[position] === 1) clearReplacedGradients()
       const at = start + position
       if (position < length) {
         const flags = data.flags[at]!
@@ -971,9 +1035,9 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     setMixes(value: CellArrays) { mixes = value },
     setStateBefore, carry, stepForward, stepBackward, runSample, clearStateGradients, clearOutputGradients,
     // What the steps computed, [position × the array's width + entry].
-    lexerBefore, grammarBefore, depthBefore, objectsBefore, events, tokens, contexts, actions, lexerAfter, grammarAfter, depthAfter, objectsAfter, kinds, containers, replaced,
+    lexerBefore, grammarBefore, depthBefore, objectsBefore, firstOnLineBefore, events, tokens, contexts, actions, lexerAfter, grammarAfter, depthAfter, objectsAfter, firstOnLineAfter, kinds, containers, replaced,
     // The gradient arrays, which change places in stepBackward, so read them through these functions.
-    stateGradients: () => ({lexer: lexerGradient, grammar: grammarGradient, depth: depthGradient, objects: objectsGradient}),
+    stateGradients: () => ({lexer: lexerGradient, grammar: grammarGradient, depth: depthGradient, objects: objectsGradient, firstOnLine: firstOnLineGradient}),
     outputGradients: () => ({events: eventGradient, kinds: kindGradient, containers: containerGradient}),
   }
 }

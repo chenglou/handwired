@@ -9,17 +9,19 @@
 // b. For random settings of every open cell, some with added states, the ground rules hold on every text: (1) the
 //    same trace as today at every position before the first error, and at all 513 positions of a valid text, (2) the
 //    same `valid`, first error position and first error kind as today.
-// c. The same for tables with added structure, see structure/README.md: with added classes, and with open entries of
-//    the display table. With no cell changed, such tables give the trace of asIsTables() at every position of every
-//    text. With random settings of every open cell and every open entry, the ground rules hold. A trace of such
-//    tables is compared in today's terms, e.g. the class of an added class's code point as the class that the code
-//    point has today.
+// c. The same for tables with added structure, see structure/README.md: with added classes, with open entries of
+//    the display table, with the bit "first on its line", and with all three. With no cell changed, such tables give
+//    the trace of asIsTables() at every position of every text. With random settings of every open cell and every
+//    open entry, the ground rules hold. A trace of such tables is compared in today's terms: the class of an added
+//    class's code point as the class that the code point has today, and a context without the bit. The bit itself
+//    is compared, at every position of every run, with the bit that the check counts from the trace's line feeds and
+//    tokens.
 import {createRandom} from '../random.ts'
 import {defaultSeed, sampleAt} from '../samples.ts'
-import {type ParserTrace, grammarStateNames, positionCount, runTableParser} from '../table-parser.ts'
+import {type ParserTrace, classNames, grammarStateNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, addClasses, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from './recovery-tables.ts'
+import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells, today} from './recovery-tables.ts'
 
 const sampleCount = Number(process.argv[2] ?? 30_000)
 const settingCount = Number(process.argv[3] ?? 200)
@@ -150,10 +152,28 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
   const variants: {name: string, make: () => RecoveryTables}[] = [
     {name: `${classesOfTheChecks.length} added classes`, make: () => addClasses(asIsTables(), classesOfTheChecks)},
     {name: 'open entries of the display table', make: () => openDisplayEntries(asIsTables())},
+    {name: 'the bit "first on its line"', make: () => addFirstOnLineBit(asIsTables())},
+    {name: 'all three', make: () => addFirstOnLineBit(openDisplayEntries(addClasses(asIsTables(), classesOfTheChecks)))},
   ]
-  // Writes a trace in today's terms.
-  const inTodaysTerms = (trace: RecoveryTrace, tables: RecoveryTables) => {
-    for (let position = 0; position < positionCount; position++) trace.characterClass[position] = tables.classToday[trace.characterClass[position]!]!
+  // Writes a trace in today's terms, and returns at how many of the first `positions` positions the bit "first on its
+  // line" was set. Before that, the bit of every position's context has to be the one that the trace's own line
+  // feeds and tokens give: a line feed sets it, and any other code point whose token is not `none` clears it.
+  const lineFeed = classNames.indexOf('lineFeed')
+  const tokenNone = tokenNames.indexOf('none')
+  const inTodaysTerms = (name: string, trace: RecoveryTrace, tables: RecoveryTables, positions: number) => {
+    const hasBit = tables.contextCount > today.contextCount
+    let withBit = 0
+    let bit = 0
+    for (let position = 0; position < positionCount; position++) {
+      const bitOfContext = trace.context[position]! >= today.contextCount ? 1 : 0
+      if (bitOfContext !== (hasBit ? bit : 0)) fail(`${name}: the context at position ${position} ${bitOfContext === 1 ? 'has' : 'does not have'} the bit "first on its line", against the line feeds and tokens before it`)
+      if (trace.characterClass[position] === lineFeed) bit = 1
+      else if (trace.token[position] !== tokenNone) bit = 0
+      if (bitOfContext === 1 && position < positions) withBit++
+      trace.characterClass[position] = tables.classToday[trace.characterClass[position]!]!
+      trace.context[position] = trace.context[position]! % today.contextCount
+    }
+    return withBit
   }
   const everyField = [...fields, 'lexerStateAfter', 'action'] as const
   const trace = createTrace()
@@ -165,10 +185,11 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
     // With no cell changed.
     const unchanged = variant.make()
     checkTables(unchanged)
+    let codePointsWithBit = 0
     for (const {text, codePoints, truncated} of texts) {
       runRecoveryParserInto(plainTrace, codePoints, 0, codePoints.length, truncated, plain)
       runRecoveryParserInto(trace, codePoints, 0, codePoints.length, truncated, unchanged)
-      inTodaysTerms(trace, unchanged)
+      codePointsWithBit += inTodaysTerms(`${variant.name}, no cell changed`, trace, unchanged, codePoints.length)
       for (const field of everyField) {
         for (let position = 0; position < positionCount; position++) {
           if (trace[field][position] !== plainTrace[field][position]) fail(`${variant.name}, no cell changed: ${field} at position ${position} is ${trace[field][position]}, and without the structure ${plainTrace[field][position]} in ${JSON.stringify(text.slice(0, 80))}`)
@@ -185,7 +206,7 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
       checkTables(tables)
       for (const {text, codePoints, truncated, expected} of texts) {
         runRecoveryParserInto(trace, codePoints, 0, codePoints.length, truncated, tables)
-        inTodaysTerms(trace, tables)
+        inTodaysTerms(`${variant.name}, setting ${setting}`, trace, tables, 0)
         const before = expected.valid ? positionCount : expected.firstErrorPosition
         const difference = verdictDifference(trace, expected) ?? differenceBefore(trace, expected, before)
         if (difference !== undefined) fail(`${variant.name}, setting ${setting}: ${difference} in ${JSON.stringify(text.slice(0, 80))}`)
@@ -195,7 +216,7 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
         }
       }
     }
-    console.log(`   ${variant.name}: ${failures === failuresBefore ? `with no cell changed, every text has the trace of today's tables at all ${positionCount} positions. With ${settingsPerVariant} random settings of every open cell${unchanged.displayOpen.includes(1) ? ' and every open entry' : ''}, every run has today's trace before the first error, today's first error and today's \`valid\`` : 'see the failures above'}. From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.`)
+    console.log(`   ${variant.name}: ${failures === failuresBefore ? `with no cell changed, every text has the trace of today's tables at all ${positionCount} positions. With ${settingsPerVariant} random settings of every open cell${unchanged.displayOpen.includes(1) ? ' and every open entry' : ''}, every run has today's trace before the first error, today's first error and today's \`valid\`` : 'see the failures above'}. From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.${codePointsWithBit === 0 ? '' : ` With no cell changed, ${codePointsWithBit} code points of the texts read a context with the bit.`}`)
   }
 }
 

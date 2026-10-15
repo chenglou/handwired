@@ -11,8 +11,8 @@
 //    tables in those cells only.
 // 5. With onlyReadCells, the tables that train returns hold the base tables' choice in every cell that the exact
 //    parser reads at no code point of a trained text, and give the trained texts the trace of the snapped tables.
-// 6. The same parts for tables with added structure, see ../structure/README.md: added classes, added states and
-//    open entries of the display table. The gradients of 4 threads are one thread's, the snapped tables of a trained
+// 6. The same parts for tables with added structure, see ../structure/README.md: added classes, added states, open
+//    entries of the display table and the bit "first on its line". The gradients of 4 threads are one thread's, the snapped tables of a trained
 //    model keep the ground rules and are the same after saving and loading, and with onlyReadCells the returned
 //    tables give the trained texts the trace of the snapped ones.
 import {mkdirSync} from 'node:fs'
@@ -20,7 +20,7 @@ import {join} from 'node:path'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {addClasses, addStates, asIsTables, checkTables, differencesOf, grammarStateNames, loadTables, openDisplayEntries, saveTables, tablesToJson} from '../recovery-tables.ts'
+import {addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, differencesOf, grammarStateNames, loadTables, openDisplayEntries, saveTables, tablesToJson} from '../recovery-tables.ts'
 import {cellsReadAt, isRead, runOnSample} from '../score.ts'
 import {createBatchRunner, randomTrainableCells, train} from './train.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
@@ -165,7 +165,7 @@ const trained = createModel(base)
 
 // 6. Tables with added structure.
 {
-  const withStructure = openDisplayEntries(addStates(addClasses(base, classesOfTheChecks), 2, [grammarStateNames.indexOf('colon')]))
+  const withStructure = addFirstOnLineBit(openDisplayEntries(addStates(addClasses(base, classesOfTheChecks), 2, [grammarStateNames.indexOf('colon')])))
   const dataWithStructure = packForTwin(samples, trainPlaces, intendedObjects, withStructure)
   const model = createModel(withStructure, {start: 'uniform'})
   const options: LossOptions = {intendedGrammarWeight: 0.2, onTrackProbability: 0.2, onTrackSeed: 5}
@@ -192,7 +192,8 @@ const trained = createModel(base)
   const changed = differencesOf(withStructure, snapped)
   const count = (table: string) => changed.filter(difference => difference.table === table).length
   const ofAddedClasses = changed.filter(difference => difference.table === 'tokenizer' && difference.cell % snapped.classCount >= base.classCount).length
-  check(count('display') > 0 && ofAddedClasses > 0, `training changed ${count('display')} entries of the display table and ${ofAddedClasses} cells of added classes`)
+  const withBit = changed.filter(difference => difference.table === 'grammar' && difference.cell % snapped.contextCount >= base.contextCount).length
+  check(count('display') > 0 && ofAddedClasses > 0 && withBit > 0, `training changed ${count('display')} entries of the display table, ${ofAddedClasses} cells of added classes and ${withBit} cells with the bit`)
   const reloaded = tablesToJson(snapped, 'check-train.ts')
   let roundTrip = 'the same tables after writing them as JSON and reading them'
   const folder = softCacheFolderOf()
@@ -215,8 +216,8 @@ const trained = createModel(base)
     }
   }
   check(different === 0, `with added structure, ${different} code points of the trained texts have another trace with the returned tables than with the snapped ones`)
-  console.log(`6. With ${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state and open entries of the display table: 4 threads differ from one thread by at most ${largestDifference.toExponential(2)} on a largest gradient of ${largest.toExponential(2)}. `
-    + `The trained model's snapped tables differ from the base tables in ${count('tokenizer')} tokenizer cells, ${ofAddedClasses} of them of added classes, ${count('grammar')} grammar cells and ${count('display')} entries of the display table, keep the ground rules, and are ${roundTrip}. `
+  console.log(`6. With ${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit "first on its line": 4 threads differ from one thread by at most ${largestDifference.toExponential(2)} on a largest gradient of ${largest.toExponential(2)}. `
+    + `The trained model's snapped tables differ from the base tables in ${count('tokenizer')} tokenizer cells, ${ofAddedClasses} of them of added classes, ${count('grammar')} grammar cells, ${withBit} of them with the bit, and ${count('display')} entries of the display table, keep the ground rules, and are ${roundTrip}. `
     + `With onlyReadCells the returned tables differ from the base tables in ${differencesOf(withStructure, result.last).length} cells and give the trained texts the same cells and the same trace.`)
 }
 

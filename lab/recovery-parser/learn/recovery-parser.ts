@@ -3,6 +3,8 @@
 // in three ways:
 //
 // - A grammar cell holds a stack action next to its next state: by token, none, push an array, push an object, pop.
+// - With tables of 16 contexts, see addFirstOnLineBit, the grammar also reads the bit "the token is the first on its
+//   line": a line feed sets it, and the first code point after it whose token is not `none` reads it and clears it.
 // - The open containers are a real stack, one kind per open level. Today's parser keeps the kinds in a running sum,
 //   which is only right before the first error: a closing bracket of the wrong kind leaves the sum with the kind of
 //   a container that is no longer open, e.g. after the ] of {"a": [1}] . Before the first error the two are the same.
@@ -23,7 +25,10 @@
 // - Position 512, the end of a text of 512 code points or its 513th code point, reads the context of an array or of no
 //   container, even inside an object, as in the highlighter's program.
 import {capacity, containerArray, containerNone, containerObject, maximumDepth, positionCount} from '../table-parser.ts'
-import {type RecoveryTables, actionByToken, actionOfToken, actionPop, actionPushArray, actionPushObject, checkTables, today} from './recovery-tables.ts'
+import {type RecoveryTables, actionByToken, actionOfToken, actionPop, actionPushArray, actionPushObject, checkTables, classNames, today, tokenNames} from './recovery-tables.ts'
+
+const classLineFeed = classNames.indexOf('lineFeed')
+const tokenNone = tokenNames.indexOf('none')
 
 // What the parser computes at every position. Each array has 513 entries: 512 code points and the position after
 // them. Entries from the text's length on belong to cells after the text.
@@ -35,7 +40,8 @@ export type RecoveryTrace = {
   lexerStateAfter: Int16Array
   event: Int16Array
   token: Int16Array
-  // depth class × 2 + [the innermost open container before the code point is an object].
+  // depth class × 2 + [the innermost open container before the code point is an object], and + 8 when the tables have
+  // the bit "first on its line" and the bit is set before the code point.
   context: Int16Array
   grammarBefore: Int16Array
   grammarAfter: Int16Array
@@ -81,9 +87,12 @@ const kindAtLevel = new Uint8Array(maximumDepth + 1)
 export function runRecoveryParserInto(trace: RecoveryTrace, codePoints: ArrayLike<number>, start: number, length: number, truncated: boolean, tables: RecoveryTables, positions: number = positionCount) {
   const {classCount, tokenCount, contextCount, grammarStateCount, errorState, classToday, classOfCodePoint, tokenOfEvent, display, lexerNext, lexerEvent, grammarNext, grammarAction} = tables
   const lastClassEntry = classOfCodePoint.length - 1
+  // What the bit "first on its line" adds to a context: 8, or 0 for tables without the bit.
+  const firstOnLineContexts = contextCount - today.contextCount
   let lexerState = 0
   let grammarState = 0
   let depth = 0
+  let firstOnLine = 0
   let firstErrorPosition = -1
   let firstErrorKind = 0
   for (let position = 0; position < positions; position++) {
@@ -95,13 +104,15 @@ export function runRecoveryParserInto(trace: RecoveryTrace, codePoints: ArrayLik
     const token = tokenOfEvent[event]!
     const level = depth > maximumDepth ? maximumDepth : depth
     const inObject = level >= 1 && position !== capacity && kindAtLevel[level] === containerObject ? 1 : 0
-    const context = today.depthClass[level < 0 ? 0 : level]! * 2 + inObject
+    const contextToday = today.depthClass[level < 0 ? 0 : level]! * 2 + inObject
+    const context = contextToday + firstOnLine * firstOnLineContexts
     const grammarCell = (grammarState * tokenCount + token) * contextCount + context
     if (firstErrorPosition === -1) {
       // Today's step from the same state. Up to here every cell that was read is frozen, so the state is today's.
-      // Today's tables have no added class: they read the class that the code point has today.
+      // Today's tables have no added class and no bit: they read the class that the code point has today, and the
+      // context without the bit.
       const eventToday = today.lexerEvent[lexerState * today.classCount + classToday[characterClass]!]!
-      const grammarCellToday = (grammarState * tokenCount + today.tokenOfEvent[eventToday]!) * contextCount + context
+      const grammarCellToday = (grammarState * tokenCount + today.tokenOfEvent[eventToday]!) * today.contextCount + contextToday
       if (today.grammarNext[grammarCellToday] === errorState) {
         firstErrorPosition = position
         firstErrorKind = today.lexerErrorKind[eventToday]! + today.grammarError[grammarCellToday]!
@@ -116,6 +127,8 @@ export function runRecoveryParserInto(trace: RecoveryTrace, codePoints: ArrayLik
     } else if (action === actionPop) {
       depth--
     }
+    if (characterClass === classLineFeed) firstOnLine = 1
+    else if (token !== tokenNone) firstOnLine = 0
     trace.characterClass[position] = characterClass
     trace.lexerStateBefore[position] = lexerState
     trace.event[position] = event

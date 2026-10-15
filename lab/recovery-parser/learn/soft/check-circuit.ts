@@ -11,21 +11,28 @@
 // agree to the accuracy of 32-bit floats: the check allows a difference of 1e-4 times the larger of 1 and the value.
 //
 // Then the same for the step of tables with added structure, see ../structure/README.md: with added classes, an
-// added grammar state, and open entries of the display table, whose mixes are random too.
+// added grammar state, open entries of the display table, whose mixes are random too, and the bit "first on its
+// line", which is a random share. The first trial of that step is at a line feed, which sets the bit.
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {capacity, maximumDepth} from '../recovery-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {type RecoveryTables, actionCount, actionNone, addClasses, addStates, asIsTables, className, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
+import {type RecoveryTables, actionCount, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, className, classNames, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {buildStepCircuit} from './step-circuit.ts'
 import {createCellArrays, createTwinRunner, defaultDepthHigh, defaultDepthLow, groupNames, groupWidths, shapeOf} from './twin.ts'
 
 const trials = Number(process.argv[2] ?? 6)
 const tolerance = 1e-4
 let failures = 0
-const worst = {value: 0, gradient: 0}
+// The largest differences of the steps since the last summary line.
+let worst = {value: 0, gradient: 0}
+const summary = (steps: string) => {
+  console.log(`${steps}: the largest difference of a value is ${worst.value.toExponential(2)} and of a gradient ${worst.gradient.toExponential(2)}.`)
+  worst = {value: 0, gradient: 0}
+}
 
-function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, trialCount: number, seedOffset: number) {
+// `firstClass` is the class of the first trial's code point. The other trials, and all without it, draw a class.
+function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, trialCount: number, seedOffset: number, firstClass?: number) {
   const shape = shapeOf(tables)
   const widths = groupWidths(shape)
   const buildStarted = performance.now()
@@ -64,8 +71,11 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
     randomMix(sources.grammarBefore, shape.grammarStateCount)
     randomMix(sources.depthBefore, depthCount)
     for (let level = 0; level < maximumDepth; level++) sourceValues[sources.objectsBefore + level] = random.next()
-    const characterClass = random.integer(0, shape.classCount - 1)
+    const drawnClass = random.integer(0, shape.classCount - 1)
+    const characterClass = trial === 0 && firstClass !== undefined ? firstClass : drawnClass
     sourceValues[sources.characterClass + characterClass] = 1
+    const hasFirstOnLine = outputs.firstOnLineAfter.length > 0
+    if (hasFirstOnLine) sourceValues[sources.firstOnLineBefore] = random.next()
     for (const group of groups) {
       const cells = group === 'display' ? shape.displayEntries : group === 'lexerNext' || group === 'lexerEvent' ? shape.lexerCells : shape.grammarCells
       for (let cell = 0; cell < cells; cell++) randomMix(sources[group] + cell * widths[group], widths[group])
@@ -79,6 +89,7 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
     for (let state = 0; state < shape.grammarStateCount; state++) runner.grammarBefore[base.grammar + state] = sourceValues[sources.grammarBefore + state]!
     for (let index = 0; index < depthCount; index++) runner.depthBefore[base.depth + index] = sourceValues[sources.depthBefore + index]!
     for (let level = 1; level <= maximumDepth; level++) runner.objectsBefore[base.objects + level] = sourceValues[sources.objectsBefore + level - 1]!
+    if (hasFirstOnLine) runner.firstOnLineBefore[position] = sourceValues[sources.firstOnLineBefore]!
     runner.stepForward(position, characterClass)
 
     // Values.
@@ -102,6 +113,7 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
     outputs.actions.forEach((wire, entry) => compareValue(`stack action ${entry + actionNone}`, wire, runner.actions[base.action + entry + actionNone]!))
     outputs.depthAfter.forEach((wire, entry) => compareValue(`depth after ${entry}`, wire, runner.depthAfter[base.depth + entry]!))
     outputs.objectsAfter.forEach((wire, entry) => compareValue(`level ${entry + 1} after`, wire, runner.objectsAfter[base.objects + entry + 1]!))
+    outputs.firstOnLineAfter.forEach(wire => compareValue('the bit "first on its line" after', wire, runner.firstOnLineAfter[position]!))
     outputs.kinds.forEach((wire, entry) => compareValue(`display kind ${entry}`, wire, runner.kinds[base.kind + entry]!))
     outputs.containers.forEach((wire, entry) => compareValue(`container ${entry}`, wire, runner.containers[base.container + entry]!))
 
@@ -123,6 +135,7 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
     outputs.grammarAfter.forEach((wire, entry) => { stateSeeds.grammar[entry] = seed(wire) })
     outputs.depthAfter.forEach((wire, entry) => { stateSeeds.depth[entry] = seed(wire) })
     outputs.objectsAfter.forEach((wire, entry) => { stateSeeds.objects[entry + 1] = seed(wire) })
+    outputs.firstOnLineAfter.forEach(wire => { stateSeeds.firstOnLine[0] = seed(wire) })
     gradients.all.fill(0)
     runner.stepBackward(position, characterClass, gradients)
     const circuitGradients = circuit.backpropagateReference(values, seeds)
@@ -148,6 +161,7 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
     for (let state = 0; state < shape.grammarStateCount; state++) compareGradient(`the grammar state before ${state}`, sources.grammarBefore + state, twinGradients.grammar[state]!)
     for (let index = 0; index < depthCount; index++) compareGradient(`the depth before ${index}`, sources.depthBefore + index, twinGradients.depth[index]!)
     for (let level = 1; level <= maximumDepth; level++) compareGradient(`level ${level} before`, sources.objectsBefore + level - 1, twinGradients.objects[level]!)
+    if (hasFirstOnLine) compareGradient('the bit "first on its line" before', sources.firstOnLineBefore, twinGradients.firstOnLine[0]!)
     worst.value = Math.max(worst.value, trialValue)
     worst.gradient = Math.max(worst.gradient, trialGradient)
     console.log(`  trial ${trial}, class ${className(tables, characterClass)}: ${compared} values, the largest difference ${trialValue.toExponential(2)}. ${comparedGradients} gradients, ${notZero} of them not 0, the largest difference ${trialGradient.toExponential(2)} of the larger of 1 and the gradient.`)
@@ -156,11 +170,14 @@ function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, 
 
 checkStep('', asIsTables(), true, trials, 200)
 checkStep('', asIsTables(), false, 2, 300)
-const withStructure = openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 0, [grammarStateNames.indexOf('colon')]))
-checkStep(`of tables with ${classesOfTheChecks.length} added classes, an added grammar state and open entries of the display table, `, withStructure, true, 2, 400)
-checkStep(`of tables with ${classesOfTheChecks.length} added classes, an added grammar state and open entries of the display table, `, withStructure, false, 1, 500)
+summary('The step of today\'s tables')
+const withStructure = addFirstOnLineBit(openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 0, [grammarStateNames.indexOf('colon')])))
+const structureName = `of tables with ${classesOfTheChecks.length} added classes, an added grammar state, open entries of the display table and the bit "first on its line", `
+checkStep(structureName, withStructure, true, 3, 400, classNames.indexOf('lineFeed'))
+checkStep(structureName, withStructure, false, 1, 500)
+summary('The step with added structure')
 if (failures > 0) {
   console.log(`${failures} comparisons FAILED: a difference above ${tolerance}.`)
   process.exit(1)
 }
-console.log(`Every value and every gradient of the circuit is the twin's within ${tolerance}: the largest difference of a value is ${worst.value.toExponential(2)} and of a gradient ${worst.gradient.toExponential(2)}.`)
+console.log(`Every value and every gradient of the circuit is the twin's within ${tolerance}.`)

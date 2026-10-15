@@ -4,15 +4,17 @@
 //
 // The code point's class is a one-hot of source cells here, so the circuit holds every tokenizer cell and the host
 // only writes the class. The softmax that turns weights into mixes is not part of the circuit: the mixes are its
-// inputs. The mixes of the display table's entries are source cells only when the shape has open entries.
+// inputs. The mixes of the display table's entries are source cells only when the shape has open entries, and the
+// bit "first on its line" is one only when the shape has 16 contexts.
 import {type Terms, type Wire, Circuit} from '../../../../src/runtime/numeric-ui-core.ts'
 import {maximumDepth} from '../recovery-parser.ts'
-import {actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, today} from '../recovery-tables.ts'
+import {actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, classNames, today, tokenNames} from '../recovery-tables.ts'
 import type {TwinShape} from './twin.ts'
 
 export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: number, readsObjects = true) {
   const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, lexerCells, grammarCells, displayEntries, tokenOfEvent, display, displayMixed} = shape
   const depthCount = depthHigh - depthLow + 1
+  const hasFirstOnLine = contextCount > today.contextCount
   // The source cells, in this order.
   let sourceSize = 0
   const take = (count: number) => {
@@ -25,7 +27,7 @@ export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: 
     // The share of "this level is an object" for the levels 1 to 16: level l is at objectsBefore + l - 1.
     objectsBefore: take(maximumDepth),
     lexerNext: take(lexerCells * lexerStateCount), lexerEvent: take(lexerCells * eventCount), grammarNext: take(grammarCells * grammarStateCount), grammarAction: take(grammarCells * actionCount),
-    display: take(displayMixed.includes(1) ? displayEntries * displayKindCount : 0),
+    display: take(displayMixed.includes(1) ? displayEntries * displayKindCount : 0), firstOnLineBefore: take(hasFirstOnLine ? 1 : 0),
   }
   const circuit = new Circuit(sourceSize)
   for (let cell = 0; cell < sourceSize; cell++) circuit.assumeRange(circuit.source(cell), 0, 1)
@@ -65,11 +67,22 @@ export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: 
   const depthBefore = Array.from({length: depthCount}, (_, index) => source(sources.depthBefore, index))
   const objectBefore = (level: number) => source(sources.objectsBefore, level - 1)
   const contexts: Wire[] = []
-  for (let depthClass = 0; depthClass < contextCount / 2; depthClass++) {
+  for (let depthClass = 0; depthClass < today.contextCount / 2; depthClass++) {
     const depths = depthBefore.filter((_, index) => depthClassOf(index) === depthClass)
     const objectTerms: Wire[] = []
     if (readsObjects) for (let index = 0; index < depthCount; index++) if (depthClassOf(index) === depthClass && levelOf(index) > 0) objectTerms.push(product(depthBefore[index]!, objectBefore(levelOf(index))))
     contexts.push(sum([...ones(depths), ...objectTerms.map(wire => [wire, -1] as const)]), sum(ones(objectTerms)))
+  }
+  // The bit "first on its line": its share of every context goes to the context with the bit, 8 further on. After
+  // the step the bit is 1 at a line feed, and otherwise the bit before times the share of the token `none`.
+  const firstOnLineAfter: Wire[] = []
+  if (hasFirstOnLine) {
+    const bit = source(sources.firstOnLineBefore, 0)
+    const withBit = contexts.map(context => product(context, bit))
+    contexts.splice(0, contexts.length, ...contexts.map((context, index) => sum([[context, 1], [withBit[index]!, -1]])), ...withBit)
+    const lineFeed = source(sources.characterClass, classNames.indexOf('lineFeed'))
+    const kept = product(bit, tokens[tokenNames.indexOf('none')]!)
+    firstOnLineAfter.push(sum([[lineFeed, 1], [kept, 1], [product(kept, lineFeed), -1]]))
   }
 
   // The grammar.
@@ -125,5 +138,5 @@ export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: 
   // In the order of containerNone, containerObject and containerArray.
   const containers = [sum(ones(depthAfter.filter((_, index) => levelOf(index) === 0))), sum(ones(inObject)), sum([...ones(inContainer), ...inObject.map(wire => [wire, -1] as const)])]
 
-  return {circuit, sourceSize, sources, depthCount, outputs: {events, tokens, contexts, lexerAfter, grammarAfter, actions, depthAfter, objectsAfter, kinds, containers}}
+  return {circuit, sourceSize, sources, depthCount, outputs: {events, tokens, contexts, lexerAfter, grammarAfter, actions, depthAfter, objectsAfter, firstOnLineAfter, kinds, containers}}
 }
