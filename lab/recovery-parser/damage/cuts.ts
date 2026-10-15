@@ -66,27 +66,37 @@ function middleCutOut(random: Random, scanned: Scan): Damage | undefined {
   const from = random.integer(2, length - span - 2)
   const edits: Edit[] = [removeRange(from, from + span)]
   if (withMarker) edits.unshift(insertAt(from, random.pick(['...', '…', '<snip>', '...(truncated)...', ` [... ${span} characters omitted ...] `])))
+  // A span that is exactly one entry of a container leaves the commas around the entry, and nothing else of it. That
+  // is the text of an entry that was deleted between its commas, which a parser can label as it labels the texts of
+  // extraComma and trailingComma: a comma where a key or a value should start changes nothing, and a closing bracket
+  // after a comma closes the container. So such a text has their flag.
+  const entry = withMarker ? undefined : scanned.entries.find(candidate => candidate.start === from && candidate.end === from + span)
+  if (entry !== undefined && (entry.index > 0 || entry.commaAfter !== -1)) {
+    const leaves = entry.index > 0 && entry.commaAfter !== -1 ? 'two commas with nothing between them, as extraComma does'
+      : entry.commaAfter !== -1 ? 'a comma before the first entry, as extraComma does' : 'a comma before the closer, as trailingComma does'
+    return {edits, form: `a short span with nothing in its place, which is exactly one entry and leaves ${leaves}`, reachable: 'yes'}
+  }
   return {edits, form: withMarker ? 'a span with a marker in its place' : 'a short span with nothing in its place', reachable: 'no'}
 }
 
 export const cutKinds: KindDefinition[] = [
   {
-    name: 'cutOff', family: 'cut off', weight: 7,
+    name: 'cutOff', family: 'cut off', origin: 'either', weight: 7,
     example: '{"id": 42, "name": "Ada Lovel',
     reachable: 'yes, and nothing is left to recover: no kept character comes after the cut',
     margin: 30,
     apply: cutOff,
   },
   {
-    name: 'headMissing', family: 'cut off', weight: 0.6,
+    name: 'headMissing', family: 'cut off', origin: 'output', weight: 0.6,
     example: '"id": 42, "name": "Ada"}',
     reachable: 'no: the depth at the start is unknown, and a text that starts inside a string has every later quote in the opposite role',
     apply: headMissing,
   },
   {
-    name: 'middleCutOut', family: 'cut off', weight: 0.6,
+    name: 'middleCutOut', family: 'cut off', origin: 'output', weight: 0.6,
     example: '{"id": 7, "tags": ["urgent", "dr...lling": true}',
-    reachable: 'no: the removed span can hold any number of brackets and quotes',
+    reachable: 'no: the removed span can hold any number of brackets and quotes. yes when a span without a marker is exactly one entry: what is left are the commas around it, the text of extraComma or of trailingComma',
     margin: 34,
     apply: middleCutOut,
   },

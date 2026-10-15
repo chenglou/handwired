@@ -1,9 +1,12 @@
 // Damage inside strings and at their quotes: escapes that are missing or belong to another language, raw line feeds
 // and tabs, a quote too few and a quote too many.
+import {freeTextTemplates} from '../documents.ts'
 import {type Edit, insertAt, removeRange, replaceOneForOne} from '../edits.ts'
 import type {Random} from '../random.ts'
 import {type Scan, type StringPart, hasOwnLine, indentationAt, lastOnLine} from '../scan.ts'
-import type {Damage, KindDefinition, KindOptions, Reachable} from './types.ts'
+import type {Damage, KindDefinition, KindOptions, Reachable, Rule} from './types.ts'
+
+const endsAtLineFeed: Rule = 'a string that is open at a line feed ends there'
 
 // The escapes of a string's content: the position of each backslash and the character after it.
 function escapesOf(scanned: Scan, part: StringPart) {
@@ -26,12 +29,18 @@ function unescapedQuote(random: Random, scanned: Scan, options: KindOptions = {}
   // A program that forgets to escape forgets every quote of a string, and in four texts of ten those of every string.
   const changed = options.scope === 'every' || (quoted.length > 1 && random.chance(0.4)) ? quoted : [random.pick(quoted)]
   const quotes = changed.flatMap(({quotes: found}) => found)
+  // The inner quote ends the string, and nothing at that point says that it shouldn't. One case reads right all the
+  // same: an item of an array with two inner quotes around one word, e.g. ["call "Ana" back"], is a string, a word and
+  // a string, each shown as a string. As a member's value, the second string would read as the next key, by the rule
+  // that recovers a missing comma.
+  const readsAsStrings = changed.every(({part, quotes: found}) => part.entry !== null && part.entry.key === null && found.length === 2
+    && /^[^\s,:{}[\]"\\]+$/.test(scanned.codePoints.slice(found[0]!.at + 2, found[1]!.at).join('')))
   return {
     edits: quotes.map(quote => removeRange(quote.at, quote.at + 1)),
     // The quote that stays is part of an escape in the original, which no reading of the broken text shows.
     unscoredKinds: quotes.map(quote => quote.at + 1),
-    form: `${quotes.length} quote${quotes.length > 1 ? 's' : ''} in ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
-    reachable: 'no',
+    form: `${quotes.length} quote${quotes.length > 1 ? 's' : ''} in ${changed.length === 1 ? 'one string' : `${changed.length} strings`}${readsAsStrings ? ', around one word in an item of an array' : ''}`,
+    reachable: readsAsStrings ? 'yes' : 'no',
   }
 }
 
@@ -45,7 +54,7 @@ function beforeClosingQuote(scanned: Scan, part: StringPart): {reachable: Reacha
   return {reachable: endsLine ? 'line rule' : 'no', unscored: [part.end - 1, ...comma]}
 }
 
-function unescapedBackslash(random: Random, scanned: Scan): Damage | undefined {
+function unescapedBackslash(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const {codePoints} = scanned
   const all = values(scanned).map(part => ({part, escapes: escapesOf(scanned, part)}))
   // Strings with a doubled backslash, e.g. a Windows path or a regular expression.
@@ -53,22 +62,24 @@ function unescapedBackslash(random: Random, scanned: Scan): Damage | undefined {
   const withApostrophe = values(scanned).filter(part => part.content.includes('\''))
   // Strings with an escape of a code point below U+0100, e.g. \u00e9, which other languages write as \xe9.
   const withLowEscape = all.filter(({escapes}) => escapes.some(escape => escape.character === 'u' && codePoints[escape.at + 2] === '0' && codePoints[escape.at + 3] === '0'))
-  const form = random.weighted([['halved', doubled.length > 0 ? 62 : 0], ['escaped apostrophe', withApostrophe.length > 0 ? 25 : 0], ['hexadecimal escape', withLowEscape.length > 0 ? 13 : 0]] as const)
+  // A program that escapes nothing writes every string's backslashes once.
+  const everyString = options.scope === 'every'
+  const form = everyString ? 'halved' : random.weighted([['halved', doubled.length > 0 ? 62 : 0], ['escaped apostrophe', withApostrophe.length > 0 ? 25 : 0], ['hexadecimal escape', withLowEscape.length > 0 ? 13 : 0]] as const)
   if (form === 'halved' && doubled.length > 0) {
     // Every \\ of the string is written as one backslash. What the backslash that stays does depends on what follows it.
-    const {part, escapes} = random.pick(doubled)
+    const changed = everyString ? doubled : [random.pick(doubled)]
     const edits: Edit[] = []
     const unscoredKinds: number[] = []
     let reachable: Reachable = 'yes'
     let closesNothing = false
-    for (const escape of escapes) {
+    for (const {part, escapes} of changed) for (const escape of escapes) {
       if (escape.character !== '\\') continue
       edits.push(removeRange(escape.at, escape.at + 1))
       const after = escape.at + 2
       const follower = codePoints[after]!
       if (after === part.end - 1) {
         const closing = beforeClosingQuote(scanned, part)
-        reachable = closing.reachable
+        if (reachable === 'yes' || closing.reachable === 'no') reachable = closing.reachable
         unscoredKinds.push(...closing.unscored)
         closesNothing = true
       } else if ('bfnrt/"'.includes(follower)) {
@@ -80,8 +91,12 @@ function unescapedBackslash(random: Random, scanned: Scan): Damage | undefined {
         for (let digit = after + 1; digit <= after + 4 && /[0-9a-fA-F]/.test(codePoints[digit] ?? ''); digit++) unscoredKinds.push(digit)
       }
     }
-    return {edits, unscoredKinds, form: `every \\\\ of one string as one backslash${closesNothing ? ', the last one before the closing quote' : ''}`, reachable}
+    return {
+      edits, unscoredKinds, form: `every \\\\ of ${changed.length === 1 ? 'one string' : `${changed.length} strings`} as one backslash${closesNothing ? ', the last one before the closing quote' : ''}`, reachable,
+      ...(reachable === 'line rule' ? {needsRules: [endsAtLineFeed]} : {}),
+    }
   }
+  if (everyString) return undefined
   if (form === 'escaped apostrophe' && withApostrophe.length > 0) {
     const part = random.pick(withApostrophe)
     const edits: Edit[] = []
@@ -95,7 +110,9 @@ function unescapedBackslash(random: Random, scanned: Scan): Damage | undefined {
     if (escape.character !== 'u' || codePoints[escape.at + 2] !== '0' || codePoints[escape.at + 3] !== '0') continue
     edits.push(replaceOneForOne(escape.at + 1, 'x'), removeRange(escape.at + 2, escape.at + 4))
   }
-  return {edits, form: `\\x and two digits for ${edits.length / 2} \\u00 escape${edits.length > 2 ? 's' : ''} of one string`, reachable: 'yes'}
+  // After a backslash, x must go on to two digits where another letter must not, e.g. the W of C:\Windows, and both
+  // are in the class of most letters.
+  return {edits, form: `\\x and two digits for ${edits.length / 2} \\u00 escape${edits.length > 2 ? 's' : ''} of one string`, reachable: 'yes', needsClass: 'x after a backslash'}
 }
 
 // A string holds real line feeds: text of several lines pasted as a value, or a long string wrapped with Enter.
@@ -106,16 +123,26 @@ function rawLineFeedInString(random: Random, scanned: Scan, options: KindOptions
   const pasted = withLineFeed.length > 0 && (options.scope === 'every' || long.length === 0 || random.chance(0.7))
   if (pasted) {
     const changed = options.scope === 'every' || (withLineFeed.length > 1 && random.chance(0.4)) ? withLineFeed : [random.pick(withLineFeed)]
-    const alsoTabs = random.chance(0.5)
+    // In half of the texts, the tabs of those strings are raw too. A combination that asks for every string leaves the
+    // tabs to rawTabInString, which then takes those of every string.
+    const alsoTabs = options.scope !== 'every' && random.chance(0.5)
     const edits: Edit[] = []
+    let tabs = 0
     for (const {escapes} of changed) {
       for (const escape of escapes) {
         if (escape.character === 'n') edits.push({at: escape.at, remove: 2, insert: '\n'})
         else if (escape.character === 'r') edits.push({at: escape.at, remove: 2, insert: '\r'})
-        else if (escape.character === 't' && alsoTabs) edits.push({at: escape.at, remove: 2, insert: '\t'})
+        else if (escape.character === 't' && alsoTabs) {
+          edits.push({at: escape.at, remove: 2, insert: '\t'})
+          tabs++
+        }
       }
     }
-    return {edits, form: `${edits.length} raw line feed${edits.length > 1 ? 's' : ''} and tabs for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`, reachable: 'yes'}
+    const lineFeeds = edits.length - tabs
+    return {
+      edits, reachable: 'yes', needsRules: ['a line feed inside a string is content'], ...(tabs > 0 ? {alsoKinds: ['rawTabInString']} : {}),
+      form: `${lineFeeds} raw line feed${lineFeeds > 1 ? 's' : ''}${tabs > 0 ? ` and ${tabs} raw tab${tabs > 1 ? 's' : ''}` : ''} for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
+    }
   }
   if (long.length === 0) return undefined
   const part = random.pick(long)
@@ -124,26 +151,18 @@ function rawLineFeedInString(random: Random, scanned: Scan, options: KindOptions
   if (spaces.length === 0) return undefined
   const indentation = indentationAt(codePoints, part.start)
   const level = indentation.includes('\t') ? '\t' : '  '
-  return {edits: [{at: random.pick(spaces), remove: 1, insert: `\n${indentation}${level}`}], form: 'a long string wrapped with a line feed and an indentation in place of a space', reachable: 'yes', debatable: true}
+  return {edits: [{at: random.pick(spaces), remove: 1, insert: `\n${indentation}${level}`}], form: 'a long string wrapped with a line feed and an indentation in place of a space', reachable: 'yes', needsRules: ['a line feed inside a string is content'], debatable: true}
 }
 
-function rawTabInString(random: Random, scanned: Scan): Damage | undefined {
+function rawTabInString(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const withTab = values(scanned).map(part => escapesOf(scanned, part).filter(escape => escape.character === 't')).filter(tabs => tabs.length > 0)
   if (withTab.length === 0) return undefined
-  const tabs = random.pick(withTab)
-  return {edits: tabs.map(escape => ({at: escape.at, remove: 2, insert: '\t'})), form: `${tabs.length} raw tab${tabs.length > 1 ? 's' : ''} for the \\t of one string`, reachable: 'yes'}
-}
-
-// How many leading code points of a string's content read as a number or a literal once its opening quote is gone.
-function misleadingPrefix(content: string) {
-  const number = /^-?(0|[1-9][0-9]*)?(\.[0-9]*)?([eE][+-]?[0-9]*)?/.exec(content)![0]
-  if (number.length > 0 && number !== '-') return number.length
-  for (const word of ['true', 'false', 'null']) {
-    let shared = 0
-    while (shared < word.length && content[shared] === word[shared]) shared++
-    if (shared > 0) return shared
+  const changed = options.scope === 'every' ? withTab : [random.pick(withTab)]
+  const tabs = changed.flat()
+  return {
+    edits: tabs.map(escape => ({at: escape.at, remove: 2, insert: '\t'})), reachable: 'yes',
+    form: `${tabs.length} raw tab${tabs.length > 1 ? 's' : ''} for the \\t of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
   }
-  return 0
 }
 
 function missingOpeningQuote(random: Random, scanned: Scan): Damage | undefined {
@@ -155,10 +174,8 @@ function missingOpeningQuote(random: Random, scanned: Scan): Damage | undefined 
   // What is left reads as a word that the closing quote ends, unless the word holds a character that ends it early.
   const breaks = ofKey ? /[\s",:{}[\]\\]/ : /[\n\t",{}[\]\\]|^ | $/
   const readable = !breaks.test(part.content)
-  const prefix = ofKey ? 0 : misleadingPrefix(part.content)
   return {
     edits: [removeRange(part.start, part.start + 1)],
-    unscoredKinds: Array.from({length: prefix}, (_, offset) => part.start + 1 + offset),
     form: `of a ${ofKey ? 'key' : 'value'}${readable ? '' : ', whose content holds a character that ends a word'}`,
     reachable: readable ? 'yes' : 'no',
   }
@@ -177,45 +194,45 @@ function doubledQuote(random: Random, scanned: Scan): Damage | undefined {
 
 export const stringKinds: KindDefinition[] = [
   {
-    name: 'unescapedQuote', family: 'inside a string', weight: 1.9,
+    name: 'unescapedQuote', family: 'inside a string', origin: 'either', weight: 1.9,
     example: '{"note": "call "Ana" on arrival", "paid": true}',
-    reachable: 'no: the inner quote ends the string, and nothing at that point says that it shouldn\'t. The inner quotes\' display kind is not scored',
-    templates: ['packageManifest', 'logEvent', 'order', 'messages', 'apiResponse', 'table', 'scalar'],
+    reachable: 'no: the inner quote ends the string, and nothing at that point says that it shouldn\'t. yes for an item of an array with two inner quotes around one word, which reads as a string, a word and a string. The inner quotes\' display kind is not scored',
+    templates: freeTextTemplates,
     apply: unescapedQuote,
   },
   {
-    name: 'unescapedBackslash', family: 'inside a string', weight: 2.4,
+    name: 'unescapedBackslash', family: 'inside a string', origin: 'either', weight: 2.4,
     example: '{"terminal.shell": "C:\\Windows\\System32\\cmd.exe"}',
-    reachable: 'yes: after a backslash and a character that JSON doesn\'t escape, the string goes on. A backslash before the closing quote is line rule when the string ends its line, otherwise no',
-    templates: ['logEvent', 'settings', 'messages', 'userRecord', 'order', 'apiResponse', 'table', 'serviceConfig', 'scalar', 'tree'],
+    reachable: 'yes: after a backslash and a character that JSON doesn\'t escape, the string goes on. A backslash before the closing quote is line rule when the string ends its line, otherwise no. The form \\xe9 needs a class for x',
+    templates: [...freeTextTemplates, 'settings', 'serviceConfig', 'tree'],
     margin: 12,
     apply: unescapedBackslash,
   },
   {
-    name: 'rawLineFeedInString', family: 'inside a string', weight: 1.2,
+    name: 'rawLineFeedInString', family: 'inside a string', origin: 'either', weight: 1.2,
     example: '{"msg": "line 1⏎line 2", "code": 0}',
-    reachable: 'yes for a parser that stays inside a string across a line feed, which is the opposite of the rule that openStringAtLineEnd needs',
-    templates: ['logEvent', 'order', 'messages', 'apiResponse', 'table', 'userRecord', 'packageManifest', 'mapFeature', 'scalar'],
+    reachable: 'yes with the rule that a line feed inside a string is content, which contradicts the rule for a half-typed string',
+    templates: freeTextTemplates,
     margin: 12,
     apply: rawLineFeedInString,
   },
   {
-    name: 'rawTabInString', family: 'inside a string', weight: 0.4,
+    name: 'rawTabInString', family: 'inside a string', origin: 'either', weight: 0.4,
     example: '{"notes": "fragile→handle with care"}',
     reachable: 'yes: a tab inside a string reads as content',
-    templates: ['order', 'messages', 'table'],
+    templates: freeTextTemplates,
     apply: rawTabInString,
   },
   {
-    name: 'missingOpeningQuote', family: 'inside a string', weight: 0.3,
+    name: 'missingOpeningQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": Lisbon",⏎  "country": "PT"⏎}',
-    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma',
+    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
     apply: missingOpeningQuote,
   },
   {
-    name: 'doubledQuote', family: 'inside a string', weight: 0.3,
+    name: 'doubledQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": "Lisbon"",⏎  "country": "PT"⏎}',
-    reachable: 'yes: a quote right after a closing quote is skipped, and content right after a closing quote opens the string again',
+    reachable: 'yes for a parser that knows that it stands right after a closing quote: a second quote there is skipped, and content there opens the string again. The highlighter\'s tokenizer is in the same state after a closing quote as between any two tokens, so its tables read the second quote as the start of a string, unless a cell that valid JSON never reads has led them into states of their own before',
     margin: 2,
     apply: doubledQuote,
   },

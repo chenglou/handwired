@@ -5,17 +5,28 @@ import {type Json, type Layout, type RecordType, makeRecords, serialize} from '.
 import {type Edit, insertAt} from '../edits.ts'
 import type {Random} from '../random.ts'
 import type {Scan} from '../scan.ts'
+import {type Split, splitOf} from '../splits.ts'
 import type {Damage, KindDefinition, KindOptions} from './types.ts'
-import {logPrefixes} from './wrappers.ts'
+import {logFieldsIn, logPrefixes} from './wrappers.ts'
 
 const oneLine = (style: 'compact' | 'spaced'): Layout => ({style, indent: '  ', shortOnOneLine: false, rowsOnOneLine: false, escapes: 'plain', finalLineFeed: false})
 const indented: Layout = {style: 'indented', indent: '  ', shortOnOneLine: false, rowsOnOneLine: false, escapes: 'plain', finalLineFeed: false}
 const lengthOf = (text: string) => Array.from(text).length
 
-// Records of one stream as texts, as many as fit in `limit` code points with `overhead` more per record.
+// Records of one stream as texts, as many as fit in `limit` code points with `overhead` more per record. Every record
+// is in the split of the first one, see splitOf: a record alone is a document like any other, and a text that mixed
+// records of two splits would put a test document's sequence of tokens into a train text. So the first record decides
+// the text's split, and a later record that falls into another split is made again, e.g. with a string where it had
+// a null. No texts when the stream has no second record of that split.
 function recordTexts(random: Random, count: number, limit: number, overhead: number, layout: Layout, types: readonly (readonly [RecordType, number])[]) {
   const type = random.weighted(types)
-  const texts = makeRecords(random, type, count).map((record: Json) => serialize(record, layout))
+  let split: Split | undefined
+  const records = makeRecords(random, type, count, record => {
+    const own = splitOf(serialize(record, layout))
+    split ??= own
+    return own === split
+  })
+  const texts = (records ?? []).map((record: Json) => serialize(record, layout))
   let total = 0
   const fitting: string[] = []
   for (const text of texts) {
@@ -78,14 +89,15 @@ function commaSeparatedRecords(random: Random, _scanned: Scan): Damage | undefin
   return {
     documents, edits, template: `records: ${type}`, style,
     form: `${texts.length} records with a comma${space === '\n' ? ' and a line feed' : space === ' ' ? ' and a space' : ''} between them${afterLast ? ' and after the last' : ''}`,
-    reachable: 'yes', debatable: true,
+    reachable: 'yes', needsRules: ['a comma after the top-level value is skipped'], debatable: true,
   }
 }
 
 // Lines of a log that hold no document: messages, which a logger writes after the same prefix as a document, and
-// lines of a stack trace or of another program, which have no prefix.
+// lines that another program wrote into the same output, which have no prefix. None is a line of one language's stack
+// trace, which would not stand alone between the lines of a logger of another language.
 const messageLines = ['Server listening on port 3000', 'Connected to db.internal:5432', 'Retrying in 5s...', 'worker 3 exited with code 1', 'cache warmed in 412 ms'] as const
-const bareLines = ['Traceback (most recent call last):', '    at handler (/app/src/index.js:42:13)', 'npm warn deprecated glob@7.2.3', '--- request 4471 ---', '  File "app.py", line 88, in handle'] as const
+const bareLines = ['npm warn deprecated glob@7.2.3', '--- request 4471 ---', '> harbor-api@2.4.0 start', 'Killed', '[nodemon] restarting due to changes...', 'Waiting for the debugger to disconnect...'] as const
 
 // Several lines of a log or of a stream: a prefix and a document on each, and lines of plain text between them.
 function logLines(random: Random, _scanned: Scan): Damage | undefined {
@@ -102,9 +114,10 @@ function logLines(random: Random, _scanned: Scan): Damage | undefined {
   }
   if (events) {
     // A stream of server-sent events: each is "data: ", a document and an empty line, and the last may be data: [DONE].
-    const withEventLine = random.chance(0.3)
+    // Every event of one stream has the same fields before its data.
+    const fieldLine = random.weighted([['none', 70], ['event', 15], ['id', 15]] as const)
     texts.forEach((text, index) => {
-      add(insertAt(offset, `${withEventLine ? `${random.chance(0.5) ? 'event: message' : `id: ${index + 1}`}\n` : ''}data: `))
+      add(insertAt(offset, `${fieldLine === 'none' ? '' : fieldLine === 'event' ? 'event: message\n' : `id: ${index + 1}\n`}data: `))
       const document = `${text}\n\n`
       documents.push(document)
       offset += lengthOf(document)
@@ -114,15 +127,16 @@ function logLines(random: Random, _scanned: Scan): Damage | undefined {
     if (offset + added > 512) return undefined
     return {documents, edits, template: `records: ${type}`, style, form: `${texts.length} server-sent events${done ? ' and data: [DONE]' : ''}`, reachable: 'yes'}
   }
-  const prefixOf = logPrefixes(random)
+  const {prefixOf, onEveryLine} = logPrefixes(random, 'lines')
   let plain = 0
   texts.forEach((text, index) => {
-    const {prefix, suffix} = prefixOf(index)
+    const fields = logFieldsIn(text)
     // About one line in four is plain text and holds no document.
     if (random.chance(0.25)) {
-      add(insertAt(offset, random.chance(0.6) ? `${prefix}${random.pick(messageLines)}\n` : `${random.pick(bareLines)}\n`))
+      add(insertAt(offset, onEveryLine || random.chance(0.6) ? `${prefixOf(index, fields, random.pick(messageLines)).prefix}\n` : `${random.pick(bareLines)}\n`))
       plain++
     }
+    const {prefix, suffix} = prefixOf(index, fields)
     add(insertAt(offset, prefix))
     if (suffix !== '') add(insertAt(offset + lengthOf(text), suffix))
     const document = `${text}${index < texts.length - 1 || random.chance(0.7) ? '\n' : ''}`
@@ -135,27 +149,27 @@ function logLines(random: Random, _scanned: Scan): Damage | undefined {
 
 export const severalKinds: KindDefinition[] = [
   {
-    name: 'newlineDelimited', family: 'several documents', weight: 2.4,
+    name: 'newlineDelimited', family: 'several documents', origin: 'output', weight: 2.4,
     example: '{"t": 1, "v": 20.5}⏎{"t": 2, "v": 20.7}⏎',
     reachable: 'yes: after a complete top-level value, the start of a value begins a new document at depth 0',
     apply: newlineDelimited,
   },
   {
-    name: 'concatenated', family: 'several documents', weight: 0.7,
+    name: 'concatenated', family: 'several documents', origin: 'output', weight: 0.7,
     example: '{"id":1}{"id":2}',
     reachable: 'yes, as newlineDelimited',
     apply: concatenated,
   },
   {
-    name: 'commaSeparatedRecords', family: 'several documents', weight: 0.4,
+    name: 'commaSeparatedRecords', family: 'several documents', origin: 'output', weight: 0.4,
     example: '{"id": 1},⏎{"id": 2},⏎{"id": 3}',
-    reachable: 'yes: a comma at depth 0 after a complete value is skipped. The rule contradicts the one for a stray closer of the top-level container',
+    reachable: 'yes with the rule that a comma after the top-level value is skipped, which contradicts the rule for a closer too many of the top-level container',
     apply: commaSeparatedRecords,
   },
   {
-    name: 'logLines', family: 'several documents', weight: 1,
+    name: 'logLines', family: 'several documents', origin: 'output', weight: 1,
     example: '09:31:07 INFO {"event": "start"}⏎09:31:08 WARN {"event": "retry", "n": 2}',
-    reachable: 'yes: every document ends at depth 0, the prefixes hold no double quote, and their brackets come in closed pairs, [DONE] included',
+    reachable: 'yes: every document ends at depth 0, and the quotes and the brackets of the prefixes and of the plain lines come in closed pairs, [DONE] included',
     apply: logLines,
   },
 ]

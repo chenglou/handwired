@@ -63,6 +63,10 @@ function missingComma(random: Random, scanned: Scan, options: KindOptions = {}):
   }
 }
 
+// A comma that is added after an entry comes before a comment that another kind adds at the same place, e.g.
+// "port": 8080, // default
+const commaAt = (at: number, text = ','): Edit => ({...insertAt(at, text), rank: -1})
+
 function trailingComma(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const {codePoints} = scanned
   const filled = scanned.containers.filter(container => container.entries.length > 0)
@@ -79,13 +83,13 @@ function trailingComma(random: Random, scanned: Scan, options: KindOptions = {})
   switch (form) {
     case 'line end': {
       if (onLines.length === 0) return undefined
-      return {edits: [insertAt(lastEnd(random.pick(onLines)), ',')], form: 'after the last entry, at a line end', reachable: 'yes'}
+      return {edits: [commaAt(lastEnd(random.pick(onLines)))], form: 'after the last entry, at a line end', reachable: 'yes'}
     }
     case 'line end and an empty line': {
       if (onLines.length === 0) return undefined
       // The person typed the comma, pressed Enter and is about to type: a line that holds only the entry's indentation.
       const container = random.pick(onLines)
-      return {edits: [insertAt(lastEnd(container), `,\n${indentationAt(codePoints, container.entries.at(-1)!.start)}`)], form: 'after the last entry, then a line with only the indentation', reachable: 'yes'}
+      return {edits: [commaAt(lastEnd(container), `,\n${indentationAt(codePoints, container.entries.at(-1)!.start)}`)], form: 'after the last entry, then a line with only the indentation', reachable: 'yes'}
     }
     case 'one line': {
       if (onOneLine.length === 0) return undefined
@@ -93,22 +97,22 @@ function trailingComma(random: Random, scanned: Scan, options: KindOptions = {})
       // A space after the comma only in a text that has spaces after its colons or commas.
       const first = container.entries[0]!
       const spaced = codePoints[(first.colon === -1 ? first.commaAfter : first.colon) + 1] === ' '
-      return {edits: [insertAt(lastEnd(container), spaced && random.chance(0.4) && codePoints[lastEnd(container)] !== ' ' ? ', ' : ',')], form: `before the closer of a one-line ${container.type}`, reachable: 'yes'}
+      return {edits: [commaAt(lastEnd(container), spaced && random.chance(0.4) && codePoints[lastEnd(container)] !== ' ' ? ', ' : ',')], form: `before the closer of a one-line ${container.type}`, reachable: 'yes'}
     }
     case 'every container on several lines': {
       if (onLines.length === 0) return undefined
-      return {edits: onLines.map(container => insertAt(lastEnd(container), ',')), form: `in every container on several lines, ${onLines.length} of them`, reachable: 'yes'}
+      return {edits: onLines.map(container => commaAt(lastEnd(container))), form: `in every container on several lines, ${onLines.length} of them`, reachable: 'yes'}
     }
     case 'every record': {
       if (recordArrays.length === 0) return undefined
       const array = random.pick(recordArrays)
-      const edits = array.entries.map(entry => insertAt(lastEnd(entry.value.container!), ','))
+      const edits = array.entries.map(entry => commaAt(lastEnd(entry.value.container!)))
       const alsoArray = random.chance(0.5)
-      if (alsoArray) edits.push(insertAt(lastEnd(array), ','))
+      if (alsoArray) edits.push(commaAt(lastEnd(array)))
       return {edits, form: `in every record of one array${alsoArray ? ' and in the array' : ''}`, reachable: 'yes'}
     }
     case 'every container': {
-      return {edits: filled.map(container => insertAt(lastEnd(container), ',')), form: `in every container, ${filled.length} of them`, reachable: 'yes'}
+      return {edits: filled.map(container => commaAt(lastEnd(container))), form: `in every container, ${filled.length} of them`, reachable: 'yes'}
     }
     default:
       return undefined
@@ -161,13 +165,14 @@ function missingColon(random: Random, scanned: Scan): Damage | undefined {
   return {
     edits: [removeRange(entry.colon, entry.colon + 1)],
     form: `before a ${entry.value.type === 'object' || entry.value.type === 'array' ? 'container' : entry.value.type}`,
-    // A string after a key is also what a half-typed key before the next member looks like. The two differ in the line
-    // feed between the strings, which is missing here.
-    reachable: isString ? 'line rule' : 'yes',
+    // A string after a key is also what a half-typed key before the next member looks like, so the rule that labels
+    // this text contradicts the rule for a half-typed key.
+    reachable: 'yes', ...(isString ? {needsRules: ['a string after a key is that key\'s value']} : {}),
   }
 }
 
-// `=>` or `=` between a key and its value, as Ruby prints a hash and as config files in other notations write it.
+// `=>` or `=` between a key and its value, as Ruby prints a hash and as a person with the habit of another notation
+// types it. The = stands for the colon and has its label, and the > is added.
 function foreignKeySeparator(random: Random, scanned: Scan): Damage | undefined {
   const {codePoints} = scanned
   const members = scanned.entries.filter(entry => entry.key !== null)
@@ -175,30 +180,39 @@ function foreignKeySeparator(random: Random, scanned: Scan): Damage | undefined 
   const spaced = members.every(entry => codePoints[entry.colon + 1] === ' ')
   const form = random.weighted([['arrow', spaced && !scanned.severalLines ? 45 : 0], ['arrow with spaces', spaced && !scanned.severalLines ? 25 : 0], ['equals sign', 30]] as const)
   const edits: Edit[] = []
+  // The = is in the class of most letters. To show it as punctuation, and to end it before a number or a literal that
+  // comes right after it, the tables need a class for it.
+  const needsClass = 'the = in the place of a colon'
   if (form === 'equals sign') {
-    // One member that a person typed that way, or every member of the text.
-    const changed = random.chance(0.3) ? [random.pick(members)] : members
-    for (const entry of changed) edits.push(spaced ? {at: entry.colon, remove: 1, insert: ' ='} : replaceOneForOne(entry.colon, '='))
-    return {edits, form: `${spaced ? '" =" for' : '= for'} ${changed.length === members.length ? 'every colon' : 'one colon'}`, reachable: 'yes'}
+    // One member that a person typed that way, and in some texts every member.
+    const changed = random.chance(0.85) ? [random.pick(members)] : members
+    for (const entry of changed) {
+      if (spaced) edits.push(insertAt(entry.colon, ' '))
+      edits.push(replaceOneForOne(entry.colon, '='))
+    }
+    return {edits, form: `${spaced ? '" =" for' : '= for'} ${changed.length === members.length ? 'every colon' : 'one colon'}`, reachable: 'yes', needsClass}
   }
   // A Ruby print: every colon changes, and every null is nil.
-  for (const entry of members) edits.push(form === 'arrow' ? {at: entry.colon, remove: 2, insert: '=>'} : {at: entry.colon, remove: 1, insert: ' =>'})
+  for (const entry of members) {
+    if (form === 'arrow') edits.push(replaceOneForOne(entry.colon, '='), {at: entry.colon + 1, remove: 1, insert: '>'})
+    else edits.push(insertAt(entry.colon, ' '), replaceOneForOne(entry.colon, '='), {...insertAt(entry.colon + 1, '>'), rank: -1})
+  }
   for (const literal of scanned.literals) {
     if (codePoints[literal.start] === 'n') edits.push({at: literal.start, remove: 4, insert: 'nil'})
   }
-  return {edits, form: form === 'arrow' ? '=> for every colon and its space, as Ruby prints a hash' : '" =>" for every colon, as Ruby 3.4 prints a hash', reachable: 'yes'}
+  return {edits, form: form === 'arrow' ? '=> for every colon and its space, as Ruby prints a hash' : '" =>" for every colon, as Ruby 3.4 prints a hash', reachable: 'yes', needsClass}
 }
 
 export const separatorKinds: KindDefinition[] = [
   {
-    name: 'missingComma', family: 'separator', weight: 5.5,
+    name: 'missingComma', family: 'separator', origin: 'either', weight: 5.5,
     example: '{⏎  "version": "0.4.1"⏎  "private": true⏎}',
     reachable: 'yes: after a complete value, a string inside an object is the next key, and the start of a value inside an array is the next item',
     styles: [['indented', 62], ['tabbed', 14], ['spaced', 16], ['compact', 8]],
     apply: missingComma,
   },
   {
-    name: 'trailingComma', family: 'separator', weight: 7.5,
+    name: 'trailingComma', family: 'separator', origin: 'either', weight: 7.5,
     example: '{⏎  "host": "localhost",⏎  "port": 8080,⏎}',
     reachable: 'yes: a closing bracket after a comma closes the container',
     styles: [['indented', 62], ['tabbed', 14], ['spaced', 16], ['compact', 8]],
@@ -206,23 +220,23 @@ export const separatorKinds: KindDefinition[] = [
     apply: trailingComma,
   },
   {
-    name: 'extraComma', family: 'separator', weight: 1.5,
+    name: 'extraComma', family: 'separator', origin: 'either', weight: 1.5,
     example: '{"id": 7, , "tags": ["ops"]}',
     reachable: 'yes: a comma where a key or a value should start changes nothing',
     margin: 24,
     apply: extraComma,
   },
   {
-    name: 'missingColon', family: 'separator', weight: 0.8,
+    name: 'missingColon', family: 'separator', origin: 'file', weight: 0.8,
     example: '{⏎  "port" 8080,⏎  "host": "localhost"⏎}',
-    reachable: 'yes when the value is a number, a literal or a container, which can only be the value. line rule when the value is a string: on the same line it is the value, where a half-typed key has the next key on the next line',
+    reachable: 'yes. When the value is a string, it needs the rule "a string after a key is that key\'s value", which contradicts the rule for a half-typed key',
     styles: [['indented', 60], ['tabbed', 10], ['spaced', 30]],
     apply: missingColon,
   },
   {
-    name: 'foreignKeySeparator', family: 'separator', weight: 0.6,
+    name: 'foreignKeySeparator', family: 'separator', origin: 'either', weight: 0.6,
     example: '{"id"=>42, "name"=>"Ada", "manager"=>nil}',
-    reachable: 'yes: where a colon is expected, = and > are skipped and a value comes next',
+    reachable: 'yes: where a colon is expected, = stands for it and > is skipped. The tables need a class for =, which is in the class of most letters',
     styles: [['spaced', 70], ['indented', 30]],
     margin: 60,
     apply: foreignKeySeparator,
