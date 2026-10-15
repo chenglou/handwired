@@ -7,7 +7,7 @@
 import {type DocumentRequest, type Style, type Template} from './documents.ts'
 import {type Edit, insertAt, mergeEdits, removeRange} from './edits.ts'
 import type {Random} from './random.ts'
-import {type Scan, hasOwnLine, lastOnLine, openContainersAt, scan} from './scan.ts'
+import {type Scan, hasOwnLine, isWhitespace, lastOnLine, openContainersAt, scan} from './scan.ts'
 import {bracketKinds} from './damage/brackets.ts'
 import {commentKinds} from './damage/comments.ts'
 import {cutKinds} from './damage/cuts.ts'
@@ -117,15 +117,18 @@ function applySteps(random: Random, scanned: Scan, steps: readonly Step[], extra
   return planned
 }
 
-// Whether the edits of two kinds sit apart: on different lines, or at least 8 code points from each other. Two
-// unrelated damages that touch are one damage of another kind, e.g. a missing comma right before a missing colon.
+// Whether the edits of two kinds sit apart: something other than white space stands between them, and they are on
+// different lines or at least 8 code points from each other. Two unrelated damages that touch are one damage of
+// another kind, e.g. a missing comma right before a missing colon. And with nothing but white space between them, one
+// can take away what the other is seen by, also across a line end: a comma that is missing at the end of a line
+// leaves no trace when the entry on the next line is replaced by `# ...`.
 function sitApart(scanned: Scan, left: readonly Edit[], right: readonly Edit[]) {
   const {codePoints} = scanned
   for (const first of left) {
     for (const second of right) {
       const [early, late] = first.at <= second.at ? [first, second] : [second, first]
-      const from = early.at + early.remove
-      if (late.at - from < 8 && !codePoints.slice(from, late.at).includes('\n')) return false
+      const between = codePoints.slice(early.at + early.remove, late.at)
+      if (between.every(isWhitespace) || (between.length < 8 && !between.includes('\n'))) return false
     }
   }
   return true
