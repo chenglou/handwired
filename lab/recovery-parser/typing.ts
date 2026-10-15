@@ -1,0 +1,312 @@
+// Typing replays: the texts that an editor holds while a person adds, deletes or changes an entry of a valid document,
+// one text per key press.
+//
+// One rule gives every text. The finished document is the original. The part that the person types is a range of it,
+// and after each key press the text is the finished document without the part of that range that isn't typed yet. An
+// editor that closes quotes and brackets by itself keeps, of that part, the closers of what is open at the cursor, e.g.
+// the closing quote of a key that is half typed. So every text only lacks code points of the original, and every code
+// point in it has a label.
+//
+// Deleting with Backspace passes through the same texts in the opposite order, so a replay of a deletion is a replay
+// of typing with its steps reversed.
+import {highlightReference} from '../../tests/json-search/highlighter/reference.ts'
+import type {Reachable} from './damage/types.ts'
+import {leastReachable} from './damage/types.ts'
+import {type Edit, removeRange} from './edits.ts'
+import type {Random} from './random.ts'
+import {type Container, type Entry, type Scan, isWhitespace} from './scan.ts'
+
+export type TypingStep = {
+  // What was pressed, e.g. `"`, Enter, or Backspace in a deletion.
+  key: string
+  text: string
+  // The removals that turn the finished document into `text`.
+  edits: Edit[]
+  valid: boolean
+  // The kinds of damage in the text, in text order, with the names of damage.ts, e.g. missingComma, openStringAtLineEnd.
+  kinds: string[]
+  reachable: Reachable
+  // Indexes into the finished document of kept code points whose display kind is not scored, e.g. a comma inside an open string.
+  unscoredKinds: number[]
+}
+export type TypingReplay = {
+  finished: string
+  action: 'add an entry' | 'delete an entry' | 'change a value' | 'type the document'
+  // A plain editor inserts only what is typed, e.g. a textarea. An auto-closing editor adds the closing quote or
+  // bracket when the opening one is typed, e.g. VS Code.
+  editor: 'plain' | 'auto-closing'
+  // When the comma that joins a new last entry to the entry before it is typed: before the entry, after it, or never.
+  // 'none' when the typed range needs no such comma.
+  comma: 'first' | 'last' | 'never' | 'none'
+  // What is typed, in words, e.g. "the last member of an object at depth 2".
+  target: string
+  steps: TypingStep[]
+}
+
+const isValidNumber = (text: string) => /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(text)
+
+// How many code points of an escape are typed when the cursor is inside one, e.g. 1 right after a backslash and 4
+// after \u00, or 0 when the cursor is not inside an escape. `stringStart` is the string's opening quote.
+function partialEscape(codePoints: readonly string[], stringStart: number, cursor: number) {
+  for (let index = stringStart + 1; index < cursor; index++) {
+    if (codePoints[index] !== '\\') continue
+    const end = index + (codePoints[index + 1] === 'u' ? 6 : 2)
+    if (cursor < end) return cursor - index
+    index = end - 1
+  }
+  return 0
+}
+
+type Target = {
+  action: TypingReplay['action']
+  // The range of the finished document that is typed, in typing order.
+  from: number
+  to: number
+  // The position of the joining comma when it is typed apart from the range, or -1.
+  comma: number
+  commaMode: TypingReplay['comma']
+  // The entry that is added, deleted or changed, or null when the whole document is typed.
+  entry: Entry | null
+  description: string
+}
+
+function chooseTarget(random: Random, scanned: Scan): Target | undefined {
+  const {codePoints} = scanned
+  const action = random.weighted([['add an entry', 58], ['delete an entry', 17], ['change a value', 17], ['type the document', 8]] as const)
+  if (action === 'type the document' || scanned.entries.length === 0) {
+    return {action: 'type the document', from: 0, to: codePoints.length, comma: -1, commaMode: 'none', entry: null, description: 'the whole document'}
+  }
+  if (action === 'change a value') {
+    // Mostly the value of a member, and mostly a scalar or a string.
+    const members = scanned.entries.filter(entry => entry.key !== null)
+    const pool = members.length > 0 && random.chance(0.85) ? members : scanned.entries
+    const short = pool.filter(entry => entry.value.container === null)
+    const entry = random.pick(short.length > 0 && random.chance(0.9) ? short : pool)
+    return {action, from: entry.value.start, to: entry.value.end, comma: -1, commaMode: 'none', entry, description: `the ${entry.value.type} value of ${entry.key === null ? 'an item' : 'a member'} at depth ${entry.container.depth}`}
+  }
+  // People append: the new entry is the last of its container in most replays.
+  const last = scanned.entries.filter(entry => entry.commaAfter === -1 && entry.index > 0)
+  const middle = scanned.entries.filter(entry => entry.commaAfter !== -1)
+  const only = scanned.entries.filter(entry => entry.commaAfter === -1 && entry.index === 0)
+  const place = random.weighted([['last', last.length > 0 ? 65 : 0], ['middle', middle.length > 0 ? 30 : 0], ['only', only.length > 0 ? 5 : 0]] as const)
+  const pool = place === 'last' ? last : place === 'middle' ? middle : only
+  if (pool.length === 0) return undefined
+  const short = pool.filter(entry => entry.value.container === null)
+  const entry = random.pick(short.length > 0 && random.chance(0.8) ? short : pool)
+  const container = entry.container
+  const what = `${entry.key === null ? 'item' : 'member'} of an ${container.type} at depth ${container.depth}`
+  if (place === 'last') {
+    const comma = container.entries[entry.index - 1]!.commaAfter
+    // Backspace over a last entry ends at the comma before it, which is the order "comma first" read backwards.
+    const commaMode = action === 'delete an entry' ? 'first' : random.weighted([['first', 60], ['last', 25], ['never', 15]] as const)
+    return {action, from: commaMode === 'first' ? comma : comma + 1, to: entry.end, comma: commaMode === 'first' ? -1 : comma, commaMode, entry, description: `the last ${what}`}
+  }
+  if (place === 'only') {
+    // The brackets were there before. When the closer is on a line of its own, that line was there too.
+    const closerOnOwnLine = codePoints.slice(entry.end, container.close).includes('\n')
+    return {action, from: container.open + 1, to: closerOnOwnLine ? entry.end : container.close, comma: -1, commaMode: 'none', entry, description: `the only ${what}`}
+  }
+  // An entry before another one. In a container on several lines the person presses Enter at the end of the line
+  // above and types the entry and its comma. Inside a line the person types the entry, its comma and the space.
+  let before = entry.start
+  while (before > 0 && isWhitespace(codePoints[before - 1])) before--
+  const ownLine = codePoints.slice(before, entry.start).includes('\n')
+  const next = container.entries[entry.index + 1]!
+  // In some replays of a new line, the comma after the new entry is never typed.
+  const never = action === 'add an entry' && ownLine && random.chance(0.15)
+  const to = never ? entry.end : ownLine ? entry.commaAfter + 1 : next.start
+  return {action, from: ownLine ? before : entry.start, to, comma: never ? entry.commaAfter : -1, commaMode: never ? 'never' : 'none', entry, description: `${entry.index === 0 ? 'the first' : 'a middle'} ${what}`}
+}
+
+// The cursor positions after each key press while the range is typed: one code point per key press, and a line feed
+// with the indentation after it as one, since Enter brings the indentation.
+function cursorStops(codePoints: readonly string[], from: number, to: number) {
+  const stops: {cursor: number, key: string}[] = []
+  let cursor = from
+  while (cursor < to) {
+    const character = codePoints[cursor]!
+    let next = cursor + 1
+    if (character === '\n') while (next < to && (codePoints[next] === ' ' || codePoints[next] === '\t')) next++
+    stops.push({cursor: next, key: character === '\n' ? 'Enter' : character === ' ' ? 'Space' : character === '\t' ? 'Tab' : character})
+    cursor = next
+  }
+  return stops
+}
+
+export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | undefined {
+  const {codePoints} = scanned
+  const target = chooseTarget(random, scanned)
+  if (target === undefined) return undefined
+  // Backspace from the end of an entry deletes the closers first, also those that an editor had added, so a deletion
+  // passes through the texts of a plain editor in every editor.
+  const editor: TypingReplay['editor'] = target.action === 'delete an entry' || random.chance(0.5) ? 'plain' : 'auto-closing'
+  const {from, to} = target
+  const inRange = (position: number) => position >= from && position < to
+  const strings = scanned.strings.filter(part => inRange(part.start))
+  const containers = scanned.containers.filter(container => inRange(container.open))
+
+  // The text after the cursor reached `cursor`, with the joining comma typed or not.
+  const stepAt = (cursor: number, commaTyped: boolean, key: string): TypingStep => {
+    // What an auto-closing editor has put after the cursor: the closers of the strings and containers that are open.
+    const kept = new Set<number>()
+    if (editor === 'auto-closing') {
+      for (const part of strings) if (part.start < cursor && cursor <= part.end - 1) kept.add(part.end - 1)
+      for (const container of containers) {
+        if (!(container.open < cursor && cursor <= container.close && container.close < to)) continue
+        kept.add(container.close)
+        // After Enter inside the new brackets, the editor has put the closer on a line of its own.
+        if (codePoints.slice(container.open + 1, cursor).includes('\n')) {
+          for (let index = container.close - 1; index >= cursor && isWhitespace(codePoints[index]); index--) kept.add(index)
+        }
+      }
+    }
+    const edits: Edit[] = []
+    if (!commaTyped && target.comma !== -1) edits.push(removeRange(target.comma, target.comma + 1))
+    let start = -1
+    for (let index = cursor; index <= to; index++) {
+      const removed = index < to && !kept.has(index)
+      if (removed && start === -1) start = index
+      if (!removed && start !== -1) {
+        edits.push(removeRange(start, index))
+        start = -1
+      }
+    }
+    let text = ''
+    let position = 0
+    for (const edit of edits) {
+      text += codePoints.slice(position, edit.at).join('')
+      position = edit.at + edit.remove
+    }
+    text += codePoints.slice(position).join('')
+    const valid = highlightReference(text).valid === 1
+    const step: TypingStep = {key, text, edits, valid, kinds: [], reachable: 'yes', unscoredKinds: []}
+    if (valid) return step
+
+    // The text after the cursor: what the editor kept, and the document after the typed range.
+    const tail = [...[...kept].sort((left, right) => left - right).map(index => codePoints[index]!), ...codePoints.slice(to)]
+    const nextToken = (skip: number) => {
+      let index = skip
+      let lineFeed = false
+      while (index < tail.length && isWhitespace(tail[index])) {
+        if (tail[index] === '\n') lineFeed = true
+        index++
+      }
+      return {character: tail[index], lineFeed}
+    }
+    const reachable: Reachable[] = []
+    const add = (kind: string, flag: Reachable) => {
+      step.kinds.push(kind)
+      reachable.push(flag)
+    }
+    if (target.action === 'type the document' && editor === 'plain') {
+      // The text is the start of the document and stops at the cursor.
+      add('cutOff', 'yes')
+      return step
+    }
+    const commaPending = !commaTyped && target.comma !== -1
+    // The entry before this one has no comma yet, and a part of this entry is there.
+    if (commaPending && target.entry !== null && target.comma < target.entry.start && cursor > target.entry.start) add('missingComma', 'yes')
+    // After a key or after a colon, what follows decides: a closer or a comma can be read as they are, the next key on
+    // a new line needs the line feed to be told from a value, and on the same line nothing tells them apart.
+    const afterKeyOrColon = (skip: number): Reachable => {
+      const {character, lineFeed} = nextToken(skip)
+      if (character === '}' || character === ',') return 'yes'
+      return character === '"' && lineFeed ? 'line rule' : 'no'
+    }
+    const openString = strings.find(part => part.start < cursor && cursor <= part.end - 1)
+    const typedKey = strings.find(part => part.role === 'key' && part.end === cursor)
+    // A member whose colon is there and whose value is not started: one that is being typed, or the one whose value was deleted.
+    const afterColon = scanned.entries.find(entry => entry.colon !== -1 && entry.colon < cursor && cursor <= entry.value.start && entry.value.start >= from && entry.value.start <= to)
+    const literal = scanned.literals.find(value => value.start < cursor && cursor < value.end && inRange(value.start))
+    const number = scanned.numbers.find(value => value.start < cursor && cursor < value.end && inRange(value.start))
+    if (openString !== undefined && editor === 'plain') {
+      // The string is open. It ends its line when nothing but one comma is left on the line after the cursor.
+      let index = 0
+      if (tail[0] === ',') index = 1
+      while (tail[index] === ' ' || tail[index] === '\t' || tail[index] === '\r') index++
+      const atLineEnd = index >= tail.length || tail[index] === '\n'
+      add(atLineEnd ? 'openStringAtLineEnd' : 'openStringMidLine', atLineEnd ? 'line rule' : 'no')
+      // A comma right after the cursor is inside the open string.
+      if (atLineEnd && tail[0] === ',') step.unscoredKinds.push(to)
+    } else if (openString !== undefined) {
+      // The editor closed the string's quote, which is the first code point after the cursor.
+      const escapeTyped = partialEscape(codePoints, openString.start, cursor)
+      if (escapeTyped === 1) {
+        // A backslash alone escapes the quote that the editor added, so the string is open after all.
+        let index = 1
+        const commaInside = tail[1] === ',' && kept.size === 1
+        if (commaInside) index = 2
+        while (tail[index] === ' ' || tail[index] === '\t' || tail[index] === '\r') index++
+        const atLineEnd = index >= tail.length || tail[index] === '\n'
+        add(atLineEnd ? 'openStringAtLineEnd' : 'openStringMidLine', atLineEnd ? 'line rule' : 'no')
+        // The quote reads as part of an escape, and a comma after it as the string's content.
+        if (atLineEnd) step.unscoredKinds.push(openString.end - 1, ...(commaInside ? [to] : []))
+      } else {
+        // The start of a \u escape that has not all of its digits yet, before the closing quote.
+        if (escapeTyped > 1) add('unescapedBackslash', 'yes')
+        // In a key, the colon and the value are not typed.
+        if (openString.role === 'key') add('keyWithoutColon', afterKeyOrColon(1))
+      }
+    } else if (typedKey !== undefined) {
+      add('keyWithoutColon', afterKeyOrColon(0))
+    } else if (afterColon !== undefined) {
+      add('colonWithoutValue', afterKeyOrColon(0))
+    } else if (literal !== undefined) {
+      add('partialLiteral', 'yes')
+    } else if (number !== undefined && !isValidNumber(codePoints.slice(number.start, cursor).join(''))) {
+      add('partialNumber', 'yes')
+    }
+    const open = containers.filter(container => container.open < cursor && cursor <= container.close && container.close < to)
+    if (open.length > 0 && editor === 'plain') {
+      // The new container has no closer yet. Only the closer of the container around it, when it is of the other kind,
+      // shows where the new one ends.
+      const innermost: Container = open.at(-1)!
+      const {character} = nextToken(0)
+      const closesBoth = open.length === 1 && innermost.parent !== null && innermost.parent.type !== innermost.type && character === (innermost.parent.type === 'object' ? '}' : ']')
+      add('missingCloser', closesBoth ? 'yes' : 'no')
+    }
+    // The last thing typed, apart from white space.
+    let lastTyped = cursor - 1
+    while (lastTyped >= from && isWhitespace(codePoints[lastTyped])) lastTyped--
+    const lastTypedIsComma = lastTyped >= from && codePoints[lastTyped] === ',' && scanned.entries.some(entry => entry.commaAfter === lastTyped)
+    if (lastTypedIsComma && !step.kinds.includes('missingCloser')) {
+      // A comma with nothing typed after it: the closer of its container follows it.
+      const closer = nextToken(0).character
+      if (closer === '}' || closer === ']') add('trailingComma', 'yes')
+      else if (closer === ',') add('extraComma', 'yes')
+    }
+    const entryKinds = step.kinds.filter(kind => kind !== 'missingComma').length
+    // In an auto-closing editor a new container is closed from the start, so what is half typed inside it is one
+    // damage, and the comma that is missing after its closer is another.
+    const closedByEditor = target.entry?.value.container !== null && target.entry !== null && kept.has(target.entry.value.container!.close)
+    if ((entryKinds === 0 || closedByEditor) && target.entry !== null && cursor > target.entry.start && target.entry.commaAfter !== -1 && target.entry.commaAfter >= cursor && target.action !== 'change a value') {
+      // The new entry is complete, in an auto-closing editor as soon as its value is closed, and the comma that joins
+      // it to the next entry is not typed.
+      add('missingComma', 'yes')
+    }
+    if (target.action === 'change a value' && cursor === from && target.entry !== null && target.entry.colon === -1) {
+      // An item was deleted and its commas stayed.
+      const {character} = nextToken(0)
+      const previous = target.entry.index === 0 ? '[' : ','
+      if (character === ',') add('extraComma', 'yes')
+      else if (character === ']' && previous === ',') add('trailingComma', 'yes')
+    }
+    step.reachable = leastReachable(reachable)
+    return step
+  }
+
+  const stops = cursorStops(codePoints, from, to)
+  const steps: TypingStep[] = []
+  // The text before the first key press: the document without the typed range. A document typed from the top starts
+  // from an empty text, which is not a step.
+  if (target.action !== 'type the document') steps.push(stepAt(from, false, target.action === 'change a value' ? 'the old value is selected and deleted' : 'before the first key press'))
+  for (const stop of stops) steps.push(stepAt(stop.cursor, false, stop.key))
+  if (target.commaMode === 'last') steps.push(stepAt(to, true, ','))
+  // A key press that moves the cursor over a closer that the editor had typed changes no text.
+  const distinct = steps.filter((step, index) => index === 0 || step.text !== steps[index - 1]!.text)
+  if (target.action === 'delete an entry') {
+    distinct.reverse()
+    distinct.forEach((step, index) => { step.key = index === 0 ? 'before the first key press' : 'Backspace' })
+  }
+  return {finished: scanned.text, action: target.action, editor, comma: target.commaMode, target: target.description, steps: distinct}
+}
