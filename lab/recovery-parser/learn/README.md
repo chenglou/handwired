@@ -35,7 +35,7 @@ The rules rest on which cells are open. `recovery-tables.ts` finds the frozen ce
 
 How the rules are checked:
 
-- `check-tables.ts`: for each of the 236 frozen cells, a text reads the cell before any error, so no cell is frozen without need. And no text reads an open cell before its first error: 81,051 texts, among them the originals and the broken texts of 30,000 samples, and valid texts with 16 levels and with 512 code points. The same holds for every text of up to 6 code points, which the check goes through class by class, 17,303,316 texts. A table file with a changed frozen cell is refused, and so is one with a number that a byte does not hold.
+- `check-tables.ts`: for each of the 236 frozen cells, a text reads the cell before any error, so no cell is frozen without need. And no text reads an open cell before its first error: 81,051 texts, among them the originals and the broken texts of 30,000 samples, and valid texts with 16 levels and with 512 code points. The same holds for every text of up to 6 code points, which the check goes through class by class, 17,303,316 texts. A table file with a changed frozen cell is refused, and so is one with a number that a byte does not hold. Every cell is also changed alone, in each of its two fields, and so is every bit of the masks of open cells: the 2,434 changes of a frozen cell or of a mask are refused, and the 2,652 changes of an open cell are not.
 - `check-parser.ts`: with today's tables the parser gives the trace of `table-parser.ts` on 71,051 texts. And for 200 random settings of every open cell, 50 of them with added states, rules 1 and 2 hold on 5,906 texts each, with every valid text's whole trace identical.
 - Both checks then run the same parts for tables with added structure, which is most of their time. `structure/README.md` says what those parts cover.
 - A review ran its own exact search over 4,063,196 parser states, with the kind of every open container, and found the same 148 and 88 frozen cells. It also ran 276 settings of the open cells and the saved tables of the arms on 80,381 texts of its own, with no difference from today's parser before a first error or in a verdict. Those scripts are not in the repo.
@@ -60,6 +60,7 @@ What a port of trained tables into the highlighter's program would need:
 - A stack action per grammar cell, read next to the next state. The depth then changes by the action, not by the event.
 - Kinds that stay right after any pop: a pop has to clear the bit of the level it leaves, whichever bracket caused it, and a push has to set the bit by the action, not by the bracket. The program's test "is the innermost container an object" compares the sum with the bit of the current level, which is only right when no bit above that level is set.
 - Today's tables next to the trained ones for the verdict. The program takes the first position whose grammar state is `error` as the first error. Trained tables can leave that state or never enter it, so `valid`, the first error's position and its kind have to come from today's tokenizer event and today's grammar cell at each position up to the first error.
+- For added classes that hold a code point from U+0080 up, see `structure/README.md`: a way to give a few such code points a class without a table that reaches up to them. The class table here has one entry per code point up to the highest one of an added class, e.g. 8,224 entries for a class of the two curly quotes and 128,515 for a class of an emoji, against 129 today.
 
 ## How a parser is scored
 
@@ -141,8 +142,8 @@ bun lab/recovery-parser/learn/score.ts                             # today's tab
 bun lab/recovery-parser/learn/score.ts --tables <file.json> --split validation --cells
 bun lab/recovery-parser/learn/score.ts --to 20000 --split train,validation,test
 bun lab/recovery-parser/learn/compare.ts <name>=<file.json> ...    # one row per saved tables, as the table of scores
-bun lab/recovery-parser/learn/check-tables.ts                      # about 40 s
-bun lab/recovery-parser/learn/check-parser.ts                      # about 40 s
+bun lab/recovery-parser/learn/check-tables.ts                      # about 45 s
+bun lab/recovery-parser/learn/check-parser.ts                      # about 45 s
 bun lab/recovery-parser/learn/check-data.ts 20000 --stats <a file written by lab/recovery-parser/stats.ts over 20000 samples>
 bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth on valid JSON of 17 to 19 levels
 bunx tsc -p lab/recovery-parser/learn                              # type-checks this folder and the folders in it

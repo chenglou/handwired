@@ -1,6 +1,6 @@
 # More structure for the parser
 
-The shared core lets an arm change open cells and add tokenizer states and grammar states (`addStates`). This folder documents what else an arm can add, each as a function of `../recovery-tables.ts` that takes tables and returns tables. `../handwritten/rules-with-structure.md` says why a programmer would want them. With none of them used, tables, the parser, the twin and saved files are what they were.
+The shared core lets an arm change open cells and add tokenizer states and grammar states (`addStates`). This folder documents what else an arm can add, each as a function of `../recovery-tables.ts` that takes tables and returns tables. `../handwritten/rules-with-structure.md` says why a programmer would want them. With none of them used, tables, the parser, the twin and saved files are what they were. The exact parser got about 6% slower for such tables: a scoring pass over the train split takes 143 to 145 ms where it took 135 to 137 ms before the three were built.
 
 Every number here is preliminary: the dataset is a snapshot that a reviewed version will replace.
 
@@ -24,7 +24,7 @@ The code points of one new class have to come from one class, since the new cell
 
 **Saving and names.** A saved file has the field `addedClasses` when the tables have some, and no other field changes for tables without. `loadTables` checks that the file's class table is today's with the added classes. A cell of a new class is named with the class's name, e.g. "(between, apostrophe)". `differencesOf(asIsTables(), tables)` compares a cell of a new class with today's cell of the class that its code points came from, so `score.ts`, `compare.ts` and `handwritten/show.ts` say for such tables what differs from today's parser.
 
-**The twin** needs nothing new: a class is a column of the tokenizer's table, and the twin reads the column of the code point's class. The classes of the samples have to be the ones of the twin's tables, so `packForTwin` takes the tables as its fourth argument, and a run on samples that were packed for other classes throws.
+**The twin** needs nothing new: a class is a column of the tokenizer's table, and the twin reads the column of the code point's class. The classes of the samples have to be the ones of the twin's tables, so `packForTwin` takes the tables as its fourth argument. The packed samples carry a key of those tables' class table (`classTableKeyOf` in `../soft/twin.ts`, a hash of the table), and a run throws when the twin's tables give some code point another class. That also holds for two lists of added classes of the same length, e.g. a twin with a class for `#` on samples that were packed for a class for the apostrophe. Two lists that give every code point the same class are taken as the same, whatever the classes' names are.
 
 ```ts
 const base = addStates(addClasses(asIsTables(), [{name: 'apostrophe', codePoints: [0x27]}]), 2, [])
@@ -53,6 +53,8 @@ tables.display[displayEntryOf(tables, eventNames.indexOf('literalStart'), gramma
 
 **Saving and names.** A saved file has the field `displayOpen` when the tables have open entries. `differencesOf` lists a changed entry under the table `display`, with the event and the state as its name and the kinds as its choices, e.g. "(literalStart, colon)  literal -> key". `cellsReadAt` and `withUnreadCellsOf` of `../score.ts` count the entries like cells, and `handwritten/show.ts --cells` prints the entry that a step read when the tables have open ones.
 
+**The count "cells that differ from today's tables"** of `../score.ts`, `../compare.ts` and the trainer's log comes from `differencesOf`, so for tables with open entries the count includes the changed entries. For tables without open entries the count is what it was before the display table could be open, e.g. 432 for an older file of tables with 2 added tokenizer states and an added grammar state. Against tables that lack an added grammar state, `differencesOf` lists the state's cells, 88 of them or 176 with the bit, and of its 25 entries only the open ones: 22 with open entries, since the three entries of a text's end hold `pastEnd`, and none without, since the state's column is then the copy that `addStates` was told to make and no cell that a run can change.
+
 **The twin** holds a mix over the 9 display kinds per open entry, the softmax of 9 weights in which `pastEnd` has the share 0 whatever its weight is. The display kind's share of a step is the sum over (event, grammar state after) of the product of the two shares, put on the kind of the table for an entry that is not open, and split by the entry's mix for an open one. The weights are a fifth group next to the four of the cells, `display`, and `createModel` makes every open entry trainable unless `trainable.display` says otherwise. `snappedTables` gives an entry the kind with the largest weight, never `pastEnd`.
 
 ```ts
@@ -77,7 +79,9 @@ const tables = addFirstOnLineBit(asIsTables())
 const cell = grammarCellOf(tables, grammarStateNames.indexOf('commaOrClose'), tokenNames.indexOf('string'), 8 + 3)
 ```
 
-`addFirstOnLineBit(tables)` returns tables whose grammar has 16 contexts in place of 8. The parser keeps one bit: a line feed code point sets it, and the first code point after it whose token is not `none` reads it and clears it. So white space and the inside of a string leave the bit as it is, and a line feed sets it whatever its own token is. The grammar reads the bit next to the depth class and the kind of the innermost container: context + 8 is the context with the bit. A text's first token does not have the bit, since no line feed comes before it.
+`addFirstOnLineBit(tables)` returns tables whose grammar has 16 contexts in place of 8. The parser keeps one bit: a line feed code point sets it, and the first code point after it whose token is not `none` clears it. So white space and the inside of a string leave the bit as it is, and a line feed sets it whatever its own token is. The grammar reads the bit next to the depth class and the kind of the innermost container: context + 8 is the context with the bit. A text's first token does not have the bit, since no line feed comes before it.
+
+**Every code point reads its grammar cell with the bit while the bit is set**, not only the token that clears it. E.g. in `[`, a line feed, two spaces and `1`, the two spaces read the cell (valueOrClose, none, depth 1, array, first on its line), and the `1` reads (valueOrClose, scalar, depth 1, array, first on its line). So the cells of the token `none` have a copy with the bit too: 64 cells in today's 8 grammar states, 38 of them open. A recovery that sets a cell of the token `none`, e.g. "white space keeps the grammar state after an error", has to set both copies, and the indentation of a line can be trained to do something else than the white space inside a line.
 
 A cell with the bit starts as a copy of the cell without, so the returned tables read every text exactly as `tables` do, until a cell with the bit is changed.
 
@@ -87,9 +91,9 @@ A cell with the bit starts as a copy of the cell without, so the returned tables
 
 **Saving and names.** A saved file has `contextCount` 16 and nothing else new. A cell with the bit is named with its context, e.g. "(commaOrClose, string, depth 1, object, first on its line)". `differencesOf(asIsTables(), tables)` compares a cell with the bit with today's cell without.
 
-**The twin** holds the bit as one more share. Before a step, the bit's share of every context goes to the context with the bit. After the step the bit is 1 at a line feed, and otherwise the share before times the share of the token `none`. `packForTwin` takes the bit at the first error from the exact parser, when it is given the tables.
+**The twin** holds the bit as one more share. Before a step, the bit's share of every context goes to the context with the bit. After the step the bit is 1 at a line feed, and otherwise the share before times the share of the token `none`. `packForTwin` takes the bit at the first error from the exact parser, when it is given the tables. With one share for the bit, the twin cannot say which tokenizer states the bit goes with once its state is a mix, e.g. after a quote that ends a string in one half of the state and starts one in the other: see "Where the twin loses information" in `../soft/README.md`.
 
-Keeping a run on track (`onTrackProbability`) replaces the tokenizer state, the grammar state, the depth and the stack by the intended ones, and **not the bit**: the bit follows from the line feeds of the broken text, and the bit of the original can be one that no parser of the broken text has, e.g. after a removed line feed. Gradients cross a replaced state through the bit only.
+Keeping a run on track (`onTrackProbability`) replaces the tokenizer state, the grammar state, the depth and the stack by the intended ones, and **not the bit**: the bit follows from the line feeds of the broken text, and the bit of the original can be one that no parser of the broken text has, e.g. after a removed line feed. Gradients cross a replaced state through the bit only. `../soft/check-twin.ts` runs every sample kept on track and compares the twin's bit at every step with a count from the text's line feeds and the run's tokens.
 
 ## Using them together
 
@@ -105,14 +109,30 @@ const model = createModel(base)
 
 ## What the checks cover
 
-Each check of the core and of the twin runs as before for today's tables, with the same texts and the same random settings, and then for tables with added structure. The classes that the checks add are in `../check-texts.ts`: the apostrophe, the two curly double quotes, U+00A0, the signs `=` `#` `*` and the round brackets, five classes, all taken from `other`.
+Each check of the core and of the twin runs as before for today's tables, with the same texts and the same random settings, and then for tables with added structure. The classes that the checks add are in `../check-texts.ts`, eight of them. Five are taken out of `other`: the apostrophe, the two curly double quotes, U+00A0, the signs `=` `#` `*` and the round brackets. Three are not, so that the checks also run the code that reads which class of today's the code points of an added class have: the digits 7 to 9 out of `digit`, the carriage return out of `tabOrCarriageReturn`, and the 7 once more, out of the added class of the digits 7 to 9. Valid JSON reads a digit and a carriage return between tokens, where a code point of `other` is an error, so code that takes such a class for one out of `other` makes a check fail.
 
-- `../check-tables.ts`, for each of the three alone and for all three with added states. With the five classes the tokenizer's table has 988 cells, 153 frozen and 835 open. With open entries the display table has 140 open entries. With the bit the grammar's table has 176 frozen cells. Each frozen cell, and each of the 37 entries that the search found, has a text that today's parser reads without an error up to it. No text reads an open cell or an open entry before its first error: the 81,051 texts of before, 4,000 texts with code points of the five classes inside strings and between tokens, and every text of up to 6 code points, with one code point per class, 38,856,146 texts with the five classes. The first two of these run today's parser, `../table-parser.ts`, and work out the cell themselves: the cell of a new class from the code point, and the bit from the text's line feeds and the trace's tokens. Tables with added structure are the same after saving and loading, and the four functions give the same tables in every order. Refused: a changed frozen cell of a new class or with the bit, a file whose class table does not fit its added classes, five lists of classes that cannot be, a changed entry that a text reads before an error, `pastEnd` in an open entry, another kind for an event of a text's end, and a changed entry in tables without open entries.
-- `../check-parser.ts`, part c, for each of the three alone and for all three, on 6,906 texts: with no cell changed, the tables give the trace of `asIsTables()` at all 513 positions, with the class of a code point compared as the class it has today and the context without the bit. 198,937 code points of those texts read a context with the bit. With 40 random settings of every open cell and every open entry, 10 of them with added states, every text has today's trace before its first error and today's verdict. In every run, the bit of every position's context is the one that the check counts from the trace's line feeds and tokens.
-- `../soft/check-twin.ts`, for each of the three alone and for all three: with today's choices and with 4 random settings, one of them with added states, the twin with exact tables is the exact parser on the 2,500 samples, the context with the bit among what is compared. 12,500 runs each, none differs when the depth range holds the run's depths.
-- `../soft/check-gradient.ts`: three more settings, with the five classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit, on 24 samples of which 11 need a class. Two of the settings keep the run on track, so the gradient crosses replaced states through the bit. All five groups of weights are compared, the display table's 1,458 weights among them. The backward pass agrees with finite differences as for today's tables: the largest relative difference of a direction is 7.8e-8.
-- `../soft/check-circuit.ts`: the step of tables with the five classes, an added grammar state, open entries and the bit, as a Handwired circuit of 74,712 source cells and 77,301 operations, has the twin's values and gradients in 4 trials, one of them at a line feed.
-- `../soft/check-train.ts`, part 6: with the same structure, the gradients of 4 threads are one thread's, a trained model's snapped tables keep the ground rules and are the same after saving and loading, and `onlyReadCells` gives the trained texts the trace of the snapped tables.
+- `../check-tables.ts`, for each of the three alone and for all three with added states.
+  - With the eight classes the tokenizer's table has 1,066 cells, 184 frozen and 882 open: a class out of `other` has 1 frozen cell, each of the two classes of digits has 13, and the carriage return's has 5. With open entries the display table has 140 open entries. With the bit the grammar's table has 176 frozen cells.
+  - Each frozen cell, and each of the 37 entries that the search found, has a text that today's parser reads without an error up to it.
+  - No text reads an open cell or an open entry before its first error: the 81,051 texts of before, 4,000 texts with code points of the eight classes inside strings and between tokens, and every text of up to 6 code points, with one code point per class, 54,305,443 texts with the eight classes. The first two of these run today's parser, `../table-parser.ts`, and work out the cell themselves: the cell of a new class from the code point, and the bit from the text's line feeds and the trace's tokens.
+  - Tables with added structure are the same after saving and loading, and the four functions give the same tables in every order.
+  - Refused: a changed frozen cell of a new class or with the bit, a file whose class table does not fit its added classes, five lists of classes that cannot be, a changed entry that a text reads before an error, `pastEnd` in an open entry, another kind for an event of a text's end, and a changed entry in tables without open entries.
+  - Every cell in each of its two fields, every entry and every bit of the three masks is changed, one at a time, in each of the five kinds of tables. The 14,496 changes of a frozen cell, of an entry that is not open or of a mask are all refused, and the 17,230 changes of an open cell or an open entry are not.
+  - `differencesOf` lists the 154 cells of 2 added tokenizer states and an added grammar state and no entry of the display table, and with open entries the state's 22 open entries too. No difference from today's tables is listed as one in a frozen cell.
+- `../check-parser.ts`, on 6,906 texts.
+  - Part c, for each of the three alone and for all three. With no cell changed, the tables give the trace of `asIsTables()` at all 513 positions, with the class of a code point compared as the class it has today and the context without the bit. 198,972 code points of those texts read a context with the bit. With 40 random settings of every open cell and every open entry, 10 of them with added states, every text has today's trace before its first error and today's verdict. In every run, the bit of every position's context is the one that the check counts from the trace's line feeds and tokens, and the two cells that the trace names are the cells of its state, class, token and context.
+  - Part d: structure that is added to tables whose open cells are changed already. Each step gives every open cell and entry a random choice and then adds one kind of structure: two classes that are taken out of added classes (the 9 out of the digits 7 to 9, the star out of the signs), the bit, open entries, added states. Every text has the same trace at all 513 positions before and after each step. So a new class's cell is a copy of the cell of the class that its code points came out of, also when that cell is changed.
+  - Part e: tables with 133 classes, 255 tokenizer states, 200 grammar states and the bit have 33,915 tokenizer cells and 35,200 grammar cells, more than 16 bits can number. The trace names the cells that were read, which `cellsReadAt` and `withUnreadCellsOf` go by, and the ground rules hold.
+- `../soft/check-twin.ts`, for each of the three alone and for all three.
+  - With today's choices and with 4 random settings, one of them with added states, the twin with exact tables is the exact parser on the 2,500 samples, the context with the bit among what is compared. 12,500 runs each, none differs when the depth range holds the run's depths.
+  - For the tables with the bit, the same 12,500 runs once more, kept on track after every code point whose intended state can be followed. No parser gives the trace of such a run, so the check counts the bit itself from the text's line feeds and the run's tokens, and the twin's bit before and after every step has to be that count. 1,546,725 states are replaced, about 260,000 of them while the bit is set.
+  - Samples that were packed for other tables are refused: for today's classes, for another list of added classes of the same length, and for tables with or without the bit where the twin's tables are the other way round. Samples packed for the same classes under other names run.
+- `../soft/check-gradient.ts`: three more settings, with the eight classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit, on 24 samples of which 11 need a class. Two of the settings keep the run on track, so the gradient crosses replaced states through the bit. All five groups of weights are compared, the display table's 1,458 weights among them. The backward pass agrees with finite differences as for today's tables: the largest relative difference of a direction is 1.1e-7.
+- `../soft/check-circuit.ts`: the step of tables with the eight classes, an added grammar state, open entries and the bit, as a Handwired circuit of 78,693 source cells and 81,357 operations, has the twin's values and gradients in 4 trials, one of them at a line feed.
+- `../soft/check-train.ts`, part 6, with the same structure.
+  - The gradients of 4 threads are one thread's, a trained model's snapped tables keep the ground rules and are the same after saving and loading, and `onlyReadCells` gives the trained texts the trace of the snapped tables.
+  - With the weight of `pastEnd` the largest of every open entry, no entry's mix gives `pastEnd` a share, at the temperatures 1 and 0.5, and no entry snaps to `pastEnd`.
+  - With a tenth of the open cells and of the open entries trainable, 21 of the 162 entries: the model's trainable cells are the masks that `createModel` was given, every other cell's mix is the base's choice as exact 0 and 1, no weight of another cell or entry moves, and the snapped tables differ from the base in trainable cells and entries only.
 
 To see that the checks can fail, the new code was broken on purpose, one place at a time, and a check failed each time:
 
@@ -129,6 +149,28 @@ To see that the checks can fail, the new code was broken on purpose, one place a
 | the bit's gradient cleared at a replaced state | `check-gradient.ts` |
 | the parser's bit not cleared by a string | `check-parser.ts`, `check-twin.ts` |
 | the cells (any state, string) with the bit not frozen | `check-tables.ts` |
+
+Two reviews then broke more places, in scratch copies of the code, and six of their changes passed every check of that time. The checks were extended until each of the six makes a check fail:
+
+| Broken | Passed, before the checks were extended | Fails now |
+| --- | --- | --- |
+| every added class is taken for one out of `other`, in four places: where the parser finds the first error, the search for frozen cells, `problemsOf`, and the cell that `addClasses` copies. With a class for the 7, the valid text `[7]` is then broken | the 8 checks that run tables | `check-tables.ts`, `check-parser.ts`, `check-twin.ts`, `check-gradient.ts`, `check-train.ts` |
+| an open entry's mix gives `pastEnd` a share | the four checks of `../soft` | `check-train.ts` |
+| snapping picks `pastEnd` when its weight is the largest | `check-train.ts` | `check-train.ts` |
+| `createModel` makes every open entry trainable, whatever `trainable.display` says | `check-gradient.ts`, `check-train.ts` | `check-train.ts` |
+| an open entry that is not trainable has no share in the mixes | the four checks of `../soft` | `check-train.ts` |
+| after a replaced state the twin's bit is 0, and the bit's gradient is cleared there too | the four checks of `../soft` | `check-twin.ts` |
+
+And more places, each broken alone with the extended checks:
+
+| Broken | Failed |
+| --- | --- |
+| each of the four places of the first row above | `check-tables.ts`, `check-parser.ts` |
+| `addClasses` copies the cell of the class that the code points have today, where it has to copy the cell of the added class that they came out of | `check-parser.ts`, part d |
+| after a replaced state the twin's bit is 0 | `check-twin.ts`, `check-gradient.ts` |
+| samples that were packed for another list of added classes of the same length are not refused | `check-twin.ts` |
+| `differencesOf` lists every display entry of an added grammar state | `check-tables.ts` |
+| the trace keeps the numbers of the two cells in 16 bits | `check-parser.ts` |
 
 ## Smoke runs
 
@@ -168,7 +210,9 @@ What the main number does not show, from `../compare.ts` and `../check-deep.ts`:
 | `display` | 0.0% | 37 | 9.6% |
 | `bit` | 1.0% | 0 | 3.1% |
 
-The run with the bit trains 951 samples per second where the others train 1,724 to 1,877, with 4 worker threads: the grammar's part of a step has twice the cells. On the 49,028 texts of the train and validation splits, each run's tables give today's display kind, depth, container, event and grammar state at every position before the first error, and today's verdict, by a script that is not in the repo.
+The run with the bit trains slower, since the grammar's part of a step has twice the cells: by a third to a half, and the number moves with what else the machine runs. With 4 worker threads on an 18 core machine, three sets of the four runs gave 951 samples per second for `bit` against 1,724 to 1,877 for the others (other jobs gave the machine a load of 10 to 20), 1,229 against 1,770 to 1,809 (a load of 3 to 4), and 1,176 against 1,744 to 1,934 (a load of 4 to 7). The three sets ended with the same four tables, byte for byte.
+
+On the 49,028 texts of the train and validation splits, each run's tables give today's display kind, depth, container, event and grammar state at every position before the first error, and today's verdict, by a script that is not in the repo.
 
 ## Not done
 
@@ -178,4 +222,5 @@ The run with the bit trains 951 samples per second where the others train 1,724 
 - **The marks of the intended states** (`codePointCanFollow`) are made for today's tables. With a class for the apostrophe, a replaced quote reads a cell that no letter reads, so its intended state could be followed, and the marks do not say so. The marks that are set stay right: a state that today's open cells can reach can be reached with more open cells too.
 - **No intended bit.** The twin's extra targets and the states that a run is put on have no bit "first on its line", for the reason given above.
 - **`pastEnd` as a choice of a display entry**, and open entries in the rows of a text's end, are left out on purpose.
+- **No kept check runs `../score.ts`, `../compare.ts` or `../handwritten/show.ts` on tables with structure.** The three were tried by hand on saved tables of each kind. The kept checks cover what they are made of: saving and loading, the names, `differencesOf`, `cellsReadAt` and `withUnreadCellsOf`.
 - **No arm was run and nothing was tuned.** The smoke runs are one seed each, on a dataset that is a snapshot.
