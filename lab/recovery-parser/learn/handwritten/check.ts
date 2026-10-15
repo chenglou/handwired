@@ -3,7 +3,7 @@
 // - The tables keep the ground rules (checkTables), and the parser's trace before a first error is today's.
 // - How often the parser reads an open cell that no rule set, per cell. Such a cell still holds today's choice, e.g.
 //   the grammar state `error`, so a cell that is read often is a rule that is missing.
-// - How many code points are read in the grammar state `error`, which the rules are meant never to enter.
+// - How many code points are read in the grammar state `error`, to which the rules give a meaning.
 // - Per rule, how many samples read one of its cells from the first error on. A rule that no sample reads is there
 //   for completeness only.
 //
@@ -54,7 +54,10 @@ if (import.meta.main) {
         }
       }
       if (tables.lexerOpen[lexerCell] === 1 && handwritten.ruleOfLexerCell[lexerCell] === -1) lexerReads[lexerCell]!++
-      if (tables.grammarOpen[grammarCell] === 1 && handwritten.ruleOfGrammarCell[grammarCell] === -1) grammarReads[grammarCell]!++
+      // A cell of the token `none` that keeps the grammar state is what every rule wants of white space and of a
+      // token's later characters, so it is not counted.
+      const keepsState = trace.token[position] === 0 && tables.grammarNext[grammarCell] === trace.grammarBefore[position]
+      if (tables.grammarOpen[grammarCell] === 1 && handwritten.ruleOfGrammarCell[grammarCell] === -1 && !keepsState) grammarReads[grammarCell]!++
       if (trace.grammarBefore[position] === tables.errorState) {
         codePointsInError++
         inError = true

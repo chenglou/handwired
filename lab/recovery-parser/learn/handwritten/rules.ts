@@ -32,8 +32,9 @@ type CellSetter = {
   lexer: (state: LexerStateName, characterClass: ClassName, next: LexerStateName, event: EventName) => void
   // Without an action the cell keeps `by token`: an opening bracket pushes its kind, a closing bracket pops.
   grammar: (state: GrammarStateName, token: TokenName, context: number, next: GrammarStateName, action?: number) => void
-  // Says that the rule relies on what a grammar cell holds today, e.g. a step into the state `error`, which the rules
-  // give a meaning. The cell is not changed, and it is counted apart from the cells that the rule sets.
+  // Says that the rule relies on what an open cell holds today, e.g. a step into the grammar state `error`, which the
+  // rules give a meaning. The cell is not changed, and it is counted apart from the cells that the rule sets.
+  lexerAsToday: (state: LexerStateName, characterClass: ClassName, next: LexerStateName, event: EventName) => void
   grammarAsToday: (state: GrammarStateName, token: TokenName, context: number, next: GrammarStateName) => void
   lexerIsOpen: (state: LexerStateName, characterClass: ClassName) => boolean
 }
@@ -86,10 +87,17 @@ const slashWordAfterDigits: LexerStateName = 'exponentDigits'
 const unfinishedTokenStates: readonly LexerStateName[] = ['t', 'tr', 'tru', 'f', 'fa', 'fal', 'fals', 'n', 'nu', 'nul', 'minus', 'dot', 'exponent']
 const finishedNumberStates: readonly LexerStateName[] = ['zero', 'integer', 'fraction']
 
-// The grammar state `error` gets a meaning too, since nothing leads into it any more: "the container around a closed
-// array still has to close", see the rule `a closing brace inside a nested array`.
-const owesClose: GrammarStateName = 'error'
-// At depth 0, where nothing is left to close, the same state means "after the document and a comma".
+// Grammar states get a second meaning too.
+//
+// - `error`, which no text falls into any more, since every token has an entry in every state that a text reaches:
+//   inside a container, "a closing brace closed a nested array, and the object around it still has to close". At
+//   depth 0, "a comma came after the document".
+// - `end`, which today is only reached at depth 0: inside a container, "a closing square bracket closed a nested
+//   object, and the array around it still has to close".
+// - `colon`, `valueOrClose` and `commaOrClose` at depth 0, where no text reaches them today: the steps of the
+//   sequence in the rule `the document goes on after its end`.
+const owesCloseOfObject: GrammarStateName = 'error'
+const owesCloseOfArray: GrammarStateName = 'end'
 const afterDocumentAndComma: GrammarStateName = 'error'
 
 export const rules: readonly Rule[] = [
@@ -116,6 +124,8 @@ export const rules: readonly Rule[] = [
     example: 'const config = {active: True}',
     cells: set => {
       for (const characterClass of ['comma', 'colon', 'closeBrace', 'closeBracket', 'openBrace', 'openBracket'] as const) set.lexer(word, characterClass, 'between', eventBetweenTokens[characterClass]!)
+      // A line feed ends a word too, and is white space, as it is in this state today.
+      set.lexerAsToday(word, 'lineFeed', 'between', 'whitespace')
     },
   },
   {
@@ -133,6 +143,13 @@ export const rules: readonly Rule[] = [
           if (finishedNumberStates.includes(state) && characterClass === 'quote') continue
           set.lexer(state, characterClass, word, 'stringContent')
         }
+      }
+      // After a complete number, a quote, a colon and an opening bracket are read as between tokens, as today.
+      for (const state of finishedNumberStates) {
+        set.lexerAsToday(state, 'quote', 'string', 'stringStart')
+        set.lexerAsToday(state, 'colon', 'between', 'colon')
+        set.lexerAsToday(state, 'openBrace', 'between', 'openObject')
+        set.lexerAsToday(state, 'openBracket', 'between', 'openArray')
       }
     },
   },
@@ -363,62 +380,93 @@ export const rules: readonly Rule[] = [
   },
   {
     name: 'a closing bracket of the other kind',
-    reason: 'A closing bracket inside an object, or a closing brace inside the outermost array, closes that container: the bracket was mistyped.',
-    example: '{"point": {"lat": 59.91, "lon": 10.75]}',
+    reason: 'A closing bracket of the other kind closes the innermost container: it was mistyped, or the innermost container is still being typed and the bracket is the one of the container around it. One step can pop only once, so inside a nested container the grammar remembers the bracket: the state `error` after a brace, the state `end` after a square bracket.',
+    example: '{⏎  "user": {⏎    "roles": ["admin"⏎  },⏎  "active": true⏎}',
     cells: set => {
+      // At depth 1 the state `end` is the document's end, as after any closing bracket there.
       for (const context of objectContexts) {
-        for (const state of ['value', 'keyOrClose', 'key', 'colon', 'commaOrClose'] as const) set.grammar(state, 'closeArray', context, afterClose(context))
+        for (const state of ['value', 'keyOrClose', 'key', 'colon', 'commaOrClose'] as const) set.grammar(state, 'closeArray', context, owesCloseOfArray)
       }
-      for (const state of ['value', 'valueOrClose', 'commaOrClose'] as const) set.grammar(state, 'closeObject', 2, 'end')
-    },
-  },
-  {
-    name: 'a closing brace inside a nested array',
-    reason: 'A closing brace inside an array that is inside another container: the array is still being typed and has no closing bracket yet, and the brace is the one of the object around it. One step can pop only once, so the brace closes the array, and the grammar remembers that the object still has to close.',
-    example: '{⏎  "user": {⏎    "roles": ["admin"⏎  },⏎  "active": true⏎}',
-    cells: set => {
-      for (const context of nestedArrayContexts) {
-        for (const state of ['value', 'valueOrClose', 'commaOrClose'] as const) set.grammarAsToday(state, 'closeObject', context, owesClose)
+      for (const state of ['value', 'valueOrClose', 'commaOrClose'] as const) {
+        set.grammar(state, 'closeObject', 2, 'end')
+        for (const context of nestedArrayContexts) set.grammarAsToday(state, 'closeObject', context, owesCloseOfObject)
       }
     },
   },
   {
-    name: 'the close that is owed',
-    reason: 'After a closing brace closed an array in place of its object: a comma closes the object, and the next key follows in the container around it. A closing brace closes the object, and the next container still has to close. Anything else is read as after a complete value.',
+    name: 'the close that is owed after a brace',
+    reason: 'After a closing brace closed a nested array: when the container that is now innermost is an object, the brace was its closing brace. A comma closes the object, and the next key follows in the container around it, unless the object is the outermost one: there a comma shows that the document goes on. Another closing brace closes the object, and the next container still has to close. Anything else is read as after a complete value. When the innermost container is an array, nothing is owed.',
     example: '{⏎  "user": {⏎    "roles": ["admin"⏎  },⏎  "active": true⏎}',
     cells: set => {
-      // The object that still has to close is the outermost one: the comma comes after the document, where the same
-      // grammar state means "after the document and a comma", see `the document goes on after its end`.
-      set.grammar(owesClose, 'comma', 3, afterDocumentAndComma, actionPop)
-      set.grammar(owesClose, 'closeObject', 3, 'end')
+      // In the outermost object a comma shows that the document goes on, so nothing was owed: the brace was mistyped.
+      set.grammar(owesCloseOfObject, 'comma', 3, 'key')
+      set.grammar(owesCloseOfObject, 'closeObject', 3, 'end')
       for (const context of nestedObjectContexts) {
-        set.grammar(owesClose, 'comma', context, 'key', actionPop)
+        set.grammar(owesCloseOfObject, 'comma', context, 'key', actionPop)
         // The brace pops, and the state stays.
-        set.grammarAsToday(owesClose, 'closeObject', context, owesClose)
+        set.grammarAsToday(owesCloseOfObject, 'closeObject', context, owesCloseOfObject)
       }
       for (const context of objectContexts) {
-        set.grammar(owesClose, 'closeArray', context, afterClose(context))
-        set.grammar(owesClose, 'string', context, 'colon')
-        set.grammar(owesClose, 'scalar', context, 'colon')
-        set.grammar(owesClose, 'colon', context, 'value')
-        set.grammar(owesClose, 'openObject', context, 'keyOrClose')
-        set.grammar(owesClose, 'openArray', context, 'valueOrClose')
+        set.grammar(owesCloseOfObject, 'closeArray', context, owesCloseOfArray)
+        set.grammar(owesCloseOfObject, 'string', context, 'colon')
+        set.grammar(owesCloseOfObject, 'scalar', context, 'colon')
+        set.grammar(owesCloseOfObject, 'colon', context, 'value')
+        set.grammar(owesCloseOfObject, 'openObject', context, 'keyOrClose')
+        set.grammar(owesCloseOfObject, 'openArray', context, 'valueOrClose')
       }
-      // Inside an array no object is there to close: the state reads as after a complete value.
+      // Inside an array nothing is owed: the state reads as after a complete value.
       for (const context of arrayContexts) {
-        set.grammar(owesClose, 'comma', context, 'value')
-        set.grammar(owesClose, 'closeArray', context, afterClose(context))
-        set.grammar(owesClose, 'string', context, 'commaOrClose')
-        set.grammar(owesClose, 'scalar', context, 'commaOrClose')
-        set.grammar(owesClose, 'openObject', context, 'keyOrClose')
-        set.grammar(owesClose, 'openArray', context, 'valueOrClose')
+        set.grammar(owesCloseOfObject, 'comma', context, 'value')
+        set.grammar(owesCloseOfObject, 'closeArray', context, afterClose(context))
+        set.grammar(owesCloseOfObject, 'string', context, 'commaOrClose')
+        set.grammar(owesCloseOfObject, 'scalar', context, 'commaOrClose')
+        set.grammar(owesCloseOfObject, 'openObject', context, 'keyOrClose')
+        set.grammar(owesCloseOfObject, 'openArray', context, 'valueOrClose')
       }
-      set.grammar(owesClose, 'closeObject', 2, 'end')
-      set.grammar(owesClose, 'colon', 2, 'commaOrClose')
+      set.grammar(owesCloseOfObject, 'closeObject', 2, 'end')
+      set.grammar(owesCloseOfObject, 'colon', 2, 'commaOrClose')
       for (const context of nestedArrayContexts) {
-        set.grammar(owesClose, 'colon', context, 'value', actionPop)
+        set.grammar(owesCloseOfObject, 'colon', context, 'value', actionPop)
         // A second closing brace in a row: it closes this array too, and the state stays.
-        set.grammarAsToday(owesClose, 'closeObject', context, owesClose)
+        set.grammarAsToday(owesCloseOfObject, 'closeObject', context, owesCloseOfObject)
+      }
+    },
+  },
+  {
+    name: 'the close that is owed after a square bracket',
+    reason: 'After a closing square bracket closed a nested object: when the container that is now innermost is an array, the bracket was its closing bracket. A comma closes the array, and the next entry follows in the container around it, unless the array is the outermost one. Another closing square bracket closes the array, and the next container still has to close. Anything else is read as after a complete value. When the innermost container is an object, nothing is owed.',
+    example: '{⏎  "items": [⏎    {"id": 1},⏎    {"id": 2⏎  ],⏎  "total": 2⏎}',
+    cells: set => {
+      // In the outermost array a comma shows that the document goes on, so nothing was owed: the bracket was mistyped.
+      set.grammar(owesCloseOfArray, 'comma', 2, 'value')
+      set.grammar(owesCloseOfArray, 'closeArray', 2, 'end')
+      set.grammar(owesCloseOfArray, 'closeObject', 2, 'end')
+      set.grammar(owesCloseOfArray, 'colon', 2, 'commaOrClose')
+      for (const context of nestedArrayContexts) {
+        // The container around the array may be an object or an array: `a key state inside an array` reads the
+        // state `key` in both.
+        set.grammar(owesCloseOfArray, 'comma', context, 'key', actionPop)
+        // The bracket pops, and the state stays.
+        set.grammar(owesCloseOfArray, 'closeArray', context, owesCloseOfArray)
+        set.grammarAsToday(owesCloseOfArray, 'closeObject', context, owesCloseOfObject)
+        set.grammar(owesCloseOfArray, 'colon', context, 'value', actionPop)
+      }
+      for (const context of arrayContexts) {
+        set.grammar(owesCloseOfArray, 'string', context, 'commaOrClose')
+        set.grammar(owesCloseOfArray, 'scalar', context, 'commaOrClose')
+        set.grammar(owesCloseOfArray, 'openObject', context, 'keyOrClose')
+        set.grammar(owesCloseOfArray, 'openArray', context, 'valueOrClose')
+      }
+      // Inside an object nothing is owed: the state reads as after a complete value.
+      for (const context of objectContexts) {
+        set.grammar(owesCloseOfArray, 'comma', context, 'key')
+        set.grammar(owesCloseOfArray, 'closeObject', context, afterClose(context))
+        set.grammar(owesCloseOfArray, 'closeArray', context, owesCloseOfArray)
+        set.grammar(owesCloseOfArray, 'string', context, 'colon')
+        set.grammar(owesCloseOfArray, 'scalar', context, 'colon')
+        set.grammar(owesCloseOfArray, 'colon', context, 'value')
+        set.grammar(owesCloseOfArray, 'openObject', context, 'keyOrClose')
+        set.grammar(owesCloseOfArray, 'openArray', context, 'valueOrClose')
       }
     },
   },
@@ -436,7 +484,7 @@ export const rules: readonly Rule[] = [
         set.grammar('key', 'comma', context, 'value')
       }
       set.grammar('key', 'closeObject', 2, 'end')
-      for (const context of nestedArrayContexts) set.grammarAsToday('key', 'closeObject', context, owesClose)
+      for (const context of nestedArrayContexts) set.grammarAsToday('key', 'closeObject', context, owesCloseOfObject)
     },
   },
   {
@@ -520,10 +568,12 @@ export type Handwritten = {
   // For every cell, the index into `rules` of the rule that set it, or -1.
   ruleOfLexerCell: Int16Array
   ruleOfGrammarCell: Int16Array
-  // How many tokenizer cells and grammar cells each rule set, and how many grammar cells it keeps as they are today.
+  // How many tokenizer cells and grammar cells each rule set, and how many open cells it keeps as they are today.
   lexerCellsOfRule: number[]
   grammarCellsOfRule: number[]
   keptCellsOfRule: number[]
+  // Whether each rule is about the tokenizer's table. The others are about the grammar's.
+  ruleIsOfTokenizer: boolean[]
 }
 
 // The tables of the hand-written recovery: today's tables with the cells of every rule. Throws when a rule sets a
@@ -535,6 +585,7 @@ export function handwrittenTables(chosen: readonly Rule[] = rules): Handwritten 
   const lexerCellsOfRule = chosen.map(() => 0)
   const grammarCellsOfRule = chosen.map(() => 0)
   const keptCellsOfRule = chosen.map(() => 0)
+  const ruleIsOfTokenizer = chosen.map(() => false)
   const indexIn = <Name extends string>(names: readonly Name[], name: Name, what: string) => {
     const index = names.indexOf(name)
     if (index === -1) throw new Error(`no ${what} is named ${name}`)
@@ -556,6 +607,17 @@ export function handwrittenTables(chosen: readonly Rule[] = rules): Handwritten 
         tables.lexerEvent[cell] = eventIndex
         ruleOfLexerCell[cell] = ruleIndex
         lexerCellsOfRule[ruleIndex]!++
+        ruleIsOfTokenizer[ruleIndex] = true
+      },
+      lexerAsToday: (state, characterClass, next, event) => {
+        const cell = lexerCellOf(tables, lexerStateNames.indexOf(state), classNames.indexOf(characterClass))
+        const name = lexerCellName(tables, cell)
+        if (tables.lexerOpen[cell] === 0) throw fail(name, 'is frozen')
+        if (ruleOfLexerCell[cell] !== -1) throw fail(name, `is already set by the rule "${chosen[ruleOfLexerCell[cell]!]!.name}"`)
+        if (tables.lexerNext[cell] !== lexerStateNames.indexOf(next) || tables.lexerEvent[cell] !== eventNames.indexOf(event)) throw fail(name, `holds ${lexerChoiceName(tables, cell)} today`)
+        ruleOfLexerCell[cell] = ruleIndex
+        keptCellsOfRule[ruleIndex]!++
+        ruleIsOfTokenizer[ruleIndex] = true
       },
       grammar: (state, token, context, next, action = actionByToken) => {
         const cell = grammarCellOf(tables, indexIn(grammarStateNames as readonly GrammarStateName[], state, 'grammar state'), tokenNames.indexOf(token), context)
@@ -572,6 +634,7 @@ export function handwrittenTables(chosen: readonly Rule[] = rules): Handwritten 
       grammarAsToday: (state, token, context, next) => {
         const cell = grammarCellOf(tables, indexIn(grammarStateNames as readonly GrammarStateName[], state, 'grammar state'), tokenNames.indexOf(token), context)
         const name = grammarCellName(tables, cell)
+        if (tables.grammarOpen[cell] === 0) throw fail(name, 'is frozen')
         if (ruleOfGrammarCell[cell] !== -1) throw fail(name, `is already set by the rule "${chosen[ruleOfGrammarCell[cell]!]!.name}"`)
         if (tables.grammarNext[cell] !== indexIn(grammarStateNames as readonly GrammarStateName[], next, 'grammar state') || tables.grammarAction[cell] !== actionByToken) throw fail(name, `holds ${grammarChoiceName(tables, cell)} today`)
         ruleOfGrammarCell[cell] = ruleIndex
@@ -580,7 +643,7 @@ export function handwrittenTables(chosen: readonly Rule[] = rules): Handwritten 
     })
   })
   checkTables(tables)
-  return {tables, ruleOfLexerCell, ruleOfGrammarCell, lexerCellsOfRule, grammarCellsOfRule, keptCellsOfRule}
+  return {tables, ruleOfLexerCell, ruleOfGrammarCell, lexerCellsOfRule, grammarCellsOfRule, keptCellsOfRule, ruleIsOfTokenizer}
 }
 
 // The rules as text: per rule its name, how many cells it sets, its reason and its example.
@@ -590,7 +653,7 @@ export function describeRules(handwritten: Handwritten, chosen: readonly Rule[] 
     const lexerCells = handwritten.lexerCellsOfRule[index]!
     const grammarCells = handwritten.grammarCellsOfRule[index]!
     const kept = handwritten.keptCellsOfRule[index]!
-    lines.push(`${String(lexerCells + grammarCells).padStart(4)} cells (${lexerCells === 0 ? 'grammar' : 'tokenizer'})${kept === 0 ? '' : ` and ${kept} kept as today`}  ${rule.name}`)
+    lines.push(`${String(lexerCells + grammarCells).padStart(4)} cells (${handwritten.ruleIsOfTokenizer[index]! ? 'tokenizer' : 'grammar'})${kept === 0 ? '' : ` and ${kept} kept as today`}  ${rule.name}`)
     lines.push(`            ${rule.reason}`)
     lines.push(`            e.g. ${rule.example}`)
   })

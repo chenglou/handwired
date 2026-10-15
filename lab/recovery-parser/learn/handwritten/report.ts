@@ -4,7 +4,9 @@
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/handwritten/report.ts [--split validation] [--without-each-rule] [--scratch <folder>] [--to 60000]
 // --split takes one split or several with commas. The test split is read only when --split names it.
-// --without-each-rule adds, per rule, the main number of the tables that leave the rule out.
+// --without-each-rule adds, per rule, the main number of the tables that leave the rule out. The cells of a rule that
+// is left out hold today's choice, which for most grammar cells is the state `error`. Other rules give that state a
+// meaning, so a text often recovers by accident, and the number understates what a grammar rule is worth.
 import {cacheFolderOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
 import type {Split} from '../../samples.ts'
 import {asIsTables} from '../recovery-tables.ts'
