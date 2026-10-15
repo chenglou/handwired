@@ -13,13 +13,14 @@
 //
 // Run from the repo root: bun lab/recovery-parser/learn/handwritten/check.ts [--scratch <folder>] [--to 60000]
 import {deepTexts, deepTextsWithMembersAfter, depthsOnDeepTexts} from '../check-deep.ts'
-import {cacheFolderOf, loadSamples, optionOf, standardRange} from '../data.ts'
+import {cacheFolderOf, loadSamples, optionOf, refuseUnknownOptions, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName} from '../recovery-tables.ts'
 import {runOnSample} from '../score.ts'
 import {handwrittenTables, rules} from './rules.ts'
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/check.ts', ['--scratch', '--to'])
   const handwritten = handwrittenTables()
   const {tables} = handwritten
   const asIs = asIsTables()

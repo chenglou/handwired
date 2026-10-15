@@ -7,10 +7,12 @@
 // describeSettings, which it also saves as summary.md there. None of the baselines has a seed.
 import {mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
+import {refuseUnknownOptions} from '../data.ts'
 import {saveTables} from '../recovery-tables.ts'
 import {type SettingResult, armFolderOf, baselineTables, describeSettings, fileNameOf, recordOf} from './harness.ts'
 
 if (import.meta.main) {
+  refuseUnknownOptions('arms/baselines.ts', [])
   const folder = armFolderOf('baselines')
   const results: SettingResult[] = []
   for (const {name, tables, base} of baselineTables()) {

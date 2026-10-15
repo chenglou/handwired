@@ -7,7 +7,8 @@
 //       [--passes 50] [--runs 1400] [--minutes <minutes>] [--workers 4] [--order 0] [--without-kinds hashComment,foreignLiteral]
 //       [--end-events] [--scratch <folder>]
 // --from   the tables to start from, e.g. the ones votes.ts saved. Without it, today's tables. With it, --out has to
-//          name the output: the search does not make up a name from the name of the file it started from.
+//          name the output: the search does not make up a name from the name of the file it started from. A file
+//          that was saved with another version of the dataset is refused, see otherDatasetOf in ../recovery-tables.ts.
 // --out    where the tables go after every pass. A log goes next to it, with the same name and .log. Without --from
 //          and --out, the tables go to <scratch>/search/search-from-today.json, with the order and the kinds that are
 //          left out in the name.
@@ -43,15 +44,16 @@
 import {appendFileSync, mkdirSync, writeFileSync} from 'node:fs'
 import {basename, dirname, join} from 'node:path'
 import {createRandom} from '../../random.ts'
-import {cacheFolderOf, loadStandardSamples, optionOf, selectSamples, trainPart, validationPart} from '../data.ts'
+import {cacheFolderOf, loadStandardSamples, optionOf, refuseUnknownOptions, selectSamples, trainPart, validationPart} from '../data.ts'
 import {
   type RecoveryTables, actionByToken, actionCount, actionOfToken, asIsTables, checkTables, differencesOf, eventNames, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName,
-  loadTables, saveTables, today,
+  loadTablesOfThisDataset, saveTables, today,
 } from '../recovery-tables.ts'
 import {scoreTables, sharesOf} from '../score.ts'
 import {cellBitCount, messageOf, prepareSamples, totalScore} from './sample-runs.ts'
 import type {Reply, Request} from './search-worker.ts'
 
+refuseUnknownOptions('search/search.ts', ['--from', '--out', '--pairs', '--passes', '--runs', '--minutes', '--workers', '--order', '--without-kinds', '--end-events', '--scratch'])
 const scratchFolder = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']
 const fromFile = optionOf('--from')
 const pairs = optionOf('--pairs') ?? 'known'
@@ -87,12 +89,14 @@ const hasLeftOutKind = (place: number) => wholeTrain.kindList.subarray(wholeTrai
 const train = withoutKinds.length === 0 ? wholeTrain : selectSamples(wholeTrain, Int32Array.from({length: wholeTrain.sampleCount}, (_, place) => place).filter(place => !hasLeftOutKind(place)))
 const validation = validationPart(samples)
 const prepared = prepareSamples(train)
-const tables: RecoveryTables = fromFile === undefined ? asIsTables() : loadTables(fromFile).tables
+// Tables to start from have to be of this dataset: the search's output is saved with this dataset's key, and tables
+// that were made with another version of the dataset may have seen samples that are validation or test samples now.
+const tables: RecoveryTables = fromFile === undefined ? asIsTables() : loadTablesOfThisDataset(fromFile).tables
 checkTables(tables)
 // The search's own parser loop, in sample-runs.ts, gives every code point the class it has today, and reads the 8
 // contexts of today.
 if (tables.addedClasses.length > 0 || tables.contextCount !== today.contextCount) throw new Error('search.ts does not run tables with added classes or with the bit "first on its line", see ../structure/README.md')
-const startTables = fromFile === undefined ? asIsTables() : loadTables(fromFile).tables
+const startTables = fromFile === undefined ? asIsTables() : loadTablesOfThisDataset(fromFile).tables
 
 const percent = (count: number, of: number) => (100 * count / of).toFixed(2)
 const validationLine = () => {

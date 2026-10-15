@@ -27,13 +27,13 @@
 // tables that a run started from: the command then also counts the cells that the run changed. --cells lists the
 // cells that differ from today's parser.
 import {
-  type Samples, cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, groupNames, heldOutByKind, heldOutByTemplate, loadSamples, optionOf, requireFinal, splitNames, splitsOfOption,
-  standardRange,
+  type Samples, cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, groupNames, heldOutByKind, heldOutByTemplate, loadSamples, optionOf, refuseUnknownOptions, requireFinal, splitNames,
+  splitsOfOption, standardRange,
 } from './data.ts'
 import {displayKind} from '../labels.ts'
 import type {Split} from '../samples.ts'
 import {type RecoveryTrace, createTrace, positionCount, runRecoveryParserInto} from './recovery-parser.ts'
-import {type CellDifference, type RecoveryTables, asIsTables, checkTables, copyTables, describeDifferences, differencesOf, displayEntryOf, loadTables} from './recovery-tables.ts'
+import {type CellDifference, type RecoveryTables, asIsTables, checkTables, copyTables, describeDifferences, differencesOf, displayEntryOf, loadTablesForReport} from './recovery-tables.ts'
 
 export type ScoreRow = {
   // Which samples the row counts, e.g. "all", "group: within reach of the tables" or "kind: missingComma".
@@ -374,13 +374,14 @@ export const scoreLegend = [
 ]
 
 if (import.meta.main) {
+  refuseUnknownOptions('score.ts', ['--tables', '--base', '--split', '--cells', '--from', '--to', '--seed', '--scratch'])
   const tablesFile = optionOf('--tables')
   const baseFile = optionOf('--base')
   const splits = splitsOfOption('score.ts')
   const seed = Number(optionOf('--seed') ?? standardRange.seed)
   const from = Number(optionOf('--from') ?? standardRange.from)
   const to = Number(optionOf('--to') ?? standardRange.to)
-  const loaded = tablesFile === undefined ? {tables: asIsTables(), note: 'the tables of today'} : loadTables(tablesFile)
+  const loaded = tablesFile === undefined ? {tables: asIsTables(), note: 'the tables of today'} : loadTablesForReport(tablesFile)
   const differences = differencesOf(asIsTables(), loaded.tables)
   const samples = loadSamples(seed, from, to, cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const started = performance.now()
@@ -389,7 +390,7 @@ if (import.meta.main) {
   const read = cellsReadBy(loaded.tables, samples, splits)
   const differencesRead = differences.filter(difference => isRead(read, difference)).length
   console.log(`Tables: ${tablesFile ?? 'today\'s'}${loaded.note === '' ? '' : ` (${loaded.note})`}.`)
-  if (baseFile !== undefined) console.log(`Cells changed against the base ${baseFile}: ${describeCellCounts(countCells(differencesOf(loadTables(baseFile).tables, loaded.tables)))}.`)
+  if (baseFile !== undefined) console.log(`Cells changed against the base ${baseFile}: ${describeCellCounts(countCells(differencesOf(loadTablesForReport(baseFile).tables, loaded.tables)))}.`)
   console.log(`Cells that differ from today's parser: ${describeCellCounts(countCells(differences))}, and a code point of the scored samples reads ${differencesRead} of them. This count holds every cell of an added state, and the cells that an added class or the bit "first on its line" copied from cells that were changed before.`)
   if (process.argv.includes('--cells') && differences.length > 0) console.log(describeDifferences(differences))
   console.log(`Dataset ${samples.datasetKey}, seed ${seed}, the samples with the indexes ${from} to ${to - 1}, split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}: ${score.rows[0]!.samples} broken samples, ${score.validSamples} valid ones left out. Scored in ${milliseconds.toFixed(0)} ms.`)

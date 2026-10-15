@@ -21,9 +21,9 @@
 //   miss   k, d or c where the kind, the depth or the container is wrong, * for more than one. Only the code points
 //          that a score counts are compared: the ones from the first error on whose label has a scored value. | marks
 //          the first damage and ! the first error, where nothing is wrong there.
-import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
+import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadSamples, optionOf, refuseUnknownOptions, splitNames, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {displayChoiceName, displayEntryName, displayEntryOf, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTables} from '../recovery-tables.ts'
+import {displayChoiceName, displayEntryName, displayEntryOf, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTablesForReport} from '../recovery-tables.ts'
 import {runOnSample, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
@@ -42,6 +42,7 @@ const depthLetter = (depth: number) => depth < 0 ? '-' : depth > 16 ? '+' : '012
 const containerLetter = (container: number) => '-oa'[container] ?? '?'
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/show.ts', ['--split', '--kind', '--index', '--limit', '--skip', '--wrong', '--cells', '--tables', '--to', '--scratch'])
   const split = optionOf('--split') ?? 'train'
   if (split !== 'train' && split !== 'validation') throw new Error(`--split takes train or validation, and got ${split}: this script never shows the test split`)
   const kind = optionOf('--kind')
@@ -51,7 +52,7 @@ if (import.meta.main) {
   const onlyWrong = process.argv.includes('--wrong')
   const withCells = process.argv.includes('--cells')
   const tablesFile = optionOf('--tables')
-  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTables(tablesFile).tables
+  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTablesForReport(tablesFile).tables
   const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   if (index !== undefined && !samples.index.includes(Number(index))) throw new Error(`sample ${index} is not among the loaded samples: it is in the test split, which is never loaded, or outside the range of --to`)
   const trace = createTrace()

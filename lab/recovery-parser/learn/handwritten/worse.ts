@@ -10,20 +10,21 @@
 // gained in all. Then the lost code points by the two cells that the hand-written parser read at a sample's first
 // lost code point, with one example each, where the code point is between 【 and 】. A cell at the top of that list
 // is a rule that is too greedy for some texts.
-import {cacheFolderOf, codePointScored, kindsOf, loadStandardSamples, optionOf, splitNames} from '../data.ts'
+import {cacheFolderOf, codePointScored, kindsOf, loadStandardSamples, optionOf, refuseUnknownOptions, splitNames} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {asIsTables, grammarCellName, lexerCellName, loadTables} from '../recovery-tables.ts'
+import {asIsTables, grammarCellName, lexerCellName, loadTablesForReport} from '../recovery-tables.ts'
 import {runOnSample, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
 const visible = (codePoint: number) => codePoint === 0x0a ? '⏎' : codePoint === 0x09 ? '→' : codePoint < 0x20 ? '␦' : String.fromCodePoint(codePoint)
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/worse.ts', ['--split', '--top', '--tables', '--scratch'])
   const split = optionOf('--split') ?? 'train'
   if (split !== 'train' && split !== 'validation') throw new Error(`--split takes train or validation, and got ${split}: this script never reads the test split`)
   const top = Number(optionOf('--top') ?? 12)
   const tablesFile = optionOf('--tables')
-  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTables(tablesFile).tables
+  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTablesForReport(tablesFile).tables
   const asIs = asIsTables()
   const samples = loadStandardSamples(cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const trace = createTrace()

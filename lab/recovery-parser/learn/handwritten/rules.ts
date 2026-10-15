@@ -17,7 +17,7 @@
 // RECOVERY_SCRATCH, and without either nothing is saved.
 import {mkdirSync} from 'node:fs'
 import {join} from 'node:path'
-import {optionOf} from '../data.ts'
+import {optionOf, refuseUnknownOptions} from '../data.ts'
 import {
   type RecoveryTables, actionByToken, actionNone, actionPop, actionPushObject, asIsTables, checkTables, classNames, eventNames, grammarCellName, grammarCellOf,
   grammarChoiceName, grammarStateNames, lexerCellName, lexerCellOf, lexerChoiceName, lexerStateNames, saveTables, tokenNames,
@@ -733,6 +733,7 @@ export function describeRules(handwritten: Handwritten, chosen: readonly Rule[] 
 }
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/rules.ts', ['--scratch'])
   const handwritten = handwrittenTables()
   console.log(describeRules(handwritten))
   const scratch = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']

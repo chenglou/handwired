@@ -19,7 +19,7 @@
 // reads afterwards, and an added code point has no label but still moves the parser. E.g. a comma inside a comment
 // is added, so it is in no "the label's depth" row, yet a pop at that comma is wrong. Where two readings are close,
 // the train score decides, and README.md says so.
-import {cacheFolderOf, codePointKept, codePointKindScored, loadStandardSamples, optionOf, splitNames} from '../data.ts'
+import {cacheFolderOf, codePointKept, codePointKindScored, loadStandardSamples, optionOf, refuseUnknownOptions, splitNames} from '../data.ts'
 import {displayKind} from '../../labels.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {grammarCellName} from '../recovery-tables.ts'
@@ -36,6 +36,7 @@ const groups: readonly {title: string, cells: RegExp}[] = [
 ]
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/two-readings.ts', ['--scratch'])
   const {tables} = handwrittenTables()
   const samples = loadStandardSamples(cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const trace = createTrace()

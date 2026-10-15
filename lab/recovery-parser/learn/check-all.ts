@@ -15,7 +15,7 @@
 // command goes to <RECOVERY_SCRATCH>/check-all/<name>.txt. The last line of this command says whether all passed.
 import {mkdirSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
-import {optionOf} from './data.ts'
+import {optionOf, refuseUnknownOptions} from './data.ts'
 
 const root = resolve(import.meta.dir, '../../..')
 const here = relative(root, import.meta.dir)
@@ -28,6 +28,7 @@ const commands: {name: string, command: string[], isCheck: boolean}[] = [
   {name: 'oxlint', command: ['bunx', 'oxlint', '--type-aware', relative(root, resolve(import.meta.dir, '..'))], isCheck: false},
   ...checks.map(check => ({name: check, command: ['bun', join(here, check)], isCheck: true})),
 ]
+refuseUnknownOptions('check-all.ts', ['--only'])
 const only = optionOf('--only')
 const chosen = only === undefined ? commands : commands.filter(({name}) => name.includes(only))
 if (chosen.length === 0) throw new Error(`--only ${only} names none of: ${commands.map(({name}) => name).join(', ')}`)

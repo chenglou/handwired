@@ -25,9 +25,9 @@
 import {scanNesting} from '../labels.ts'
 import {createRandom} from '../random.ts'
 import {tooDeepText, tooDeepTextWithMembersAfter} from './check-texts.ts'
-import {optionOf} from './data.ts'
+import {optionOf, refuseUnknownOptions} from './data.ts'
 import {codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, asIsTables, checkTables, loadTables} from './recovery-tables.ts'
+import {type RecoveryTables, asIsTables, checkTables, loadTablesForReport} from './recovery-tables.ts'
 
 // `count` valid JSON texts of 17 to 19 levels and at most 512 code points with nothing after their nested containers,
 // the same ones on every call.
@@ -82,10 +82,11 @@ export function wrongDepthsOnDeepTexts(tables: RecoveryTables, textCount = 300) 
 }
 
 if (import.meta.main) {
+  refuseUnknownOptions('check-deep.ts', ['--texts', '--must-hold'])
   const textCount = Number(optionOf('--texts') ?? 300)
   const forms = [{name: 'nothing after the nested containers', texts: deepTexts(textCount)}, {name: 'members after the nested containers', texts: deepTextsWithMembersAfter(textCount)}]
   const named = process.argv.slice(2).filter(argument => !argument.startsWith('--') && argument.includes('=')).map(argument => ({name: argument.slice(0, argument.indexOf('=')), file: argument.slice(argument.indexOf('=') + 1)}))
-  const savedTables = named.map(({name, file}) => ({name, tables: loadTables(file).tables}))
+  const savedTables = named.map(({name, file}) => ({name, tables: loadTablesForReport(file).tables}))
   let todayWrong = 0
   let worse = 0
   for (const form of forms) {

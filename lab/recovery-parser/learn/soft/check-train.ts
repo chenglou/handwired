@@ -20,10 +20,14 @@
 //    gives `pastEnd` the share 0 and never snaps to it, also when the weight of `pastEnd` is the entry's largest.
 //    And part 4 again, with a tenth of the open entries trainable too.
 // 7. What a call can get wrong is an error and not a silent run: samples to train on that are no places in the
-//    packed data, as a third argument or in the options, a set without a scored code point, and masks of trainable
-//    cells that leave a table out. And the masks 'open' and 'none' mean what they say.
+//    packed data, as a third argument (of three or of four) or in the options, also one place past the end among
+//    good ones, a set without a scored code point, samples of the validation split, a model without a trainable
+//    cell, masks of trainable cells that leave a table out, and a mask with another number than 0 and 1. And the
+//    masks 'open' and 'none' mean what they say.
+// 8. An error inside train, after its worker threads have started, closes the threads: a second process that
+//    catches such an error ends by itself. That process is error-inside-train.ts.
 import {mkdirSync} from 'node:fs'
-import {join} from 'node:path'
+import {join, relative, resolve} from 'node:path'
 import {createRandom} from '../../random.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples} from '../data.ts'
@@ -313,9 +317,37 @@ async function checkTenthTrainable(tables: RecoveryTables, twinData: TwinData) {
   // The places of the samples in the set that the data was packed from are no places in the packed data.
   const placesInTheSamples = placesForTwin(samples, 'train').subarray(200, 260)
   check(placesInTheSamples.some(place => place >= data.sampleCount), 'the places for part 7 are all inside the packed data')
-  check(await throws(() => untyped(createModel(base), data, placesInTheSamples, {...trainOptions})), 'train with the places of its samples as the third argument does not throw')
+  const errorOf = async (run: () => unknown): Promise<string> => {
+    try {
+      await run()
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+    return ''
+  }
+  check(await throws(() => untyped(createModel(base), data, placesInTheSamples, {...trainOptions})), 'train with the places of its samples as the third of four arguments does not throw')
+  // The places as the third of three arguments, where options belong: a typed array and a plain array. With the
+  // places inside the packed data, so that nothing else can be what throws.
+  const placesInside = everyPlace.subarray(0, 10)
+  check((await errorOf(() => untyped(createModel(base), data, placesInside))).includes('train takes (model, data, options)') && (await errorOf(() => untyped(createModel(base), data, Array.from(placesInside)))).includes('train takes (model, data, options)'),
+    'train with the places of its samples as the third of three arguments does not throw the error about its arguments')
   check(await throws(() => train(createModel(base), data, {...trainOptions, places: placesInTheSamples})), 'train with places outside the packed data does not throw')
+  // One place past the end among good ones: every other place is fine, so only the test of the range can throw.
+  const onePastTheEnd = everyPlace.slice()
+  onePastTheEnd[40] = 500
+  check((await errorOf(() => train(createModel(base), data, {...trainOptions, places: onePastTheEnd}))).includes('train got the place 500'), 'train with one place past the end of the packed data among good ones does not throw the error that names the place')
   check(await throws(() => train(createModel(base), data, {...trainOptions, places: new Int32Array(0)})), 'train on no sample does not throw')
+  // Samples of the validation split: train refuses them, and names the split, unless the call asks for them.
+  const validationData = packForTwin(samples, placesForTwin(samples, 'validation').subarray(0, 32), intendedObjects)
+  const mixedData = packForTwin(samples, [...trainPlaces.subarray(0, 31), placesForTwin(samples, 'validation')[0]!], intendedObjects)
+  check(data.split.every(split => split === 0) && validationData.split.every(split => split === 1), 'the packed data does not hold the split of its samples')
+  check((await errorOf(() => train(createModel(base), validationData, {...trainOptions}))).includes('validation split') && (await errorOf(() => train(createModel(base), mixedData, {...trainOptions}))).includes('validation split'), 'train on samples of the validation split does not throw the error that names the split')
+  const onValidation = createModel(base)
+  await train(onValidation, validationData, {...trainOptions, alsoOtherSplits: true})
+  const untrained = createModel(base)
+  check(onValidation.weights.all.some((weight, entry) => weight !== untrained.weights.all[entry]), 'train with alsoOtherSplits does not train on samples of the validation split')
+  // A model without a trainable cell.
+  check((await errorOf(() => train(createModel(base, {trainable: {lexer: 'none', grammar: 'none', display: 'none'}}), data, {...trainOptions}))).includes('without a trainable cell'), 'train with a model without a trainable cell does not throw')
   // A set of samples without a scored code point: every label's value is taken away.
   const withoutScores: TwinData = {...data, flags: data.flags.map(flags => flags & ~(2 | 16))}
   check(await throws(() => train(createModel(base), withoutScores, {...trainOptions})), 'train on samples without a scored code point does not throw')
@@ -324,13 +356,26 @@ async function checkTenthTrainable(tables: RecoveryTables, twinData: TwinData) {
   const untypedCreateModel = createModel as unknown as (tables: RecoveryTables, options: unknown) => ReturnType<typeof createModel>
   check(await throws(() => untypedCreateModel(withOpenEntries, {trainable: {lexer: withOpenEntries.lexerOpen, grammar: withOpenEntries.grammarOpen}})), 'createModel with masks that leave out the display table does not throw')
   check(await throws(() => untypedCreateModel(withOpenEntries, {trainable: {grammar: 'open', display: 'none'}})), 'createModel with masks that leave out the tokenizer does not throw')
+  // A mask holds 0 and 1. A 2 in the place of a 1 used to make a cell that is never trained and has a uniform mix.
+  const maskOfTwos = withOpenEntries.grammarOpen.map(bit => 2 * bit)
+  check((await errorOf(() => createModel(withOpenEntries, {trainable: {lexer: 'none', grammar: maskOfTwos, display: 'none'}}))).includes('a mask holds 1 for a trainable cell'), 'createModel with a mask that holds 2 does not throw')
   const ones = (mask: Uint8Array) => mask.reduce((total, bit) => total + bit, 0)
   const grammarOnly = createModel(withOpenEntries, {trainable: {lexer: 'none', grammar: 'open', display: 'none'}})
   const everything = createModel(withOpenEntries, {trainable: {lexer: 'open', grammar: 'open', display: 'open'}})
   const counts = cellCounts(withOpenEntries)
   check(ones(grammarOnly.trainableLexer) === 0 && ones(grammarOnly.trainableGrammar) === counts.grammarOpen && ones(grammarOnly.trainableDisplay) === 0, 'the masks none, open, none do not make exactly the open grammar cells trainable')
   check(ones(everything.trainableLexer) === counts.lexerOpen && ones(everything.trainableGrammar) === counts.grammarOpen && ones(everything.trainableDisplay) === counts.displayOpen, 'the mask open does not make every open cell and entry trainable')
-  console.log(`7. train throws for samples to train on that are no places in the packed data, as a third argument and in the options, for no sample, and for samples without a scored code point. createModel throws for masks of trainable cells that leave a table out, and with lexer 'none', grammar 'open', display 'none' exactly the ${counts.grammarOpen} open grammar cells are trainable, of ${counts.lexerOpen + counts.grammarOpen} open cells and ${counts.displayOpen} open entries.`)
+  console.log(`7. train throws for samples to train on that are no places in the packed data, as a third argument of three or of four and in the options, for one place past the end among ${everyPlace.length - 1} good ones, for no sample, for samples without a scored code point, for samples of the validation split unless alsoOtherSplits is true, and for a model without a trainable cell. createModel throws for masks of trainable cells that leave a table out and for a mask that holds a 2, and with lexer 'none', grammar 'open', display 'none' exactly the ${counts.grammarOpen} open grammar cells are trainable, of ${counts.lexerOpen + counts.grammarOpen} open cells and ${counts.displayOpen} open entries.`)
+}
+
+// 8. An error inside train closes the worker threads.
+{
+  const root = resolve(import.meta.dir, '../../../..')
+  const started = performance.now()
+  const run = Bun.spawnSync(['bun', join(relative(root, import.meta.dir), 'error-inside-train.ts')], {cwd: root, stdout: 'pipe', stderr: 'pipe', timeout: 60_000})
+  const output = run.stdout.toString()
+  check(run.exitCode === 0 && output.includes('The error inside train was caught: thrown by the log of the check'), `a process that catches an error inside train ends with the exit code ${run.exitCode} after ${((performance.now() - started) / 1000).toFixed(0)} s, where 60 s is the limit, and prints ${JSON.stringify(output.slice(-200))}`)
+  console.log(`8. A second process in which train throws inside a log point, with 4 worker threads started, catches the error and ends by itself in ${((performance.now() - started) / 1000).toFixed(1)} s: the threads are closed.`)
 }
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)

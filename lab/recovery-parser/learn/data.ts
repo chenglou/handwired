@@ -10,9 +10,10 @@
 //   bun lab/recovery-parser/learn/data.ts [--scratch <folder>] [--from 0] [--to 60000] [--seed 20261015]
 // Without --scratch, the folder is the environment variable RECOVERY_SCRATCH. The cache file goes to <folder>/cache.
 import {mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync} from 'node:fs'
-import {join, resolve} from 'node:path'
+import {join} from 'node:path'
 import {families, kinds} from '../damage.ts'
 import {type Group, type Sample, type Split, defaultSeed, groupOf, groups, labelsOf, mostRightFor, sampleAt, scoredCodePoints, sources, splits} from '../samples.ts'
+import {cacheKey, datasetKey} from './dataset-key.ts'
 import {intendedOf} from './intended.ts'
 
 // The standard set of the experiment: the samples 0 to 59,999 of the default seed that are not in the test split.
@@ -156,30 +157,9 @@ const kindNames = kinds.map(kind => kind.name)
 const familyNames: string[] = [...families]
 const kindFamily = kinds.map(kind => familyNames.indexOf(kind.family))
 
-// A hash of every source file that decides what the dataset's samples are: the dataset's modules, the highlighter's
-// tables and the reference highlighter. Two runs with the same key read the same dataset, so a record of a run
-// holds the key.
-const hashOfFiles = (files: string[]) => Bun.hash(files.sort().map(file => Bun.hash(readFileSync(file)).toString(16)).join('.')).toString(16)
-let knownDatasetKey: string | undefined
-export function datasetKey(): string {
-  if (knownDatasetKey !== undefined) return knownDatasetKey
-  const folder = resolve(import.meta.dir, '..')
-  const root = resolve(folder, '../..')
-  knownDatasetKey = hashOfFiles([
-    ...readdirSync(folder).filter(name => name.endsWith('.ts')).map(name => join(folder, name)),
-    ...readdirSync(join(folder, 'damage')).filter(name => name.endsWith('.ts')).map(name => join(folder, 'damage', name)),
-    join(root, 'src/json-search/highlighter/kinds.ts'), join(root, 'src/json-search/highlighter/tables.ts'), join(root, 'tests/json-search/highlighter/reference.ts'),
-  ])
-  return knownDatasetKey
-}
-// The dataset's key together with a hash of this file and of intended.ts, which decide what the arrays hold. It is in
-// the name of every cache file, so a cache file that was made from other sources is never read, e.g. one of another
-// version of the dataset.
-let knownCacheKey: string | undefined
-function cacheKey(): string {
-  knownCacheKey ??= `${datasetKey()}-${hashOfFiles([join(import.meta.dir, 'data.ts'), join(import.meta.dir, 'intended.ts')])}`
-  return knownCacheKey
-}
+// The dataset's key and the cache's key are in dataset-key.ts: hashes of the source files that decide what the
+// samples are, and what these arrays hold. A record of a run and every saved file of tables hold the dataset's key.
+export {datasetKey}
 
 // An array that grows as values are added.
 function growing<Typed extends TypedArray>(create: (length: number) => Typed) {
@@ -467,6 +447,15 @@ export function loadSamples(seed: number, from: number, to: number, cacheFolder:
 
 export const loadStandardSamples = (cacheFolder: string | null = cacheFolderOf()) => loadSamples(standardRange.seed, standardRange.from, standardRange.to, cacheFolder)
 
+// Throws when a command got an option that it does not have, e.g. `mistakes.ts --split test`: a command that
+// ignores an option runs as if the option were not there, and its output is then read as if it were. `known` are the
+// command's options, e.g. ['--tables', '--count'].
+export function refuseUnknownOptions(command: string, known: readonly string[], argv: readonly string[] = process.argv.slice(2)) {
+  for (const argument of argv) {
+    if (argument.startsWith('--') && !known.includes(argument)) throw new Error(`${command} has no option ${argument}. ${known.length === 0 ? 'It takes no option.' : `Its options: ${known.join(', ')}.`}`)
+  }
+}
+
 // The value of a command's option, e.g. optionOf('--split') for `--split validation`.
 export function optionOf(name: string, argv: readonly string[] = process.argv): string | undefined {
   const at = argv.indexOf(name)
@@ -486,6 +475,7 @@ export function splitsOfOption(command: string, argv: readonly string[] = proces
 }
 
 if (import.meta.main) {
+  refuseUnknownOptions('data.ts', ['--scratch', '--from', '--to', '--seed'])
   const seed = Number(optionOf('--seed') ?? standardRange.seed)
   const from = Number(optionOf('--from') ?? standardRange.from)
   const to = Number(optionOf('--to') ?? standardRange.to)
@@ -505,4 +495,19 @@ if (import.meta.main) {
   console.log(`groups of the ${brokenCount} broken samples: ${tally(samples.group, groupNames, broken)}`)
   console.log(`${samples.scored.reduce((total, count, place) => total + Number(broken(place) && count === 0), 0)} broken samples have nothing to recover. The others have ${scored} scored code points, and the plain table parser can have at most ${mostRight} of them right (${(100 * mostRight / scored).toFixed(2)}%).`)
   console.log(`${samples.carriageReturns.reduce((total, bit) => total + bit, 0)} samples have line ends with a carriage return.`)
+  // A sample has the split of its original document, by the document's tokens (../splits.ts), so two documents of
+  // two splits can end as the same short broken text, e.g. `0.` or `{...}`.
+  const train = splitNames.indexOf('train')
+  const validation = splitNames.indexOf('validation')
+  const trainTexts = new Set<string>()
+  for (let place = 0; place < samples.sampleCount; place++) if (samples.split[place] === train && broken(place)) trainTexts.add(textOf(samples, place))
+  const shared = {samples: 0, texts: new Set<string>(), withSomethingToScore: 0, scored: 0}
+  for (let place = 0; place < samples.sampleCount; place++) {
+    if (samples.split[place] !== validation || !broken(place) || !trainTexts.has(textOf(samples, place))) continue
+    shared.samples++
+    shared.texts.add(textOf(samples, place))
+    if (samples.scored[place]! > 0) shared.withSomethingToScore++
+    shared.scored += samples.scored[place]!
+  }
+  console.log(`${shared.samples} broken validation samples have the broken text of a broken train sample (${shared.texts.size} texts). ${shared.withSomethingToScore} of them have something to score, ${shared.scored} scored code points.`)
 }

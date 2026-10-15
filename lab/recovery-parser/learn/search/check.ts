@@ -1,16 +1,20 @@
-// Checks that the search counts what score.ts counts:
+// Checks that the search counts what score.ts counts, and that the votes are counted on the train split only:
 // - For today's tables and for random settings of every open cell, some of them with added states, the score that
 //   sample-runs.ts gives on the train split and on the validation split is the score of scoreTables.
 // - The change that the search computes for another choice of one cell, from each sample's first read of the cell
 //   on, is the change between two runs of every sample from its start.
+// - countVotes refuses a set that holds a broken sample of the validation split, e.g. the whole standard set, unless
+//   the call asks for it.
 //
 // Run from the repo root: bun lab/recovery-parser/learn/search/check.ts [--settings 30]
 import {createRandom} from '../../random.ts'
-import {loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
+import {loadStandardSamples, optionOf, refuseUnknownOptions, selectSamples, trainPart, validationPart} from '../data.ts'
 import {actionCount, addStates, asIsTables, randomizeOpenCells} from '../recovery-tables.ts'
 import {scoreTables} from '../score.ts'
 import {changesOfChoices, prepareSamples, totalScore} from './sample-runs.ts'
+import {countVotes} from './votes.ts'
 
+refuseUnknownOptions('search/check.ts', ['--settings'])
 const settings = Number(optionOf('--settings') ?? 30)
 const samples = loadStandardSamples()
 const random = createRandom(20261015, 1)
@@ -77,6 +81,29 @@ for (const [split, part] of [['train', trainPart(samples)], ['validation', valid
   }
   console.log(`single cells: ${choices} other choices in 12 settings of the tables, ${choicesThatChange} of them change the score`)
 }
-console.log(`Checked: today's tables and ${settings} random settings on each split, and the other choices of single cells.`)
+// The votes: every broken sample of the set votes, so a set with validation samples is refused.
+{
+  const refusalOf = (run: () => unknown) => {
+    try {
+      run()
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+    return ''
+  }
+  const few = selectSamples(samples, Int32Array.from({length: 3000}, (_, place) => place))
+  const fewTrain = trainPart(few)
+  const wholeRefused = refusalOf(() => countVotes(few, {follow: false, stay: false})).includes('validation split')
+  const validationRefused = refusalOf(() => countVotes(validationPart(few), {follow: true, stay: false})).includes('validation split')
+  const total = (votes: {lexer: Int32Array, grammar: Int32Array}) => votes.lexer.reduce((sum, count) => sum + count, 0) + votes.grammar.reduce((sum, count) => sum + count, 0)
+  const ofTrain = total(countVotes(fewTrain, {follow: false, stay: false}))
+  const ofAll = total(countVotes(few, {follow: false, stay: false, alsoOtherSplits: true}))
+  if (!wholeRefused || !validationRefused || !(ofTrain > 0 && ofAll > ofTrain)) {
+    problems++
+    console.log(`  countVotes: a set with validation samples is ${wholeRefused ? 'refused' : 'taken'}, the validation part is ${validationRefused ? 'refused' : 'taken'}, the train part of 3000 samples gives ${ofTrain} votes and all of them with alsoOtherSplits ${ofAll}  <- wrong`)
+  }
+  console.log(`votes: countVotes refuses a set with validation samples and counts ${ofTrain} votes on the train part of the first 3000 samples, ${ofAll} when it is asked to count the validation samples too`)
+}
+console.log(`Checked: today's tables and ${settings} random settings on each split, the other choices of single cells, and which samples vote.`)
 console.log(problems === 0 ? 'Every check passed.' : `${problems} checks FAILED.`)
 if (problems > 0) process.exitCode = 1

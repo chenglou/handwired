@@ -16,9 +16,9 @@
 // grammar after a complete value inside a nested object, the parser's depth there is one more than the label's, and
 // these samples have 23,304 wrong code points in all. "kind k->s" means that the label says key and the parser shows
 // a string. An example shows the text around the code point, which is between 【 and 】.
-import {cacheFolderOf, codePointNestingScored, codePointScored, kindsOf, loadStandardSamples, optionOf, sourceNames, splitNames} from '../data.ts'
+import {cacheFolderOf, codePointNestingScored, codePointScored, kindsOf, loadStandardSamples, optionOf, refuseUnknownOptions, sourceNames, splitNames} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {grammarCellName, lexerCellName, loadTables} from '../recovery-tables.ts'
+import {grammarCellName, lexerCellName, loadTablesForReport} from '../recovery-tables.ts'
 import {runOnSample, wrongKind, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
@@ -49,6 +49,7 @@ const causes: readonly (readonly [name: string, fits: (what: string, lexerCell: 
 const visible = (codePoint: number) => codePoint === 0x0a ? '⏎' : codePoint === 0x09 ? '→' : codePoint < 0x20 ? '␦' : String.fromCodePoint(codePoint)
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/where-wrong.ts', ['--split', '--kind', '--typing', '--top', '--examples', '--tables', '--cause', '--causes', '--scratch'])
   const split = optionOf('--split') ?? 'train'
   if (split !== 'train' && split !== 'validation') throw new Error(`--split takes train or validation, and got ${split}: this script never reads the test split`)
   const kind = optionOf('--kind')
@@ -57,7 +58,7 @@ if (import.meta.main) {
   const exampleCount = Number(optionOf('--examples') ?? 1)
   const tablesFile = optionOf('--tables')
   const onlyCause = optionOf('--cause')
-  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTables(tablesFile).tables
+  const tables = tablesFile === undefined ? handwrittenTables().tables : loadTablesForReport(tablesFile).tables
   const samples = loadStandardSamples(cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const trace = createTrace()
   const tally = new Map<string, {samples: number, wrong: number, examples: string[]}>()

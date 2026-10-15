@@ -19,17 +19,19 @@
 //          container, * more than one.
 import {kindLetters} from '../../labels.ts'
 import {createRandom} from '../../random.ts'
-import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadStandardSamples, optionOf, validationPart} from '../data.ts'
+import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadStandardSamples, optionOf, refuseUnknownOptions, validationPart} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {asIsTables, checkTables, loadTables} from '../recovery-tables.ts'
+import {asIsTables, checkTables, loadTablesForReport} from '../recovery-tables.ts'
 import {runOnSample, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../score.ts'
 
+// The command shows the validation split and has no --split: an option that it does not have is an error.
+refuseUnknownOptions('search/mistakes.ts', ['--tables', '--count', '--pick', '--kind', '--scratch'])
 const scratchFolder = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']
 const tablesFile = optionOf('--tables')
 const count = Number(optionOf('--count') ?? 30)
 const pick = Number(optionOf('--pick') ?? 1)
 const onlyKind = optionOf('--kind')
-const tables = tablesFile === undefined ? asIsTables() : loadTables(tablesFile).tables
+const tables = tablesFile === undefined ? asIsTables() : loadTablesForReport(tablesFile).tables
 checkTables(tables)
 const samples = validationPart(loadStandardSamples(cacheFolderOf(scratchFolder)))
 const trace = createTrace()

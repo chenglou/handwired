@@ -18,16 +18,18 @@
 // - What those do not show, see score.ts: the percentage of the code points that the damage added that are shown as
 //   an error, the percentage of the samples that show an error at or after the first damage, and the number of code
 //   points that are shown as past the end.
-// The first lines say what the dataset's bound for the plain table parser is on these samples.
-import {cacheFolderOf, loadSamples, optionOf, splitsOfOption, standardRange} from './data.ts'
-import {type RecoveryTables, asIsTables, differencesOf, loadTables, today} from './recovery-tables.ts'
+// The first lines say what the dataset's bound for the plain table parser is on these samples. A file of tables that
+// was saved with another version of the dataset is scored all the same, after a line that starts with "Note:".
+import {cacheFolderOf, loadSamples, optionOf, refuseUnknownOptions, splitsOfOption, standardRange} from './data.ts'
+import {type RecoveryTables, asIsTables, differencesOf, loadTablesForReport, today} from './recovery-tables.ts'
 import {cellsReadBy, isRead, scoreTables, sharesOf} from './score.ts'
 
+refuseUnknownOptions('compare.ts', ['--split', '--to', '--scratch'])
 const splits = splitsOfOption('compare.ts')
 const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
 const named = process.argv.slice(2).filter(argument => !argument.startsWith('--') && argument.includes('=')).map(argument => {
   const [tablesFile, baseFile] = argument.slice(argument.indexOf('=') + 1).split(',')
-  return {name: argument.slice(0, argument.indexOf('=')), tables: loadTables(tablesFile!).tables, base: baseFile === undefined ? undefined : loadTables(baseFile).tables}
+  return {name: argument.slice(0, argument.indexOf('=')), tables: loadTablesForReport(tablesFile!).tables, base: baseFile === undefined ? undefined : loadTablesForReport(baseFile).tables}
 })
 const asIs = asIsTables()
 const percent = (share: number, digits = 1) => Number.isNaN(share) ? '-' : (100 * share).toFixed(digits)

@@ -15,6 +15,7 @@
 import {readFileSync, writeFileSync} from 'node:fs'
 import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
 import type {Random} from '../random.ts'
+import {datasetKey} from './dataset-key.ts'
 import {classNames, containerArray, containerNone, containerObject, contextNames, defaultTables, eventNames, grammarStateNames, lexerStateNames, maximumDepth, tokenNames} from '../table-parser.ts'
 
 // What a grammar cell does to the stack of open containers. `by token` is what the parser does today: an opening
@@ -700,17 +701,22 @@ const arrayFields = ['classOfCodePoint', 'tokenOfEvent', 'display', 'lexerNext',
 const sizeFields = ['classCount', 'lexerStateCount', 'eventCount', 'tokenCount', 'contextCount', 'grammarStateCount', 'errorState'] as const
 
 // Tables as JSON text, one line per field, with a note that says where the tables come from, e.g. "hand-written
-// recovery, 14 cells". tablesFromJson reads the text back and throws when the tables break the ground rules.
-export function tablesToJson(tables: RecoveryTables, note = ''): string {
+// recovery, 14 cells", and with the key of the dataset as it is when the text is made, see dataset-key.ts.
+// tablesFromJson reads the text back and throws when the tables break the ground rules.
+export function tablesToJson(tables: RecoveryTables, note = '', keyOfTheDataset: string = datasetKey()): string {
   checkTables(tables)
-  const lines = [`"format": "recovery tables 1"`, `"note": ${JSON.stringify(note)}`, ...sizeFields.map(field => `"${field}": ${tables[field]}`), ...arrayFields.map(field => `"${field}": [${Array.from(tables[field]).join(',')}]`)]
+  const lines = [`"format": "recovery tables 1"`, `"note": ${JSON.stringify(note)}`, `"datasetKey": ${JSON.stringify(keyOfTheDataset)}`, ...sizeFields.map(field => `"${field}": ${tables[field]}`), ...arrayFields.map(field => `"${field}": [${Array.from(tables[field]).join(',')}]`)]
   // What was added is only written when something was, so tables without it give the file that they always gave.
   if (tables.addedClasses.length > 0) lines.push(`"addedClasses": ${JSON.stringify(tables.addedClasses)}`)
   if (tables.displayOpen.includes(1)) lines.push(`"displayOpen": [${Array.from(tables.displayOpen).join(',')}]`)
   return `{\n${lines.map(line => `  ${line}`).join(',\n')}\n}\n`
 }
 
-export function tablesFromJson(text: string): {tables: RecoveryTables, note: string} {
+// The tables of a file, its note, and the key of the dataset that the file was saved with, or undefined for a file
+// from before the key was written.
+export type LoadedTables = {tables: RecoveryTables, note: string, datasetKey: string | undefined}
+
+export function tablesFromJson(text: string): LoadedTables {
   const parsed = JSON.parse(text) as Record<string, unknown>
   if (parsed['format'] !== 'recovery tables 1') throw new Error(`not a file of recovery tables: its format is ${JSON.stringify(parsed['format'])}`)
   const size = (field: string) => {
@@ -749,10 +755,39 @@ export function tablesFromJson(text: string): {tables: RecoveryTables, note: str
     grammarNext: array('grammarNext'), grammarAction: array('grammarAction'), grammarOpen: array('grammarOpen'),
   }
   checkTables(tables)
-  return {tables, note: typeof parsed['note'] === 'string' ? parsed['note'] : ''}
+  return {tables, note: typeof parsed['note'] === 'string' ? parsed['note'] : '', datasetKey: typeof parsed['datasetKey'] === 'string' ? parsed['datasetKey'] : undefined}
 }
 
+// A file of tables holds the key of the dataset's source files as they were when the file was saved, see
+// dataset-key.ts. Tables are saved by the run that made them, so the key says which dataset they were made with.
 export const saveTables = (path: string, tables: RecoveryTables, note = '') => writeFileSync(path, tablesToJson(tables, note))
-export const loadTables = (path: string) => tablesFromJson(readFileSync(path, 'utf8'))
+export const loadTables = (path: string): LoadedTables => tablesFromJson(readFileSync(path, 'utf8'))
+
+// What is wrong with the dataset key of a loaded file, as a sentence, or undefined when the file was saved with the
+// dataset as it is now. A later commit of the dataset can move a sample from the train split to the validation or
+// the test split, so tables that were made before it may have been trained on samples that are scored now.
+export function otherDatasetOf(path: string, loaded: LoadedTables): string | undefined {
+  if (loaded.datasetKey === datasetKey()) return undefined
+  const saved = loaded.datasetKey === undefined ? 'holds no dataset key, so it was saved before the key was written' : `was saved with the dataset ${loaded.datasetKey}`
+  return `${path} ${saved}, and the dataset is ${datasetKey()} now: its tables may have been made with samples that are in another split now`
+}
+
+// The tables of a file for a command that only reports on them, e.g. compare.ts: a file of another dataset is
+// loaded, and the command's output says so in a line that starts with "Note:".
+export function loadTablesForReport(path: string, log: (line: string) => void = line => console.log(line)): LoadedTables {
+  const loaded = loadTables(path)
+  const problem = otherDatasetOf(path, loaded)
+  if (problem !== undefined) log(`Note: ${problem}.`)
+  return loaded
+}
+
+// The tables of a file for a run that starts from them, e.g. search.ts --from, and for the test split's final
+// numbers: a file of another dataset is refused. Make the tables again with the dataset as it is.
+export function loadTablesOfThisDataset(path: string): LoadedTables {
+  const loaded = loadTables(path)
+  const problem = otherDatasetOf(path, loaded)
+  if (problem !== undefined) throw new Error(`${problem}. Make the tables again with this dataset.`)
+  return loaded
+}
 
 export {classNames, contextNames, eventNames, grammarStateNames, lexerStateNames, tokenNames}

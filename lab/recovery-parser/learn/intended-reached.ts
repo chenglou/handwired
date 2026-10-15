@@ -11,15 +11,16 @@
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/intended-reached.ts [--split train] <name>=<tables.json> ...
 // --split is train or validation.
-import {codePointCanFollow, codePointKept, loadStandardSamples, optionOf, splitNames} from './data.ts'
+import {codePointCanFollow, codePointKept, loadStandardSamples, optionOf, refuseUnknownOptions, splitNames} from './data.ts'
 import {createTrace} from './recovery-parser.ts'
-import {type RecoveryTables, asIsTables, loadTables} from './recovery-tables.ts'
+import {type RecoveryTables, asIsTables, loadTablesForReport} from './recovery-tables.ts'
 import {runOnSample} from './score.ts'
 
+refuseUnknownOptions('intended-reached.ts', ['--split'])
 const split = optionOf('--split') ?? 'train'
 if (split !== 'train' && split !== 'validation') throw new Error(`--split takes train or validation, and got ${split}`)
 const samples = loadStandardSamples()
-const named = process.argv.slice(2).filter(argument => !argument.startsWith('--') && argument.includes('=')).map(argument => ({name: argument.slice(0, argument.indexOf('=')), tables: loadTables(argument.slice(argument.indexOf('=') + 1)).tables}))
+const named = process.argv.slice(2).filter(argument => !argument.startsWith('--') && argument.includes('=')).map(argument => ({name: argument.slice(0, argument.indexOf('=')), tables: loadTablesForReport(argument.slice(argument.indexOf('=') + 1)).tables}))
 const trace = createTrace()
 
 function reachedBy(tables: RecoveryTables) {

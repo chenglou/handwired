@@ -7,7 +7,7 @@
 // --without-each-rule adds, per rule, the main number of the tables that leave the rule out. The cells of a rule that
 // is left out hold today's choice, which for most grammar cells is the state `error`. Other rules give that state a
 // meaning, so a text often recovers by accident, and the number understates what a grammar rule is worth.
-import {cacheFolderOf, loadSamples, optionOf, splitsOfOption, standardRange} from '../data.ts'
+import {cacheFolderOf, loadSamples, optionOf, refuseUnknownOptions, splitsOfOption, standardRange} from '../data.ts'
 import {asIsTables} from '../recovery-tables.ts'
 import {type ScoreRow, scoreTables, sharesOf} from '../score.ts'
 import {handwrittenTables, rules} from './rules.ts'
@@ -15,6 +15,7 @@ import {handwrittenTables, rules} from './rules.ts'
 const percent = (share: number) => Number.isNaN(share) ? '    -' : (100 * share).toFixed(1).padStart(5)
 
 if (import.meta.main) {
+  refuseUnknownOptions('handwritten/report.ts', ['--split', '--to', '--scratch', '--without-each-rule'])
   const splits = splitsOfOption('report.ts')
   const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
   const asIs = scoreTables(asIsTables(), samples, {splits})

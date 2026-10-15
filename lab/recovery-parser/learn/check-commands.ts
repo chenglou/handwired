@@ -14,10 +14,13 @@
 // 3. handwritten/show.ts --tables <file> --split validation --wrong --cells runs and shows samples.
 // And the two counts are not the same number once structure is added: a class that is added to tables whose cells
 // are changed already adds to the cells that differ from today's parser, and changes no cell against its base.
-import {mkdirSync} from 'node:fs'
+// 4. A file of tables that was saved with another version of the dataset, or before the dataset's key was written:
+//    compare.ts and score.ts score it after a line that starts with "Note:", and search.ts --from and
+//    soft/train.ts --base refuse to start from it.
+import {mkdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
 import {createRandom} from '../random.ts'
-import {loadSamples, standardRange} from './data.ts'
+import {datasetKey, loadSamples, standardRange} from './data.ts'
 import {handwrittenTables} from './handwritten/rules.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, copyTables, differencesOf, grammarStateNames, openDisplayEntries, randomizeOpenCells, saveTables} from './recovery-tables.ts'
 import {cellCountsOf, scoreTables, sharesOf} from './score.ts'
@@ -104,6 +107,42 @@ for (const {name, base, cellNamed} of bases) {
   check(afterClass.differFromToday.total > before && afterBit.differFromToday.total > before, 'adding structure to the hand-written tables adds nothing to the cells that differ from today\'s parser')
   check(differencesOf(asIsTables(), addStates(asIsTables(), 2, [0])).length > 0 && differencesOf(addStates(asIsTables(), 2, [0]), addStates(asIsTables(), 2, [0])).length === 0, 'added states do not count as cells that differ from today\'s parser')
   console.log(`The hand-written tables differ from today's parser in ${before} cells. With a class for the apostrophe added and no cell changed, ${afterClass.differFromToday.total} cells differ from today's parser, and with the bit "first on its line" ${afterBit.differFromToday.total}. Against the hand-written tables as the base, both counts are 0.`)
+}
+
+// 4. Tables of another dataset.
+{
+  const ofThisDataset = join(folder, 'of-this-dataset.json')
+  saveTables(ofThisDataset, handwrittenTables().tables, 'check-commands.ts')
+  const text = readFileSync(ofThisDataset, 'utf8')
+  const keyLine = `  "datasetKey": ${JSON.stringify(datasetKey())},\n`
+  check(text.includes(keyLine), 'a saved file of tables does not hold the dataset\'s key')
+  const others = [{name: 'another-dataset', text: text.replace(keyLine, '  "datasetKey": "0123456789abcdef",\n'), says: 'was saved with the dataset 0123456789abcdef'}, {name: 'without-a-key', text: text.replace(keyLine, ''), says: 'holds no dataset key'}]
+  let noted = 0
+  let refused = 0
+  for (const other of others) {
+    const file = join(folder, `${other.name}.json`)
+    writeFileSync(file, other.text)
+    // Commands that only report: the file is scored, after a note.
+    for (const [script, parameters] of [['compare.ts', ['--to', String(lastIndex), `${other.name}=${file}`]], ['score.ts', ['--to', String(lastIndex), '--tables', file]]] as const) {
+      const report = run(script, [...parameters])
+      const says = report.exitCode === 0 && report.output.includes(`Note: ${file} ${other.says}`)
+      check(says, `${script} on a file of tables that ${other.says} ends with the exit code ${report.exitCode} and ${report.output.includes('Note:') ? 'another note' : 'no note'}`)
+      if (says) noted++
+    }
+    // Commands that start a run from the file: refused. The limits keep the run short in case it is not refused.
+    for (const [script, parameters] of [
+      ['search/search.ts', ['--from', file, '--out', join(folder, `search-from-${other.name}.json`), '--passes', '1', '--pairs', 'parts', '--runs', '1']],
+      ['soft/train.ts', ['--base', file, '--name', `check-commands-${other.name}`, '--train-samples', '8']],
+    ] as const) {
+      const start = run(script, [...parameters])
+      const says = start.exitCode !== 0 && start.output.includes(other.says) && start.output.includes('Make the tables again with this dataset')
+      check(says, `${script} from a file of tables that ${other.says} ${start.exitCode === 0 ? 'runs' : 'fails with another error'}: ${start.output.slice(-200)}`)
+      if (says) refused++
+    }
+  }
+  const withoutNote = run('compare.ts', ['--to', String(lastIndex), `mine=${ofThisDataset}`])
+  check(withoutNote.exitCode === 0 && !withoutNote.output.includes('Note:'), 'compare.ts prints a note for a file of tables of this dataset')
+  console.log(`A file of tables with another dataset key, and one without a key: compare.ts and score.ts score them after a note (${noted} of 4 runs), and search.ts --from and soft/train.ts --base refuse them (${refused} of 4 runs). A file of this dataset gets no note.`)
 }
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)

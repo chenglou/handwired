@@ -123,6 +123,8 @@ export type TwinModel = {
 }
 
 // Which cells of one table are trainable: a mask with 1 per trainable cell, 'open' for every open cell, or 'none'.
+// A mask is a Uint8Array with one entry per cell of the table, 1 for a trainable cell and 0 for every other one,
+// e.g. a copy of `base.grammarOpen` with some entries set to 0. Only an open cell may be trainable.
 export type TrainableCells = Uint8Array | 'open' | 'none'
 
 export type ModelOptions = {
@@ -169,6 +171,10 @@ export function createModel(base: RecoveryTables, options: ModelOptions = {}): T
     if (chosen === 'open') return open.slice()
     if (chosen === 'none') return new Uint8Array(open.length)
     if (!(chosen instanceof Uint8Array)) throw new Error(`createModel got \`trainable.${table}\` that is no mask, 'open' or 'none'`)
+    // A mask holds 1 for a trainable cell and 0 for every other one. Another number, e.g. 2, used to make a cell that
+    // the trainer never steps and whose mix is uniform all the same.
+    const bad = chosen.findIndex(entry => entry !== 0 && entry !== 1)
+    if (bad !== -1) throw new Error(`createModel got \`trainable.${table}\` with ${chosen[bad]} at entry ${bad}: a mask holds 1 for a trainable cell and 0 for every other cell`)
     return chosen.slice()
   }
   const trainableLexer = maskOf('lexer', base.lexerOpen)
@@ -344,6 +350,9 @@ export type TwinData = {
   contextCount: number
   // The sample's index in the dataset, e.g. for the random draws of one sample.
   index: Int32Array
+  // The sample's split, as an index into splitNames of ../data.ts: 0 is the train split. train refuses a sample of
+  // another split unless TrainOptions.alsoOtherSplits is true.
+  split: Uint8Array
   // The code points of sample s are the entries start[s] to start[s + 1] - 1 of the arrays per code point.
   start: Int32Array
   // The position of the first error, where the twin starts, and the exact parser's state before that position: the

@@ -5,18 +5,17 @@
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-parser/learn/arms/plain-pass/run.ts [--seeds 1,2,3,4,5]
 // About 30 s per seed with 4 worker threads. The tables and the records go to <RECOVERY_SCRATCH>/arms/plain-pass/.
-import {optionOf} from '../../data.ts'
+import {optionOf, refuseUnknownOptions} from '../../data.ts'
 import {asIsTables} from '../../recovery-tables.ts'
 import {train} from '../../soft/train.ts'
-import {packForTwin, placesForTwin} from '../../soft/twin-data.ts'
 import {createModel} from '../../soft/twin.ts'
-import {baselines, describeComparison, describeSettings, runArm, samplesOfTheStandardSet} from '../harness.ts'
+import {baselines, describeComparison, describeSettings, runArm, trainDataFor} from '../harness.ts'
 
+refuseUnknownOptions('arms/plain-pass/run.ts', ['--seeds'])
 const seeds = (optionOf('--seeds') ?? '1,2,3,4,5').split(',').map(Number)
-const samples = samplesOfTheStandardSet()
 const base = asIsTables()
 // The train samples that give the twin a step, packed once: every seed trains on the same samples in another order.
-const data = packForTwin(samples, placesForTwin(samples, 'train'), undefined, base)
+const data = trainDataFor(base)
 
 const results = await runArm({
   name: 'plain-pass', seeds,

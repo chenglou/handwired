@@ -16,20 +16,30 @@
 //    errors. The container and all three labels can differ, because today's parser keeps the containers in a running
 //    sum and the recovery parser in a stack. And before the first error today's parser gives every scored value, so
 //    counting from the first error leaves nothing out that tables could change.
-// 4. The time of one scoring pass over the validation part of the standard set.
+// 4. Every row of a score, in every count: a second count made here from the dataset's functions (sampleAt's sample,
+//    labelsOf, groupOf, scoredCodePoints, mostRightFor, the kinds' families of damage.ts) and the exact parser's
+//    trace, with its own rows per split, source, group, family, kind, debatable or not and carriage returns, against
+//    scoreTables. For today's tables and for the hand-written tables, whose stack actions and changed cells make the
+//    two parsers differ. A sample that is counted in the row of another group or kind, or as a whole sample with a
+//    wrong code point, shows here.
+// 5. The time of one scoring pass over the validation part of the standard set.
 //
 // The check reads the train and validation splits only: allowedSampleAt gives no sample of the test split.
+import {kinds as kindDefinitions} from '../damage.ts'
 import {displayKind} from '../labels.ts'
 import {type Label, groupOf, labelsOf, mostRightFor, scoredCodePoints} from '../samples.ts'
 import {runTableParser} from '../table-parser.ts'
 import {
   allowedSampleAt, cacheFolderOf, codePointCanFollow, codePointKept, codePointKindScored, codePointNestingScored, codePointReplaced, groupNames, kindsOf, loadSamples, loadStandardSamples, optionOf,
-  reachableNames, sourceNames, splitNames, standardRange, textOf, validationPart,
+  reachableNames, refuseUnknownOptions, sourceNames, splitNames, standardRange, textOf, validationPart,
 } from './data.ts'
+import {handwrittenTables} from './handwritten/rules.ts'
 import {intendedOf} from './intended.ts'
+import {codePointsOf, runRecoveryParser} from './recovery-parser.ts'
 import {asIsTables, today} from './recovery-tables.ts'
 import {type ScoreRow, describeScore, scoreTables, sharesOf} from './score.ts'
 
+refuseUnknownOptions('check-data.ts', ['--scratch'])
 const sampleCount = Number(process.argv[2] !== undefined && !process.argv[2].startsWith('--') ? process.argv[2] : 20_000)
 const cacheFolder = cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH'])
 const seed = standardRange.seed
@@ -41,10 +51,14 @@ const fail = (message: string) => {
 
 const samples = loadSamples(seed, 0, sampleCount, cacheFolder)
 // The count made here: one row for every broken sample of the train and validation splits.
-const expected: ScoreRow = {
-  name: 'all', samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, kindScored: 0, kindRight: 0, nestingScored: 0, depthRight: 0, containerRight: 0, wholeSamples: 0,
+const emptyRow = (name: string): ScoreRow => ({
+  name, samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, kindScored: 0, kindRight: 0, nestingScored: 0, depthRight: 0, containerRight: 0, wholeSamples: 0,
   plainBoundRight: 0, plainBoundWholeSamples: 0, addedCodePoints: 0, addedShownAsError: 0, samplesShowingError: 0, shownAsPastEnd: 0,
-}
+})
+const expected: ScoreRow = emptyRow('all')
+// The second count of part 4: the rows by name, per tables, made with the exact parser.
+const familyOfKind = new Map<string, string>(kindDefinitions.map(kind => [kind.name, kind.family]))
+const tablesOfPart4 = [{name: 'today\'s tables', tables: asIsTables(), rows: new Map<string, ScoreRow>()}, {name: 'the hand-written tables', tables: handwrittenTables().tables, rows: new Map<string, ScoreRow>()}]
 const tally = {
   beforeDamage: 0, keptAndScored: 0, replaced: 0, added: 0, codePoints: 0, keptFromDamage: 0, canFollowFromDamage: 0, leftOut: 0, scoredValuesBeforeError: 0, wrongBeforeError: 0,
   keptBetweenDamageAndError: 0, unscoredKinds: 0, unscoredNesting: 0, keptFromError: 0,
@@ -193,6 +207,61 @@ for (let index = 0; index < sampleCount; index++) {
       if (right === scored) expected.wholeSamples++
       if (bound.right === scored) expected.plainBoundWholeSamples++
     }
+
+    // 4. The same count with the exact parser, and the rows that the sample is in, from the sample's own fields.
+    const rowNames = [
+      'all', `split: ${sample.split}`, `source: ${sample.source}`, `group: ${groupOf(sample)}`, sample.debatable ? 'debatable' : 'not debatable',
+      ...(sample.lineEnd === '\r\n' ? ['line ends with a carriage return'] : []),
+      ...new Set(sample.kinds.map(kind => `family: ${familyOfKind.get(kind)}`)), ...new Set(sample.kinds.map(kind => `kind: ${kind}`)),
+    ]
+    const {codePoints, truncated} = codePointsOf(sample.broken)
+    for (const {tables, rows} of tablesOfPart4) {
+      const exact = runRecoveryParser(codePoints, truncated, tables)
+      const ofSample = emptyRow('')
+      let exactShowsError = false
+      for (let position = sample.firstDamage; position < length; position++) {
+        const label = labels[position]
+        const shown = exact.displayKind[position]
+        if (shown === displayKind.error) exactShowsError = true
+        if (shown === displayKind.pastEnd) ofSample.shownAsPastEnd++
+        if (label === undefined) {
+          ofSample.addedCodePoints++
+          if (shown === displayKind.error) ofSample.addedShownAsError++
+          continue
+        }
+        if (position < sample.firstErrorPosition || (label.kind === undefined && label.depth === undefined)) continue
+        ofSample.codePoints++
+        const kindIsRight = label.kind === undefined || label.kind === shown
+        const depthIsRight = label.depth === undefined || label.depth === exact.depthAfter[position]
+        const containerIsRight = label.container === undefined || label.container === exact.containerAfter[position]
+        if (label.kind !== undefined) {
+          ofSample.kindScored++
+          if (kindIsRight) ofSample.kindRight++
+        }
+        if (label.depth !== undefined) {
+          ofSample.nestingScored++
+          if (depthIsRight) ofSample.depthRight++
+          if (containerIsRight) ofSample.containerRight++
+        }
+        if (kindIsRight && depthIsRight && containerIsRight) ofSample.allRight++
+      }
+      for (const name of rowNames) {
+        let row = rows.get(name)
+        if (row === undefined) {
+          row = emptyRow(name)
+          rows.set(name, row)
+        }
+        row.samples++
+        if (ofSample.codePoints === 0) row.nothingToRecover++
+        else {
+          if (ofSample.allRight === ofSample.codePoints) row.wholeSamples++
+          if (bound.right === ofSample.codePoints) row.plainBoundWholeSamples++
+        }
+        row.plainBoundRight += bound.right
+        if (exactShowsError) row.samplesShowingError++
+        for (const field of ['codePoints', 'allRight', 'kindScored', 'kindRight', 'nestingScored', 'depthRight', 'containerRight', 'addedCodePoints', 'addedShownAsError', 'shownAsPastEnd'] as const) row[field] += ofSample[field]
+      }
+    }
   }
   place++
 }
@@ -234,6 +303,38 @@ console.log(`   Whole samples right: ${all.wholeSamples} with the stack (${perce
 console.log(`   Before the first error, all ${tally.scoredValuesBeforeError} scored values are what today's parser gives, so a score that counts from the first error leaves out nothing that tables could change.`)
 console.log(`   Both counts also agree on what the shares do not show: the plain table parser can have at most ${all.plainBoundRight} of the scored code points right (${percent(mine.plainBound)}%) and ${all.plainBoundWholeSamples} whole samples (${percent(mine.plainBoundWhole)}%), by the dataset's mostRightFor. ${all.addedShownAsError} of the ${all.addedCodePoints} added code points are shown as an error (${percent(mine.addedAsError)}%), ${all.samplesShowingError} samples show an error at or after the first damage (${percent(mine.showsError)}%), and ${all.shownAsPastEnd} code points are shown as past the end.`)
 
+// 4. Every row of scoreTables against the rows of the second count, in every count.
+{
+  const countFields = ['samples', 'nothingToRecover', 'codePoints', 'allRight', 'kindScored', 'kindRight', 'nestingScored', 'depthRight', 'containerRight', 'wholeSamples', 'plainBoundRight', 'plainBoundWholeSamples', 'addedCodePoints', 'addedShownAsError', 'samplesShowingError', 'shownAsPastEnd'] as const
+  for (const {name, tables, rows} of tablesOfPart4) {
+    const scored = scoreTables(tables, samples, {splits: ['train', 'validation']})
+    let rowsThatDiffer = 0
+    for (const row of scored.rows) {
+      const made = rows.get(row.name)
+      if (made === undefined) {
+        rowsThatDiffer++
+        fail(`${name}: scoreTables has the row ${JSON.stringify(row.name)} with ${row.samples} samples, and the count made here has no such row`)
+        continue
+      }
+      const differing = countFields.filter(field => row[field] !== made[field])
+      if (differing.length > 0) {
+        rowsThatDiffer++
+        fail(`${name}, row ${JSON.stringify(row.name)}: ${differing.map(field => `${field} is ${row[field]} in scoreTables and ${made[field]} in the count made here`).join(', ')}`)
+      }
+    }
+    for (const rowName of rows.keys()) {
+      if (!scored.rows.some(row => row.name === rowName)) {
+        rowsThatDiffer++
+        fail(`${name}: the count made here has the row ${JSON.stringify(rowName)}, and scoreTables has no such row`)
+      }
+    }
+    const count = (prefix: string) => scored.rows.filter(row => row.name.startsWith(prefix)).length
+    if (count('group: ') < 5 || count('kind: ') < 40 || count('family: ') < 8) fail(`${name}: the score has ${count('group: ')} rows of groups, ${count('family: ')} of families and ${count('kind: ')} of kinds, too few for this check to mean much`)
+    const all = scored.rows[0]!
+    console.log(`4. ${name}: all ${scored.rows.length} rows of scoreTables (${count('group: ')} groups, ${count('family: ')} families, ${count('kind: ')} kinds, the splits, the sources, debatable or not, carriage returns) are the rows of a second count made here with the exact parser, in all ${countFields.length} counts, ${rowsThatDiffer} rows differ. All three right: ${all.allRight} of ${all.codePoints} (${(100 * all.allRight / all.codePoints).toFixed(1)}%), whole samples ${all.wholeSamples}.`)
+  }
+}
+
 {
   const validation = validationPart(loadStandardSamples(cacheFolder))
   const tables = asIsTables()
@@ -245,7 +346,7 @@ console.log(`   Both counts also agree on what the shares do not show: the plain
     times.push(performance.now() - started)
   }
   const validationScore = scoreTables(tables, validation)
-  console.log(`4. One scoring pass over the validation part of the standard set, ${validation.sampleCount} samples and ${validation.codePointCount} code points: ${Math.min(...times).toFixed(0)} to ${Math.max(...times).toFixed(0)} ms in 5 passes. Today's tables on it:`)
+  console.log(`5. One scoring pass over the validation part of the standard set, ${validation.sampleCount} samples and ${validation.codePointCount} code points: ${Math.min(...times).toFixed(0)} to ${Math.max(...times).toFixed(0)} ms in 5 passes. Today's tables on it:`)
   console.log(describeScore({...validationScore, rows: validationScore.rows.slice(0, 1)}).split('\n').map(line => `   ${line}`).join('\n'))
 }
 

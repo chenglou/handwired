@@ -31,7 +31,7 @@
 //           right for a comment and wrong for the first quote of a string that the damage quoted.
 import {mkdirSync} from 'node:fs'
 import {dirname, join} from 'node:path'
-import {type Samples, cacheFolderOf, codePointKept, loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
+import {type Samples, cacheFolderOf, codePointKept, loadStandardSamples, optionOf, refuseUnknownOptions, splitNames, trainPart, validationPart} from '../data.ts'
 import {containerArray, containerNone, containerObject, maximumDepth} from '../recovery-parser.ts'
 import {
   type RecoveryTables, actionByToken, actionCount, actionNames, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, asIsTables, cellCounts, differencesOf,
@@ -39,7 +39,9 @@ import {
 } from '../recovery-tables.ts'
 import {scoreTables, sharesOf} from '../score.ts'
 
-export type VoteOptions = {follow: boolean, stay: boolean}
+// `alsoOtherSplits` lets samples vote that are not of the train split. Without it countVotes throws for such a
+// sample, so that a caller who passes a whole set does not let the validation split vote.
+export type VoteOptions = {follow: boolean, stay: boolean, alsoOtherSplits?: boolean}
 
 export type Votes = {
   // Votes per tokenizer cell and choice, [cell × lexerStateCount × eventCount + next state × eventCount + event], and
@@ -65,8 +67,12 @@ function stayEvents(tables: RecoveryTables): Uint8Array {
   })
 }
 
-// Walks the broken samples of `samples` and counts their votes.
+// Walks the broken samples of `samples` and counts their votes. Every broken sample of the set votes, so the set is
+// the train split, e.g. trainPart(samples).
 export function countVotes(samples: Samples, options: VoteOptions): Votes {
+  const trainSplit = splitNames.indexOf('train')
+  const other = options.alsoOtherSplits === true ? -1 : samples.split.findIndex((split, place) => split !== trainSplit && samples.firstDamage[place] !== -1)
+  if (other !== -1) throw new Error(`countVotes got the sample ${samples.index[other]} of the dataset, which is in the ${splitNames[samples.split[other]!]} split: the votes are counted on the train split only, e.g. on trainPart(samples)`)
   const tables = asIsTables()
   const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, tokenOfEvent, classOfCodePoint, lexerOpen, grammarOpen} = tables
   const lexerChoices = lexerStateCount * eventCount
@@ -260,6 +266,7 @@ export function tablesOfVotes(votes: Votes): VotedTables {
 }
 
 if (import.meta.main) {
+  refuseUnknownOptions('search/votes.ts', ['--follow', '--stay', '--cells', '--out', '--scratch'])
   const options: VoteOptions = {follow: process.argv.includes('--follow'), stay: process.argv.includes('--stay')}
   const scratchFolder = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']
   const outFile = optionOf('--out') ?? (scratchFolder === undefined ? undefined : join(scratchFolder, 'search', `votes${options.follow ? '-follow' : ''}${options.stay ? '-stay' : ''}.json`))

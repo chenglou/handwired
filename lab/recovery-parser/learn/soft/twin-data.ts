@@ -41,15 +41,21 @@ export function intendedObjectsOf(sample: Sample): Uint16Array {
   return Uint16Array.from(sample.alignment, index => index === -1 ? 0 : stacks[index]!)
 }
 
+// A hash of this file, for the name of the cache file of the intended stacks: a change of intendedObjectsOf gets
+// another file.
+let knownHashOfThisFile: string | undefined
+const hashOfThisFile = () => knownHashOfThisFile ??= Bun.hash(readFileSync(join(import.meta.dir, 'twin-data.ts'))).toString(16)
+
 // The intended stacks of every code point of `samples`, see intendedObjectsOf. Making them takes about half a
 // millisecond per sample, since every sample is made again. With a cache folder they are read from a file whose name
-// holds the dataset's key and a hash of the samples' arrays, so another version of the dataset gets another file.
+// holds the dataset's key, a hash of this file and a hash of the samples' arrays, so another version of the dataset
+// or of this file gets another file.
 export function loadIntendedObjects(samples: Samples, cacheFolder: string | undefined): Uint16Array {
   let path: string | undefined
   if (cacheFolder !== undefined) {
     mkdirSync(cacheFolder, {recursive: true})
     const hashes = [samples.index, samples.start, samples.codePoints, samples.intendedDepthAfter, samples.intendedContainerAfter].map(array => Bun.hash(array).toString(16))
-    path = join(cacheFolder, `intended-stacks-${samples.datasetKey}-${samples.seed}-${Bun.hash(hashes.join('.')).toString(16)}.bin`)
+    path = join(cacheFolder, `intended-stacks-${samples.datasetKey}-${hashOfThisFile()}-${samples.seed}-${Bun.hash(hashes.join('.')).toString(16)}.bin`)
     if (existsSync(path)) {
       const bytes = readFileSync(path)
       if (bytes.byteLength === 2 * samples.codePointCount) return new Uint16Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
@@ -106,7 +112,7 @@ export function packForTwin(samples: Samples, places: ArrayLike<number>, intende
   for (let at = 0; at < sampleCount; at++) codePointCount += samples.start[places[at]! + 1]! - samples.start[places[at]!]!
   const data: TwinData = {
     sampleCount, classCount: tables.classCount, classTable: classTableKeyOf(tables), contextCount: tables.contextCount,
-    index: shared(Int32Array, 4, sampleCount), start: shared(Int32Array, 4, sampleCount + 1),
+    index: shared(Int32Array, 4, sampleCount), split: shared(Uint8Array, 1, sampleCount), start: shared(Int32Array, 4, sampleCount + 1),
     firstError: shared(Int32Array, 4, sampleCount), startLexerState: shared(Uint8Array, 1, sampleCount), startGrammarState: shared(Uint8Array, 1, sampleCount),
     startDepth: shared(Int8Array, 1, sampleCount), startObjects: shared(Uint16Array, 2, sampleCount), startFirstOnLine: shared(Uint8Array, 1, sampleCount),
     classes: shared(Uint8Array, 1, codePointCount), flags: shared(Uint8Array, 1, codePointCount), labelKind: shared(Int8Array, 1, codePointCount),
@@ -123,6 +129,7 @@ export function packForTwin(samples: Samples, places: ArrayLike<number>, intende
     const start = samples.start[place]!
     const length = samples.start[place + 1]! - start
     data.index[at] = samples.index[place]!
+    data.split[at] = samples.split[place]!
     runRecoveryParserInto(trace, samples.codePoints, start, length, false, tables)
     const firstError = trace.firstErrorPosition
     if (firstError !== samples.firstErrorPosition[place]) throw new Error(`sample ${samples.index[place]}: the parser's first error is at ${firstError}, and the sample says ${samples.firstErrorPosition[place]}`)
@@ -173,10 +180,14 @@ export function packForTwin(samples: Samples, places: ArrayLike<number>, intende
 
 // The places in `samples` of the broken samples of one split that give the twin something to do: a scored code
 // point, i.e. one at or after the first error whose label has a scored value. E.g. a text that is only cut off has
-// its first error after its last code point, and the twin has no step to take. `split` is 'train' or 'validation'.
+// its first error after its last code point, and the twin has no step to take. `split` is 'train' or 'validation',
+// and anything else throws, e.g. 'test'. The validation places are for reading how a twin does there, e.g. in a
+// check: train refuses to train on them.
 export function placesForTwin(samples: Samples, split: 'train' | 'validation'): Int32Array {
+  // The type allows no other name. A caller without types, or with a cast, can still pass one, e.g. 'test'.
+  const named: string = split
+  if (named !== 'train' && named !== 'validation') throw new Error(`placesForTwin takes the split 'train' or 'validation', and got ${JSON.stringify(named)}`)
   const wanted = splitNames.indexOf(split)
-  if (wanted === -1) throw new Error(`placesForTwin takes the split 'train' or 'validation', and got ${JSON.stringify(split)}`)
   const places: number[] = []
   for (let place = 0; place < samples.sampleCount; place++) if (samples.split[place] === wanted && samples.firstDamage[place] !== -1 && samples.scored[place]! > 0) places.push(place)
   return Int32Array.from(places)
