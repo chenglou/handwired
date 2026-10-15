@@ -309,14 +309,17 @@ export function sampleProblems(sample: Sample): string[] {
   })
 
   // A string value without its opening quote, after white space or punctuation: the code points at its start that read
-  // as a number or a literal are not scored, e.g. the 0.2 of `version: 0.2.0`.
+  // as a number or a literal are not scored, e.g. the 0.2 of `version: 0.2.0`. The code point before the value counts
+  // as white space or punctuation by its label when it is kept, and by what it is when the damage added it.
   alignment.forEach((index, at) => {
     if (index <= 0 || labels[index]!.kind !== kindOf.string) return
     const quote = labels[index - 1]!
     if (original[index - 1] !== '"' || quote.kind !== kindOf.string || kept.has(index - 1)) return
     if (at > 0) {
       const before = alignment[at - 1]!
-      if (before === -1 || unscoredKinds.has(before) || (labels[before]!.kind !== kindOf.whitespace && labels[before]!.kind !== kindOf.punctuation)) return
+      const added = broken[at - 1]!
+      if (before === -1 && !isSpace(added) && !'{}[]:,'.includes(added)) return
+      if (before !== -1 && (unscoredKinds.has(before) || (labels[before]!.kind !== kindOf.whitespace && labels[before]!.kind !== kindOf.punctuation))) return
     }
     const length = ownNumberOrLiteralStart(broken, at)
     for (let offset = 0; offset < length && alignment[at + offset] === index + offset && labels[index + offset]!.kind === kindOf.string; offset++) {

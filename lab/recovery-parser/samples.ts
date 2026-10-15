@@ -129,8 +129,11 @@ const punctuation = displayKind.punctuation
 // - A string value that lost its opening quote and stands after white space or punctuation starts where a number or
 //   a literal can start. Its first code points that read as one have a display kind that is not scored, e.g. the 0.2
 //   of `version: 0.2.0` and the t of `NODE_ENV: test`: at the t no parser can tell test from true. Before the first
-//   error the second rule says the same, and this rule says it for the rest of the text. A key is another matter: no
-//   literal can stand where a key is expected, so the n of the key `name` is scored, see needsDisplayFix.
+//   error the second rule says the same, and this rule says it for the rest of the text. The white space or the
+//   punctuation can be the damage's own, e.g. the indentation of the line after an added comment. After another added
+//   code point the rule does not apply, e.g. after the ; of &quot;, which stands for the opening quote. A key is
+//   another matter: no literal can stand where a key is expected, so the n of the key `name` is scored, see
+//   needsDisplayFix.
 function unscoredOf(original: readonly string[], broken: readonly string[], labels: readonly ValidLabel[], alignment: readonly number[], firstDamage: number, trace: ParserTrace, declared: readonly number[]) {
   const kept = new Set(alignment)
   const kinds = new Set(declared.filter(index => kept.has(index)))
@@ -147,9 +150,11 @@ function unscoredOf(original: readonly string[], broken: readonly string[], labe
     if (index <= 0 || labels[index]!.kind !== displayKind.string) continue
     // The code point before it in the original is the value's opening quote, which is not in the broken text.
     if (original[index - 1] !== '"' || labels[index - 1]!.kind !== displayKind.string || kept.has(index - 1)) continue
+    // What stands before it in the broken text is white space or punctuation: a kept code point by its label, and one
+    // that the damage added by what it is, e.g. the indentation after an added line with a # comment.
     if (position > 0) {
       const before = alignment[position - 1]!
-      if (before === -1 || kinds.has(before) || (labels[before]!.kind !== displayKind.whitespace && labels[before]!.kind !== punctuation)) continue
+      if (before === -1 ? !' \t\r\n{}[]:,'.includes(broken[position - 1]!) : kinds.has(before) || (labels[before]!.kind !== displayKind.whitespace && labels[before]!.kind !== punctuation)) continue
     }
     const run = readsAsNumberOrLiteral(broken, position)
     for (let offset = 0; offset < run && alignment[position + offset] === index + offset && labels[index + offset]!.kind === displayKind.string; offset++) kinds.add(index + offset)
