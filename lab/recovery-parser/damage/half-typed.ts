@@ -164,17 +164,21 @@ function colonWithoutValue(random: Random, scanned: Scan): Damage | undefined {
   const from = random.chance(0.5) ? entry.value.start : entry.colon + 1
   let follows = place === 'comma' ? 'its comma stays' : 'the closer follows'
   let to = entry.value.end
+  let unscoredKinds: number[] = []
   if (place === 'key') {
     to = entry.commaAfter + 1
     // A string after a colon is what valid JSON looks like, so every parser reads the next key as the value, and its
-    // display kind is not scored (see unscoredOf in samples.ts). The colon after it is the first error, and a parser can
-    // go on from there: a colon after a value means that the value was a key.
-    follows = `the next key follows ${hasLineFeedBetween(codePoints, to, entry.container.entries[entry.index + 1]!.start) ? 'on the next line' : 'on the same line'}`
+    // display kind is not scored. The colon after it is the first error, and a parser can go on from there: a colon
+    // after a value means that the value was a key. When this damage is the text's first error, samples.ts finds by
+    // itself that the key is not scored, and when another damage comes before it, only this list says so.
+    const next = entry.container.entries[entry.index + 1]!
+    follows = `the next key follows ${hasLineFeedBetween(codePoints, to, next.start) ? 'on the next line' : 'on the same line'}`
+    unscoredKinds = Array.from({length: next.key!.end - next.key!.start}, (_, offset) => next.key!.start + offset)
   }
   // What the form says about the space is read off the text that is left: white space between the colon and the
   // removed part stays, and so does a space right after the removed part. A compact text has neither.
   const spaceStays = from > entry.colon + 1 || codePoints[to] === ' ' || codePoints[to] === '\t'
-  return {edits: [removeRange(from, to)], form: `${spaceStays ? 'the space after the colon stays' : 'nothing after the colon'}, ${follows}`, reachable: 'yes'}
+  return {edits: [removeRange(from, to)], form: `${spaceStays ? 'the space after the colon stays' : 'nothing after the colon'}, ${follows}`, reachable: 'yes', unscoredKinds}
 }
 
 function partialLiteral(random: Random, scanned: Scan): Damage | undefined {
