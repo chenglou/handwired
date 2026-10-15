@@ -191,8 +191,9 @@ function withoutChanceMatches(steps: readonly Step[]): Step[] {
   const last = runs.at(-1)
   if (last !== undefined && last.isEdit && last.added === 0) {
     const lastLongRun = runs.findLastIndex(run => !run.isEdit && run.steps.length > chanceMatchLength)
-    // Without a longer kept run, a kept run at the very start of both texts is left alone.
-    const from = lastLongRun !== -1 ? lastLongRun + 1 : runs[0]!.isEdit ? 0 : 1
+    // Without a longer kept run, the first run is left out: a kept run at the very start of both texts, or text
+    // before the whole original, e.g. the line of a code fence before `nul`, after which `nul` is kept.
+    const from = lastLongRun !== -1 ? lastLongRun + 1 : 1
     const end = runs.slice(from)
     const kept = end.reduce((total, run) => total + (run.isEdit ? 0 : run.steps.length), 0)
     const added = end.reduce((total, run) => total + run.added, 0)

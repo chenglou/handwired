@@ -144,6 +144,8 @@ const pairs: [broken: string, valid: string, marks: string][] = [
   // No letter of a marker is paired with a letter of the part that is missing, also when the missing part is short.
   ['{"name": "Ada", "tags": ["x... [truncated]', '{"name": "Ada", "tags": ["x-ray", "urgent", "retired"]}', `${'.'.repeat(27)}${'+'.repeat(15)}`],
   ['{"name": "Ada", "tags": ["x... [truncated]', '{"name": "Ada", "tags": ["x"]}', `${'.'.repeat(27)}${'+'.repeat(15)}`],
+  // Text before the whole original is no marker at a cut: the start of the literal after it is kept.
+  ['```json\nnul', 'null', '++++++++...'],
   // The brace at the end is kept after a word of another notation.
   ['{"ok": FALSE\n}', '{"ok": false\n}', '.......+++++..'],
   ['{ id: 1, name: \'Ada\', manager: undefined }', '{"id": 1, "name": "Ada", "manager": null}', '.+.............~...~...........++++++++++.'],

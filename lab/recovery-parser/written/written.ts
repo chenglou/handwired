@@ -151,7 +151,8 @@ function firstDamageOf(alignment: readonly number[], replaced: readonly boolean[
 // - The rest of an escape whose backslash the broken text lacks, e.g. the inner quotes of `"call "Ana" back"`: its
 //   label says escape, and no reading of the broken text shows that.
 // - What reads as an escape after a backslash that lost its second half, e.g. the t of `C:\temp` for `C:\\temp`,
-//   the `u00e` of `C:\u00e` and a closing quote: the label says string, and every reader shows an escape.
+//   the `u00e` of `C:\u00e`, and a closing quote with the comma after it: the labels say string and punctuation, and
+//   every reader shows an escape and goes on with the string.
 function unscoredOf(opinion: Opinion, broken: readonly string[], trace: ParserTrace) {
   const valid = Array.from(opinion.text)
   const validLabels = labelsOfValidText(opinion.text)
@@ -188,6 +189,8 @@ function unscoredOf(opinion: Opinion, broken: readonly string[], trace: ParserTr
     } else if (valid[index + 1] === '\\' && positionOf[index + 1] === -1) {
       const after = positionOf[index]! + 1
       if ('bfnrt/"'.includes(broken[after] ?? ' ')) kinds.add(after)
+      // After a quote that reads as escaped, the string goes on, and a comma is its content.
+      if (broken[after] === '"' && broken[after + 1] === ',') kinds.add(after + 1)
       else if (broken[after] === 'u') for (let digit = after; digit <= after + 4 && (digit === after || /^[0-9a-fA-F]$/.test(broken[digit] ?? '')); digit++) kinds.add(digit)
     }
     index += length - 1
