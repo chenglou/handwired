@@ -7,7 +7,8 @@
 //    frozen without need.
 // 3. Runs today's parser on valid texts and on broken ones, and looks at every cell it reads before a first error:
 //    none may be open. The texts are the dataset's originals, its valid samples, its broken texts, and texts made
-//    in check-texts.ts, among them valid ones with 16 levels and with 512 code points.
+//    in check-texts.ts, among them valid ones with 16 levels and with 512 code points. Then the same for every text
+//    of up to 6 code points.
 // 4. Writes tables as JSON and reads them again, lists the cells in which two tables differ, and shows that a change
 //    of a frozen cell is refused. With the environment variable RECOVERY_SCRATCH it also saves the tables to a file
 //    in that folder and loads the file.
@@ -17,6 +18,7 @@ import {createRandom} from '../random.ts'
 import {defaultSeed, sampleAt} from '../samples.ts'
 import {classNames, positionCount, runTableParser} from '../table-parser.ts'
 import {checkTexts} from './check-texts.ts'
+import {createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {
   actionNone, asIsTables, cellCounts, configurationsReachedByGuessAlone, copyTables, describeDifferences, differencesOf, frozenGrammarCellWitness, frozenLexerCellWitness, grammarCellName, lexerCellName,
   loadTables, problemsOf, saveTables, tablesFromJson, tablesToJson, today,
@@ -120,6 +122,40 @@ const missedByValid = [
   ...Array.from(tables.grammarOpen, (open, cell) => open === 0 && grammarReadByValid[cell] === 0 ? grammarCellName(tables, cell) : ''),
 ].filter(name => name !== '')
 console.log(`   The valid texts alone read ${ones(lexerReadByValid)} of the ${counts.lexerFrozen} frozen tokenizer cells and ${ones(grammarReadByValid)} of the ${counts.grammarFrozen} frozen grammar cells.${missedByValid.length === 0 ? '' : ` Not read: ${missedByValid.join(' ')}`}`)
+
+// Every short text. The parser only sees a code point's class, so one code point per class stands for every text.
+// A text is only made longer while it has no error, and each step that is no first error has to read frozen cells.
+// This part runs the recovery parser with today's tables, which check-parser.ts compares with today's parser.
+{
+  const maximumLength = 6
+  const codePoints = classNames.filter(name => name !== 'end' && name !== 'truncatedEnd').map(name => codePointOfClass[name].codePointAt(0)!)
+  const trace = createTrace()
+  const text = new Int32Array(maximumLength)
+  let texts = 0
+  let openReads = 0
+  const checkLastStep = (position: number) => {
+    if (trace.firstErrorPosition !== -1) return false
+    if (tables.lexerOpen[trace.lexerCell[position]!] === 1 || tables.grammarOpen[trace.grammarCell[position]!] === 1) {
+      openReads++
+      fail(`the text ${JSON.stringify(String.fromCodePoint(...text.subarray(0, position)))} reads an open cell at position ${position}, before any error`)
+    }
+    return true
+  }
+  const extend = (length: number) => {
+    // The text up to `length` has no error. Its end position is a step too.
+    texts++
+    runRecoveryParserInto(trace, text, 0, length, false, tables, length + 1)
+    checkLastStep(length)
+    if (length === maximumLength) return
+    for (const codePoint of codePoints) {
+      text[length] = codePoint
+      runRecoveryParserInto(trace, text, 0, length + 1, false, tables, length + 1)
+      if (checkLastStep(length)) extend(length + 1)
+    }
+  }
+  extend(0)
+  console.log(`   Every text of up to ${maximumLength} code points, as far as its classes go: ${texts} texts without an error before their end, and ${openReads} of their steps read an open cell.`)
+}
 
 // 4. Saving, loading, the differences of two tables, and a frozen cell.
 const changed = copyTables(tables)
