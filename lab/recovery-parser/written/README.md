@@ -2,9 +2,9 @@
 
 This folder holds a small evaluation set of broken JSON. Agents wrote its cases from what broken JSON looks like where they have seen it, e.g. in the output of a program, in a file that a person edits, or in the answer of a language model.
 
-**The set is for one last evaluation at the end of the experiment.** Nobody who builds or trains a parser reads the files in `cases/` and `repairs/`, or prints a case with the tools of this folder: a parser that was shaped by a look at the cases says nothing about broken JSON that nobody has seen. [The set as it is](#the-set-as-it-is) gives the set's numbers and says how other code scores its tables on the set without a look at a case.
+**The set is for one last evaluation at the end of the experiment.** Whoever builds or trains a parser reads nothing in this folder, this page included, and uses only the scoring call that the dataset's README names, `scoreTables` of `score.ts`. A parser that was shaped by a look at the cases, at their repairs or at a description of them says nothing about broken JSON that nobody has seen.
 
-The page up to that heading is for a writer of cases, and it says everything a writer needs.
+The page up to [The set as it is](#the-set-as-it-is) is for a writer of cases, and it says everything a writer needs. The rest is for those who check the set and read its numbers.
 
 ## What a case is
 
@@ -211,7 +211,7 @@ When the list of changes is not the damage that you made, look for an unintended
 
 - `blind.ts` writes the broken texts of all writers into part files, in a shuffled order and under ids that say nothing about the case.
 - Two repairers per part write repairs, by the rules of `REPAIR.md`. Their files go into `repairs/`.
-- `written.ts` reads `cases/` and `repairs/`. Per case it gives the opinions, i.e. your intended text and the repairs, the values of every code point by each opinion, and which code points are agreed, added by every opinion, or disputed. A value that the reading of one opinion does not score, by the rules of the `?` above, is no dispute with another opinion. `bun lab/recovery-parser/written/written.ts --disputed` prints every case with a disputed code point, opinion by opinion.
+- `written.ts` reads `cases/` and `repairs/`. Per case it gives the opinions, i.e. your intended text and the repairs, the values of every code point by each opinion, and which code points are agreed, added by every opinion, disputed, or without a label by the list of `no-label.txt`. A value that the reading of one opinion does not score, by the rules of the `?` above, is no dispute with another opinion. `bun lab/recovery-parser/written/written.ts --disputed` prints every case with a disputed code point, opinion by opinion.
 - `left-out.txt` names the repairs that are left out of their case because they plainly break a rule of `REPAIR.md`. A line is the repair file without its ending, the id of the broken text, and the reason. A repair that reads the text in another way than the other opinions breaks no rule and stays, and its case is then disputed.
 - `no-label.txt` names text of a broken text that has no label, whatever the opinions make of it: `written.ts` takes it out before it holds the opinions against each other, so its code points are not scored and are no dispute. A line is the id of the case, the position of the text's first code point in the broken text, the reason, a colon and a space, and the text as a case file writes it, e.g. `⟦lf⟧` for a line feed. [Text without a label](#text-without-a-label) says what is on the list.
 - `kinds.txt` says for every case which of the generator's kinds describe its damage, by the names of the table of kinds in the dataset's README, and whether the case also has damage that no kind makes. A line is the id of the case, the names of the kinds, each after a space, and for a case with damage that no kind makes ` new: ` and that damage in a few words. [What the damage is](#what-the-damage-is) says how the line between the two was drawn. `bun lab/recovery-parser/written/written.ts --kinds` counts the cases per writer's file and per kind.
@@ -222,7 +222,9 @@ When the list of changes is not the damage that you made, look for an unintended
 
 ## The set as it is
 
-The set has 240 cases: six writers wrote 40 each, every writer from one source of broken JSON, and every broken text was repaired twice more by agents who saw only the broken text. It is used once, at the end of the experiment, to see how far a result on the generated samples carries over to damage that the generator's rules did not make. Whoever builds or trains a parser does not read `cases/`, `repairs/` and `left-out.txt`, and does not run `written.ts --disputed` or the two checks, which print cases. `score.ts` and the function below print numbers alone.
+The set has 240 cases: six writers wrote 40 each, every writer from one source of broken JSON, and every broken text was repaired twice more by agents who saw only the broken text. It is used once, at the end of the experiment, to see how far a result on the generated samples carries over to texts that no generator made. The writers did not see the generator. 194 of their cases have only damage that the generator's kinds also make, in other documents and in other words, and 46 have damage that no kind makes, see [What the damage is](#what-the-damage-is).
+
+Whoever builds or trains a parser reads nothing in this folder: not the cases, the repairs and the three lists, and not this page, the tools and the tests either, whose examples describe sorts of damage that only the cases have, e.g. `#012` in the place of a line feed. Such a reader uses only `scoreTables` of `score.ts`, as the dataset's README says. The function returns numbers alone.
 
 ### How other code scores its tables
 
@@ -258,6 +260,8 @@ The broken texts have 35,429 code points, and 27,048 of them stand from the firs
 
 7 cases have nothing to recover. A text that only stops early and a whole document with other text after it have no code point to score, as in the dataset, so the writers kept such cases few, and the set says nothing about them.
 
+The set says nothing about three more things, because it lacks them. No case is a text of several documents, e.g. one document per line: rule 1 forbids it, and the dataset has five kinds for such texts. No text has a code point outside the Basic Multilingual Plane, e.g. an emoji. And no number has an exponent. The broken texts have 40 to 482 code points, 101 of them are on several lines, 5 hold tabs and 6 hold carriage returns.
+
 No broken text, no intended text and no repair of the set is among the first 60,000 generated samples of the default seed, of which 57,016 are broken: neither as the same text nor as the same JSON value. `bun lab/recovery-parser/written/check-overlap.ts` checks it in about 15 seconds, and its last line is `60000 samples of seed 20261015, 57016 of them broken: 0 of 240 broken texts, 0 of 240 intended texts and 0 of 480 repairs are among them.` Parts of the texts are in both: 558 of the 1,204 keys of the intended texts and 102 of their 746 string values are also in the documents of these samples, e.g. the names of fields that many examples of JSON have. The writers and the generator's templates draw on the same stock of examples.
 
 ### What the damage is
@@ -276,7 +280,7 @@ The writers did not see the generator, and most of what they wrote is damage tha
 
 A case is of the generator's kinds when every damage in it is one of the kinds, in any form that a person would call the same sort of damage. These count as a kind:
 
-- Another word, name or character in the same part, e.g. German quotes as `curlyQuotes`, the line separator U+2028 in the place of a line feed as `nonBreakingSpace`, a call with another name as `callWrapper`, and a currency sign before a number as `numberFormat`.
+- Another word, name or character that plays the same part, e.g. German quotes as `curlyQuotes`, the line separator U+2028 in the place of a line feed as `nonBreakingSpace`, a call with another name as `callWrapper`, and a currency sign before a number as `numberFormat`.
 - Text before or after the document, whatever it holds, as one of the wrapper kinds, e.g. the headers of an HTTP answer as `proseAround`, and the tags of a script around the document as `statementWrapper`.
 - A piece of the text that is missing with nothing in its place, e.g. a line that opens an object, as `middleCutOut`.
 - The notation of another language, when each of its differences from JSON is a kind's, e.g. what Go prints for a struct with the names of its fields: keys and values without quotes, and no commas.
@@ -293,6 +297,10 @@ The kinds that describe the most cases are `unquotedKey` with 22, `logPrefix` an
 
 So a score over the whole set says mostly how a result carries over to other documents with damage of the sorts that the samples have. The score of the 46 cases says how it carries over to other sorts of damage, and `score.ts` prints the two apart.
 
+The six sources overlap, so the set has fewer sorts of damage than cases: about 120 by a reader's count. The same sort of damage from the same sort of source comes two to four times, from two or three writers, e.g. a guard line before the answer of a web API, a row of a CSV file with the document in its last cell, a mail that is wrapped at 72 columns, and a placeholder for a key between angle brackets. The larger groups, by the same count: inner quotes without their backslash in 8 cases, curly quotes in 7, and 5 each of single backslashes, a JavaScript object with keys without quotes and strings in single quotes, the color codes of a terminal, merge conflicts and the marks of a diff. Thousands separators, a backslash before every quote, raw line feeds in the place of `\n`, a colon without a value and line numbers before the lines come 4 times each. The same sort of file comes several times too, e.g. `tsconfig.json` 4 times and `package.json` at least 6 times. So the cases are not 240 trials that have nothing to do with each other: a parser that fails on one sort of damage loses two to eight cases at once.
+
+25 of the cases with full agreement are a whole document with text only before it or after it. They hold 3,200 of the 19,343 scored code points, and each of these code points is as easy as the first.
+
 ### Text without a label
 
 Two sorts of text have no label in the dataset, and the opinions of a case keep them in different ways. `no-label.txt` lists every such text of the set, and its code points have no label: they are not scored, and they are no dispute.
@@ -307,7 +315,7 @@ The edge of the first rule is the value: the list holds text that stands for a v
 - A number with a leading zero, e.g. a file mode `0644`, has the depth and the container of its digits and not their display kind, as in the dataset: the number and the string of the same digits are as sensible. Two cases have such a value, and in both all three opinions take it for a string, which a score counted as a string before.
 - A word of another notation in the place of a literal or a number has no label, e.g. `True`, `nil` and `0x1F`.
 
-Where the opinions of a case differ on which of these three a text is, the text is disputed, e.g. `yes` as `true` or as the string `"yes"`, and `$9.99` as a number or as a string.
+Where the opinions of a case differ on which of these a text is, the text is disputed, e.g. `yes` as `true` or as the string `"yes"`, and `$9.99` as a number or as a string.
 
 With the list, 5 cases that were disputed have full agreement, and 224 code points from the first error on have no label: 107 of them were disputed, 113 were scored as a string, and 4 are the line feeds. One of the 11 cases is `documents-and-web-33`, whose `from` line says that a number will stand in the place of its variable, and whose intended text has a string there, as both repairs have by rule 4. None of the variable's code points is scored now, so the case stays as it is.
 
@@ -371,10 +379,14 @@ The writers marked 31 cases as debatable, and 3 of those are among the 19. In 15
 
 The two cases where the tools were wrong are `logs-and-transport-02`, with 1 disputed code point, and `model-output-22`, with 6. In both, `align.ts` took a short part of the document for a chance match, i.e. the first brace after a log prefix and the last two braces before a closing code fence, and one repairer had written the repair in another way to get around that. `align.ts` no longer takes such parts for chance matches, see the list under "What the tools cannot know". In `model-output-22` that repair still puts the missing bracket at another place among the white space than the writer and the other repair do, which gives three white space code points another depth. `written.ts` no longer takes that for a dispute: a value that the reading of one opinion does not score is no dispute with another opinion, and by the rule on a missing bracket the repair's reading does not score the depth there.
 
-The same change of `align.ts` gives values to the short parts between two replaced quotes in `documents-and-web-10`, `documents-and-web-15`, `logs-and-transport-33` and `merges-and-tools-36`. The notes of these four cases, of `logs-and-transport-02` and of `model-output-22` describe how the tools read the case before the change.
+The same change of `align.ts` gives values to the short parts between two replaced quotes in `documents-and-web-10`, `documents-and-web-15`, `logs-and-transport-33` and `merges-and-tools-36`. The notes of these four cases, of `logs-and-transport-02` and of `model-output-22` describe how the tools read the case before the change. A seventh note is out of date too: the one of `merges-and-tools-21` says that the check reports white space that differs, and `check-cases.ts` no longer reports that for the case. The notes stay, since no text of a case is changed.
 
-### What is left out
+Four of the disputed cases are disputed over a character inside a string that is the string's content by every opinion: `documents-and-web-05`, `documents-and-web-06`, `logs-and-transport-15` and `merges-and-tools-35`. The writer puts the character back that was meant, e.g. two hyphens for a dash, so the character that stands there is added by the writer's opinion and kept by the repairs. Nobody doubts its display kind, its depth or its container. The cases stay disputed, as the rules stand. Their 338 scored code points are not in the main number, and they do count in the row of the agreed code points.
+
+### What is left out and what is left as it is
 
 - No case is left out, and no text of a case or of a repair was changed.
 - One repair is left out, the one of `logs-and-transport-11` in `repairs/a-part-3.txt`. It keeps the line feed after the last color code, i.e. white space after text that follows the document. `REPAIR.md` asks for a repair that ends with the document's last character where text after the document is removed, and the writer's intended text and the other repair end so. Leaving a repair out is a judgment: someone held the repair against the rules and found that it breaks one. Here the judgment changes no scored code point. With the repair, the case has the same 156 scored code points and the line feed as its one disputed code point, and without it the case has the writer's opinion and one repair, which agree.
 - The repair of `logs-and-transport-14` in the same file was left out for the same reason, and it is an opinion of its case again. The file of that case is UTF-16 read as bytes, so a NUL follows every character, also the carriage return and the line feed that end the file. The repair keeps these two as the file's own line end, which is what rule 3 asks of a writer for a file that ends with a line feed, and the repairer marked the repair as unsure and named the other reading. That is another reading and no break of a rule, so the case is disputed over the 2 code points, and its 51 scored code points are the same with the repair and without it.
+- In four cases the values of some kept code points stand under other text than the text that a reader takes for the document's: `documents-and-web-13`, `documents-and-web-30`, `merges-and-tools-11` and `merges-and-tools-37`. The rule that the earlier of two equal code points is the kept one puts them e.g. under the copy of an address inside the tag of a link and not under the link's text, under the spaces before a line number and not under the indentation after it, and under the first two of four quotes. The values are the same under either counterpart, as [What the tools cannot know](#what-the-tools-cannot-know) says, so these cases are left as they are.
+- Two files of the dataset outside this folder changed for the set: `../README.md` got its paragraph about this folder, and `../tsconfig.json` got `written/*.ts` in its `include`, one line, so that `bun run check` checks the tools of this folder.

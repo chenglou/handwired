@@ -10,7 +10,7 @@ import {readFileSync, readdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {defaultSeed, sampleAt} from '../samples.ts'
 import {readRepairFile} from './format.ts'
-import {readWritten, writtenFolder} from './written.ts'
+import {type WrittenCase, readWritten, writtenFolder} from './written.ts'
 
 // The texts of one case: its broken text, the writer's intended text, and every repair of the broken text, also one
 // that left-out.txt names.
@@ -58,13 +58,14 @@ export function overlapWithSamples(cases: readonly CaseTextsOfSet[], sampleCount
   }
 }
 
-// The texts of every case of a folder, with the repairs as the repair files hold them.
-export function textsOfSet(folder: string = writtenFolder): CaseTextsOfSet[] {
+// The texts of every case of a folder, with the repairs as the repair files hold them. `cases` are the folder's cases
+// when the caller has read them already.
+export function textsOfSet(folder: string = writtenFolder, cases: readonly WrittenCase[] = readWritten(folder).cases): CaseTextsOfSet[] {
   const repairsOf = new Map<string, string[]>()
   for (const file of readdirSync(join(folder, 'repairs')).filter(name => name.endsWith('.txt')).sort()) {
     for (const repair of readRepairFile(readFileSync(join(folder, 'repairs', file), 'utf8')).items) repairsOf.set(repair.id, [...(repairsOf.get(repair.id) ?? []), repair.repaired])
   }
-  return readWritten(folder).cases.map(writtenCase => ({id: writtenCase.id, broken: writtenCase.broken, intended: writtenCase.original, repairs: repairsOf.get(writtenCase.blindId) ?? []}))
+  return cases.map(writtenCase => ({id: writtenCase.id, broken: writtenCase.broken, intended: writtenCase.original, repairs: repairsOf.get(writtenCase.blindId) ?? []}))
 }
 
 if (import.meta.main) {

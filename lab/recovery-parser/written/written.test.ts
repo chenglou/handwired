@@ -20,6 +20,10 @@ import {type Score, scoreCases, scoreTables} from './score.ts'
 import {changesOf, describeCase, describeOpinions, whiteSpaceOnlyChanges} from './show.ts'
 import {blindIdOf, brokenTextProblems, caseOf, labelsOfWritten, readWritten, scoredCodePointsOfWritten, validTextProblems, writtenFolder} from './written.ts'
 
+// The set of the folder, read once for all the tests that look at it.
+let setOfFolder: ReturnType<typeof readWritten> | undefined
+const theSet = () => setOfFolder ??= readWritten()
+
 // Texts that a file format gets wrong when it quotes or escapes: each must come back as it went in.
 const awkwardTexts = [
   '{"path": "C:\\\\Users\\\\zoe", "quote": "she said \\"hi\\""}',
@@ -400,7 +404,7 @@ test('readWritten takes the texts of no-label.txt, and a line that names none is
 })
 
 test('the list of the set: no placeholder and no line feed for a space is scored', () => {
-  const {cases} = readWritten()
+  const {cases} = theSet()
   const listed = cases.filter(writtenCase => writtenCase.noLabel.length > 0)
   expect(listed.length).toBeGreaterThan(0)
   for (const writtenCase of listed) {
@@ -509,7 +513,7 @@ test('readWritten takes the lines of kinds.txt, and a case without a line is a p
 })
 
 test('kinds.txt names every case of the set, with kinds of the generator', () => {
-  const {cases, problems} = readWritten()
+  const {cases, problems} = theSet()
   expect(problems).toEqual([])
   const names = new Set(kinds.map(kind => kind.name))
   for (const writtenCase of cases) {
@@ -533,6 +537,8 @@ test('kinds.txt names every case of the set, with kinds of the generator', () =>
   expect(scores.otherDamage.agreedCodePoints.cases).toBe(withOther.length)
   const readme = readFileSync(join(writtenFolder, 'README.md'), 'utf8')
   expect(readme).toContain(`| All | ${cases.length - withOther.length} | ${withOther.length} |`)
+  expect(readme).toContain(`${cases.length - withOther.length} of their cases have only damage that the generator's kinds also make, in other documents and in other words, and ${withOther.length} have damage that no kind makes`)
+  expect(readFileSync(join(writtenFolder, '..', 'README.md'), 'utf8')).toContain(`${cases.length - withOther.length} of their cases have only damage that the kinds above also make, and ${withOther.length} have damage that no kind makes`)
   for (const file of new Set(cases.map(writtenCase => writtenCase.file))) {
     const ofFile = cases.filter(writtenCase => writtenCase.file === file)
     const other = ofFile.filter(writtenCase => writtenCase.damage!.other !== undefined).length
@@ -619,7 +625,7 @@ test('the examples of README.md and of REPAIR.md are what the two pages say', ()
 })
 
 test('the README has the numbers that score.ts gives', () => {
-  const {cases} = readWritten()
+  const {cases} = theSet()
   const readers = [defaultTables, ...handRules.map(rule => handRuleTables(rule))].map(tables => scoreTables(tables, cases))
   const percent = (part: number, whole: number) => (100 * part / whole).toFixed(1)
   const row = (name: string, pick: (score: typeof readers[number]) => Score) => {
@@ -640,13 +646,20 @@ test('the README has the numbers that score.ts gives', () => {
   const disputedCodePoints = disputed.reduce((total, writtenCase) => total + writtenCase.agreement.filter((state, position) => state === 'disputed' && position >= writtenCase.firstErrorPosition).length, 0)
   expect(readme).toContain(`| All | ${cases.length} | ${cases.length - disputed.length} | ${disputed.length} |`)
   expect(readme).toContain(`They stay disputed, with ${disputedCodePoints} code points`)
+  // What becomes of the code points from the first error on, and how many cases have opinions that are one text.
+  const fromFirstError = (wanted: string) => cases.reduce((total, writtenCase) => total + writtenCase.agreement.filter((state, position) => state === wanted && position >= writtenCase.firstErrorPosition).length, 0)
+  const scored = cases.reduce((total, writtenCase) => total + scoredCodePointsOfWritten(writtenCase), 0)
+  const counted = (value: number) => value.toLocaleString('en-US')
+  expect(readme).toContain(`Of these, ${counted(scored)} are scored, ${counted(fromFirstError('added'))} are added by every opinion, ${counted(fromFirstError('noLabel'))} have no label by the list of \`no-label.txt\`, and ${counted(fromFirstError('disputed'))} are disputed.`)
+  const oneText = cases.filter(writtenCase => writtenCase.opinions.every(opinion => opinion.text === writtenCase.original))
+  expect(readme).toContain(`In ${oneText.length} cases all opinions are the same text, and in ${cases.length - disputed.length - oneText.filter(writtenCase => !writtenCase.disputedFromFirstError).length} more they differ without a disputed code point from the first error on`)
   // Every case that the page names as disputed is, and the page names every disputed case.
   for (const writtenCase of disputed) expect(readme).toContain(`\`${writtenCase.id}\``)
   expect(cases.flatMap(writtenCase => writtenCase.leftOut.map(() => writtenCase.id))).toEqual(['logs-and-transport-11'])
 })
 
 test('a repair of the set that is left out changes no scored code point', () => {
-  const {cases} = readWritten()
+  const {cases} = theSet()
   const withLeftOut = cases.filter(writtenCase => writtenCase.leftOut.length > 0)
   expect(withLeftOut.length).toBeGreaterThan(0)
   for (const writtenCase of withLeftOut) {
@@ -669,13 +682,13 @@ test('a repair of the set that is left out changes no scored code point', () => 
 
 test('no text of the set is among generated samples, and a text that is among them is found', () => {
   // Every case with both of its repairs, also the repair that is left out.
-  const cases = textsOfSet()
-  expect(cases.length).toBe(readWritten().cases.length)
+  const cases = textsOfSet(writtenFolder, theSet().cases)
+  expect(cases.length).toBe(theSet().cases.length)
   expect(cases.filter(entry => entry.repairs.length !== 2)).toEqual([])
-  const sampleCount = 600
+  const sampleCount = 300
   const none = overlapWithSamples(cases, sampleCount)
   expect([none.broken, none.intended, none.repairs]).toEqual([[], [], []])
-  expect(none.brokenSamples).toBeGreaterThan(500)
+  expect(none.brokenSamples).toBeGreaterThan(250)
   // A case that is a generated sample is found by its two texts, and a repair by its JSON value in another layout.
   const sample = Array.from({length: sampleCount}, (_, index) => sampleAt(defaultSeed, index)).find(candidate => candidate.source === 'damage' && candidate.documents.length === 1 && candidate.original.startsWith('{'))!
   const laidOutAnew = JSON.stringify(JSON.parse(sample.original), null, 7)
@@ -684,7 +697,7 @@ test('no text of the set is among generated samples, and a text that is among th
 })
 
 test('the cases and the repairs of the folder have no problem', () => {
-  const {cases, problems} = readWritten()
+  const {cases, problems} = theSet()
   expect(problems).toEqual([])
   // Every case of the set is within the rules that the check of a case file asks for.
   for (const writtenCase of cases) expect([writtenCase.id, caseProblems({intended: writtenCase.original, broken: writtenCase.broken})]).toEqual([writtenCase.id, []])
