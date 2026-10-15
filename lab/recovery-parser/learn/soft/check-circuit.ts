@@ -9,26 +9,32 @@
 // every cell's mixes and the state before the step are random, the class is a random one, and every output gets a
 // random gradient. The circuit computes in 32-bit floats and the twin in 64-bit floats on the same inputs, so they
 // agree to the accuracy of 32-bit floats: the check allows a difference of 1e-4 times the larger of 1 and the value.
+//
+// Then the same for the step of tables with added structure, see ../structure/README.md: with added classes, an
+// added grammar state, and open entries of the display table, whose mixes are random too.
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {capacity, maximumDepth} from '../recovery-parser.ts'
-import {actionCount, actionNone, asIsTables, classNames} from '../recovery-tables.ts'
+import {classesOfTheChecks} from '../check-texts.ts'
+import {type RecoveryTables, actionCount, actionNone, addClasses, addStates, asIsTables, className, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {buildStepCircuit} from './step-circuit.ts'
 import {createCellArrays, createTwinRunner, defaultDepthHigh, defaultDepthLow, groupNames, groupWidths, shapeOf} from './twin.ts'
 
 const trials = Number(process.argv[2] ?? 6)
 const tolerance = 1e-4
-const shape = shapeOf(asIsTables())
-const widths = groupWidths(shape)
 let failures = 0
 const worst = {value: 0, gradient: 0}
 
-function checkStep(readsObjects: boolean, trialCount: number, seedOffset: number) {
+function checkStep(name: string, tables: RecoveryTables, readsObjects: boolean, trialCount: number, seedOffset: number) {
+  const shape = shapeOf(tables)
+  const widths = groupWidths(shape)
   const buildStarted = performance.now()
   const built = buildStepCircuit(shape, defaultDepthLow, defaultDepthHigh, readsObjects)
   const {circuit, sources, outputs, depthCount} = built
   const reglus = circuit.operations.filter(operation => operation.kind === 'reglu').length
-  console.log(`The step ${readsObjects ? 'at a code point' : 'at position 512, which reads no object'}: ${built.sourceSize} source cells and ${circuit.operations.length} operations, `
+  // The four groups of the cells' mixes, and the display table's when the shape has open entries.
+  const groups = groupNames.filter(group => group !== 'display' || shape.displayMixed.includes(1))
+  console.log(`The step ${name}${readsObjects ? 'at a code point' : 'at position 512, which reads no object'}: ${built.sourceSize} source cells and ${circuit.operations.length} operations, `
     + `${reglus} of them products and ${circuit.operations.length - reglus} sums, ${Math.max(...circuit.depths)} operations deep. Built in ${((performance.now() - buildStarted) / 1000).toFixed(1)} s.`)
   // The twin runs the step at position 0, or at position 512 for the step that reads no object.
   const position = readsObjects ? 0 : capacity
@@ -60,15 +66,15 @@ function checkStep(readsObjects: boolean, trialCount: number, seedOffset: number
     for (let level = 0; level < maximumDepth; level++) sourceValues[sources.objectsBefore + level] = random.next()
     const characterClass = random.integer(0, shape.classCount - 1)
     sourceValues[sources.characterClass + characterClass] = 1
-    for (const group of groupNames) {
-      const cells = group === 'lexerNext' || group === 'lexerEvent' ? shape.lexerCells : shape.grammarCells
+    for (const group of groups) {
+      const cells = group === 'display' ? shape.displayEntries : group === 'lexerNext' || group === 'lexerEvent' ? shape.lexerCells : shape.grammarCells
       for (let cell = 0; cell < cells; cell++) randomMix(sources[group] + cell * widths[group], widths[group])
     }
 
     // The twin on the same numbers.
     const base = {lexer: position * shape.lexerStateCount, grammar: position * shape.grammarStateCount, depth: position * depthCount, objects: position * (maximumDepth + 1), event: position * shape.eventCount,
       token: position * shape.tokenCount, context: position * shape.contextCount, action: position * actionCount, kind: position * shape.displayKindCount, container: position * 3}
-    for (const group of groupNames) mixes[group].set(sourceValues.subarray(sources[group], sources[group] + mixes[group].length))
+    for (const group of groups) mixes[group].set(sourceValues.subarray(sources[group], sources[group] + mixes[group].length))
     for (let state = 0; state < shape.lexerStateCount; state++) runner.lexerBefore[base.lexer + state] = sourceValues[sources.lexerBefore + state]!
     for (let state = 0; state < shape.grammarStateCount; state++) runner.grammarBefore[base.grammar + state] = sourceValues[sources.grammarBefore + state]!
     for (let index = 0; index < depthCount; index++) runner.depthBefore[base.depth + index] = sourceValues[sources.depthBefore + index]!
@@ -134,7 +140,7 @@ function checkStep(readsObjects: boolean, trialCount: number, seedOffset: number
         if (failures <= 20) console.log(`FAILED: trial ${trial}, the gradient by ${name}: the circuit has ${circuitGradients[sourceCell]}, and the twin ${twinGradient}`)
       }
     }
-    for (const group of groupNames) {
+    for (const group of groups) {
       const twinGroup = gradients[group]
       for (let entry = 0; entry < twinGroup.length; entry++) compareGradient(`${group} ${entry}`, sources[group] + entry, twinGroup[entry]!)
     }
@@ -144,12 +150,15 @@ function checkStep(readsObjects: boolean, trialCount: number, seedOffset: number
     for (let level = 1; level <= maximumDepth; level++) compareGradient(`level ${level} before`, sources.objectsBefore + level - 1, twinGradients.objects[level]!)
     worst.value = Math.max(worst.value, trialValue)
     worst.gradient = Math.max(worst.gradient, trialGradient)
-    console.log(`  trial ${trial}, class ${classNames[characterClass]}: ${compared} values, the largest difference ${trialValue.toExponential(2)}. ${comparedGradients} gradients, ${notZero} of them not 0, the largest difference ${trialGradient.toExponential(2)} of the larger of 1 and the gradient.`)
+    console.log(`  trial ${trial}, class ${className(tables, characterClass)}: ${compared} values, the largest difference ${trialValue.toExponential(2)}. ${comparedGradients} gradients, ${notZero} of them not 0, the largest difference ${trialGradient.toExponential(2)} of the larger of 1 and the gradient.`)
   }
 }
 
-checkStep(true, trials, 200)
-checkStep(false, 2, 300)
+checkStep('', asIsTables(), true, trials, 200)
+checkStep('', asIsTables(), false, 2, 300)
+const withStructure = openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 0, [grammarStateNames.indexOf('colon')]))
+checkStep(`of tables with ${classesOfTheChecks.length} added classes, an added grammar state and open entries of the display table, `, withStructure, true, 2, 400)
+checkStep(`of tables with ${classesOfTheChecks.length} added classes, an added grammar state and open entries of the display table, `, withStructure, false, 1, 500)
 if (failures > 0) {
   console.log(`${failures} comparisons FAILED: a difference above ${tolerance}.`)
   process.exit(1)

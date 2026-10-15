@@ -4,14 +4,14 @@
 //
 // The code point's class is a one-hot of source cells here, so the circuit holds every tokenizer cell and the host
 // only writes the class. The softmax that turns weights into mixes is not part of the circuit: the mixes are its
-// inputs.
+// inputs. The mixes of the display table's entries are source cells only when the shape has open entries.
 import {type Terms, type Wire, Circuit} from '../../../../src/runtime/numeric-ui-core.ts'
 import {maximumDepth} from '../recovery-parser.ts'
 import {actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, today} from '../recovery-tables.ts'
 import type {TwinShape} from './twin.ts'
 
 export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: number, readsObjects = true) {
-  const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, lexerCells, grammarCells, tokenOfEvent, display} = shape
+  const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, lexerCells, grammarCells, displayEntries, tokenOfEvent, display, displayMixed} = shape
   const depthCount = depthHigh - depthLow + 1
   // The source cells, in this order.
   let sourceSize = 0
@@ -25,6 +25,7 @@ export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: 
     // The share of "this level is an object" for the levels 1 to 16: level l is at objectsBefore + l - 1.
     objectsBefore: take(maximumDepth),
     lexerNext: take(lexerCells * lexerStateCount), lexerEvent: take(lexerCells * eventCount), grammarNext: take(grammarCells * grammarStateCount), grammarAction: take(grammarCells * actionCount),
+    display: take(displayMixed.includes(1) ? displayEntries * displayKindCount : 0),
   }
   const circuit = new Circuit(sourceSize)
   for (let cell = 0; cell < sourceSize; cell++) circuit.assumeRange(circuit.source(cell), 0, 1)
@@ -110,7 +111,13 @@ export function buildStepCircuit(shape: TwinShape, depthLow: number, depthHigh: 
   // The display kind and the container after.
   const kindTerms: Wire[][] = Array.from({length: displayKindCount}, () => [])
   for (let event = 0; event < eventCount; event++) {
-    for (let next = 0; next < grammarStateCount; next++) kindTerms[display[event * grammarStateCount + next]!]!.push(product(events[event]!, grammarAfter[next]!))
+    for (let next = 0; next < grammarStateCount; next++) {
+      // The share of the pair goes to the entry's kind, or is split by the entry's mix when the entry is open.
+      const entry = event * grammarStateCount + next
+      const pair = product(events[event]!, grammarAfter[next]!)
+      if (displayMixed[entry] === 0) kindTerms[display[entry]!]!.push(pair)
+      else for (let kind = 0; kind < displayKindCount; kind++) kindTerms[kind]!.push(product(pair, source(sources.display, entry * displayKindCount + kind)))
+    }
   }
   const kinds = kindTerms.map(terms => sum(ones(terms)))
   const inContainer = depthAfter.filter((_, index) => levelOf(index) > 0)

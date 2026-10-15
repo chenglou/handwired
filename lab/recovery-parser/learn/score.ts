@@ -23,7 +23,7 @@ import {
 import {displayKind} from '../labels.ts'
 import type {Split} from '../samples.ts'
 import {type RecoveryTrace, createTrace, positionCount, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, asIsTables, checkTables, copyTables, describeDifferences, differencesOf, loadTables} from './recovery-tables.ts'
+import {type CellDifference, type RecoveryTables, asIsTables, checkTables, copyTables, describeDifferences, differencesOf, displayEntryOf, loadTables} from './recovery-tables.ts'
 
 export type ScoreRow = {
   // Which samples the row counts, e.g. "all", "reachable: yes" or "kind: missingComma".
@@ -228,15 +228,16 @@ export function scoreTables(tables: RecoveryTables, samples: Samples, options: S
   return scoreWith(samples, options, (place, trace) => runOnSample(trace, samples, place, tables))
 }
 
-export type CellsRead = {lexer: Uint8Array, grammar: Uint8Array}
+export type CellsRead = {lexer: Uint8Array, grammar: Uint8Array, display: Uint8Array}
 
-// Which cells the exact parser reads with `tables` at a code point of the samples at `places`: 1 per tokenizer cell
-// and per grammar cell that is read. Cells that are only read at the position after a text are not counted, since
-// nothing that is shown or scored depends on them.
+// Which cells the exact parser reads with `tables` at a code point of the samples at `places`: 1 per tokenizer cell,
+// per grammar cell and per entry of the display table that is read. Cells that are only read at the position after a
+// text are not counted, since nothing that is shown or scored depends on them.
 export function cellsReadAt(tables: RecoveryTables, samples: Samples, places: ArrayLike<number>): CellsRead {
   checkTables(tables)
   const lexer = new Uint8Array(tables.lexerNext.length)
   const grammar = new Uint8Array(tables.grammarNext.length)
+  const display = new Uint8Array(tables.display.length)
   const trace = createTrace()
   for (let at = 0; at < places.length; at++) {
     const place = places[at]!
@@ -245,10 +246,14 @@ export function cellsReadAt(tables: RecoveryTables, samples: Samples, places: Ar
     for (let position = 0; position < length; position++) {
       lexer[trace.lexerCell[position]!] = 1
       grammar[trace.grammarCell[position]!] = 1
+      display[displayEntryOf(tables, trace.event[position]!, trace.grammarAfter[position]!)] = 1
     }
   }
-  return {lexer, grammar}
+  return {lexer, grammar, display}
 }
+
+// Whether a cell in which two tables differ is one that `read` marks.
+export const isRead = (read: CellsRead, difference: CellDifference) => (difference.table === 'tokenizer' ? read.lexer : difference.table === 'grammar' ? read.grammar : read.display)[difference.cell] === 1
 
 // The same for every sample of the given splits.
 export function cellsReadBy(tables: RecoveryTables, samples: Samples, splits: readonly Split[]): CellsRead {
@@ -256,12 +261,12 @@ export function cellsReadBy(tables: RecoveryTables, samples: Samples, splits: re
   return cellsReadAt(tables, samples, Int32Array.from({length: samples.sampleCount}, (_, place) => place).filter(place => wanted[samples.split[place]!]!))
 }
 
-// A copy of `tables` in which every cell that `read` does not mark holds the choice of `base`, and how many cells
-// that puts back. When `read` holds the cells that `tables` read on some texts, the copy gives the same trace on those
+// A copy of `tables` in which every cell and every entry of the display table that `read` does not mark holds the
+// choice of `base`, and how many that puts back. When `read` holds the cells that `tables` read on some texts, the copy gives the same trace on those
 // texts, since a cell that is put back is one that they never read. E.g. a training run moves cells that only its
 // mixes read, and their choices in the snapped tables mean nothing.
 export function withUnreadCellsOf(base: RecoveryTables, tables: RecoveryTables, read: CellsRead): {tables: RecoveryTables, putBack: number} {
-  if (base.lexerNext.length !== tables.lexerNext.length || base.grammarNext.length !== tables.grammarNext.length) throw new Error('withUnreadCellsOf takes two tables with the same states')
+  if (base.lexerNext.length !== tables.lexerNext.length || base.grammarNext.length !== tables.grammarNext.length) throw new Error('withUnreadCellsOf takes two tables with the same states and the same added structure')
   const result = copyTables(tables)
   let putBack = 0
   for (let cell = 0; cell < result.lexerNext.length; cell++) {
@@ -274,6 +279,11 @@ export function withUnreadCellsOf(base: RecoveryTables, tables: RecoveryTables, 
     if (read.grammar[cell] === 1 || (result.grammarNext[cell] === base.grammarNext[cell] && result.grammarAction[cell] === base.grammarAction[cell])) continue
     result.grammarNext[cell] = base.grammarNext[cell]!
     result.grammarAction[cell] = base.grammarAction[cell]!
+    putBack++
+  }
+  for (let entry = 0; entry < result.display.length; entry++) {
+    if (read.display[entry] === 1 || result.display[entry] === base.display[entry]) continue
+    result.display[entry] = base.display[entry]!
     putBack++
   }
   return {tables: result, putBack}
@@ -311,7 +321,7 @@ if (import.meta.main) {
   const score = scoreTables(loaded.tables, samples, {splits})
   const milliseconds = performance.now() - started
   const read = cellsReadBy(loaded.tables, samples, splits)
-  const differencesRead = differences.filter(difference => (difference.table === 'tokenizer' ? read.lexer : read.grammar)[difference.cell] === 1).length
+  const differencesRead = differences.filter(difference => isRead(read, difference)).length
   console.log(`Tables: ${tablesFile ?? 'today\'s'}${loaded.note === '' ? '' : ` (${loaded.note})`}. ${differences.length} cells differ from today's tables, and a code point of the scored samples reads ${differencesRead} of them.`)
   if (process.argv.includes('--cells') && differences.length > 0) console.log(describeDifferences(differences))
   console.log(`Seed ${seed}, samples ${from} to ${to - 1}, split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}: ${score.rows[0]!.samples} broken samples, ${score.validSamples} valid ones left out. Scored in ${milliseconds.toFixed(0)} ms.`)

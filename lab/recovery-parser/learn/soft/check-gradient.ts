@@ -5,8 +5,9 @@
 //
 // Every open cell is trainable and its weights are random, so every mix is a random mix. For each setting of the
 // options below, the backward pass gives the gradient of the objective by every weight. The last settings run tables
-// with added structure, see ../structure/README.md: with added classes and two added tokenizer states, on samples
-// of which half need a class. The check compares the gradient with
+// with added structure, see ../structure/README.md: with added classes, two added tokenizer states, an added
+// grammar state and open entries of the display table, whose mixes are a fifth group of weights, on samples of
+// which half need a class. The check compares the gradient with
 // central differences of the fourth order, (-f(2h) + 8 f(h) - 8 f(-h) + f(-2h)) / 12h, in two ways per group of weights:
 //
 // - Along random directions: every trainable weight of the group moves by +h or -h at once, and the difference is
@@ -24,9 +25,9 @@ import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
-import {type RecoveryTables, addClasses, addStates, asIsTables} from '../recovery-tables.ts'
+import {type RecoveryTables, addClasses, addStates, asIsTables, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
-import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective} from './twin.ts'
+import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective, trainableOf} from './twin.ts'
 
 const sampleCount = Number(process.argv[2] ?? 24)
 const weightsPerGroup = Number(process.argv[3] ?? 60)
@@ -60,7 +61,8 @@ const todays = setupOf(asIsTables(), [...short.slice(0, sampleCount - 2), ...lon
 // With added structure, half of the short samples are ones that need a class, so that the cells of the added classes
 // are read.
 const needsClass = short.filter(place => samples.needsClass[place] === 1).slice(0, Math.floor((sampleCount - 2) / 2))
-const withClasses = setupOf(addStates(addClasses(asIsTables(), classesOfTheChecks), 2, []), [...needsClass, ...short.filter(place => samples.needsClass[place] === 0).slice(0, sampleCount - 2 - needsClass.length), ...long])
+const added = `${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state and open entries of the display table`
+const withStructure = setupOf(openDisplayEntries(addStates(addClasses(asIsTables(), classesOfTheChecks), 2, [grammarStateNames.indexOf('colon')])), [...needsClass, ...short.filter(place => samples.needsClass[place] === 0).slice(0, sampleCount - 2 - needsClass.length), ...long])
 
 type Setting = {name: string, setup: ReturnType<typeof setupOf>, added: boolean, options: ObjectiveOptions, depthLow: number, depthHigh: number, weightScale: number}
 const everyOption: ObjectiveOptions = {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.3, onTrackSeed: 7, temperature: 0.7, sharpnessCost: 0.05}
@@ -73,8 +75,8 @@ const settings: Setting[] = [
     options: {onTrackProbability: 0.5, onTrackSeed: 11, sharpnessCost: 0.2, intendedGrammarWeight: 0.5}},
   {name: 'the intended states at every kept code point, not only where a parser can follow them: intended targets, on track with probability 0.4', setup: todays, added: false, depthLow: -8, depthHigh: 24, weightScale: 1.5,
     options: {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.4, onTrackSeed: 13, intendedEverywhere: true}},
-  {name: `${classesOfTheChecks.length} added classes and 2 added tokenizer states: the three label losses alone`, setup: withClasses, added: true, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
-  {name: `${classesOfTheChecks.length} added classes and 2 added tokenizer states: every option on`, setup: withClasses, added: true, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
+  {name: `${added}: the three label losses alone`, setup: withStructure, added: true, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
+  {name: `${added}: every option on`, setup: withStructure, added: true, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
 ]
 
 // A normal random number from two uniform ones.
@@ -94,7 +96,13 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
   const shape = model.shape
   const worst = setting.added ? worstOfAdded : worstOfTodays
   const random = createRandom(defaultSeed + 77, settingIndex)
-  for (let entry = 0; entry < model.weights.all.length; entry++) model.weights.all[entry] = setting.weightScale * normal(random)
+  // The weights of the display table's entries come from random numbers of their own, so that the other weights of
+  // a setting are the same with and without open entries.
+  const displayRandom = createRandom(defaultSeed + 78, settingIndex)
+  for (const group of groupNames) {
+    const weights = model.weights[group]
+    for (let entry = 0; entry < weights.length; entry++) weights[entry] = setting.weightScale * normal(group === 'display' ? displayRandom : random)
+  }
   const runner: TwinRunner = createTwinRunner(shape, setting.depthLow, setting.depthHigh)
   const result = objective(model, runner, data, everyPlace, setting.options, mixes, mixGradients, weightGradients)
   const value = () => objective(model, runner, data, everyPlace, setting.options, mixes).value
@@ -103,7 +111,7 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
   for (const group of groupNames) {
     const gradient = weightGradients[group].slice()
     const weights = model.weights[group]
-    const trainable = group === 'lexerNext' || group === 'lexerEvent' ? model.trainableLexer : model.trainableGrammar
+    const trainable = trainableOf(model, group)
     const width = gradient.length / trainable.length
     const notZero: number[] = []
     const all: number[] = []
@@ -116,6 +124,8 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
       largestGradient = Math.max(largestGradient, Math.abs(gradient[entry]!))
       sumOfSquares += gradient[entry]! * gradient[entry]!
     }
+    // Today's tables have no open entry of the display table, so that group has no weight to check.
+    if (all.length === 0) continue
     const gradientLength = Math.sqrt(sumOfSquares)
     const tally = worst[group]!
 
@@ -176,6 +186,7 @@ for (const [name, worst] of [['today\'s tables', worstOfTodays], ['added structu
   console.log(`The largest differences per group of weights, over every setting with ${name}:`)
   for (const group of groupNames) {
     const tally = worst[group]!
+    if (tally.directions === 0) continue
     console.log(`  ${group.padEnd(13)} ${tally.directions} directions: relative ${tally.direction.toExponential(2)}. ${tally.singles} single weights: absolute ${tally.absolute.toExponential(2)}, relative ${tally.relative.toExponential(2)} over the ${tally.large} with a gradient of at least ${largeGradient}`)
   }
 }

@@ -3,15 +3,15 @@
 // Run from the repo root: bun lab/recovery-parser/learn/check-tables.ts [number of dataset samples, default 30000]
 //
 // Every part runs for today's tables, and for today's tables with structure added to them, see structure/README.md:
-// with added classes.
+// with added classes, and with open entries of the display table.
 //
 // 1. Counts the frozen and the open cells of each table.
 // 2. For every frozen cell, runs a text that makes today's parser read the cell before any error. So no cell is
-//    frozen without need.
+//    frozen without need. With open entries of the display table, the same for every entry that is not open.
 // 3. Runs today's parser on valid texts and on broken ones, and looks at every cell it reads before a first error:
-//    none may be open. The texts are the dataset's originals, its valid samples, its broken texts, and texts made
-//    in check-texts.ts, among them valid ones with 16 levels and with 512 code points. Then the same for every text
-//    of up to 6 code points.
+//    none may be open, and neither may an entry of the display table. The texts are the dataset's originals, its
+//    valid samples, its broken texts, and texts made in check-texts.ts, among them valid ones with 16 levels and with
+//    512 code points. Then the same for every text of up to 6 code points.
 // 4. Writes tables as JSON and reads them again, lists the cells in which two tables differ, and shows that a change
 //    of a frozen cell is refused, and so is a file with a number that a byte does not hold, e.g. the state 259. With
 //    the environment variable RECOVERY_SCRATCH it also saves the tables to a file in that folder and loads the file.
@@ -26,8 +26,8 @@ import {type ParserTrace, classNames, positionCount, runTableParser} from '../ta
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
 import {codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {
-  type AddedClass, type RecoveryTables, actionNone, addClasses, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, frozenSearchOf, grammarCellName, lexerCellName,
-  loadTables, problemsOf, saveTables, tablesFromJson, tablesToJson, today,
+  type AddedClass, type RecoveryTables, actionNone, addClasses, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, displayEntryName, displayEntryOf, displayKindNames, eventNames,
+  frozenSearchOf, grammarCellName, grammarStateNames, lexerCellName, loadTables, openDisplayEntries, problemsOf, saveTables, tablesFromJson, tablesToJson, today,
 } from './recovery-tables.ts'
 
 const sampleCount = Number(process.argv[2] ?? 30_000)
@@ -40,6 +40,7 @@ const fail = (message: string) => {
 const variants: {name: string, tables: RecoveryTables}[] = [
   {name: 'today\'s tables', tables: asIsTables()},
   {name: `${classesOfTheChecks.length} added classes (${classesOfTheChecks.map(added => added.name).join(', ')})`, tables: addClasses(asIsTables(), classesOfTheChecks)},
+  {name: 'open entries of the display table', tables: openDisplayEntries(asIsTables())},
 ]
 const ones = (mask: Uint8Array) => mask.reduce((total, bit) => total + bit, 0)
 
@@ -61,6 +62,8 @@ function lexerCellAt(tables: RecoveryTables, codePoints: readonly number[], trac
 }
 const grammarCellAt = (tables: RecoveryTables, trace: ParserTrace, position: number) =>
   (trace.grammarBefore[position]! * tables.tokenCount + trace.token[position]!) * tables.contextCount + trace.context[position]!
+const displayEntryAt = (tables: RecoveryTables, trace: ParserTrace, position: number) => displayEntryOf(tables, trace.event[position]!, trace.grammarAfter[position]!)
+const pastEnd = displayKindNames.indexOf('pastEnd')
 
 for (const {name, tables} of variants) {
   if (problemsOf(tables).length > 0) fail(`${name}: ${problemsOf(tables).join('; ')}`)
@@ -84,9 +87,17 @@ for (const {name, tables} of variants) {
     const frozen = Array.from({length: tables.lexerStateCount}, (_, state) => state * tables.classCount + characterClass).filter(cell => tables.lexerOpen[cell] === 0)
     console.log(`   The class ${className(tables, characterClass)}, from the class ${classNames[tables.classToday[characterClass]!]}: ${frozen.length} of its ${tables.lexerStateCount} cells are frozen, ${frozen.map(cell => lexerCellName(tables, cell)).join(' ')}.`)
   }
+  const search = frozenSearchOf(tables)
+  if (counts.displayOpen > 0) {
+    // An entry that is not open is one that the search found, or one of the three events of a text's end.
+    const endEntries = Array.from(tables.display, (kind, entry) => kind === pastEnd && search.displayFrozen[entry] === 0 ? 1 : 0).reduce((total: number, bit) => total + bit, 0)
+    const open = Array.from(tables.displayOpen, (isOpen, entry) => isOpen === 1 ? displayEntryName(tables, entry) : '').filter(entryName => entryName !== '')
+    console.log(`   Display table: ${counts.displayEntries} entries, ${counts.displayOpen} open. Of the other ${counts.displayEntries - counts.displayOpen}, a text reads ${ones(search.displayFrozen)} before any error, and ${endEntries} are entries of the three events of a text's end that no text reads before an error.`)
+    console.log(`   Open, by event: ${eventNames.map(event => ({event, states: open.filter(entryName => entryName.startsWith(`(${event},`)).length})).filter(({states}) => states > 0).map(({event, states}) => `${event} ${states}`).join(', ')}.`)
+    if (counts.displayOpen + ones(search.displayFrozen) + endEntries !== counts.displayEntries) fail(`${name}: an entry of the display table is neither open, nor read before an error, nor one of a text's end`)
+  }
 
   // 2. A text for every frozen cell, from the search that found the cell frozen.
-  const search = frozenSearchOf(tables)
   let witnessed = 0
   let longestWitness = 0
   const checkWitness = (classes: number[], cellAt: (codePoints: readonly number[], trace: ParserTrace, position: number) => number, cell: number, cellName: string) => {
@@ -108,10 +119,18 @@ for (const {name, tables} of variants) {
   }
   if (search.reachedByGuessAlone !== 0) fail(`the search reached ${search.reachedByGuessAlone} configurations only by guessing the kind of a container`)
   console.log(`2. ${witnessed} of the ${counts.lexerFrozen + counts.grammarFrozen} frozen cells are read before any error by a text of this check, the longest of ${longestWitness} code points. The search reached ${search.reachedByGuessAlone} configurations only by guessing the kind of a container.`)
+  if (counts.displayOpen > 0) {
+    witnessed = 0
+    for (let entry = 0; entry < search.displayFrozen.length; entry++) {
+      const classes = search.displayWitness(entry)
+      if (classes !== undefined) checkWitness(classes, (_, trace, position) => displayEntryAt(tables, trace, position), entry, `${displayEntryName(tables, entry)} of the display table`)
+    }
+    console.log(`   ${witnessed} of the ${ones(search.displayFrozen)} entries of the display table that the search found are read before any error by a text of this check.`)
+  }
 }
 
 // 3. No text reads an open cell before its first error.
-const read = variants.map(({tables}) => ({lexerByValid: new Uint8Array(tables.lexerNext.length), grammarByValid: new Uint8Array(tables.grammarNext.length), open: 0}))
+const read = variants.map(({tables}) => ({lexerByValid: new Uint8Array(tables.lexerNext.length), grammarByValid: new Uint8Array(tables.grammarNext.length), displayByValid: new Uint8Array(tables.display.length), open: 0}))
 const tally = {texts: 0, valid: 0, broken: 0, positions: 0}
 const madeTally = new Map<string, number>()
 function checkText(text: string, expectValid: boolean | undefined, made: string) {
@@ -129,13 +148,15 @@ function checkText(text: string, expectValid: boolean | undefined, made: string)
     for (let position = 0; position < positions; position++) {
       const lexerCell = lexerCellAt(tables, codePoints, trace, position)
       const grammarCell = grammarCellAt(tables, trace, position)
-      if (tables.lexerOpen[lexerCell] === 1 || tables.grammarOpen[grammarCell] === 1) {
+      const displayEntry = displayEntryAt(tables, trace, position)
+      if (tables.lexerOpen[lexerCell] === 1 || tables.grammarOpen[grammarCell] === 1 || tables.displayOpen[displayEntry] === 1) {
         read[variant]!.open++
-        fail(`${name}: position ${position} of ${JSON.stringify(text.slice(0, 80))} reads the open cell ${tables.lexerOpen[lexerCell] === 1 ? lexerCellName(tables, lexerCell) : grammarCellName(tables, grammarCell)} before the first error`)
+        fail(`${name}: position ${position} of ${JSON.stringify(text.slice(0, 80))} reads the open cell ${tables.lexerOpen[lexerCell] === 1 ? lexerCellName(tables, lexerCell) : tables.grammarOpen[grammarCell] === 1 ? grammarCellName(tables, grammarCell) : `${displayEntryName(tables, displayEntry)} of the display table`} before the first error`)
       }
       if (trace.valid) {
         read[variant]!.lexerByValid[lexerCell] = 1
         read[variant]!.grammarByValid[grammarCell] = 1
+        read[variant]!.displayByValid[displayEntry] = 1
       }
     }
   })
@@ -161,12 +182,12 @@ console.log(`   ${[...madeTally].map(([made, texts]) => `${made} ${texts}`).join
 }
 variants.forEach(({name, tables}, variant) => {
   const counts = cellCounts(tables)
-  const {lexerByValid, grammarByValid, open} = read[variant]!
+  const {lexerByValid, grammarByValid, displayByValid, open} = read[variant]!
   const missedByValid = [
     ...Array.from(tables.lexerOpen, (isOpen, cell) => isOpen === 0 && lexerByValid[cell] === 0 ? lexerCellName(tables, cell) : ''),
     ...Array.from(tables.grammarOpen, (isOpen, cell) => isOpen === 0 && grammarByValid[cell] === 0 ? grammarCellName(tables, cell) : ''),
   ].filter(cellName => cellName !== '')
-  console.log(`   ${name}: ${open} of the positions read an open cell. The valid texts alone read ${ones(lexerByValid)} of the ${counts.lexerFrozen} frozen tokenizer cells and ${ones(grammarByValid)} of the ${counts.grammarFrozen} frozen grammar cells.${missedByValid.length === 0 ? '' : ` Not read: ${missedByValid.join(' ')}`}`)
+  console.log(`   ${name}: ${open} of the positions read an open cell${counts.displayOpen > 0 ? ' or an open entry of the display table' : ''}. The valid texts alone read ${ones(lexerByValid)} of the ${counts.lexerFrozen} frozen tokenizer cells and ${ones(grammarByValid)} of the ${counts.grammarFrozen} frozen grammar cells${counts.displayOpen > 0 ? `, and ${ones(displayByValid)} of the ${ones(frozenSearchOf(tables).displayFrozen)} entries of the display table that the search found` : ''}.${missedByValid.length === 0 ? '' : ` Not read: ${missedByValid.join(' ')}`}`)
 })
 
 // Every short text. The parser only sees a code point's class, so one code point per class stands for every text.
@@ -181,7 +202,7 @@ for (const {name, tables} of variants) {
   let openReads = 0
   const checkLastStep = (position: number) => {
     if (trace.firstErrorPosition !== -1) return false
-    if (tables.lexerOpen[trace.lexerCell[position]!] === 1 || tables.grammarOpen[trace.grammarCell[position]!] === 1) {
+    if (tables.lexerOpen[trace.lexerCell[position]!] === 1 || tables.grammarOpen[trace.grammarCell[position]!] === 1 || tables.displayOpen[displayEntryOf(tables, trace.event[position]!, trace.grammarAfter[position]!)] === 1) {
       openReads++
       fail(`${name}: the text ${JSON.stringify(String.fromCodePoint(...text.subarray(0, position)))} reads an open cell at position ${position}, before any error`)
     }
@@ -215,6 +236,12 @@ variants.forEach(({name, tables}, variant) => {
   changed.lexerEvent[openLexerCell] = 2
   changed.grammarNext[openGrammarCell] = 5
   changed.grammarAction[openGrammarCell] = actionNone
+  // With open entries of the display table, a third change: a literal's first letter is shown as a key when the
+  // grammar expects a colon after it.
+  const openDisplayEntry = displayEntryOf(tables, eventNames.indexOf('literalStart'), grammarStateNames.indexOf('colon'))
+  const hasOpenDisplay = tables.displayOpen[openDisplayEntry] === 1
+  if (hasOpenDisplay) changed.display[openDisplayEntry] = displayKindNames.indexOf('key')
+  const changes = hasOpenDisplay ? 3 : 2
   let loaded = tablesFromJson(tablesToJson(changed, 'two changed cells'))
   if (scratchFolder !== undefined && scratchFolder !== '') {
     mkdirSync(scratchFolder, {recursive: true})
@@ -224,8 +251,8 @@ variants.forEach(({name, tables}, variant) => {
   }
   // The loaded tables are the saved ones when they give the same file again.
   const differences = differencesOf(asIsTables(), loaded.tables)
-  if (tablesToJson(loaded.tables, loaded.note) !== tablesToJson(changed, 'two changed cells') || differencesOf(changed, loaded.tables).length !== 0 || differences.length !== 2) fail(`${name}: tables that were saved and loaded are not the tables that were saved`)
-  console.log(`${variant === 0 ? '4. ' : '   '}${name[0]!.toUpperCase()}${name.slice(1)} with two changed open cells, written${scratchFolder === undefined || scratchFolder === '' ? ' as JSON' : ' to a file'} and read again, differ from today's in ${differences.length} cells:`)
+  if (tablesToJson(loaded.tables, loaded.note) !== tablesToJson(changed, 'two changed cells') || differencesOf(changed, loaded.tables).length !== 0 || differences.length !== changes) fail(`${name}: tables that were saved and loaded are not the tables that were saved`)
+  console.log(`${variant === 0 ? '4. ' : '   '}${name[0]!.toUpperCase()}${name.slice(1)} with ${changes === 2 ? 'two' : 'three'} changed open cells, written${scratchFolder === undefined || scratchFolder === '' ? ' as JSON' : ' to a file'} and read again, differ from today's in ${differences.length} cells:`)
   console.log(describeDifferences(differences).split('\n').map(line => `   ${line}`).join('\n'))
   const broken = copyTables(tables)
   const frozenGrammarCell = tables.grammarOpen.indexOf(0)
@@ -251,6 +278,26 @@ variants.forEach(({name, tables}, variant) => {
     }
     if (refused === '') fail(`${name}: a file that gives the apostrophe the class of the quote is loaded`)
     else console.log(`   A file that gives the apostrophe the class of the quote is refused: ${refused.replace(/^Error: /, '')}.`)
+  }
+  if (hasOpenDisplay) {
+    // What the display table may not hold: another kind in an entry that a text reads before an error, the kind of
+    // the cells after a text's end in an open entry, and another kind for an event of a text's end.
+    const refusals: [string, number, number][] = [
+      ['of the entry (stringStart, colon), which the quote of a key reads', displayEntryOf(tables, eventNames.indexOf('stringStart'), grammarStateNames.indexOf('colon')), displayKindNames.indexOf('string')],
+      ['of an open entry to `pastEnd`', openDisplayEntry, pastEnd],
+      ['of the entry (endInsideToken, error), which the end of a text inside a string reads', displayEntryOf(tables, eventNames.indexOf('endInsideToken'), tables.errorState), displayKindNames.indexOf('error')],
+    ]
+    for (const [what, entry, kind] of refusals) {
+      const brokenDisplay = copyTables(tables)
+      brokenDisplay.display[entry] = kind
+      const displayProblems = problemsOf(brokenDisplay)
+      if (displayProblems.length !== 1) fail(`${name}: a change ${what} is not reported as one problem`)
+      console.log(`   A change ${what} is refused: ${displayProblems.join('; ')}.`)
+    }
+    // Without open entries, the same change of an entry that no text reads before an error is refused too.
+    const fixed = asIsTables()
+    fixed.display[openDisplayEntry] = displayKindNames.indexOf('key')
+    if (problemsOf(fixed).length !== 1) fail('a change of the display table of today\'s tables is not reported as one problem')
   }
   // A number that a byte array would cut to its low 8 bits, e.g. 259 to 3, and a number that is no whole number.
   for (const value of [259, -1, 1.5]) {

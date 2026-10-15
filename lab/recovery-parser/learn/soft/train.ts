@@ -47,7 +47,7 @@ import type {WorkerAnswer, WorkerSetup, WorkerTask} from './train-worker.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {
   type LossOptions, type LossTally, type TwinData, type TwinModel, addSharpnessCost, addTally, cellArraysLength, createCellArrays, createModel, createTally, createTwinRunner,
-  defaultDepthHigh, defaultDepthLow, exactMixesInto, groupNames, groupWidths, mixesInto, runBatch, sharpnessOf, snappedTables, weightGradientsInto,
+  defaultDepthHigh, defaultDepthLow, exactMixesInto, groupNames, groupWidths, mixesInto, runBatch, sharpnessOf, snappedTables, trainableOf, weightGradientsInto,
 } from './twin.ts'
 
 // Runs batches of samples on worker threads, or in this thread with 0 workers. The mixes are read from `mixes`, which
@@ -202,7 +202,7 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
   const trainableEntries: number[] = []
   let offset = 0
   for (const group of groupNames) {
-    const trainable = group === 'lexerNext' || group === 'lexerEvent' ? model.trainableLexer : model.trainableGrammar
+    const trainable = trainableOf(model, group)
     for (let cell = 0; cell < trainable.length; cell++) {
       if (trainable[cell] === 1) for (let choice = 0; choice < widths[group]; choice++) trainableEntries.push(offset + cell * widths[group] + choice)
     }
@@ -351,11 +351,12 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
   return {best, bestPoint, last, points, samplesPerSecond: samplesSeen / (trainingMilliseconds / 1000)}
 }
 
-// A random share of the open cells of `tables`, as masks of trainable cells, e.g. a tenth with share 0.1.
+// A random share of the open cells of `tables` and of the open entries of their display table, as masks of trainable
+// cells, e.g. a tenth with share 0.1.
 export function randomTrainableCells(tables: RecoveryTables, share: number, seed: number) {
   const random = createRandom(seed, 0)
   const pick = (open: Uint8Array) => open.map(bit => bit === 1 && random.next() < share ? 1 : 0)
-  return {lexer: pick(tables.lexerOpen), grammar: pick(tables.grammarOpen)}
+  return {lexer: pick(tables.lexerOpen), grammar: pick(tables.grammarOpen), display: pick(tables.displayOpen)}
 }
 
 if (import.meta.main) {
@@ -386,7 +387,7 @@ if (import.meta.main) {
   const base = baseFile === undefined ? asIsTables() : loadTables(baseFile).tables
   const data = packForTwin(samples, trainPlaces, onTrack > 0 ? loadIntendedObjects(samples, softCacheFolderOf(scratch)) : undefined, base)
   const model = createModel(base, {start, startShare: number('--start-share', 0.9), ...(openShare < 1 ? {trainable: randomTrainableCells(base, openShare, seed)} : {})})
-  const trainableCells = model.trainableLexer.reduce((total, bit) => total + bit, 0) + model.trainableGrammar.reduce((total, bit) => total + bit, 0)
+  const trainableCells = [model.trainableLexer, model.trainableGrammar, model.trainableDisplay].reduce((total, mask) => total + mask.reduce((count, bit) => count + bit, 0), 0)
   log(`bun ${process.argv.slice(1).join(' ')}`)
   log(`${trainPlaces.length} of the ${everyTrainPlace.length} train samples that give the twin a step, ${data.start[data.sampleCount]} code points. ${trainableCells} trainable cells. Base tables: ${baseFile ?? 'today\'s'}. Tables and log in ${folder}`)
   const result = await train(model, data, Int32Array.from({length: data.sampleCount}, (_, place) => place), {

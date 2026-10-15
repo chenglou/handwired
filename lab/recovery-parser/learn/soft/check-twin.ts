@@ -13,8 +13,8 @@
 // twice: with a range that holds every depth the exact parser reaches in that run, where every position has to be
 // equal, and with the range that training uses, -8 to 24, where the check counts the runs that leave the range.
 //
-// The same comparison runs for tables with added structure, see ../structure/README.md: with added classes, with
-// today's choices in every cell and with random settings.
+// The same comparison runs for tables with added structure, see ../structure/README.md: with added classes, and
+// with open entries of the display table, with today's choices in every cell and with random settings.
 //
 // It also checks the intended stacks of twin-data.ts against the exact parser on the originals of the first 2,000
 // samples that are not in the test split.
@@ -23,7 +23,7 @@ import {defaultSeed, sampleAt} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
 import {type RecoveryTrace, containerObject, createTrace, positionCount, runRecoveryParser, runRecoveryParserInto} from '../recovery-parser.ts'
-import {type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addStates, asIsTables, checkTables, randomizeOpenCells} from '../recovery-tables.ts'
+import {type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from '../recovery-tables.ts'
 import {intendedObjectsOf, packForTwin, placesForTwin} from './twin-data.ts'
 import {type TwinData, type TwinRunner, createCellArrays, createTally, createTwinRunner, defaultDepthHigh, defaultDepthLow, exactMixesInto, shapeOf} from './twin.ts'
 
@@ -182,6 +182,7 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
   const settingsPerVariant = Math.max(2, Math.round(settingCount / 5))
   const variants: {name: string, make: () => RecoveryTables}[] = [
     {name: `${classesOfTheChecks.length} added classes`, make: () => addClasses(asIsTables(), classesOfTheChecks)},
+    {name: 'open entries of the display table', make: () => openDisplayEntries(asIsTables())},
   ]
   for (const variant of variants) {
     const data = packForTwin(samples, places, undefined, variant.make())
@@ -190,11 +191,12 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
     checkTablesAgainstParser(`${variant.name}, today's choices`, variant.make(), data, wide, training)
     for (let setting = 0; setting < settingsPerVariant; setting++) {
       const random = createRandom(defaultSeed + 37, setting)
+      // The last setting has 2 more tokenizer states and a grammar state more.
       const tables = setting === settingsPerVariant - 1 ? addStates(variant.make(), 2, [random.integer(0, 7)]) : variant.make()
       randomizeOpenCells(tables, random)
       checkTablesAgainstParser(`${variant.name}, random setting ${setting}`, tables, data, wide, training)
     }
-    console.log(`Tables with ${variant.name}, with today's choices and with ${settingsPerVariant} random settings of every open cell, on the same samples:`)
+    console.log(`Tables with ${variant.name}, with today's choices and with ${settingsPerVariant} random settings of every open cell${variant.make().displayOpen.includes(1) ? ' and every open entry' : ''}, on the same samples:`)
     console.log(`  with a depth range that holds the run's depths: ${describe(wide)}.`)
     console.log(`  with the depths ${defaultDepthLow} to ${defaultDepthHigh}: ${describe(training)}, all of them among the ${training.runsThatLeaveTheRange} runs that reach an end of the range.`)
   }

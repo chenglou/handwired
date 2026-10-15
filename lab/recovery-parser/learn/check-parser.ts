@@ -9,16 +9,17 @@
 // b. For random settings of every open cell, some with added states, the ground rules hold on every text: (1) the
 //    same trace as today at every position before the first error, and at all 513 positions of a valid text, (2) the
 //    same `valid`, first error position and first error kind as today.
-// c. The same for tables with added structure, see structure/README.md: with added classes. With no cell changed,
-//    such tables give the trace of asIsTables() at every position of every text. With random settings of every open
-//    cell, the ground rules hold. A trace of such tables is compared in today's terms, e.g. the class of an added
-//    class's code point as the class that the code point has today.
+// c. The same for tables with added structure, see structure/README.md: with added classes, and with open entries of
+//    the display table. With no cell changed, such tables give the trace of asIsTables() at every position of every
+//    text. With random settings of every open cell and every open entry, the ground rules hold. A trace of such
+//    tables is compared in today's terms, e.g. the class of an added class's code point as the class that the code
+//    point has today.
 import {createRandom} from '../random.ts'
 import {defaultSeed, sampleAt} from '../samples.ts'
 import {type ParserTrace, grammarStateNames, positionCount, runTableParser} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, addClasses, addStates, asIsTables, checkTables, randomizeOpenCells} from './recovery-tables.ts'
+import {type RecoveryTables, addClasses, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from './recovery-tables.ts'
 
 const sampleCount = Number(process.argv[2] ?? 30_000)
 const settingCount = Number(process.argv[3] ?? 200)
@@ -148,6 +149,7 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
   const settingsPerVariant = Math.max(4, Math.round(settingCount / 5))
   const variants: {name: string, make: () => RecoveryTables}[] = [
     {name: `${classesOfTheChecks.length} added classes`, make: () => addClasses(asIsTables(), classesOfTheChecks)},
+    {name: 'open entries of the display table', make: () => openDisplayEntries(asIsTables())},
   ]
   // Writes a trace in today's terms.
   const inTodaysTerms = (trace: RecoveryTrace, tables: RecoveryTables) => {
@@ -193,7 +195,7 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
         }
       }
     }
-    console.log(`   ${variant.name}: ${failures === failuresBefore ? `with no cell changed, every text has the trace of today's tables at all ${positionCount} positions. With ${settingsPerVariant} random settings of every open cell, every run has today's trace before the first error, today's first error and today's \`valid\`` : 'see the failures above'}. From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.`)
+    console.log(`   ${variant.name}: ${failures === failuresBefore ? `with no cell changed, every text has the trace of today's tables at all ${positionCount} positions. With ${settingsPerVariant} random settings of every open cell${unchanged.displayOpen.includes(1) ? ' and every open entry' : ''}, every run has today's trace before the first error, today's first error and today's \`valid\`` : 'see the failures above'}. From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.`)
   }
 }
 

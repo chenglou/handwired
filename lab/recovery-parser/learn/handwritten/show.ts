@@ -6,8 +6,9 @@
 //       [--skip 0] [--wrong] [--cells] [--tables <file.json>] [--to 60000] [--scratch <folder>]
 // --kind shows the samples that have the kind, --index the sample with that index in the dataset, --wrong only the
 // samples in which a labeled code point from the first damage on is wrong, and --cells adds, per wrong sample, the
-// cells that the parser read at the first wrong code point. --split is train or validation: this script never shows
-// the test split. --tables shows saved tables in place of the hand-written ones.
+// cells that the parser read at the first wrong code point, and the entry of the display table when the tables have
+// open ones. --split is train or validation: this script never shows the test split. --tables shows saved tables in
+// place of the hand-written ones.
 //
 // The lines of a sample, one column per code point (⏎ is a line feed, → a tab):
 //   text   the broken text
@@ -20,7 +21,7 @@
 //          the first damage on are compared, and | marks the first damage.
 import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadSamples, optionOf, reachableNames, splitNames, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTables} from '../recovery-tables.ts'
+import {displayChoiceName, displayEntryName, displayEntryOf, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTables} from '../recovery-tables.ts'
 import {runOnSample} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
@@ -107,7 +108,8 @@ if (import.meta.main) {
       for (let position = Math.max(0, firstWrong - 2); position <= firstWrong; position++) {
         const lexerCell = trace.lexerCell[position]!
         const grammarCell = trace.grammarCell[position]!
-        console.log(`      ${String(position).padStart(3)} ${visible(samples.codePoints[start + position]!)}  ${lexerCellName(tables, lexerCell)} -> ${lexerChoiceName(tables, lexerCell)}   ${grammarCellName(tables, grammarCell)} -> ${grammarChoiceName(tables, grammarCell)}`)
+        const displayEntry = displayEntryOf(tables, trace.event[position]!, trace.grammarAfter[position]!)
+        console.log(`      ${String(position).padStart(3)} ${visible(samples.codePoints[start + position]!)}  ${lexerCellName(tables, lexerCell)} -> ${lexerChoiceName(tables, lexerCell)}   ${grammarCellName(tables, grammarCell)} -> ${grammarChoiceName(tables, grammarCell)}${tables.displayOpen.includes(1) ? `   ${displayEntryName(tables, displayEntry)} -> ${displayChoiceName(tables, displayEntry)}` : ''}`)
       }
     }
     console.log('')

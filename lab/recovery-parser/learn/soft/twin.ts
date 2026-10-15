@@ -5,7 +5,8 @@
 //   1 to 16 of the stack holds the share of "this level is an object".
 // - A cell holds a mix: a share per choice. A tokenizer cell has a mix over its next state and a mix over its event. A
 //   grammar cell has a mix over its next state and a mix over its stack action. A cell that is not trained holds its
-//   one choice as exact 0 and 1.
+//   one choice as exact 0 and 1. An open entry of the display table holds a mix over the display kinds, and every
+//   other entry is read from the table.
 // - A step multiplies shares and adds the products, see stepForward. With exact tables every share is exactly 0 or 1,
 //   and the twin is the exact parser: check-twin.ts compares the two. step-circuit.ts builds the same step as a
 //   Handwired circuit, and check-circuit.ts compares the two.
@@ -18,7 +19,7 @@
 // README.md of this folder says where treating the parts of the state as independent loses information.
 import {createRandom} from '../../random.ts'
 import {capacity, containerArray, containerNone, containerObject, maximumDepth, positionCount} from '../recovery-parser.ts'
-import {type RecoveryTables, actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, copyTables, today} from '../recovery-tables.ts'
+import {type RecoveryTables, actionByToken, actionCount, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, copyTables, displayKindCount, displayKindNames, today} from '../recovery-tables.ts'
 
 // The bits of TwinData.flags, as in data.ts.
 const codePointLabeled = 1
@@ -36,49 +37,59 @@ export type TwinShape = {
   displayKindCount: number
   lexerCells: number
   grammarCells: number
+  displayEntries: number
   // tokenOfEvent[event], and display[event × grammarStateCount + grammar state after], as in RecoveryTables.
   tokenOfEvent: Uint8Array
   display: Uint8Array
+  // 1 where an entry of the display table is open. A step reads the display kind of such an entry from the entry's
+  // mix, and of every other entry from `display`.
+  displayMixed: Uint8Array
 }
 
 export function shapeOf(tables: RecoveryTables): TwinShape {
   if (tables.contextCount !== 8) throw new Error(`the twin is written for 8 contexts, and these tables have ${tables.contextCount}`)
   return {
     classCount: tables.classCount, lexerStateCount: tables.lexerStateCount, eventCount: tables.eventCount, tokenCount: tables.tokenCount,
-    contextCount: tables.contextCount, grammarStateCount: tables.grammarStateCount, displayKindCount: 1 + Math.max(...tables.display),
-    lexerCells: tables.lexerStateCount * tables.classCount, grammarCells: tables.grammarStateCount * tables.tokenCount * tables.contextCount,
-    tokenOfEvent: tables.tokenOfEvent.slice(), display: tables.display.slice(),
+    contextCount: tables.contextCount, grammarStateCount: tables.grammarStateCount, displayKindCount,
+    lexerCells: tables.lexerStateCount * tables.classCount, grammarCells: tables.grammarStateCount * tables.tokenCount * tables.contextCount, displayEntries: tables.display.length,
+    tokenOfEvent: tables.tokenOfEvent.slice(), display: tables.display.slice(), displayMixed: tables.displayOpen.slice(),
   }
 }
 
-// One number per choice of every cell, in four groups: the tokenizer cells' next states [cell × lexerStateCount + next
-// state] and events [cell × eventCount + event], and the grammar cells' next states [cell × grammarStateCount + next
-// state] and stack actions [cell × 5 + action]. The same layout holds the trainable weights, the mixes and the
-// gradients. `all` is the four groups one after another, e.g. for Adam, and the other fields are views of its parts.
+// One number per choice of every cell, in five groups: the tokenizer cells' next states [cell × lexerStateCount + next
+// state] and events [cell × eventCount + event], the grammar cells' next states [cell × grammarStateCount + next
+// state] and stack actions [cell × 5 + action], and the display kinds of the display table's entries [entry × 9 +
+// display kind]. The same layout holds the trainable weights, the mixes and the gradients. `all` is the five groups
+// one after another, e.g. for Adam, and the other fields are views of its parts.
 export type CellArrays = {
   all: Float64Array
   lexerNext: Float64Array
   lexerEvent: Float64Array
   grammarNext: Float64Array
   grammarAction: Float64Array
+  display: Float64Array
 }
 
-export const groupNames = ['lexerNext', 'lexerEvent', 'grammarNext', 'grammarAction'] as const
+export const groupNames = ['lexerNext', 'lexerEvent', 'grammarNext', 'grammarAction', 'display'] as const
 export type GroupName = typeof groupNames[number]
 
 // How many numbers each group holds per cell.
 export const groupWidths = (shape: TwinShape): Record<GroupName, number> =>
-  ({lexerNext: shape.lexerStateCount, lexerEvent: shape.eventCount, grammarNext: shape.grammarStateCount, grammarAction: actionCount})
+  ({lexerNext: shape.lexerStateCount, lexerEvent: shape.eventCount, grammarNext: shape.grammarStateCount, grammarAction: actionCount, display: shape.displayKindCount})
 
 export const cellArraysLength = (shape: TwinShape) =>
-  shape.lexerCells * (shape.lexerStateCount + shape.eventCount) + shape.grammarCells * (shape.grammarStateCount + actionCount)
+  shape.lexerCells * (shape.lexerStateCount + shape.eventCount) + shape.grammarCells * (shape.grammarStateCount + actionCount) + shape.displayEntries * shape.displayKindCount
 
 // New arrays of zeros, or views of `buffer`, e.g. of a SharedArrayBuffer that a worker thread also holds.
 export function createCellArrays(shape: TwinShape, buffer: ArrayBufferLike = new ArrayBuffer(8 * cellArraysLength(shape))): CellArrays {
-  const lengths = [shape.lexerCells * shape.lexerStateCount, shape.lexerCells * shape.eventCount, shape.grammarCells * shape.grammarStateCount, shape.grammarCells * actionCount]
-  const offsets = [0, lengths[0]!, lengths[0]! + lengths[1]!, lengths[0]! + lengths[1]! + lengths[2]!]
-  const view = (group: number) => new Float64Array(buffer, 8 * offsets[group]!, lengths[group])
-  return {all: new Float64Array(buffer, 0, cellArraysLength(shape)), lexerNext: view(0), lexerEvent: view(1), grammarNext: view(2), grammarAction: view(3)}
+  const lengths = [shape.lexerCells * shape.lexerStateCount, shape.lexerCells * shape.eventCount, shape.grammarCells * shape.grammarStateCount, shape.grammarCells * actionCount, shape.displayEntries * shape.displayKindCount]
+  let offset = 0
+  const view = (group: number) => {
+    const values = new Float64Array(buffer, 8 * offset, lengths[group])
+    offset += lengths[group]!
+    return values
+  }
+  return {all: new Float64Array(buffer, 0, cellArraysLength(shape)), lexerNext: view(0), lexerEvent: view(1), grammarNext: view(2), grammarAction: view(3), display: view(4)}
 }
 
 // The tables with trainable cells. A cell that is not trainable holds the choice of `base`, e.g. today's tables, or
@@ -87,15 +98,16 @@ export function createCellArrays(shape: TwinShape, buffer: ArrayBufferLike = new
 export type TwinModel = {
   base: RecoveryTables
   shape: TwinShape
-  // 1 where a cell is trainable. Only open cells can be.
+  // 1 where a cell or an entry of the display table is trainable. Only open ones can be.
   trainableLexer: Uint8Array
   trainableGrammar: Uint8Array
+  trainableDisplay: Uint8Array
   weights: CellArrays
 }
 
 export type ModelOptions = {
-  // The trainable cells, e.g. a tenth of the open cells. Without it, every open cell.
-  trainable?: {lexer: Uint8Array, grammar: Uint8Array}
+  // The trainable cells and entries of the display table, e.g. a tenth of the open cells. Without it, every open one.
+  trainable?: {lexer: Uint8Array, grammar: Uint8Array, display: Uint8Array}
   // Where the weights start. 'base': every trainable mix gives `startShare` to the choice of the base tables and
   // splits the rest evenly over the other choices. 'uniform': every choice of a trainable mix has the same share.
   start?: 'base' | 'uniform'
@@ -103,31 +115,43 @@ export type ModelOptions = {
   startShare?: number
 }
 
-// Per group: its width, the mask of trainable cells and the base tables' choices.
+// The display kind that no mix of an open entry holds: the kind of the cells after a text's end. Its share is 0 for
+// every weight.
+const kindLeftOut = displayKindNames.indexOf('pastEnd')
+
+// Per group: its width, the mask of trainable cells, the base tables' choices, and a choice that the group's mixes
+// leave out, or -1.
 function groupsOf(model: TwinModel) {
   const widths = groupWidths(model.shape)
   return [
-    {name: 'lexerNext', width: widths.lexerNext, trainable: model.trainableLexer, choice: model.base.lexerNext},
-    {name: 'lexerEvent', width: widths.lexerEvent, trainable: model.trainableLexer, choice: model.base.lexerEvent},
-    {name: 'grammarNext', width: widths.grammarNext, trainable: model.trainableGrammar, choice: model.base.grammarNext},
-    {name: 'grammarAction', width: widths.grammarAction, trainable: model.trainableGrammar, choice: model.base.grammarAction},
+    {name: 'lexerNext', width: widths.lexerNext, trainable: model.trainableLexer, choice: model.base.lexerNext, leftOut: -1},
+    {name: 'lexerEvent', width: widths.lexerEvent, trainable: model.trainableLexer, choice: model.base.lexerEvent, leftOut: -1},
+    {name: 'grammarNext', width: widths.grammarNext, trainable: model.trainableGrammar, choice: model.base.grammarNext, leftOut: -1},
+    {name: 'grammarAction', width: widths.grammarAction, trainable: model.trainableGrammar, choice: model.base.grammarAction, leftOut: -1},
+    {name: 'display', width: widths.display, trainable: model.trainableDisplay, choice: model.base.display, leftOut: kindLeftOut},
   ] as const
 }
+
+// The mask of trainable cells that a group's weights belong to.
+export const trainableOf = (model: TwinModel, group: GroupName) => group === 'display' ? model.trainableDisplay : group === 'lexerNext' || group === 'lexerEvent' ? model.trainableLexer : model.trainableGrammar
 
 export function createModel(base: RecoveryTables, options: ModelOptions = {}): TwinModel {
   const shape = shapeOf(base)
   const trainableLexer = (options.trainable?.lexer ?? base.lexerOpen).slice()
   const trainableGrammar = (options.trainable?.grammar ?? base.grammarOpen).slice()
-  if (trainableLexer.length !== shape.lexerCells || trainableGrammar.length !== shape.grammarCells) throw new Error('the masks of trainable cells do not have one entry per cell')
+  const trainableDisplay = (options.trainable?.display ?? base.displayOpen).slice()
+  if (trainableLexer.length !== shape.lexerCells || trainableGrammar.length !== shape.grammarCells || trainableDisplay.length !== shape.displayEntries) throw new Error('the masks of trainable cells do not have one entry per cell')
   for (let cell = 0; cell < shape.lexerCells; cell++) if (trainableLexer[cell] === 1 && base.lexerOpen[cell] === 0) throw new Error(`the tokenizer cell ${cell} is frozen, and cannot be trainable`)
   for (let cell = 0; cell < shape.grammarCells; cell++) if (trainableGrammar[cell] === 1 && base.grammarOpen[cell] === 0) throw new Error(`the grammar cell ${cell} is frozen, and cannot be trainable`)
-  const model: TwinModel = {base: copyTables(base), shape, trainableLexer, trainableGrammar, weights: createCellArrays(shape)}
+  for (let entry = 0; entry < shape.displayEntries; entry++) if (trainableDisplay[entry] === 1 && base.displayOpen[entry] === 0) throw new Error(`the entry ${entry} of the display table is not open, and cannot be trainable`)
+  const model: TwinModel = {base: copyTables(base), shape, trainableLexer, trainableGrammar, trainableDisplay, weights: createCellArrays(shape)}
   const startShare = options.startShare ?? 0.9
   if (!(startShare > 0 && startShare < 1)) throw new Error(`startShare has to be between 0 and 1, and is ${startShare}`)
   if ((options.start ?? 'base') === 'base') {
     for (const group of groupsOf(model)) {
       // softmax gives the base choice the share s when its weight is ln(s / (1 - s) × (choices - 1)) and the others are 0.
-      const weight = Math.log(startShare / (1 - startShare) * (group.width - 1))
+      const choices = group.leftOut === -1 ? group.width : group.width - 1
+      const weight = Math.log(startShare / (1 - startShare) * (choices - 1))
       for (let cell = 0; cell < group.trainable.length; cell++) if (group.trainable[cell] === 1) model.weights[group.name][cell * group.width + group.choice[cell]!] = weight
     }
   }
@@ -135,7 +159,7 @@ export function createModel(base: RecoveryTables, options: ModelOptions = {}): T
 }
 
 // Writes every cell's mix into `mixes`: softmax(weights / temperature) for a trainable cell, and exact 0 and 1 for
-// every other cell.
+// every other cell. A choice that a group leaves out has the share 0 in a trainable mix, whatever its weight is.
 export function mixesInto(model: TwinModel, temperature: number, mixes: CellArrays) {
   for (const group of groupsOf(model)) {
     const weights = model.weights[group.name]
@@ -149,10 +173,10 @@ export function mixesInto(model: TwinModel, temperature: number, mixes: CellArra
         continue
       }
       let largest = -Infinity
-      for (let choice = 0; choice < width; choice++) if (weights[row + choice]! > largest) largest = weights[row + choice]!
+      for (let choice = 0; choice < width; choice++) if (choice !== group.leftOut && weights[row + choice]! > largest) largest = weights[row + choice]!
       let total = 0
       for (let choice = 0; choice < width; choice++) {
-        const share = Math.exp((weights[row + choice]! - largest) / temperature)
+        const share = choice === group.leftOut ? 0 : Math.exp((weights[row + choice]! - largest) / temperature)
         mix[row + choice] = share
         total += share
       }
@@ -174,6 +198,7 @@ export function exactMixesInto(tables: RecoveryTables, mixes: CellArrays) {
     mixes.grammarNext[cell * grammarStates + tables.grammarNext[cell]!] = 1
     mixes.grammarAction[cell * actionCount + tables.grammarAction[cell]!] = 1
   }
+  for (let entry = 0; entry < tables.display.length; entry++) mixes.display[entry * displayKindCount + tables.display[entry]!] = 1
 }
 
 // Turns gradients with respect to the mixes into gradients with respect to the weights, times `scale`, and writes
@@ -244,7 +269,7 @@ export function snappedTables(model: TwinModel): RecoveryTables {
       if (group.trainable[cell] === 0) continue
       const row = cell * width
       let best = group.choice[cell]!
-      for (let choice = 0; choice < width; choice++) if (weights[row + choice]! > weights[row + best]!) best = choice
+      for (let choice = 0; choice < width; choice++) if (choice !== group.leftOut && weights[row + choice]! > weights[row + best]!) best = choice
       choices[cell] = best
     }
   }
@@ -375,7 +400,7 @@ const levelCount = maximumDepth + 1
 // step, everything the step computes and the state after it, so that the backward pass can read them.
 export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDepthLow, depthHigh: number = defaultDepthHigh, positions: number = positionCount) {
   if (depthLow > -1 || depthHigh < maximumDepth + 1) throw new Error(`the depth range has to hold -1 to ${maximumDepth + 1}, and is ${depthLow} to ${depthHigh}`)
-  const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, tokenOfEvent, display} = shape
+  const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, tokenOfEvent, display, displayMixed} = shape
   const depthCount = depthHigh - depthLow + 1
   const numbers = (perPosition: number) => new Float64Array(positions * perPosition)
   // The state before each position: the shares of the tokenizer states, of the grammar states and of the depths, and
@@ -466,6 +491,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     const lexerNextMix = mixes!.lexerNext
     const grammarNextMix = mixes!.grammarNext
     const grammarActionMix = mixes!.grammarAction
+    const displayMix = mixes!.display
     const lexerBase = position * lexerStateCount
     const eventBase = position * eventCount
     const tokenBase = position * tokenCount
@@ -570,13 +596,23 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       objectsAfter[objectsBase + level] = objectsBefore[objectsBase + level]! * (1 - below * push) + below * pushObject
     }
 
-    // The display kind's mix follows from the event's and the next grammar state's.
+    // The display kind's mix follows from the event's and the next grammar state's: the product of the two shares goes
+    // to the kind that the display table has for the pair, or is split by the entry's mix when the entry is open.
     for (let kind = 0; kind < displayKindCount; kind++) kinds[kindBase + kind] = 0
     for (let event = 0; event < eventCount; event++) {
       const share = events[eventBase + event]!
       if (share === 0) continue
       const row = event * grammarStateCount
-      for (let next = 0; next < grammarStateCount; next++) kinds[kindBase + display[row + next]!]! += share * grammarAfter[grammarBase + next]!
+      for (let next = 0; next < grammarStateCount; next++) {
+        const entry = row + next
+        const entryShare = share * grammarAfter[grammarBase + next]!
+        if (displayMixed[entry] === 0) {
+          kinds[kindBase + display[entry]!]! += entryShare
+          continue
+        }
+        const mixRow = entry * displayKindCount
+        for (let kind = 0; kind < displayKindCount; kind++) kinds[kindBase + kind]! += entryShare * displayMix[mixRow + kind]!
+      }
     }
 
     // The container after: none at depth 0 or below, and at a depth above 0 the kind at the depth's level.
@@ -604,6 +640,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     const lexerNextMix = mixes!.lexerNext
     const grammarNextMix = mixes!.grammarNext
     const grammarActionMix = mixes!.grammarAction
+    const displayMix = mixes!.display
     const lexerBase = position * lexerStateCount
     const eventBase = position * eventCount
     const tokenBase = position * tokenCount
@@ -634,11 +671,24 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     let anyKind = false
     for (let kind = 0; kind < displayKindCount; kind++) if (kindGradient[kind] !== 0) anyKind = true
     if (anyKind) {
+      const displayGradient = gradients.display
       for (let event = 0; event < eventCount; event++) {
         const share = events[eventBase + event]!
         const row = event * grammarStateCount
         for (let next = 0; next < grammarStateCount; next++) {
-          const gradient = kindGradient[display[row + next]!]!
+          const entry = row + next
+          // The gradient by the share of the pair: the gradient of the entry's kind, or of the kinds of its mix.
+          let gradient = 0
+          if (displayMixed[entry] === 0) {
+            gradient = kindGradient[display[entry]!]!
+          } else {
+            const mixRow = entry * displayKindCount
+            const entryShare = share * grammarAfter[grammarBase + next]!
+            for (let kind = 0; kind < displayKindCount; kind++) {
+              gradient += kindGradient[kind]! * displayMix[mixRow + kind]!
+              displayGradient[mixRow + kind]! += entryShare * kindGradient[kind]!
+            }
+          }
           if (gradient === 0) continue
           eventGradient[event]! += gradient * grammarAfter[grammarBase + next]!
           grammarGradient[next]! += gradient * share

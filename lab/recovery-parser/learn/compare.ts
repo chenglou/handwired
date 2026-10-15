@@ -15,7 +15,7 @@
 import {cacheFolderOf, loadStandardSamples, optionOf, splitNames} from './data.ts'
 import type {Split} from '../samples.ts'
 import {asIsTables, differencesOf, loadTables} from './recovery-tables.ts'
-import {cellsReadBy, scoreTables, sharesOf} from './score.ts'
+import {cellsReadBy, isRead, scoreTables, sharesOf} from './score.ts'
 
 const splits = (optionOf('--split') ?? 'validation').split(',') as Split[]
 for (const split of splits) if (!splitNames.includes(split)) throw new Error(`--split takes ${splitNames.join(', ')}, or several of them with commas, and got ${split}`)
@@ -30,7 +30,7 @@ for (const {name, tables} of [{name: 'the parser as it is', tables: asIs}, ...na
   const shares = sharesOf(row)
   const differences = differencesOf(asIs, tables)
   const read = cellsReadBy(tables, samples, splits)
-  const differencesRead = differences.filter(difference => (difference.table === 'tokenizer' ? read.lexer : read.grammar)[difference.cell] === 1).length
+  const differencesRead = differences.filter(difference => isRead(read, difference)).length
   if (lines.length === 0) {
     console.log(`Split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}: ${row.samples} broken samples, ${row.nothingToRecover} of them with nothing to recover, ${row.codePoints} labeled code points at or after the first damage.`)
     console.log(`${row.wrongBeforeError} of those code points come before the first error and are wrong today, in ${row.samplesWrongBeforeError} samples. No choice of the open cells changes them, so no tables pass ${percent(shares.ceiling, 2)}% of all three and ${percent(shares.wholeCeiling)}% of whole samples.`)

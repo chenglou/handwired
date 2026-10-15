@@ -1,5 +1,5 @@
-// The tables that the recovery experiment runs and changes: the JSON highlighter's tokenizer table and grammar table,
-// a stack action per grammar cell, and which cells may change.
+// The tables that the recovery experiment runs and changes: the JSON highlighter's tokenizer table, grammar table and
+// display table, a stack action per grammar cell, and which cells may change.
 //
 // A cell is one entry of the tokenizer's table, (tokenizer state, class), or of the grammar's table, (grammar state,
 // token, context). A frozen cell is one that some text makes the parser read before that text's first error, e.g.
@@ -9,6 +9,7 @@
 //
 // The code keeps the names of table-parser.ts, where the tokenizer is the "lexer".
 import {readFileSync, writeFileSync} from 'node:fs'
+import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
 import type {Random} from '../random.ts'
 import {classNames, containerArray, containerNone, containerObject, contextNames, defaultTables, eventNames, grammarStateNames, lexerStateNames, maximumDepth, tokenNames} from '../table-parser.ts'
 
@@ -47,9 +48,13 @@ export type RecoveryTables = {
   // entry, which is `other`. It is today's table with the code points of the added classes changed, and longer when
   // an added class has a code point from U+007F up.
   classOfCodePoint: Uint8Array
-  // Fixed tables. tokenOfEvent[event]. display[event × grammarStateCount + grammar state after].
+  // A fixed table: tokenOfEvent[event].
   tokenOfEvent: Uint8Array
+  // The display table, [event × grammarStateCount + grammar state after]: the display kind, and 1 where the entry is
+  // open. No entry is open unless openDisplayEntries made the tables. Then an open entry holds any display kind but
+  // `pastEnd`, the kind of the cells after a text's end.
   display: Uint8Array
+  displayOpen: Uint8Array
   // The tokenizer's cells, [tokenizer state × classCount + class]: the next tokenizer state, the event, and 1 where
   // the cell is open.
   lexerNext: Uint8Array
@@ -90,8 +95,19 @@ export const today = {
 export const actionOfToken = Uint8Array.from(tokenNames, name =>
   name === 'openObject' ? actionPushObject : name === 'openArray' ? actionPushArray : name === 'closeObject' || name === 'closeArray' ? actionPop : actionNone)
 
+// The display kinds, e.g. `key`, in the order of their numbers.
+export const displayKindNames = Object.keys(displayKind)
+export const displayKindCount = displayKindNames.length
+// 1 for the three events of a text's end, whose row of the display table holds `pastEnd` in every column.
+const isEndEvent = Uint8Array.from({length: eventCount}, (_, event) => Number(today.display[event * grammarStateCount] === displayKind.pastEnd))
+
 function checkToday() {
   if (lexerStateCount !== lexerStateNames.length || tokenCount !== tokenNames.length || today.depthClass.length !== maximumDepth + 1) throw new Error('recovery-tables.ts no longer fits the sizes of table-parser.ts')
+  if (displayKindNames.some((name, kind) => displayKind[name as keyof typeof displayKind] !== kind) || today.display.some(kind => kind >= displayKindCount)) throw new Error('recovery-tables.ts no longer fits the display kinds of kinds.ts')
+  // A row of the display table holds `pastEnd` in every column or in none.
+  for (let entry = 0; entry < today.display.length; entry++) {
+    if ((today.display[entry] === displayKind.pastEnd) !== (isEndEvent[Math.floor(entry / grammarStateCount)] === 1)) throw new Error('an event is shown as past the end after some grammar states only')
+  }
   // `by token` has to change the depth as today's parser does, which adds depthChange[event].
   for (let event = 0; event < eventCount; event++) {
     const action = actionOfToken[today.tokenOfEvent[event]!]!
@@ -155,6 +171,10 @@ function classesWith(addedClasses: readonly AddedClass[]) {
 // class is today's step with the class that its code points have today, and it freezes the cell of the added class.
 // E.g. an apostrophe inside a string is read by valid JSON, so the cell (string, apostrophe) is frozen, and an
 // apostrophe between tokens is an error today, so the cell (between, apostrophe) is open.
+//
+// A step without an error also reads an entry of the display table, (event, grammar state after), so the search
+// finds the frozen entries of that table too. E.g. (literalStart, commaOrClose) is what the t of [true] reads, and no
+// step without an error reads (literalStart, colon), since valid JSON has no literal as a key.
 const kindCount = 3
 const classEnd = classNames.indexOf('end')
 function searchFrozenCells(classToday: Uint8Array) {
@@ -167,10 +187,13 @@ function searchFrozenCells(classToday: Uint8Array) {
   const cameByClass = new Uint8Array(cameFrom.length)
   const lexerFrozen = new Uint8Array(lexerStateCount * classes)
   const grammarFrozen = new Uint8Array(grammarStateCount * tokenCount * contextCount)
+  const displayFrozen = new Uint8Array(eventCount * grammarStateCount)
   // For every frozen cell: a configuration from which a class reads the cell without an error, and that class.
   const lexerReadFrom = new Int32Array(lexerFrozen.length).fill(-1)
   const grammarReadFrom = new Int32Array(grammarFrozen.length).fill(-1)
   const grammarReadByClass = new Uint8Array(grammarFrozen.length)
+  const displayReadFrom = new Int32Array(displayFrozen.length).fill(-1)
+  const displayReadByClass = new Uint8Array(displayFrozen.length)
   const queue = [configurationOf(0, 0, 0, containerNone)]
   cameFrom[queue[0]!] = -1
   // The steps that end in a guessed kind: the configuration before, the class, and the configuration after.
@@ -208,6 +231,12 @@ function searchFrozenCells(classToday: Uint8Array) {
         grammarReadFrom[grammarCell] = configuration
         grammarReadByClass[grammarCell] = characterClass
       }
+      const displayEntry = event * grammarStateCount + grammarAfter
+      if (displayFrozen[displayEntry] === 0) {
+        displayFrozen[displayEntry] = 1
+        displayReadFrom[displayEntry] = configuration
+        displayReadByClass[displayEntry] = characterClass
+      }
       // The class `end` stands for the cells after the text. The configuration it leads to, between tokens in the
       // grammar state `end` at depth 0, is also where the last closing bracket of a text leads, so the search does not
       // go on from it, and no text of a frozen cell has to go on after its end.
@@ -235,17 +264,19 @@ function searchFrozenCells(classToday: Uint8Array) {
     return classes.reverse()
   }
   return {
-    lexerFrozen, grammarFrozen, reachedByGuessAlone,
+    lexerFrozen, grammarFrozen, displayFrozen, reachedByGuessAlone,
     lexerWitness: (cell: number) => lexerFrozen[cell] === 0 ? undefined : [...classesTo(lexerReadFrom[cell]!), cell % classes],
     grammarWitness: (cell: number) => grammarFrozen[cell] === 0 ? undefined : [...classesTo(grammarReadFrom[cell]!), grammarReadByClass[cell]!],
+    displayWitness: (entry: number) => displayFrozen[entry] === 0 ? undefined : [...classesTo(displayReadFrom[entry]!), displayReadByClass[entry]!],
   }
 }
 
-// The search's result for the classes of some tables, made once per list of classes. `lexerFrozen` and
-// `grammarFrozen` hold 1 per frozen cell of today's states. `lexerWitness(cell)` and `grammarWitness(cell)` give, for
-// a frozen cell, the classes of a text whose last class makes the parser read the cell, with no error up to and
-// including that step, and `undefined` for an open cell. When the last class is `end`, the text ends before it.
-// `reachedByGuessAlone` is how many configurations the search reached only by guessing the kind of a container.
+// The search's result for the classes of some tables, made once per list of classes. `lexerFrozen`, `grammarFrozen`
+// and `displayFrozen` hold 1 per frozen cell or entry of today's states. `lexerWitness(cell)`, `grammarWitness(cell)`
+// and `displayWitness(entry)` give, for a frozen one, the classes of a text whose last class makes the parser read
+// it, with no error up to and including that step, and `undefined` for one that the search did not find. When the
+// last class is `end`, the text ends before it. `reachedByGuessAlone` is how many configurations the search reached
+// only by guessing the kind of a container.
 const frozenSearches = new Map<string, ReturnType<typeof searchFrozenCells>>()
 export function frozenSearchOf(tables: {classToday: Uint8Array}) {
   const key = tables.classToday.join(',')
@@ -257,16 +288,32 @@ export function frozenSearchOf(tables: {classToday: Uint8Array}) {
   return search
 }
 
-// The masks of open cells for tables with the given numbers of states and the classes of `classToday`: today's cells
-// as the search found them, and every cell of an added state, since only an open cell can lead into an added state.
-// Without `classToday`, the masks of tables with today's classes.
-export function openMasks(lexerStates: number, grammarStates: number, classToday: Uint8Array = todaysClasses) {
-  const search = frozenSearchOf({classToday})
-  const lexerOpen = new Uint8Array(lexerStates * classToday.length).fill(1)
+// What tables can have besides today's classes and today's fixed display table, as far as the masks of open cells
+// depend on it: the class of today's for every class, and whether the display table has open entries.
+type AddedStructure = {classToday: Uint8Array, openDisplay: boolean}
+const structureOf = (tables: RecoveryTables): AddedStructure => ({classToday: tables.classToday, openDisplay: tables.displayOpen.includes(1)})
+
+// The masks of open cells for tables with the given numbers of states: today's cells as the search found them, and
+// every cell of an added state, since only an open cell can lead into an added state. Without `added`, the masks of
+// tables with today's classes and no open entry of the display table.
+//
+// With `added.openDisplay`, an entry of the display table is open when the search did not find it, and so is every
+// entry of an added grammar state. The rows of the three events of a text's end stay as they are, in every column:
+// they are what the cells after a text read, and `pastEnd` is no choice of an open entry.
+export function openMasks(lexerStates: number, grammarStates: number, added: AddedStructure = {classToday: todaysClasses, openDisplay: false}) {
+  const search = frozenSearchOf(added)
+  const lexerOpen = new Uint8Array(lexerStates * added.classToday.length).fill(1)
   for (let cell = 0; cell < search.lexerFrozen.length; cell++) lexerOpen[cell] = 1 - search.lexerFrozen[cell]!
   const grammarOpen = new Uint8Array(grammarStates * tokenCount * contextCount).fill(1)
   for (let cell = 0; cell < search.grammarFrozen.length; cell++) grammarOpen[cell] = 1 - search.grammarFrozen[cell]!
-  return {lexerOpen, grammarOpen}
+  const displayOpen = new Uint8Array(eventCount * grammarStates)
+  if (added.openDisplay) {
+    for (let event = 0; event < eventCount; event++) {
+      if (isEndEvent[event] === 1) continue
+      for (let state = 0; state < grammarStates; state++) displayOpen[event * grammarStates + state] = state < grammarStateCount ? 1 - search.displayFrozen[event * grammarStateCount + state]! : 1
+    }
+  }
+  return {lexerOpen, grammarOpen, displayOpen}
 }
 
 // The tables of today: every cell as the highlighter has it, and every stack action `by token`. Each call returns a
@@ -285,7 +332,8 @@ export function asIsTables(): RecoveryTables {
 export function copyTables(tables: RecoveryTables): RecoveryTables {
   return {
     ...tables,
-    classToday: tables.classToday.slice(), classOfCodePoint: tables.classOfCodePoint.slice(), tokenOfEvent: tables.tokenOfEvent.slice(), display: tables.display.slice(),
+    classToday: tables.classToday.slice(), classOfCodePoint: tables.classOfCodePoint.slice(), tokenOfEvent: tables.tokenOfEvent.slice(),
+    display: tables.display.slice(), displayOpen: tables.displayOpen.slice(),
     lexerNext: tables.lexerNext.slice(), lexerEvent: tables.lexerEvent.slice(), lexerOpen: tables.lexerOpen.slice(),
     grammarNext: tables.grammarNext.slice(), grammarAction: tables.grammarAction.slice(), grammarOpen: tables.grammarOpen.slice(),
   }
@@ -322,15 +370,25 @@ export function addClasses(tables: RecoveryTables, classes: readonly AddedClass[
   }
   return {
     ...copyTables(tables), classCount: classesAfter, addedClasses, classToday, classOfCodePoint, lexerNext, lexerEvent,
-    lexerOpen: openMasks(tables.lexerStateCount, tables.grammarStateCount, classToday).lexerOpen,
+    lexerOpen: openMasks(tables.lexerStateCount, tables.grammarStateCount, {...structureOf(tables), classToday}).lexerOpen,
   }
+}
+
+// A copy of `tables` in which entries of the display table are open: every entry that no text makes the parser read
+// before its first error, by the same search that finds the frozen cells, and every entry of an added grammar state.
+// E.g. (literalStart, colon), the first letter of a literal when the grammar expects a colon after it. Nothing is
+// shown otherwise until an open entry is changed. An open entry holds any display kind but `pastEnd`, and the rows
+// of the three events of a text's end are not open, see openMasks.
+export function openDisplayEntries(tables: RecoveryTables): RecoveryTables {
+  return {...copyTables(tables), displayOpen: openMasks(tables.lexerStateCount, tables.grammarStateCount, {...structureOf(tables), openDisplay: true}).displayOpen}
 }
 
 // A copy of `tables` with more states: `addedLexerStates` tokenizer states, and one grammar state per entry of
 // `addedGrammarStatesShownAs`. An added state comes after the states that are there, and each of its cells is open.
 // An added tokenizer state starts as a copy of the state errorLine, and an added grammar state as a copy of the state
 // error. The display table needs a column per grammar state: an entry names the grammar state whose column the added
-// state copies, e.g. the state colon, after which a string is shown as a key.
+// state copies, e.g. the state colon, after which a string is shown as a key. When the display table of `tables` has
+// open entries, the entries of an added state are open too.
 export function addStates(tables: RecoveryTables, addedLexerStates: number, addedGrammarStatesShownAs: readonly number[]): RecoveryTables {
   const lexerStates = tables.lexerStateCount + addedLexerStates
   const grammarStates = tables.grammarStateCount + addedGrammarStatesShownAs.length
@@ -360,12 +418,12 @@ export function addStates(tables: RecoveryTables, addedLexerStates: number, adde
   return {
     ...tables, lexerStateCount: lexerStates, grammarStateCount: grammarStates,
     classToday: tables.classToday.slice(), classOfCodePoint: tables.classOfCodePoint.slice(), tokenOfEvent: tables.tokenOfEvent.slice(), display,
-    lexerNext, lexerEvent, grammarNext, grammarAction, ...openMasks(lexerStates, grammarStates, tables.classToday),
+    lexerNext, lexerEvent, grammarNext, grammarAction, ...openMasks(lexerStates, grammarStates, structureOf(tables)),
   }
 }
 
-// Gives every open cell a random choice. check-parser.ts uses it to show that no choice of the open cells changes
-// what a text gets before its first error.
+// Gives every open cell and every open entry of the display table a random choice. check-parser.ts uses it to show
+// that no choice of them changes what a text gets before its first error.
 export function randomizeOpenCells(tables: RecoveryTables, random: Random) {
   for (let cell = 0; cell < tables.lexerNext.length; cell++) {
     if (tables.lexerOpen[cell] === 0) continue
@@ -377,6 +435,12 @@ export function randomizeOpenCells(tables: RecoveryTables, random: Random) {
     tables.grammarNext[cell] = random.integer(0, tables.grammarStateCount - 1)
     tables.grammarAction[cell] = random.integer(0, actionCount - 1)
   }
+  for (let entry = 0; entry < tables.display.length; entry++) {
+    if (tables.displayOpen[entry] === 0) continue
+    // Any kind but `pastEnd`.
+    const kind = random.integer(0, displayKindCount - 2)
+    tables.display[entry] = kind < displayKind.pastEnd ? kind : kind + 1
+  }
 }
 
 const sameArray = (left: ArrayLike<number>, right: ArrayLike<number>) => {
@@ -387,7 +451,8 @@ const sameArray = (left: ArrayLike<number>, right: ArrayLike<number>) => {
 
 // What breaks the experiment's ground rules in `tables`, as sentences. An empty list means that the fixed tables are
 // today's, the class table is today's with the added classes, the masks are the ones of openMasks, every frozen cell
-// holds what it holds today, and every open cell holds a state, an event and an action that exist.
+// and every entry of the display table that is not open holds what it holds today, and every open one holds a state,
+// an event, an action or a display kind that exists.
 export function problemsOf(tables: RecoveryTables): string[] {
   const problems: string[] = []
   const fixedSizes = [['classCount', tables.classCount, classCount + tables.addedClasses.length], ['eventCount', tables.eventCount, eventCount], ['tokenCount', tables.tokenCount, tokenCount], ['contextCount', tables.contextCount, contextCount], ['errorState', tables.errorState, errorState]] as const
@@ -406,20 +471,29 @@ export function problemsOf(tables: RecoveryTables): string[] {
   if (problems.length > 0) return problems
   const lexerCells = tables.lexerStateCount * tables.classCount
   const grammarCells = tables.grammarStateCount * tokenCount * contextCount
-  const lengths = [['lexerNext', tables.lexerNext.length, lexerCells], ['lexerEvent', tables.lexerEvent.length, lexerCells], ['lexerOpen', tables.lexerOpen.length, lexerCells], ['grammarNext', tables.grammarNext.length, grammarCells], ['grammarAction', tables.grammarAction.length, grammarCells], ['grammarOpen', tables.grammarOpen.length, grammarCells], ['display', tables.display.length, eventCount * tables.grammarStateCount]] as const
+  const displayEntries = eventCount * tables.grammarStateCount
+  const lengths = [['lexerNext', tables.lexerNext.length, lexerCells], ['lexerEvent', tables.lexerEvent.length, lexerCells], ['lexerOpen', tables.lexerOpen.length, lexerCells], ['grammarNext', tables.grammarNext.length, grammarCells], ['grammarAction', tables.grammarAction.length, grammarCells], ['grammarOpen', tables.grammarOpen.length, grammarCells], ['display', tables.display.length, displayEntries], ['displayOpen', tables.displayOpen.length, displayEntries]] as const
   for (const [name, actual, expected] of lengths) if (actual !== expected) problems.push(`${name} has ${actual} entries, and has to have ${expected}`)
   if (problems.length > 0) return problems
   if (!sameArray(tables.tokenOfEvent, today.tokenOfEvent)) problems.push('tokenOfEvent is not today\'s')
-  const displayKindCount = 1 + Math.max(...today.display)
-  for (let event = 0; event < eventCount; event++) {
-    for (let state = 0; state < tables.grammarStateCount; state++) {
-      const kind = tables.display[event * tables.grammarStateCount + state]!
-      if (state < grammarStateCount ? kind !== today.display[event * grammarStateCount + state] : kind >= displayKindCount) problems.push(`display of (${eventNames[event]}, ${grammarStateName(state)}) is ${kind}`)
-    }
-  }
-  const masks = openMasks(tables.lexerStateCount, tables.grammarStateCount, tables.classToday)
+  const added = structureOf(tables)
+  const masks = openMasks(tables.lexerStateCount, tables.grammarStateCount, added)
   if (!sameArray(tables.lexerOpen, masks.lexerOpen)) problems.push('lexerOpen is not the mask of openMasks')
   if (!sameArray(tables.grammarOpen, masks.grammarOpen)) problems.push('grammarOpen is not the mask of openMasks')
+  if (!sameArray(tables.displayOpen, masks.displayOpen)) problems.push('displayOpen is not the mask of openMasks: it has to be without an open entry, or the mask that openDisplayEntries gives')
+  for (let event = 0; event < eventCount; event++) {
+    for (let state = 0; state < tables.grammarStateCount; state++) {
+      const entry = event * tables.grammarStateCount + state
+      const kind = tables.display[entry]!
+      // An open entry holds any kind but `pastEnd`. Another entry of a state of today's holds today's kind. An added
+      // state's column holds any kind when the table has no open entry, as addStates fills it, and with open entries
+      // only its three entries of a text's end are not open, and hold `pastEnd`.
+      const wrong = masks.displayOpen[entry] === 1 ? kind >= displayKindCount || kind === displayKind.pastEnd
+        : state < grammarStateCount ? kind !== today.display[event * grammarStateCount + state]
+          : added.openDisplay ? kind !== displayKind.pastEnd : kind >= displayKindCount
+      if (wrong) problems.push(`display of (${eventNames[event]}, ${grammarStateName(state)}) is ${kind}`)
+    }
+  }
   for (let cell = 0; cell < lexerCells; cell++) {
     if (masks.lexerOpen[cell] === 0) {
       // A frozen cell of an added class holds what today's cell of the class of its code points holds.
@@ -449,6 +523,9 @@ export function checkTables(tables: RecoveryTables) {
 // classNames.indexOf('slash')), and grammarCellOf with a grammar state, a token and a context.
 export const lexerCellOf = (tables: RecoveryTables, lexerState: number, characterClass: number) => lexerState * tables.classCount + characterClass
 export const grammarCellOf = (tables: RecoveryTables, grammarState: number, token: number, context: number) => (grammarState * tables.tokenCount + token) * tables.contextCount + context
+// The index of an entry of the display table, e.g. displayEntryOf(tables, eventNames.indexOf('literalStart'),
+// grammarStateNames.indexOf('colon')).
+export const displayEntryOf = (tables: RecoveryTables, event: number, grammarStateAfter: number) => event * tables.grammarStateCount + grammarStateAfter
 
 // Names. A state that was added has no name of its own, e.g. "state 26". An added class has the name it was given.
 export const lexerStateName = (state: number) => lexerStateNames[state] ?? `state ${state}`
@@ -467,16 +544,22 @@ export function grammarCellName(tables: RecoveryTables, cell: number) {
 // What a cell holds, e.g. "string, stringStart" for a tokenizer cell and "commaOrClose, by token" for a grammar cell.
 export const lexerChoiceName = (tables: RecoveryTables, cell: number) => `${lexerStateName(tables.lexerNext[cell]!)}, ${eventNames[tables.lexerEvent[cell]!] ?? `event ${tables.lexerEvent[cell]}`}`
 export const grammarChoiceName = (tables: RecoveryTables, cell: number) => `${grammarStateName(tables.grammarNext[cell]!)}, ${actionNames[tables.grammarAction[cell]!] ?? `action ${tables.grammarAction[cell]}`}`
+// The name of an entry of the display table, the event and the grammar state after, e.g. "(literalStart, colon)", and
+// the display kind that it holds, e.g. "key".
+export const displayEntryName = (tables: RecoveryTables, entry: number) => `(${eventNames[Math.floor(entry / tables.grammarStateCount)]}, ${grammarStateName(entry % tables.grammarStateCount)})`
+export const displayChoiceName = (tables: RecoveryTables, entry: number) => displayKindNames[tables.display[entry]!] ?? `kind ${tables.display[entry]}`
 
 export type CellDifference = {
-  table: 'tokenizer' | 'grammar'
+  // `display` is an entry of the display table.
+  table: 'tokenizer' | 'grammar' | 'display'
+  // The index of the cell or of the entry in the tables with more states.
   cell: number
-  // The cell's name, e.g. "(value, comma, depth 1, array)".
+  // The cell's name, e.g. "(value, comma, depth 1, array)", or the entry's, e.g. "(literalStart, colon)".
   name: string
   // Whether the cell is open. A difference in a frozen cell breaks the ground rules.
   open: boolean
-  // What the cell holds in the first tables and in the second, e.g. "error, by token" and "value, none". "no such
-  // state" where the tables have fewer states.
+  // What the cell holds in the first tables and in the second, e.g. "error, by token" and "value, none", or "literal"
+  // and "key" for an entry of the display table. "no such state" where the tables have fewer states.
   before: string
   after: string
 }
@@ -492,7 +575,8 @@ function withClassesOf(tables: RecoveryTables, like: RecoveryTables): RecoveryTa
   return shared === like.addedClasses.length ? tables : addClasses(tables, like.addedClasses.slice(shared))
 }
 
-// The cells in which two tables differ, tokenizer cells first. When the second tables have added classes that the
+// The cells in which two tables differ, tokenizer cells first, then grammar cells, then entries of the display table,
+// which the list names like cells. When the second tables have added classes that the
 // first do not have, the first are compared as addClasses makes them: a cell of an added class with the cell of the
 // class that its code points came from. So differencesOf(asIsTables(), tables) lists the cells of `tables` that do
 // something else than today's parser.
@@ -510,6 +594,17 @@ export function differencesOf(beforeAsGiven: RecoveryTables, after: RecoveryTabl
     const choices = [before, after].map(tables => cell < tables.grammarNext.length ? grammarChoiceName(tables, cell) : 'no such state')
     if (choices[0] !== choices[1]) differences.push({table: 'grammar', cell, name: grammarCellName(grammarTables, cell), open: grammarTables.grammarOpen[cell] === 1, before: choices[0]!, after: choices[1]!})
   }
+  // An entry's index depends on the number of grammar states, so the entries are compared by event and state. An
+  // entry counts as open when it is open in the tables that have its state, in the second ones when both have it:
+  // today's tables have no open entry.
+  for (let event = 0; event < grammarTables.eventCount; event++) {
+    for (let state = 0; state < grammarTables.grammarStateCount; state++) {
+      const choices = [before, after].map(tables => state < tables.grammarStateCount ? displayChoiceName(tables, displayEntryOf(tables, event, state)) : 'no such state')
+      const entry = displayEntryOf(grammarTables, event, state)
+      const holder = state < after.grammarStateCount ? after : before
+      if (choices[0] !== choices[1]) differences.push({table: 'display', cell: entry, name: displayEntryName(grammarTables, entry), open: holder.displayOpen[displayEntryOf(holder, event, state)] === 1, before: choices[0]!, after: choices[1]!})
+    }
+  }
   return differences
 }
 
@@ -521,12 +616,16 @@ export function describeDifferences(differences: readonly CellDifference[]): str
     `${difference.table.padEnd(9)}  ${difference.name.padEnd(nameWidth)}  ${difference.before.padEnd(beforeWidth)}  ->  ${difference.after}${difference.open ? '' : '  (a frozen cell)'}`).join('\n')
 }
 
-// How many cells of each table are frozen and open.
+// How many cells of each table are frozen and open, and how many entries the display table has and how many of them
+// are open.
 export function cellCounts(tables: RecoveryTables) {
   const ones = (mask: Uint8Array) => mask.reduce((total, bit) => total + bit, 0)
   const lexerOpen = ones(tables.lexerOpen)
   const grammarOpen = ones(tables.grammarOpen)
-  return {lexerCells: tables.lexerOpen.length, lexerOpen, lexerFrozen: tables.lexerOpen.length - lexerOpen, grammarCells: tables.grammarOpen.length, grammarOpen, grammarFrozen: tables.grammarOpen.length - grammarOpen}
+  return {
+    lexerCells: tables.lexerOpen.length, lexerOpen, lexerFrozen: tables.lexerOpen.length - lexerOpen, grammarCells: tables.grammarOpen.length, grammarOpen, grammarFrozen: tables.grammarOpen.length - grammarOpen,
+    displayEntries: tables.displayOpen.length, displayOpen: ones(tables.displayOpen),
+  }
 }
 
 const arrayFields = ['classOfCodePoint', 'tokenOfEvent', 'display', 'lexerNext', 'lexerEvent', 'lexerOpen', 'grammarNext', 'grammarAction', 'grammarOpen'] as const
@@ -539,6 +638,7 @@ export function tablesToJson(tables: RecoveryTables, note = ''): string {
   const lines = [`"format": "recovery tables 1"`, `"note": ${JSON.stringify(note)}`, ...sizeFields.map(field => `"${field}": ${tables[field]}`), ...arrayFields.map(field => `"${field}": [${Array.from(tables[field]).join(',')}]`)]
   // What was added is only written when something was, so tables without it give the file that they always gave.
   if (tables.addedClasses.length > 0) lines.push(`"addedClasses": ${JSON.stringify(tables.addedClasses)}`)
+  if (tables.displayOpen.includes(1)) lines.push(`"displayOpen": [${Array.from(tables.displayOpen).join(',')}]`)
   return `{\n${lines.map(line => `  ${line}`).join(',\n')}\n}\n`
 }
 
@@ -570,10 +670,13 @@ export function tablesFromJson(text: string): {tables: RecoveryTables, note: str
     if (typeof name !== 'string' || !Array.isArray(codePoints) || !(codePoints as unknown[]).every(codePoint => typeof codePoint === 'number')) throw new Error(`the field addedClasses holds ${JSON.stringify(entry)}, and every entry has to be a name and code points`)
     addedClasses.push({name, codePoints: codePoints as number[]})
   }
+  const display = array('display')
   const tables: RecoveryTables = {
     classCount: size('classCount'), lexerStateCount: size('lexerStateCount'), eventCount: size('eventCount'), tokenCount: size('tokenCount'),
     contextCount: size('contextCount'), grammarStateCount: size('grammarStateCount'), errorState: size('errorState'),
-    addedClasses, classToday: classesWith(addedClasses).classToday, classOfCodePoint: array('classOfCodePoint'), tokenOfEvent: array('tokenOfEvent'), display: array('display'),
+    addedClasses, classToday: classesWith(addedClasses).classToday, classOfCodePoint: array('classOfCodePoint'), tokenOfEvent: array('tokenOfEvent'),
+    // A file of tables without an open entry of the display table has no mask for it.
+    display, displayOpen: parsed['displayOpen'] === undefined ? new Uint8Array(display.length) : array('displayOpen'),
     lexerNext: array('lexerNext'), lexerEvent: array('lexerEvent'), lexerOpen: array('lexerOpen'),
     grammarNext: array('grammarNext'), grammarAction: array('grammarAction'), grammarOpen: array('grammarOpen'),
   }
