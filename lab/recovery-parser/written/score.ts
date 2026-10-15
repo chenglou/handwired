@@ -3,9 +3,11 @@
 // right when every scored value is right, and a case is right as a whole when all of its counted code points are.
 //
 // Run from the repo root: bun lab/recovery-parser/written/score.ts [folder]
-// It prints the parser as it is and the four hand rules of hand-rules.ts, over the cases with full agreement, over
-// the agreed code points of all cases, and both again per writer's file. Other code scores its own tables with
-// scoreTables(tables).
+// It prints the parser as it is and the four hand rules of hand-rules.ts, over the cases with full agreement and over
+// the agreed code points of all cases. It prints both again for the two parts that kinds.txt makes of the set, i.e.
+// the cases whose damage is all of the generator's kinds and the cases with damage that no kind makes, and per
+// writer's file, and the first of them without the cases that someone marked as open to another reading. Other code
+// scores its own tables with scoreTables(tables).
 import {handRuleTables, handRules} from '../hand-rules.ts'
 import {type ParserTables, defaultTables, runTableParser} from '../table-parser.ts'
 import {type WrittenCase, labelsOfWritten, readWritten, writtenFolder} from './written.ts'
@@ -69,11 +71,28 @@ export function scoreCases(tables: ParserTables, cases: readonly WrittenCase[]):
 // - agreedCodePoints: all cases, where a disputed code point is left out. A case with a disputed code point is then
 //   right as a whole when the code points around the dispute are right.
 export type WrittenScore = {fullAgreement: Score, agreedCodePoints: Score}
-export function scoreTables(tables: ParserTables, cases: readonly WrittenCase[] = readWritten().cases): {all: WrittenScore, perFile: Map<string, WrittenScore>} {
+
+// The scores of tables over the set and over its parts:
+// - all: every case.
+// - perFile: the cases of each writer's file.
+// - generatorKinds and otherDamage: the two parts that kinds.txt makes of the set. The first has the cases whose
+//   damage is all of the generator's kinds, written by someone who did not see the generator, so it says how a
+//   result carries over to other documents with damage of sorts that the samples have. The second has the cases with
+//   damage that no kind makes, e.g. the marks of a diff, so it says how a result carries over to other damage. A case
+//   that kinds.txt does not name is in neither.
+// - unmarked: the cases that their writer did not mark as debatable and of which no repair is marked as unsure, i.e.
+//   without the cases whose agreement rests on a reading that someone called open.
+export type WrittenScores = {all: WrittenScore, perFile: Map<string, WrittenScore>, generatorKinds: WrittenScore, otherDamage: WrittenScore, unmarked: WrittenScore}
+export function scoreTables(tables: ParserTables, cases: readonly WrittenCase[] = readWritten().cases): WrittenScores {
   const scoreOf = (some: readonly WrittenCase[]): WrittenScore =>
     ({fullAgreement: scoreCases(tables, some.filter(writtenCase => !writtenCase.disputedFromFirstError)), agreedCodePoints: scoreCases(tables, some)})
   const files = [...new Set(cases.map(writtenCase => writtenCase.file))].sort()
-  return {all: scoreOf(cases), perFile: new Map(files.map(file => [file, scoreOf(cases.filter(writtenCase => writtenCase.file === file))]))}
+  return {
+    all: scoreOf(cases), perFile: new Map(files.map(file => [file, scoreOf(cases.filter(writtenCase => writtenCase.file === file))])),
+    generatorKinds: scoreOf(cases.filter(writtenCase => writtenCase.damage !== undefined && writtenCase.damage.other === undefined)),
+    otherDamage: scoreOf(cases.filter(writtenCase => writtenCase.damage?.other !== undefined)),
+    unmarked: scoreOf(cases.filter(writtenCase => !writtenCase.debatable && writtenCase.opinions.every(opinion => opinion.unsure === undefined))),
+  }
 }
 
 if (import.meta.main) {
@@ -84,7 +103,7 @@ if (import.meta.main) {
   const readers = ['now', ...handRules] as const
   const scores = readers.map(reader => scoreTables(reader === 'now' ? defaultTables : handRuleTables(reader), cases))
   const percent = (part: number, whole: number) => (whole === 0 ? '-' : (100 * part / whole).toFixed(1)).padStart(6)
-  const line = (pick: (score: {all: WrittenScore, perFile: Map<string, WrittenScore>}) => Score, name: string) => {
+  const line = (pick: (score: WrittenScores) => Score, name: string) => {
     const first = pick(scores[0]!)
     const perReader = scores.map(score => `${percent(pick(score).right, pick(score).scored)} ${percent(pick(score).wholeRight, pick(score).cases - pick(score).nothingToRecover)}`)
     return `  ${String(first.cases).padStart(5)} ${String(first.nothingToRecover).padStart(7)} ${String(first.scored).padStart(7)}   ${perReader.join('   ')}  ${name}`
@@ -97,7 +116,12 @@ if (import.meta.main) {
   console.log('something to recover in which every counted code point is right.')
   console.log(`\n  ${'cases'.padStart(5)} ${'nothing'.padStart(7)} ${'points'.padStart(7)}   ${readers.map(reader => `${reader.padStart(6)} ${'whole'.padStart(6)}`).join('   ')}`)
   console.log(line(score => score.all.fullAgreement, 'cases with full agreement from the first error on'))
+  console.log(line(score => score.generatorKinds.fullAgreement, '  of them, the cases whose damage is all of the generator\'s kinds'))
+  console.log(line(score => score.otherDamage.fullAgreement, '  of them, the cases with damage that no kind makes'))
+  console.log(line(score => score.unmarked.fullAgreement, '  of them, the cases that nobody marked as debatable or unsure'))
   console.log(line(score => score.all.agreedCodePoints, 'all cases, the agreed code points'))
+  console.log(line(score => score.generatorKinds.agreedCodePoints, '  of them, the cases whose damage is all of the generator\'s kinds'))
+  console.log(line(score => score.otherDamage.agreedCodePoints, '  of them, the cases with damage that no kind makes'))
   for (const file of scores[0]!.perFile.keys()) {
     console.log(line(score => score.perFile.get(file)!.fullAgreement, `${file}: cases with full agreement`))
     console.log(line(score => score.perFile.get(file)!.agreedCodePoints, `${file}: all cases, the agreed code points`))

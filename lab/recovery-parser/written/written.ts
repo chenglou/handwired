@@ -25,7 +25,9 @@
 // A written case is as near to a Sample of samples.ts as its making allows: the fields that both have are named as in
 // Sample and mean the same, see WrittenCase, and labelsOfWritten is what labelsOf is for a sample. What a written case
 // lacks:
-// - source, recipe, kinds, forms, template, style, typing: nobody drew the case from a generator.
+// - source, recipe, kinds, forms, template, style, typing: nobody drew the case from a generator. kinds.txt holds a
+//   judgment per case instead: the generator's kinds that describe its damage, and whether it has damage that no kind
+//   makes, see CaseDamage.
 // - edits: a case has two texts and no edits. The alignment comes from align.ts.
 // - reachable, needsRules, needsClass and with them groupOf: they are judgments per form of a kind of damage.
 // - split and heldOut: the whole set is for testing, and no arm of the experiment trains on it.
@@ -38,11 +40,14 @@
 //   a string whose last backslash now escapes the closing quote, which every reader takes for the string's content.
 //   The other three rules are applied.
 //
-// Run from the repo root: bun lab/recovery-parser/written/written.ts [folder] [--disputed]
-// It prints one line per case, and with --disputed every case that has a disputed code point, opinion by opinion.
+// Run from the repo root: bun lab/recovery-parser/written/written.ts [folder] [--disputed] [--kinds]
+// It prints one line per case, with --disputed every case that has a disputed code point, opinion by opinion, and
+// with --kinds what kinds.txt says: per writer's file the cases whose damage is all of the generator's kinds and the
+// cases with damage that no kind makes, and per kind the cases that it describes.
 import {existsSync, readFileSync, readdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {displayKind, errorKinds, maximumDepth} from '../../../src/json-search/highlighter/kinds.ts'
+import {kinds as generatorKinds} from '../damage.ts'
 import {type Label, type ValidLabel, labelsOfValidText} from '../labels.ts'
 import {limitsOf, readsAsNumberOrLiteral} from '../limits.ts'
 import {hashText} from '../random.ts'
@@ -78,6 +83,10 @@ export type LeftOut = {name: string, reason: string}
 // broken text, the text, and why it is on the list.
 export type NoLabel = {position: number, text: string, reason: string}
 
+// What kinds.txt says about a case's damage: the generator's kinds that describe it, by the names of the table of
+// kinds in the dataset's README, and in a few words the damage that no kind makes, when the case has such damage.
+export type CaseDamage = {kinds: string[], other: string | undefined}
+
 // The fields of Sample that a written case has with the same meaning, where `original` is the writer's intended text
 // and `alignment`, `replaced` and `firstDamage` are the writer's opinion. `debatable` is the writer's mark, where a
 // sample's is the judgment of its form.
@@ -95,6 +104,8 @@ export type WrittenCase = Pick<Sample, 'id' | 'documents' | 'original' | 'broken
   leftOut: LeftOut[]
   // The texts of this case that no-label.txt names.
   noLabel: NoLabel[]
+  // What kinds.txt says about the case, or undefined where no such file is read, e.g. for a writer's file alone.
+  damage: CaseDamage | undefined
   // Per code point of the broken text.
   agreement: Agreement[]
   // Positions in the broken text of agreed code points whose display kind is not scored, and of those whose depth and
@@ -276,9 +287,10 @@ export function noLabelProblems(entry: NoLabel, brokenText: string): string[] {
 }
 
 // A case with its opinions and their agreement. It works with the writer's opinion alone, before any repair exists:
-// every code point is then agreed or added. `noLabel` are the case's entries of no-label.txt. Throws when a text is
-// not what validTextProblems, brokenTextProblems and noLabelProblems ask for.
-export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairText[] = [], leftOut: readonly LeftOut[] = [], noLabel: readonly NoLabel[] = []): WrittenCase {
+// every code point is then agreed or added. `noLabel` are the case's entries of no-label.txt, and `damage` is what
+// kinds.txt says about the case. Throws when a text is not what validTextProblems, brokenTextProblems and
+// noLabelProblems ask for.
+export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairText[] = [], leftOut: readonly LeftOut[] = [], noLabel: readonly NoLabel[] = [], damage?: CaseDamage): WrittenCase {
   const problems = [
     ...validTextProblems(texts.intended).map(problem => `the intended text: ${problem}`), ...brokenTextProblems(texts.broken).map(problem => `the broken text: ${problem}`),
     ...noLabel.flatMap(entry => noLabelProblems(entry, texts.broken)),
@@ -310,7 +322,7 @@ export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairT
     documents: [texts.intended], original: texts.intended, broken: texts.broken, lineEnd: texts.intended.includes('\r\n') ? '\r\n' as const : '\n' as const,
     alignment: writer.alignment, replaced: writer.replaced, firstDamage: firstDamageOf(writer.alignment, writer.replaced, codePointLength(texts.intended)),
     firstErrorPosition: trace.firstErrorPosition, firstErrorKind: trace.firstErrorKind,
-    opinions, leftOut: [...leftOut], noLabel: [...noLabel], agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
+    opinions, leftOut: [...leftOut], noLabel: [...noLabel], damage, agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
     disputedFromFirstError: agreement.some((state, position) => state === 'disputed' && position >= trace.firstErrorPosition),
   }
   const limits = limitsOf(broken, labelsOfWritten(draft), trace.firstErrorPosition)
@@ -345,16 +357,16 @@ export function scoredCodePointsOfWritten(writtenCase: WrittenCase, labels: read
 
 const textFilesOf = (folder: string) => existsSync(folder) ? readdirSync(folder).filter(name => name.endsWith('.txt')).sort() : []
 
-// The lines of no-label.txt that say something, each with its number in the file, counted from 1. An empty line says
-// nothing, and neither does a line that starts with #, which explains the file to its reader.
+// The lines of no-label.txt or kinds.txt that say something, each with its number in the file, counted from 1. An
+// empty line says nothing, and neither does a line that starts with #, which explains the file to its reader.
 function listLines(file: string): {text: string, number: number}[] {
   if (!existsSync(file)) return []
   return readFileSync(file, 'utf8').split('\n').map((text, index) => ({text, number: index + 1})).filter(line => line.text.trim() !== '' && !line.text.startsWith('#'))
 }
 
-// Every case of cases/ with the repairs of repairs/, what left-out.txt and no-label.txt say about them, and what is
-// wrong with the files. A case or a repair with a problem is left out, so the problems must be empty before the cases
-// are used for a result.
+// Every case of cases/ with the repairs of repairs/, what left-out.txt, no-label.txt and kinds.txt say about them,
+// and what is wrong with the files. A case or a repair with a problem is left out, so the problems must be empty
+// before the cases are used for a result.
 export function readWritten(folder: string = writtenFolder): {cases: WrittenCase[], problems: string[]} {
   const problems: string[] = []
   const repairsOf = new Map<string, RepairText[]>()
@@ -436,7 +448,33 @@ export function readWritten(folder: string = writtenFolder): {cases: WrittenCase
     problems.push(...found.map(problem => `${where}: ${problem}`))
     if (found.length === 0) noLabelOf.set(id, [...others, entry])
   }
-  const cases = caseTexts.map(({file, texts}) => caseOf(texts, file, repairsOf.get(blindIdOf(texts.broken)) ?? [], leftOutOf.get(blindIdOf(texts.broken)) ?? [], noLabelOf.get(texts.id) ?? []))
+  // What kinds.txt says about each case. Where the folder has the file, every case has one line in it.
+  const kindNames = new Set(generatorKinds.map(kind => kind.name))
+  const damageOf = new Map<string, CaseDamage>()
+  const namedInKinds = new Set<string>()
+  for (const line of listLines(join(folder, 'kinds.txt'))) {
+    const where = `kinds.txt, line ${line.number}`
+    const [, id, names, other] = /^(\S+)((?: [A-Za-z]+)*)(?: new: (\S.*))?$/.exec(line.text) ?? []
+    if (id === undefined || names === undefined) {
+      problems.push(`${where}: a line is the id of a case, the names of the generator's kinds that describe its damage, each after a space, and where the case has damage that no kind makes, " new: " and that damage in a few words, and this line is not: ${line.text}`)
+      continue
+    }
+    const kinds = names.split(' ').filter(name => name !== '')
+    const found = [
+      ...kinds.filter(name => !kindNames.has(name)).map(name => `${name} is no kind of the table of kinds in the dataset's README`),
+      ...(new Set(kinds).size < kinds.length ? ['a kind stands twice'] : []),
+      ...(kinds.length === 0 && other === undefined ? ['the line names no kind and no damage that no kind makes'] : []),
+      ...(brokenOfId.has(id) ? [] : [`no case has the id ${id}`]),
+      ...(namedInKinds.has(id) ? ['the case has a line before this one'] : []),
+    ]
+    problems.push(...found.map(problem => `${where}: ${problem}`))
+    namedInKinds.add(id)
+    if (found.length === 0) damageOf.set(id, {kinds, other})
+  }
+  if (existsSync(join(folder, 'kinds.txt'))) {
+    for (const {texts} of caseTexts) if (!namedInKinds.has(texts.id)) problems.push(`kinds.txt: the case ${texts.id} has no line`)
+  }
+  const cases = caseTexts.map(({file, texts}) => caseOf(texts, file, repairsOf.get(blindIdOf(texts.broken)) ?? [], leftOutOf.get(blindIdOf(texts.broken)) ?? [], noLabelOf.get(texts.id) ?? [], damageOf.get(texts.id)))
   for (const writtenCase of cases) {
     for (const entry of writtenCase.noLabel) {
       const added = Array.from(entry.text).every((_, offset) => writtenCase.opinions.every(opinion => opinion.labels[entry.position + offset] === undefined))
@@ -450,6 +488,7 @@ if (import.meta.main) {
   const {describeOpinions} = await import('./show.ts')
   const folder = process.argv.slice(2).find(argument => !argument.startsWith('--')) ?? writtenFolder
   const showDisputed = process.argv.includes('--disputed')
+  const showKinds = process.argv.includes('--kinds')
   const {cases, problems} = readWritten(folder)
   for (const problem of problems) console.log(`problem: ${problem}`)
   const count = (states: readonly Agreement[], from: number, wanted: Agreement) => states.reduce((total, state, position) => total + Number(position >= from && state === wanted), 0)
@@ -469,6 +508,20 @@ if (import.meta.main) {
   if (listed.length > 0) {
     const total = (from: (writtenCase: WrittenCase) => number) => listed.reduce((sum, writtenCase) => sum + count(writtenCase.agreement, from(writtenCase), 'noLabel'), 0)
     console.log(`Without a label by no-label.txt: ${total(() => 0)} code points in ${listed.length} cases, ${total(writtenCase => writtenCase.firstErrorPosition)} of them from the first error on.`)
+  }
+  if (showKinds) {
+    const tagged = cases.filter(writtenCase => writtenCase.damage !== undefined)
+    const ofTheKinds = (some: readonly WrittenCase[]) => some.filter(writtenCase => writtenCase.damage!.other === undefined).length
+    console.log(`\nBy kinds.txt, ${ofTheKinds(tagged)} of ${tagged.length} cases have damage of the generator's kinds alone, and ${tagged.length - ofTheKinds(tagged)} have damage that no kind makes. Per writer's file:`)
+    for (const file of [...new Set(tagged.map(writtenCase => writtenCase.file))].sort()) {
+      const ofFile = tagged.filter(writtenCase => writtenCase.file === file)
+      console.log(`  ${String(ofTheKinds(ofFile)).padStart(4)} ${String(ofFile.length - ofTheKinds(ofFile)).padStart(4)}  ${file}`)
+    }
+    const casesOfKind = new Map<string, number>()
+    for (const writtenCase of tagged) for (const kind of writtenCase.damage!.kinds) casesOfKind.set(kind, (casesOfKind.get(kind) ?? 0) + 1)
+    console.log('The cases that each kind describes, and the kinds that describe none:')
+    for (const [kind, total] of [...casesOfKind].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))) console.log(`  ${String(total).padStart(4)}  ${kind}`)
+    console.log(`  none: ${generatorKinds.map(kind => kind.name).filter(name => !casesOfKind.has(name)).join(', ')}`)
   }
   console.log(`${cases.length} cases: ${repaired(2)} with two repairs, ${repaired(1)} with one, ${repaired(0)} with none, ${cases.length - repaired(0) - repaired(1) - repaired(2)} with more. ${cases.length - disputed.length} with full agreement from the first error on, ${disputed.length} with a disputed code point there. ${problems.length} problems.`)
   if (problems.length > 0) process.exitCode = 1

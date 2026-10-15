@@ -6,6 +6,7 @@ import {mkdirSync, mkdtempSync, readFileSync, writeFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
+import {kinds} from '../damage.ts'
 import {handRuleTables, handRules} from '../hand-rules.ts'
 import {defaultSeed} from '../samples.ts'
 import {defaultTables} from '../table-parser.ts'
@@ -455,6 +456,87 @@ test('a case with the writer\'s opinion alone, and its score', () => {
   expect(scores.all.agreedCodePoints).toMatchObject({cases: 3, scored: 12})
   expect([...scores.perFile.keys()]).toEqual(['made-up.txt', 'other.txt'])
   expect(scores.perFile.get('other.txt')!.fullAgreement.cases).toBe(0)
+  // These three cases have no line of kinds.txt, so they are in neither of the two parts that the file makes.
+  expect([scores.generatorKinds.agreedCodePoints.cases, scores.otherDamage.agreedCodePoints.cases, scores.unmarked.agreedCodePoints.cases]).toEqual([0, 0, 3])
+})
+
+test('scoreTables scores the two parts that kinds.txt makes, and the cases that nobody marked', () => {
+  const sameRepair = {name: 'part-1.a', repaired: madeUp.intended, unsure: undefined}
+  const cases = [
+    caseOf(madeUp, 'made-up.txt', [sameRepair], [], [], {kinds: ['missingComma', 'foreignLiteral', 'trailingComma'], other: undefined}),
+    // The same texts with damage that no kind makes, with a writer's mark, with a repairer's mark, and with a dispute.
+    caseOf({...madeUp, id: 'made-up-6'}, 'made-up.txt', [sameRepair], [], [], {kinds: ['missingComma'], other: 'something that no kind makes'}),
+    caseOf({...madeUp, id: 'made-up-7', debatable: true}, 'made-up.txt', [sameRepair], [], [], {kinds: ['missingComma'], other: undefined}),
+    caseOf({...madeUp, id: 'made-up-8'}, 'made-up.txt', [{...sameRepair, unsure: 'None could be a string'}], [], [], {kinds: [], other: 'something that no kind makes'}),
+    caseOf({...madeUp, id: 'made-up-9'}, 'made-up.txt', [{...sameRepair, repaired: '{"a": 1, "b": "None"}'}], [], [], {kinds: ['missingComma'], other: undefined}),
+  ]
+  const scores = scoreTables(handRuleTables('words'), cases)
+  const counts = (pick: (score: typeof scores) => {fullAgreement: Score, agreedCodePoints: Score}) => [pick(scores).fullAgreement.cases, pick(scores).agreedCodePoints.cases]
+  expect(counts(score => score.all)).toEqual([4, 5])
+  expect(counts(score => score.generatorKinds)).toEqual([2, 3])
+  expect(counts(score => score.otherDamage)).toEqual([2, 2])
+  expect(counts(score => score.unmarked)).toEqual([2, 3])
+  expect(scores.generatorKinds.fullAgreement.scored + scores.otherDamage.fullAgreement.scored).toBe(scores.all.fullAgreement.scored)
+})
+
+test('readWritten takes the lines of kinds.txt, and a case without a line is a problem', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'written-'))
+  mkdirSync(join(folder, 'cases'))
+  writeFileSync(join(folder, 'cases', 'made-up.txt'), caseFileText([withPlaceholder, madeUp]))
+  // Without the file no case has a judgment, and nothing is wrong.
+  expect(readWritten(folder).cases.map(writtenCase => writtenCase.damage)).toEqual([undefined, undefined])
+  expect(readWritten(folder).problems).toEqual([])
+  const lines = (...entries: string[]) => writeFileSync(join(folder, 'kinds.txt'), `${entries.join('\n')}\n`)
+  lines('# what the file is for', '', 'made-up-4 templatePlaceholder', 'made-up-1 missingComma foreignLiteral new: a comma after a word of Python')
+  const {cases, problems} = readWritten(folder)
+  expect(problems).toEqual([])
+  expect(cases.map(writtenCase => writtenCase.damage)).toEqual([{kinds: ['templatePlaceholder'], other: undefined}, {kinds: ['missingComma', 'foreignLiteral'], other: 'a comma after a word of Python'}])
+  // A case with no kind at all has only the damage that no kind makes.
+  lines('made-up-4 new: a variable of a template', 'made-up-1 missingComma')
+  expect(readWritten(folder).cases[0]!.damage).toEqual({kinds: [], other: 'a variable of a template'})
+  const problemOf = (...entries: string[]) => {
+    lines(...entries)
+    return readWritten(folder).problems
+  }
+  expect(problemOf('made-up-4 templatePlaceholder')).toEqual(['kinds.txt: the case made-up-1 has no line'])
+  expect(problemOf('made-up-4 templatePlaceholder', 'made-up-1 missingcomma')).toEqual(['kinds.txt, line 2: missingcomma is no kind of the table of kinds in the dataset\'s README'])
+  expect(problemOf('made-up-4 templatePlaceholder', 'made-up-1 missingComma', 'made-up-1 trailingComma')).toEqual(['kinds.txt, line 3: the case has a line before this one'])
+  expect(problemOf('made-up-4 templatePlaceholder', 'made-up-1 missingComma', 'made-up-9 trailingComma')).toEqual(['kinds.txt, line 3: no case has the id made-up-9'])
+  expect(problemOf('made-up-4', 'made-up-1 missingComma')).toEqual(['kinds.txt, line 1: the line names no kind and no damage that no kind makes'])
+  expect(problemOf('made-up-4 templatePlaceholder templatePlaceholder', 'made-up-1 missingComma')).toEqual(['kinds.txt, line 1: a kind stands twice'])
+  expect(problemOf('made-up-4 templatePlaceholder, ellipsis', 'made-up-1 missingComma').join()).toContain('kinds.txt, line 1: a line is the id of a case')
+})
+
+test('kinds.txt names every case of the set, with kinds of the generator', () => {
+  const {cases, problems} = readWritten()
+  expect(problems).toEqual([])
+  const names = new Set(kinds.map(kind => kind.name))
+  for (const writtenCase of cases) {
+    expect([writtenCase.id, writtenCase.damage === undefined]).toEqual([writtenCase.id, false])
+    const {kinds: named, other} = writtenCase.damage!
+    expect([writtenCase.id, named.filter(name => !names.has(name))]).toEqual([writtenCase.id, []])
+    // A case has a kind, or damage that no kind makes, which the file says in a few words.
+    expect(named.length > 0 || other !== undefined).toBe(true)
+    if (other !== undefined) expect(other.split(' ').length).toBeGreaterThan(3)
+    // What no-label.txt names is damage of a kind: a placeholder, with the marker that Node prints for a container,
+    // and a raw line feed in a string.
+    for (const entry of writtenCase.noLabel) {
+      expect([writtenCase.id, entry.text === '\n' ? named.includes('rawLineFeedInString') : named.includes('templatePlaceholder') || named.includes('ellipsis')]).toEqual([writtenCase.id, true])
+    }
+  }
+  // The two parts are the whole set, and the page states their sizes.
+  const scores = scoreTables(defaultTables, cases)
+  const withOther = cases.filter(writtenCase => writtenCase.damage!.other !== undefined)
+  expect(scores.generatorKinds.agreedCodePoints.cases + scores.otherDamage.agreedCodePoints.cases).toBe(cases.length)
+  expect(scores.generatorKinds.fullAgreement.cases + scores.otherDamage.fullAgreement.cases).toBe(scores.all.fullAgreement.cases)
+  expect(scores.otherDamage.agreedCodePoints.cases).toBe(withOther.length)
+  const readme = readFileSync(join(writtenFolder, 'README.md'), 'utf8')
+  expect(readme).toContain(`| All | ${cases.length - withOther.length} | ${withOther.length} |`)
+  for (const file of new Set(cases.map(writtenCase => writtenCase.file))) {
+    const ofFile = cases.filter(writtenCase => writtenCase.file === file)
+    const other = ofFile.filter(writtenCase => writtenCase.damage!.other !== undefined).length
+    expect(readme).toContain(`| \`${file}\` | ${ofFile.length - other} | ${other} |`)
+  }
 })
 
 test('what the checks say about texts that cannot be a case', () => {
@@ -547,6 +629,11 @@ test('the README has the numbers that score.ts gives', () => {
   const readme = readFileSync(join(writtenFolder, 'README.md'), 'utf8')
   expect(readme).toContain(row('Cases with full agreement', score => score.all.fullAgreement))
   expect(readme).toContain(row('All cases, the agreed code points', score => score.all.agreedCodePoints))
+  expect(readme).toContain(row('Full agreement, damage of the generator\'s kinds alone', score => score.generatorKinds.fullAgreement))
+  expect(readme).toContain(row('Full agreement, with damage that no kind makes', score => score.otherDamage.fullAgreement))
+  expect(readme).toContain(row('Full agreement, marked by nobody as debatable or unsure', score => score.unmarked.fullAgreement))
+  expect(readme).toContain(row('Agreed code points, damage of the generator\'s kinds alone', score => score.generatorKinds.agreedCodePoints))
+  expect(readme).toContain(row('Agreed code points, with damage that no kind makes', score => score.otherDamage.agreedCodePoints))
   for (const file of readers[0]!.perFile.keys()) expect(readme).toContain(row(`\`${file}\`, full agreement`, score => score.perFile.get(file)!.fullAgreement))
   const disputed = cases.filter(writtenCase => writtenCase.disputedFromFirstError)
   const disputedCodePoints = disputed.reduce((total, writtenCase) => total + writtenCase.agreement.filter((state, position) => state === 'disputed' && position >= writtenCase.firstErrorPosition).length, 0)

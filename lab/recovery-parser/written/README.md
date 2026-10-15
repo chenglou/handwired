@@ -214,7 +214,8 @@ When the list of changes is not the damage that you made, look for an unintended
 - `written.ts` reads `cases/` and `repairs/`. Per case it gives the opinions, i.e. your intended text and the repairs, the values of every code point by each opinion, and which code points are agreed, added by every opinion, or disputed. A value that the reading of one opinion does not score, by the rules of the `?` above, is no dispute with another opinion. `bun lab/recovery-parser/written/written.ts --disputed` prints every case with a disputed code point, opinion by opinion.
 - `left-out.txt` names the repairs that are left out of their case because they plainly break a rule of `REPAIR.md`. A line is the repair file without its ending, the id of the broken text, and the reason. A repair that reads the text in another way than the other opinions breaks no rule and stays, and its case is then disputed.
 - `no-label.txt` names text of a broken text that has no label, whatever the opinions make of it: `written.ts` takes it out before it holds the opinions against each other, so its code points are not scored and are no dispute. A line is the id of the case, the position of the text's first code point in the broken text, the reason, a colon and a space, and the text as a case file writes it, e.g. `⟦lf⟧` for a line feed. [Text without a label](#text-without-a-label) says what is on the list.
-- `score.ts` prints what today's highlighter and four hand-written settings of its tables get right on the set, and `scoreTables` scores any other tables.
+- `kinds.txt` says for every case which of the generator's kinds describe its damage, by the names of the table of kinds in the dataset's README, and whether the case also has damage that no kind makes. A line is the id of the case, the names of the kinds, each after a space, and for a case with damage that no kind makes ` new: ` and that damage in a few words. [What the damage is](#what-the-damage-is) says how the line between the two was drawn. `bun lab/recovery-parser/written/written.ts --kinds` counts the cases per writer's file and per kind.
+- `score.ts` prints what today's highlighter and four hand-written settings of its tables get right on the set, also for the two parts that `kinds.txt` makes of the set and without the cases that someone marked as open to another reading, and `scoreTables` scores any other tables.
 - `align.ts` pairs the code points of a broken text with those of a valid text, and `check-align.ts` measures it on generated samples whose changes are known: in 5,700 of them it finds the known pairing for 97.1% of the texts and for 99.96% of the code points. Taken as cases of this set, the same samples give today's highlighter and the four hand-written settings the scores that the samples' own values give, within 0.1 points per code point and about half a point per sample.
 - `format.ts` reads and writes the files, `show.ts` prints a case, `check-repairs.ts` is the check for a repairer, and `written.test.ts` tests the folder.
 
@@ -228,11 +229,13 @@ The set has 240 cases: six writers wrote 40 each, every writer from one source o
 
 ```ts
 import {scoreTables} from './written/score.ts'
-const {all, perFile} = scoreTables(tables)
+const {all, perFile, generatorKinds, otherDamage, unmarked} = scoreTables(tables)
 console.log(all.fullAgreement.right / all.fullAgreement.scored, all.fullAgreement.wholeRight / (all.fullAgreement.cases - all.fullAgreement.nothingToRecover))
 ```
 
 - `all` is a `WrittenScore`, and `perFile` maps each writer's file, e.g. `model-output.txt`, to one.
+- `generatorKinds` and `otherDamage` are the `WrittenScore` of the two parts that `kinds.txt` makes of the set: the cases whose damage is all of the generator's kinds, and the cases with damage that no kind makes. The first says how a result carries over to other documents with damage of the sorts that the samples have, and the second how it carries over to other sorts of damage. A report gives both beside `all`.
+- `unmarked` is the `WrittenScore` of the cases that their writer did not mark as debatable and of which no repair is marked as unsure. In the other cases with full agreement, the agreement rests on a reading that someone called open, so a result is held against `unmarked.fullAgreement` too.
 - A `WrittenScore` has two scores. `fullAgreement` counts the cases without a disputed code point from the first error on, and it is the set's main number. `agreedCodePoints` counts all cases and leaves the disputed code points out.
 - A `Score` has `cases`, `nothingToRecover`, `scored`, `right`, `wholeRight`, and per value `kindScored`, `kindRight`, `nestingScored`, `depthRight` and `containerRight`. It counts as `stats.ts` counts a sample: over the code points from the first error of today's highlighter on that have a scored value, a code point is right when every scored value is right, and a case is right as a whole when all of its counted code points are.
 
@@ -255,6 +258,39 @@ The broken texts have 35,429 code points, and 27,048 of them stand from the firs
 7 cases have nothing to recover. A text that only stops early and a whole document with other text after it have no code point to score, as in the dataset, so the writers kept such cases few, and the set says nothing about them.
 
 No broken text and no intended text of the set is among the first 60,000 generated samples of the default seed, of which 57,016 are broken: neither as the same text nor as the same JSON value.
+
+### What the damage is
+
+The writers did not see the generator, and most of what they wrote is damage that the generator's kinds also make. `kinds.txt` says for every case which of the 55 kinds describe its damage, and whether the case also has damage that no kind makes. A reader of all cases made the list from the broken text and the intended text of each case. It is a judgment per case, and the file gives a few words of reason for every case of the second sort.
+
+| Writer's file | Cases whose damage is all of the generator's kinds | Cases with damage that no kind makes |
+| --- | --- | --- |
+| `documents-and-web.txt` | 24 | 16 |
+| `hand-editing.txt` | 38 | 2 |
+| `logs-and-transport.txt` | 31 | 9 |
+| `merges-and-tools.txt` | 31 | 9 |
+| `model-output.txt` | 36 | 4 |
+| `other-notations.txt` | 34 | 6 |
+| All | 194 | 46 |
+
+A case is of the generator's kinds when every damage in it is one of the kinds, in any form that a person would call the same sort of damage. These count as a kind:
+
+- Another word, name or character in the same part, e.g. German quotes as `curlyQuotes`, the line separator U+2028 in the place of a line feed as `nonBreakingSpace`, a call with another name as `callWrapper`, and a currency sign before a number as `numberFormat`.
+- Text before or after the document, whatever it holds, as one of the wrapper kinds, e.g. the headers of an HTTP answer as `proseAround`, and the tags of a script around the document as `statementWrapper`.
+- A piece of the text that is missing with nothing in its place, e.g. a line that opens an object, as `middleCutOut`.
+- The notation of another language, when each of its differences from JSON is a kind's, e.g. what Go prints for a struct with the names of its fields: keys and values without quotes, and no commas.
+
+A case has damage that no kind makes when at least one damage in it is of another sort. The 46 cases have these sorts:
+
+- An encoding of the whole text that the generator lacks: quoted-printable, a percent code, `\x22` or `#012` in the place of a character, every quote twice as in a cell of a CSV file, every brace twice as in a format string, and UTF-16 read as bytes.
+- Marks before every line of one document: line numbers, the marks of a diff, the mark of a quoted mail, the prompt of a shell, and the name of a service.
+- Other text in the middle of the document: the header of a page, a pasted line, a second document, the tags of a template's loop, a remark in round brackets, the tag of a link inside a string, the sizes of the chunks of an HTTP body, and line feeds at the edge of a window.
+- A character that a program changed inside a string or a number, e.g. a dash in the place of two hyphens, and the true minus sign.
+- Brackets of another notation around a whole container, e.g. braces around a set, square brackets around a dictionary, and `array (` and `)` around an object.
+
+The kinds that describe the most cases are `unquotedKey` with 22, `logPrefix` and `singleQuotedString` with 20 each, `numberFormat` and `unquotedValue` with 18 each, `cutOff` with 14 and `foreignLiteral` with 13. Three kinds describe no case: `partialNumber`, `commaSeparatedRecords` and `logLines`.
+
+So a score over the whole set says mostly how a result carries over to other documents with damage of the sorts that the samples have. The score of the 46 cases says how it carries over to other sorts of damage, and `score.ts` prints the two apart.
 
 ### Text without a label
 
@@ -281,7 +317,12 @@ With the list, 5 cases that were disputed have full agreement, and 224 code poin
 | Cases | Count | Nothing to recover | Scored code points | `now` | `stay` | `resync` | `words` | `lines` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Cases with full agreement | 221 | 6 | 19,343 | 22.0 / 2.3 | 50.4 / 18.1 | 62.5 / 45.1 | 75.6 / 49.8 | 76.1 / 50.2 |
+| Full agreement, damage of the generator's kinds alone | 180 | 6 | 15,513 | 23.6 / 2.9 | 52.2 / 19.5 | 64.4 / 46.0 | 78.6 / 50.6 | 79.1 / 51.1 |
+| Full agreement, with damage that no kind makes | 41 | 0 | 3,830 | 15.7 / 0.0 | 43.2 / 12.2 | 54.7 / 41.5 | 63.7 / 46.3 | 63.7 / 46.3 |
+| Full agreement, marked by nobody as debatable or unsure | 169 | 5 | 15,574 | 23.1 / 2.4 | 49.3 / 15.9 | 62.6 / 44.5 | 75.5 / 50.0 | 76.0 / 50.6 |
 | All cases, the agreed code points | 240 | 7 | 20,672 | 21.4 / 2.6 | 50.5 / 18.9 | 62.7 / 45.1 | 76.5 / 50.2 | 76.9 / 50.6 |
+| Agreed code points, damage of the generator's kinds alone | 194 | 7 | 16,497 | 22.8 / 3.2 | 52.4 / 20.3 | 64.7 / 46.0 | 79.2 / 50.8 | 79.8 / 51.3 |
+| Agreed code points, with damage that no kind makes | 46 | 0 | 4,175 | 16.0 / 0.0 | 43.0 / 13.0 | 55.1 / 41.3 | 65.8 / 47.8 | 65.8 / 47.8 |
 | `documents-and-web.txt`, full agreement | 37 | 1 | 3,613 | 15.3 / 0.0 | 56.5 / 16.7 | 78.5 / 63.9 | 89.0 / 66.7 | 89.0 / 66.7 |
 | `hand-editing.txt`, full agreement | 37 | 2 | 2,483 | 31.4 / 0.0 | 60.9 / 20.0 | 72.5 / 42.9 | 82.5 / 57.1 | 82.5 / 57.1 |
 | `logs-and-transport.txt`, full agreement | 37 | 3 | 3,288 | 20.8 / 2.9 | 40.2 / 8.8 | 50.8 / 38.2 | 56.0 / 41.2 | 56.0 / 41.2 |
@@ -290,6 +331,10 @@ With the list, 5 cases that were disputed have full agreement, and 224 code poin
 | `other-notations.txt`, full agreement | 36 | 0 | 3,609 | 8.3 / 2.8 | 41.0 / 16.7 | 45.5 / 25.0 | 73.2 / 25.0 | 73.2 / 25.0 |
 
 Every reader gets less right here than on generated samples: for the broken samples of one document among the first 6,000, `check-align.ts` prints 41.7% of the code points for `now`, 73.8% for `stay`, 82.7% for `resync`, 91.4% for `words` and 91.3% for `lines`.
+
+The hand rules get less right on the cases with damage that no kind makes than on the others, e.g. `words` has 63.7% of the code points right there and 78.6% in the cases whose damage is all of the generator's kinds.
+
+Of the 221 cases with full agreement, 52 are marked: their writers marked 28 as debatable, and 24 more have a repair that is marked as unsure. In these cases the agreement rests on a reading that someone called open, e.g. which of the two sides of a diff stays, or whether a document between quotes is a string with quotes that lost their backslashes or an object with two quotes too many. The row without them is there so that a result can be held against both: the hand rules score nearly the same in it, e.g. `words` 75.5% and 75.6%.
 
 ### Where the opinions differ
 
