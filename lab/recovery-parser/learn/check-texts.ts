@@ -4,12 +4,18 @@ import type {Random} from '../random.ts'
 import {capacity, maximumDepth} from '../table-parser.ts'
 import type {AddedClass} from './recovery-tables.ts'
 
-// The classes that the checks add: the apostrophe, the two curly double quotes, the no-break space, the signs = # *
-// and the round brackets. All of them have the class `other` today, the class of most letters, and the dataset's
-// broken texts hold them. textWithAddedClasses makes texts with them, inside strings and between tokens.
+// The classes that the checks add. The first five are taken out of the class `other`, the class of most letters: the
+// apostrophe, the two curly double quotes, the no-break space, the signs = # * and the round brackets. The dataset's
+// broken texts hold them. The last three are taken out of other classes, so that the checks also run the code that
+// reads which class of today's an added class's code points have: the digits 7, 8 and 9 out of `digit`, the carriage
+// return out of `tabOrCarriageReturn`, and the 7 once more, out of the added class of the digits 7 to 9. Valid JSON
+// reads a digit and a carriage return between tokens, where a code point of the class `other` is an error, so a
+// check fails when the code takes such a class for one that came out of `other`.
+// textWithAddedClasses makes texts with all of them, inside strings and between tokens.
 export const classesOfTheChecks: AddedClass[] = [
   {name: 'apostrophe', codePoints: [0x27]}, {name: 'curlyQuote', codePoints: [0x201c, 0x201d]}, {name: 'noBreakSpace', codePoints: [0xa0]},
   {name: 'sign', codePoints: [0x3d, 0x23, 0x2a]}, {name: 'roundBracket', codePoints: [0x28, 0x29]},
+  {name: 'highDigit', codePoints: [0x37, 0x38, 0x39]}, {name: 'carriageReturn', codePoints: [0x0d]}, {name: 'seven', codePoints: [0x37]},
 ]
 
 const pieces = ['a', 'b', 'e', 'E', 'f', 'l', 'n', 'r', 's', 't', 'u', 'c', 'D', 'x', 'z', ' ', '/', '{', '}', '[', ']', ':', ',', '-', '+', '.', '0', '7', '\'', 'é', '東', '😀', '\u007f', ' ']
@@ -105,8 +111,9 @@ export function editedText(random: Random): string {
 }
 
 // A text with code points of the classes that the checks add: a valid text in which one to four code points are
-// replaced by such a code point, or get one before them. Inside a string the text stays valid, e.g. "it's", and
-// between tokens it breaks, e.g. [1,'2].
+// replaced by such a code point, or get one before them. With a code point that has the class `other` today, the
+// text stays valid inside a string, e.g. "it's", and breaks between tokens, e.g. [1,'2]. A digit can also keep a
+// number valid, e.g. 17, and a carriage return is white space between tokens and an error inside a string.
 const addedCodePoints = classesOfTheChecks.flatMap(added => added.codePoints.map(codePoint => String.fromCodePoint(codePoint)))
 export function textWithAddedClasses(random: Random): string {
   const codePoints = Array.from(validText(random))

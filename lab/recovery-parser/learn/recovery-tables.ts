@@ -393,12 +393,14 @@ export function addClasses(tables: RecoveryTables, classes: readonly AddedClass[
 }
 
 // A copy of `tables` in which the grammar also reads the bit "the token is the first on its line". A line feed sets
-// the bit, and the first code point after it whose token is not `none` reads it and clears it. E.g. in
+// the bit, and the first code point after it whose token is not `none` clears it. Every code point after the line
+// feed, up to and including that one, reads its grammar cell with the bit, also white space, whose token is `none`.
+// E.g. in
 //   "version":⏎  "license": "MIT"
-// the quote of "license" reads its grammar cell with the bit, and the quote of "MIT" without. The contexts double
-// from 8 to 16: context + 8 is the context with the bit. A cell with the bit starts as a copy of the cell without, so
-// the copy reads every text as `tables` do, until a cell with the bit is changed. Which cells with the bit are open
-// comes from the search for frozen cells, run over the bit too, see searchFrozenCells.
+// the two spaces and the quote of "license" read their grammar cells with the bit, and the quote of "MIT" without.
+// The contexts double from 8 to 16: context + 8 is the context with the bit. A cell with the bit starts as a copy of
+// the cell without, so the copy reads every text as `tables` do, until a cell with the bit is changed. Which cells
+// with the bit are open comes from the search for frozen cells, run over the bit too, see searchFrozenCells.
 export function addFirstOnLineBit(tables: RecoveryTables): RecoveryTables {
   if (tables.contextCount !== contextCount) throw new Error('these tables have the bit "first on its line" already')
   const contexts = 2 * contextCount
@@ -602,7 +604,9 @@ export type CellDifference = {
   cell: number
   // The cell's name, e.g. "(value, comma, depth 1, array)", or the entry's, e.g. "(literalStart, colon)".
   name: string
-  // Whether the cell is open. A difference in a frozen cell breaks the ground rules.
+  // Whether the cell is open. A difference in a frozen cell breaks the ground rules. For an entry of the display
+  // table: whether the entry is open, or is an entry of an added grammar state in tables without open entries,
+  // where it may hold any kind.
   open: boolean
   // What the cell holds in the first tables and in the second, e.g. "error, by token" and "value, none", or "literal"
   // and "key" for an entry of the display table. "no such state" where the tables have fewer states.
@@ -628,7 +632,7 @@ function inLayoutOf(tables: RecoveryTables, like: RecoveryTables): RecoveryTable
 // "first on its line" and the first do not, the first are compared as addClasses and addFirstOnLineBit make them: a
 // cell of an added class with the cell of the class that its code points came from, and a cell with the bit with the
 // cell without. So differencesOf(asIsTables(), tables) lists the cells of `tables` that do something else than
-// today's parser.
+// today's parser. Every cell of an added state is listed, as "no such state" in the tables without the state.
 export function differencesOf(beforeAsGiven: RecoveryTables, after: RecoveryTables): CellDifference[] {
   const before = inLayoutOf(beforeAsGiven, after)
   const differences: CellDifference[] = []
@@ -646,12 +650,27 @@ export function differencesOf(beforeAsGiven: RecoveryTables, after: RecoveryTabl
   // An entry's index depends on the number of grammar states, so the entries are compared by event and state. An
   // entry counts as open when it is open in the tables that have its state, in the second ones when both have it:
   // today's tables have no open entry.
+  //
+  // The entries of a grammar state that only one of the two tables has are listed where they are open, as that
+  // state's cells are, and nowhere else: an entry that is not open is no cell that a run can change. Without open
+  // entries the state's column is the one that addStates was told to copy, and with open entries the three entries
+  // of a text's end hold `pastEnd`. So tables with an added grammar state and no open entry differ from today's in
+  // cells only, as before the display table could have open entries.
+  //
+  // When both tables have the state and no entry is open, an entry of an added state can still differ, e.g. between
+  // tables whose added state copies the column of `colon` and tables whose added state copies the column of `key`.
+  // The entry is then listed as one that may differ, since checkTables lets such a column hold any kinds.
+  const hasOpenEntries = (tables: RecoveryTables) => tables.displayOpen.includes(1)
   for (let event = 0; event < grammarTables.eventCount; event++) {
     for (let state = 0; state < grammarTables.grammarStateCount; state++) {
       const choices = [before, after].map(tables => state < tables.grammarStateCount ? displayChoiceName(tables, displayEntryOf(tables, event, state)) : 'no such state')
+      if (choices[0] === choices[1]) continue
       const entry = displayEntryOf(grammarTables, event, state)
       const holder = state < after.grammarStateCount ? after : before
-      if (choices[0] !== choices[1]) differences.push({table: 'display', cell: entry, name: displayEntryName(grammarTables, entry), open: holder.displayOpen[displayEntryOf(holder, event, state)] === 1, before: choices[0]!, after: choices[1]!})
+      const isOpen = holder.displayOpen[displayEntryOf(holder, event, state)] === 1
+      const inBoth = state < before.grammarStateCount && state < after.grammarStateCount
+      if (!inBoth && !isOpen) continue
+      differences.push({table: 'display', cell: entry, name: displayEntryName(grammarTables, entry), open: isOpen || (state >= grammarStateCount && !hasOpenEntries(holder)), before: choices[0]!, after: choices[1]!})
     }
   }
   return differences

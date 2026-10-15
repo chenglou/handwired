@@ -16,6 +16,9 @@
 // 4. Writes tables as JSON and reads them again, lists the cells in which two tables differ, and shows that a change
 //    of a frozen cell is refused, and so is a file with a number that a byte does not hold, e.g. the state 259. With
 //    the environment variable RECOVERY_SCRATCH it also saves the tables to a file in that folder and loads the file.
+//    Then every cell, every entry of the display table and every bit of a mask is changed, one at a time: a change
+//    of a frozen cell, of an entry that is not open or of a mask is refused, and a change of an open one is not.
+//    And differencesOf lists no entry of the display table for an added grammar state unless the entry is open.
 //
 // Parts 2 and 3 run today's parser, table-parser.ts, which knows nothing of added structure. The check works out
 // itself which cell of the tables a step of today's parser reads: the cell of an added class from the code point,
@@ -30,8 +33,8 @@ import {type ParserTrace, classNames, contextNames, positionCount, runTableParse
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
 import {codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {
-  type AddedClass, type RecoveryTables, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, displayEntryName, displayEntryOf, displayKindNames, eventNames,
-  frozenSearchOf, grammarCellName, grammarStateNames, lexerCellName, loadTables, openDisplayEntries, problemsOf, saveTables, tablesFromJson, tablesToJson, today,
+  type AddedClass, type RecoveryTables, actionCount, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, displayEntryName, displayEntryOf, displayKindNames,
+  eventNames, frozenSearchOf, grammarCellName, grammarStateNames, lexerCellName, loadTables, openDisplayEntries, problemsOf, randomizeOpenCells, saveTables, tablesFromJson, tablesToJson, today,
 } from './recovery-tables.ts'
 
 const sampleCount = Number(process.argv[2] ?? 30_000)
@@ -50,19 +53,29 @@ const variants: {name: string, tables: RecoveryTables}[] = [
 ]
 const ones = (mask: Uint8Array) => mask.reduce((total, bit) => total + bit, 0)
 
-// One code point per class. The class `end` stands for the end of the text.
+// One code point per class. The class `end` stands for the end of the text. The code points are ones that no class
+// of the checks takes out of its class of today's, e.g. the 5 for `digit`, since the checks add a class with the 7.
 const codePointOfTodaysClass: Record<typeof classNames[number], string> = {
   end: '', truncatedEnd: '', space: ' ', tabOrCarriageReturn: '\t', lineFeed: '\n', control: '\u0001', quote: '"', backslash: '\\', slash: '/', openBrace: '{', closeBrace: '}',
-  openBracket: '[', closeBracket: ']', colon: ':', comma: ',', minus: '-', plus: '+', dot: '.', zero: '0', digit: '7', a: 'a', b: 'b', e: 'e', capitalE: 'E', f: 'f', l: 'l', n: 'n',
+  openBracket: '[', closeBracket: ']', colon: ':', comma: ',', minus: '-', plus: '+', dot: '.', zero: '0', digit: '5', a: 'a', b: 'b', e: 'e', capitalE: 'E', f: 'f', l: 'l', n: 'n',
   r: 'r', s: 's', t: 't', u: 'u', otherHexLetter: 'c', other: 'x',
 }
-const codePointOfClass = (tables: RecoveryTables, characterClass: number) =>
-  characterClass < classNames.length ? codePointOfTodaysClass[classNames[characterClass]!] : String.fromCodePoint(tables.addedClasses[characterClass - classNames.length]!.codePoints[0]!)
+const classOfCodePoint = (tables: RecoveryTables, codePoint: number) => tables.classOfCodePoint[Math.min(codePoint + 1, tables.classOfCodePoint.length - 1)]!
+// A code point that `tables` give the class. For an added class it is the first of the class's listed code points
+// that still has the class: a later added class may have taken some, as the class `seven` takes the 7 out of the
+// class of the digits 7 to 9.
+function codePointOfClass(tables: RecoveryTables, characterClass: number): string {
+  if (characterClass < classNames.length && codePointOfTodaysClass[classNames[characterClass]!] === '') return ''
+  const listed = characterClass < classNames.length ? [codePointOfTodaysClass[classNames[characterClass]!].codePointAt(0)!] : tables.addedClasses[characterClass - classNames.length]!.codePoints
+  const codePoint = listed.find(candidate => classOfCodePoint(tables, candidate) === characterClass)
+  if (codePoint === undefined) throw new Error(`check-tables.ts has no code point of the class ${className(tables, characterClass)} for these tables`)
+  return String.fromCodePoint(codePoint)
+}
 
 // The cells of `tables` that a step of today's parser reads. The class is the one that `tables` give the code point,
 // and it has to be a class whose code points have the trace's class today.
 function lexerCellAt(tables: RecoveryTables, codePoints: readonly number[], trace: ParserTrace, position: number) {
-  const characterClass = position < codePoints.length ? tables.classOfCodePoint[Math.min(codePoints[position]! + 1, tables.classOfCodePoint.length - 1)]! : trace.characterClass[position]!
+  const characterClass = position < codePoints.length ? classOfCodePoint(tables, codePoints[position]!) : trace.characterClass[position]!
   if (tables.classToday[characterClass] !== trace.characterClass[position]) fail(`the tables give the code point ${codePoints[position]} the class ${className(tables, characterClass)}, and today's parser reads the class ${classNames[trace.characterClass[position]!]}`)
   return trace.lexerStateBefore[position]! * tables.classCount + characterClass
 }
@@ -108,7 +121,7 @@ for (const {name, tables} of variants) {
   for (let added = 0; added < tables.addedClasses.length; added++) {
     const characterClass = classNames.length + added
     const frozen = Array.from({length: tables.lexerStateCount}, (_, state) => state * tables.classCount + characterClass).filter(cell => tables.lexerOpen[cell] === 0)
-    console.log(`   The class ${className(tables, characterClass)}, from the class ${classNames[tables.classToday[characterClass]!]}: ${frozen.length} of its ${tables.lexerStateCount} cells are frozen, ${frozen.map(cell => lexerCellName(tables, cell)).join(' ')}.`)
+    console.log(`   The class ${className(tables, characterClass)}, whose code points have the class ${classNames[tables.classToday[characterClass]!]} today: ${frozen.length} of its ${tables.lexerStateCount} cells are frozen, ${frozen.map(cell => lexerCellName(tables, cell)).join(' ')}.`)
   }
   if (tables.contextCount > contextNames.length) {
     // The cells with the bit, and whether they are frozen where the cell without the bit is.
@@ -234,11 +247,13 @@ for (const {name, tables} of variants) {
   const text = new Int32Array(maximumLength)
   let texts = 0
   let openReads = 0
-  const checkLastStep = (position: number) => {
+  // `length` is the number of code points of the text that ran: the step at `position` is its last code point, or
+  // with `position` equal to `length` the step after its end.
+  const checkLastStep = (position: number, length: number) => {
     if (trace.firstErrorPosition !== -1) return false
     if (tables.lexerOpen[trace.lexerCell[position]!] === 1 || tables.grammarOpen[trace.grammarCell[position]!] === 1 || tables.displayOpen[displayEntryOf(tables, trace.event[position]!, trace.grammarAfter[position]!)] === 1) {
       openReads++
-      fail(`${name}: the text ${JSON.stringify(String.fromCodePoint(...text.subarray(0, position)))} reads an open cell at position ${position}, before any error`)
+      fail(`${name}: the text ${JSON.stringify(String.fromCodePoint(...text.subarray(0, length)))} reads an open cell at position ${position}, before any error`)
     }
     return true
   }
@@ -246,12 +261,12 @@ for (const {name, tables} of variants) {
     // The text up to `length` has no error. Its end position is a step too.
     texts++
     runRecoveryParserInto(trace, text, 0, length, false, tables, length + 1)
-    checkLastStep(length)
+    checkLastStep(length, length)
     if (length === maximumLength) return
     for (const codePoint of codePoints) {
       text[length] = codePoint
       runRecoveryParserInto(trace, text, 0, length + 1, false, tables, length + 1)
-      if (checkLastStep(length)) extend(length + 1)
+      if (checkLastStep(length, length + 1)) extend(length + 1)
     }
   }
   extend(0)
@@ -350,7 +365,73 @@ variants.forEach(({name, tables}, variant) => {
     if (refused === '') fail(`${name}: a file with the state ${value} in an open cell is loaded`)
     else if (value === 259) console.log(`   A file with the state 259 in an open cell is refused: ${refused.replace(/^Error: /, '')}.`)
   }
+  // One change at a time, of every cell in each of its two fields, of every entry of the display table and of every
+  // bit of the three masks. A change of a frozen cell, of an entry that is not open or of a mask has to be refused,
+  // and a change of an open cell or an open entry to another choice must not be.
+  {
+    const probe = copyTables(tables)
+    const tally = {refused: 0, taken: 0}
+    const change = (array: Uint8Array, index: number, value: number, hasToBeRefused: boolean, what: () => string) => {
+      const kept = array[index]!
+      array[index] = value
+      const isRefused = problemsOf(probe).length > 0
+      array[index] = kept
+      if (isRefused !== hasToBeRefused) fail(`${name}: a change of ${what()} is ${isRefused ? 'refused' : 'not refused'}`)
+      else if (isRefused) tally.refused++
+      else tally.taken++
+    }
+    for (let cell = 0; cell < probe.lexerNext.length; cell++) {
+      const frozen = tables.lexerOpen[cell] === 0
+      change(probe.lexerNext, cell, (probe.lexerNext[cell]! + 1) % probe.lexerStateCount, frozen, () => `the next state of the tokenizer cell ${lexerCellName(tables, cell)}`)
+      change(probe.lexerEvent, cell, (probe.lexerEvent[cell]! + 1) % probe.eventCount, frozen, () => `the event of the tokenizer cell ${lexerCellName(tables, cell)}`)
+      change(probe.lexerOpen, cell, 1 - probe.lexerOpen[cell]!, true, () => `the mask's bit of the tokenizer cell ${lexerCellName(tables, cell)}`)
+    }
+    for (let cell = 0; cell < probe.grammarNext.length; cell++) {
+      const frozen = tables.grammarOpen[cell] === 0
+      change(probe.grammarNext, cell, (probe.grammarNext[cell]! + 1) % probe.grammarStateCount, frozen, () => `the next state of the grammar cell ${grammarCellName(tables, cell)}`)
+      change(probe.grammarAction, cell, (probe.grammarAction[cell]! + 1) % actionCount, frozen, () => `the stack action of the grammar cell ${grammarCellName(tables, cell)}`)
+      change(probe.grammarOpen, cell, 1 - probe.grammarOpen[cell]!, true, () => `the mask's bit of the grammar cell ${grammarCellName(tables, cell)}`)
+    }
+    for (let entry = 0; entry < probe.display.length; entry++) {
+      // Another kind, and for an open entry another one than `pastEnd`, which no open entry may hold. Every variant
+      // of this check with an added grammar state has open entries, so no entry here may hold just any kind.
+      let kind = (probe.display[entry]! + 1) % displayKindNames.length
+      if (tables.displayOpen[entry] === 1 && kind === pastEnd) kind = (kind + 1) % displayKindNames.length
+      change(probe.display, entry, kind, tables.displayOpen[entry] === 0, () => `the entry ${displayEntryName(tables, entry)} of the display table`)
+      change(probe.displayOpen, entry, 1 - probe.displayOpen[entry]!, true, () => `the mask's bit of the entry ${displayEntryName(tables, entry)} of the display table`)
+    }
+    console.log(`   One change at a time: ${tally.refused} changes of a frozen cell in one of its two fields, of an entry of the display table that is not open, or of a bit of a mask are all refused. ${tally.taken} changes of an open cell in one of its two fields${tables.displayOpen.includes(1) ? ' or of an open entry' : ''} are not.`)
+  }
 })
+
+// What differencesOf lists, for the count "cells that differ from today's" of score.ts and compare.ts.
+{
+  const colon = grammarStateNames.indexOf('colon')
+  const describeFirst = (differences: ReturnType<typeof differencesOf>) => describeDifferences(differences.slice(0, 2)).replace(/\s+/g, ' ')
+  // Tables that keep the ground rules differ from today's in open cells and open entries only, whatever they hold.
+  variants.forEach(({name, tables}, variant) => {
+    const changed = copyTables(tables)
+    randomizeOpenCells(changed, createRandom(20261015, 6 + variant))
+    const frozen = [...differencesOf(asIsTables(), tables), ...differencesOf(asIsTables(), changed)].filter(difference => !difference.open)
+    if (frozen.length > 0) fail(`${name}: differencesOf lists ${frozen.length} differences from today's tables in cells that are not open, e.g. ${describeFirst(frozen)}`)
+  })
+  // Added states without open entries of the display table: every cell of an added state is listed, 33 per tokenizer
+  // state and 88 per grammar state, and no entry of the display table is. The column of an added grammar state is
+  // what addStates was told to copy, and no cell that a run can change.
+  const withStates = addStates(asIsTables(), 2, [colon])
+  const ofStates = differencesOf(asIsTables(), withStates)
+  const cellsOfStates = 2 * today.classCount + today.tokenCount * today.contextCount
+  if (ofStates.length !== cellsOfStates || ofStates.some(difference => difference.table === 'display')) fail(`differencesOf lists ${ofStates.length} differences for tables with 2 added tokenizer states and an added grammar state, ${ofStates.filter(difference => difference.table === 'display').length} of them entries of the display table, and the added states have ${cellsOfStates} cells`)
+  // With open entries, the open entries of an added grammar state are listed like its cells: one per event but the
+  // three events of a text's end.
+  const entriesOfState = differencesOf(asIsTables(), addStates(openDisplayEntries(asIsTables()), 2, [colon])).filter(difference => difference.table === 'display')
+  if (entriesOfState.length !== today.eventCount - 3 || entriesOfState.some(difference => !difference.open)) fail(`differencesOf lists ${entriesOfState.length} entries of the display table for an added grammar state with open entries, and the state has ${today.eventCount - 3} open ones`)
+  // Two tables whose added grammar state copies another column differ in entries of that state, which are no frozen
+  // cells: without open entries, the column of an added state may hold any kinds.
+  const shownOtherwise = differencesOf(withStates, addStates(asIsTables(), 2, [grammarStateNames.indexOf('commaOrClose')]))
+  if (shownOtherwise.length === 0 || shownOtherwise.some(difference => difference.table !== 'display' || !difference.open)) fail(`two tables whose added grammar state copies another column differ in ${shownOtherwise.length} cells, e.g. ${describeFirst(shownOtherwise)}`)
+  console.log(`   differencesOf: tables with 2 added tokenizer states and an added grammar state differ from today's in the ${ofStates.length} cells of the added states and in no entry of the display table. With open entries, the ${entriesOfState.length} open entries of the added grammar state are listed too. No difference of the ${variants.length} kinds of tables from today's is in a frozen cell, with every open cell as it is and with a random choice in each.`)
+}
 
 // The lists of added classes that cannot be.
 {

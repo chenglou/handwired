@@ -1,10 +1,11 @@
 // The parser of the recovery experiment: one code point per step over RecoveryTables, as table-parser.ts runs the
 // highlighter's own tables. With asIsTables() it gives the trace of today's parser. It differs from table-parser.ts
-// in three ways:
+// in four ways:
 //
 // - A grammar cell holds a stack action next to its next state: by token, none, push an array, push an object, pop.
 // - With tables of 16 contexts, see addFirstOnLineBit, the grammar also reads the bit "the token is the first on its
-//   line": a line feed sets it, and the first code point after it whose token is not `none` reads it and clears it.
+//   line": a line feed sets it, and the first code point after it whose token is not `none` clears it. Every code
+//   point after the line feed, up to and including that one, reads its grammar cell with the bit.
 // - The open containers are a real stack, one kind per open level. Today's parser keeps the kinds in a running sum,
 //   which is only right before the first error: a closing bracket of the wrong kind leaves the sum with the kind of
 //   a container that is no longer open, e.g. after the ] of {"a": [1}] . Before the first error the two are the same.
@@ -46,9 +47,10 @@ export type RecoveryTrace = {
   grammarBefore: Int16Array
   grammarAfter: Int16Array
   // The cells that the step read: tokenizer state × classCount + class, and (grammar state × tokenCount + token) ×
-  // contextCount + context.
-  lexerCell: Int16Array
-  grammarCell: Int16Array
+  // contextCount + context. They are 32-bit numbers: tables can have up to 255 states and 255 classes, and e.g. 187
+  // grammar states with the bit "first on its line" have 32,912 cells, more than 16 bits hold.
+  lexerCell: Int32Array
+  grammarCell: Int32Array
   // What the step did to the stack: actionNone, actionPushArray, actionPushObject or actionPop. A cell's `by token` is
   // shown as what the token did.
   action: Int8Array
@@ -68,7 +70,7 @@ export function createTrace(): RecoveryTrace {
   const cells = () => new Int16Array(positionCount)
   return {
     length: 0, characterClass: cells(), lexerStateBefore: cells(), lexerStateAfter: cells(), event: cells(), token: cells(), context: cells(),
-    grammarBefore: cells(), grammarAfter: cells(), lexerCell: cells(), grammarCell: cells(), action: new Int8Array(positionCount),
+    grammarBefore: cells(), grammarAfter: cells(), lexerCell: new Int32Array(positionCount), grammarCell: new Int32Array(positionCount), action: new Int8Array(positionCount),
     displayKind: cells(), depthAfter: cells(), containerAfter: new Int8Array(positionCount), firstErrorPosition: -1, firstErrorKind: 0, valid: true,
   }
 }

@@ -16,12 +16,15 @@
 //    class's code point as the class that the code point has today, and a context without the bit. The bit itself
 //    is compared, at every position of every run, with the bit that the check counts from the trace's line feeds and
 //    tokens.
+// d. Structure that is added to tables whose open cells are changed already leaves every text's trace as it was.
+// e. With so many classes and states that a cell's number does not fit 16 bits, the trace names the cells that were
+//    read, and the ground rules hold.
 import {createRandom} from '../random.ts'
 import {defaultSeed, sampleAt} from '../samples.ts'
 import {type ParserTrace, classNames, grammarStateNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells, today} from './recovery-tables.ts'
+import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, grammarCellOf, lexerCellOf, openDisplayEntries, randomizeOpenCells, today} from './recovery-tables.ts'
 
 const sampleCount = Number(process.argv[2] ?? 30_000)
 const settingCount = Number(process.argv[3] ?? 200)
@@ -141,6 +144,33 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
   console.log(`   From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.`)
 }
 
+// Writes a trace of tables with added structure in today's terms, and returns at how many of the first `positions`
+// positions the bit "first on its line" was set. Before that, at every position:
+// - The bit of the context has to be the one that the trace's own line feeds and tokens give: a line feed sets it,
+//   and any other code point whose token is not `none` clears it.
+// - The two cells that the trace names have to be the cells of its tokenizer state and class, and of its grammar
+//   state, token and context.
+const lineFeed = classNames.indexOf('lineFeed')
+const tokenNone = tokenNames.indexOf('none')
+function inTodaysTerms(name: string, trace: RecoveryTrace, tables: RecoveryTables, positions: number) {
+  const hasBit = tables.contextCount > today.contextCount
+  let withBit = 0
+  let bit = 0
+  for (let position = 0; position < positionCount; position++) {
+    const bitOfContext = trace.context[position]! >= today.contextCount ? 1 : 0
+    if (bitOfContext !== (hasBit ? bit : 0)) fail(`${name}: the context at position ${position} ${bitOfContext === 1 ? 'has' : 'does not have'} the bit "first on its line", against the line feeds and tokens before it`)
+    if (trace.lexerCell[position] !== lexerCellOf(tables, trace.lexerStateBefore[position]!, trace.characterClass[position]!) || trace.grammarCell[position] !== grammarCellOf(tables, trace.grammarBefore[position]!, trace.token[position]!, trace.context[position]!)) {
+      fail(`${name}: the trace names the cells ${trace.lexerCell[position]} and ${trace.grammarCell[position]} at position ${position}, and the step read ${lexerCellOf(tables, trace.lexerStateBefore[position]!, trace.characterClass[position]!)} and ${grammarCellOf(tables, trace.grammarBefore[position]!, trace.token[position]!, trace.context[position]!)}`)
+    }
+    if (trace.characterClass[position] === lineFeed) bit = 1
+    else if (trace.token[position] !== tokenNone) bit = 0
+    if (bitOfContext === 1 && position < positions) withBit++
+    trace.characterClass[position] = tables.classToday[trace.characterClass[position]!]!
+    trace.context[position] = trace.context[position]! % today.contextCount
+  }
+  return withBit
+}
+
 // Check c.
 {
   // More texts, with the code points of the added classes inside strings and between tokens.
@@ -155,26 +185,6 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
     {name: 'the bit "first on its line"', make: () => addFirstOnLineBit(asIsTables())},
     {name: 'all three', make: () => addFirstOnLineBit(openDisplayEntries(addClasses(asIsTables(), classesOfTheChecks)))},
   ]
-  // Writes a trace in today's terms, and returns at how many of the first `positions` positions the bit "first on its
-  // line" was set. Before that, the bit of every position's context has to be the one that the trace's own line
-  // feeds and tokens give: a line feed sets it, and any other code point whose token is not `none` clears it.
-  const lineFeed = classNames.indexOf('lineFeed')
-  const tokenNone = tokenNames.indexOf('none')
-  const inTodaysTerms = (name: string, trace: RecoveryTrace, tables: RecoveryTables, positions: number) => {
-    const hasBit = tables.contextCount > today.contextCount
-    let withBit = 0
-    let bit = 0
-    for (let position = 0; position < positionCount; position++) {
-      const bitOfContext = trace.context[position]! >= today.contextCount ? 1 : 0
-      if (bitOfContext !== (hasBit ? bit : 0)) fail(`${name}: the context at position ${position} ${bitOfContext === 1 ? 'has' : 'does not have'} the bit "first on its line", against the line feeds and tokens before it`)
-      if (trace.characterClass[position] === lineFeed) bit = 1
-      else if (trace.token[position] !== tokenNone) bit = 0
-      if (bitOfContext === 1 && position < positions) withBit++
-      trace.characterClass[position] = tables.classToday[trace.characterClass[position]!]!
-      trace.context[position] = trace.context[position]! % today.contextCount
-    }
-    return withBit
-  }
   const everyField = [...fields, 'lexerStateAfter', 'action'] as const
   const trace = createTrace()
   const plainTrace = createTrace()
@@ -218,6 +228,80 @@ for (const {text} of checkTexts(createRandom(20261015, 3), 2000)) add(text)
     }
     console.log(`   ${variant.name}: ${failures === failuresBefore ? `with no cell changed, every text has the trace of today's tables at all ${positionCount} positions. With ${settingsPerVariant} random settings of every open cell${unchanged.displayOpen.includes(1) ? ' and every open entry' : ''}, every run has today's trace before the first error, today's first error and today's \`valid\`` : 'see the failures above'}. From the first error on, the settings change the display kind, the depth or the grammar state at ${(100 * changedFromError / positionsFromError).toFixed(1)}% of the code points.${codePointsWithBit === 0 ? '' : ` With no cell changed, ${codePointsWithBit} code points of the texts read a context with the bit.`}`)
   }
+}
+
+// Check d. Structure that is added to tables whose open cells are changed already: every text keeps its whole trace.
+// Check c shows that for tables with today's cells only. Each step below gives every open cell and every open entry
+// of the tables so far a random choice, adds one kind of structure, and compares the traces before and after:
+// - Two classes that are taken out of added classes whose cells are changed: the 9 out of the class of the digits 7
+//   to 9, and the star out of the class of the signs. A new class's cell has to be a copy of the cell of the class
+//   that its code points came out of, and not e.g. of the cell of the class that they have today.
+// - The bit "first on its line": a cell with the bit is a copy of the cell without.
+// - Open entries of the display table, which changes no entry.
+// - Added states, which leave the cells and the entries of the states that were there as they were.
+{
+  const colon = grammarStateNames.indexOf('colon')
+  const steps: {name: string, add: (tables: RecoveryTables) => RecoveryTables}[] = [
+    {name: 'two classes taken out of added classes', add: tables => addClasses(tables, [{name: 'nine', codePoints: [0x39]}, {name: 'star', codePoints: [0x2a]}])},
+    {name: 'the bit "first on its line"', add: addFirstOnLineBit},
+    {name: 'open entries of the display table', add: openDisplayEntries},
+    {name: '2 tokenizer states and a grammar state', add: tables => addStates(tables, 2, [colon])},
+  ]
+  const sameFields = ['lexerStateBefore', 'lexerStateAfter', 'event', 'token', 'grammarBefore', 'grammarAfter', 'action', 'displayKind', 'depthAfter', 'containerAfter'] as const
+  const traceBefore = createTrace()
+  const traceAfter = createTrace()
+  const failuresBefore = failures
+  let tables = addClasses(asIsTables(), classesOfTheChecks)
+  let codePointsOfNewClasses = 0
+  steps.forEach((step, index) => {
+    randomizeOpenCells(tables, createRandom(20261015, 7000 + index))
+    checkTables(tables)
+    const added = step.add(tables)
+    checkTables(added)
+    for (const {text, codePoints, truncated} of texts) {
+      runRecoveryParserInto(traceBefore, codePoints, 0, codePoints.length, truncated, tables)
+      runRecoveryParserInto(traceAfter, codePoints, 0, codePoints.length, truncated, added)
+      for (let position = 0; position < positionCount; position++) {
+        const field = sameFields.find(name => traceBefore[name][position] !== traceAfter[name][position])
+        // A new class has the class of today's that its code points had before, and the bit adds 8 to a context.
+        const sameClass = added.classToday[traceAfter.characterClass[position]!] === tables.classToday[traceBefore.characterClass[position]!]
+        const sameContext = traceAfter.context[position]! % tables.contextCount === traceBefore.context[position]
+        if (field !== undefined || !sameClass || !sameContext) fail(`${step.name}, added to tables with changed cells: ${field ?? (sameClass ? 'context' : 'characterClass')} at position ${position} is ${traceAfter[field ?? 'context'][position]}, and ${traceBefore[field ?? 'context'][position]} before the structure was added, in ${JSON.stringify(text.slice(0, 80))}`)
+        if (position < codePoints.length && traceAfter.characterClass[position]! >= tables.classCount) codePointsOfNewClasses++
+      }
+      if (traceBefore.valid !== traceAfter.valid || traceBefore.firstErrorPosition !== traceAfter.firstErrorPosition || traceBefore.firstErrorKind !== traceAfter.firstErrorKind) fail(`${step.name}, added to tables with changed cells: another verdict in ${JSON.stringify(text.slice(0, 80))}`)
+    }
+    tables = added
+  })
+  if (codePointsOfNewClasses === 0) fail('no code point of the texts has one of the two classes that check d adds')
+  console.log(`d. Structure added to tables whose open cells are changed already, on the same texts, one step after the other (${steps.map(step => step.name).join('; ')}): ${failures === failuresBefore ? `every text has the same trace at all ${positionCount} positions before and after each step` : 'see the failures above'}. ${codePointsOfNewClasses} code points of the texts have one of the two new classes.`)
+}
+
+// Check e. Tables with so many classes and states that the number of a cell does not fit 16 bits: 100 more classes
+// and 229 more tokenizer states give 33,915 tokenizer cells, and 192 more grammar states with the bit give 35,200
+// grammar cells. The trace has to name the cells that the steps read, see inTodaysTerms: cellsReadAt and
+// withUnreadCellsOf of score.ts go by the trace's cells. And the ground rules hold as for any tables.
+{
+  const manyClasses = Array.from({length: 100}, (_, index) => ({name: `letter${index}`, codePoints: [0x100 + index]}))
+  const tables = addStates(addFirstOnLineBit(addClasses(asIsTables(), manyClasses)), 255 - today.lexerStateCount, new Array<number>(200 - today.grammarStateCount).fill(0))
+  randomizeOpenCells(tables, createRandom(20261015, 8000))
+  checkTables(tables)
+  const trace = createTrace()
+  const failuresBefore = failures
+  let largestLexerCell = 0
+  let largestGrammarCell = 0
+  for (const {text, codePoints, truncated, expected} of texts) {
+    runRecoveryParserInto(trace, codePoints, 0, codePoints.length, truncated, tables)
+    for (let position = 0; position < positionCount; position++) {
+      largestLexerCell = Math.max(largestLexerCell, trace.lexerCell[position]!)
+      largestGrammarCell = Math.max(largestGrammarCell, trace.grammarCell[position]!)
+    }
+    inTodaysTerms('tables with many classes and states', trace, tables, 0)
+    const difference = verdictDifference(trace, expected) ?? differenceBefore(trace, expected, expected.valid ? positionCount : expected.firstErrorPosition)
+    if (difference !== undefined) fail(`tables with many classes and states: ${difference} in ${JSON.stringify(text.slice(0, 80))}`)
+  }
+  if (largestLexerCell < 2 ** 15 || largestGrammarCell < 2 ** 15) fail(`no step of check e read a cell whose number does not fit 16 bits: the largest are ${largestLexerCell} and ${largestGrammarCell}`)
+  console.log(`e. Tables with ${tables.classCount} classes, ${tables.lexerStateCount} tokenizer states, ${tables.grammarStateCount} grammar states and the bit, ${tables.lexerNext.length} tokenizer cells and ${tables.grammarNext.length} grammar cells, with a random setting of every open cell: ${failures === failuresBefore ? 'the trace names the cells that every step read, up to the cells' : 'see the failures above. The largest cells read are'} ${largestLexerCell} and ${largestGrammarCell}, and every run has today's trace before the first error and today's verdict.`)
 }
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)
