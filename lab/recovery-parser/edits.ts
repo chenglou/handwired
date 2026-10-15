@@ -1,0 +1,90 @@
+// Edits turn the text its author meant into the broken text, and say which code point of one is which code point of
+// the other.
+//
+// An edit removes `remove` code points of the original at `at` and puts `insert` there. A code point of the broken text
+// is then one of three things:
+// - kept: it is a code point of the original that no edit touched, and takes that code point's label.
+// - replaced one for one: an edit with `oneForOne` put it in the place of one code point of the original that plays the
+//   same part, e.g. ' for ", the T of True for the t of true, or ] for }. It takes that code point's label too.
+// - added: every other inserted code point, e.g. an extra comma or a comment's text. It has no counterpart and no label.
+
+export type Edit = {
+  // An index into the original's code points.
+  at: number
+  remove: number
+  insert: string
+  // True when `insert` has exactly `remove` code points and each stands for the removed code point at the same offset.
+  oneForOne?: boolean
+  // The order among edits that only insert at the same place: a lower rank comes first, and edits of one rank keep the
+  // order in which their kinds were applied. Text around a document has a negative rank before it and a positive one
+  // after it, e.g. -5 for a sentence and -4 for a code fence, so that the sentence comes first.
+  rank?: number
+}
+
+export const removeRange = (from: number, to: number): Edit => ({at: from, remove: to - from, insert: ''})
+export const insertAt = (at: number, text: string): Edit => ({at, remove: 0, insert: text})
+export const replaceOneForOne = (at: number, text: string): Edit => ({at, remove: Array.from(text).length, insert: text, oneForOne: true})
+
+// Puts the edits of several kinds of damage into one list in text order, or returns undefined when two of them touch
+// the same code points, e.g. one removes a comma that the other replaces.
+export function mergeEdits(lists: readonly (readonly Edit[])[], originalLength: number): Edit[] | undefined {
+  const merged: {edit: Edit, order: number}[] = []
+  lists.forEach((list, listIndex) => list.forEach((edit, editIndex) => merged.push({edit, order: listIndex * 100_000 + editIndex})))
+  merged.sort((left, right) =>
+    left.edit.at - right.edit.at
+    // At one place, pure insertions come before an edit that removes from that place on.
+    || Number(left.edit.remove > 0) - Number(right.edit.remove > 0)
+    || (left.edit.rank ?? 0) - (right.edit.rank ?? 0)
+    || left.order - right.order)
+  // The end of the last removed range. An edit that starts before it touches code points that another edit removed.
+  let covered = 0
+  for (const {edit} of merged) {
+    if (edit.at < covered || edit.at + edit.remove > originalLength) return undefined
+    if (edit.remove > 0) covered = edit.at + edit.remove
+  }
+  return merged.map(({edit}) => edit)
+}
+
+export type AppliedEdits = {
+  broken: string
+  // For each code point of the broken text: the index of its counterpart in the original, or -1 when the damage added it.
+  alignment: number[]
+  // For each code point of the broken text: whether it was replaced one for one, so it differs from its counterpart.
+  replaced: boolean[]
+  // The index in the broken text of the first code point that is added or replaced, or of the first kept code point
+  // after a removed part, or the broken text's length when the edits only removed the original's end. -1 without edits.
+  firstDamage: number
+}
+
+// Applies edits that are in text order and don't overlap.
+export function applyEdits(original: readonly string[], edits: readonly Edit[]): AppliedEdits {
+  const broken: string[] = []
+  const alignment: number[] = []
+  const replaced: boolean[] = []
+  let firstDamage = -1
+  let position = 0
+  for (const edit of edits) {
+    if (edit.at < position) throw new Error(`edits overlap or are out of order at ${edit.at}`)
+    for (; position < edit.at; position++) {
+      broken.push(original[position]!)
+      alignment.push(position)
+      replaced.push(false)
+    }
+    if (firstDamage === -1 && (edit.remove > 0 || edit.insert !== '')) firstDamage = broken.length
+    const inserted = Array.from(edit.insert)
+    if (edit.oneForOne === true && inserted.length !== edit.remove) throw new Error(`a one for one edit must insert as many code points as it removes, at ${edit.at}`)
+    inserted.forEach((character, offset) => {
+      broken.push(character)
+      alignment.push(edit.oneForOne === true ? edit.at + offset : -1)
+      replaced.push(edit.oneForOne === true)
+    })
+    position += edit.remove
+  }
+  if (position > original.length) throw new Error('an edit removes past the end of the original')
+  for (; position < original.length; position++) {
+    broken.push(original[position]!)
+    alignment.push(position)
+    replaced.push(false)
+  }
+  return {broken: broken.join(''), alignment, replaced, firstDamage}
+}
