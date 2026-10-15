@@ -163,12 +163,13 @@ export function describeCase(writtenCase: WrittenCase, validName = 'orig'): stri
 }
 
 // A case with every opinion: per opinion the alignment and the label of every code point of the broken text, and
-// under them the agreement: . agreed, + added by every opinion, ! disputed.
+// under them the agreement: . agreed, + added by every opinion, ! disputed, - without a label by no-label.txt.
 export function describeOpinions(writtenCase: WrittenCase): string {
   const header = [
     `--- ${writtenCase.id}  ${writtenCase.file}  id for the repairers: ${writtenCase.blindId}  from: ${writtenCase.from}`,
     ...(writtenCase.note === undefined ? [] : [`    note: ${writtenCase.note}`]),
     ...(writtenCase.debatable ? ['    debatable: another repair is as sensible'] : []),
+    ...writtenCase.noLabel.map(entry => `    without a label by no-label.txt, at ${entry.position}: ${quoted(Array.from(entry.text))}, ${entry.reason}`),
     ...writtenCase.opinions.flatMap(opinion => [
       `    ${opinion.name}${opinion.unsure === undefined ? '' : `, unsure: ${opinion.unsure}`}`,
       `      ${visible(opinion.text)}`,
@@ -183,7 +184,7 @@ export function describeOpinions(writtenCase: WrittenCase): string {
       [`${opinion.name} depth`, opinion.labels.map(label => label === undefined ? ' ' : depthLetter(label.depth))],
       [`${opinion.name} cont`, opinion.labels.map(label => label === undefined ? ' ' : containerLetter(label.container))],
     ]),
-    ['agree', writtenCase.agreement.map(state => state === 'agreed' ? '.' : state === 'added' ? '+' : '!')],
+    ['agree', writtenCase.agreement.map(state => state === 'agreed' ? '.' : state === 'added' ? '+' : state === 'noLabel' ? '-' : '!')],
     ...wantAndNowRows(writtenCase),
   ]
   return [...header, ...inBlocks(rows, writtenCase.agreement.length)].join('\n')

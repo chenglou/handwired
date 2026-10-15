@@ -304,6 +304,110 @@ test('a repair that left-out.txt names is no opinion of its case', () => {
   expect(readWritten(folder).problems.map(problem => problem.slice(0, 40))).toEqual(['left-out.txt: repairs/part-1.c.txt has n', 'left-out.txt: a line is the name of a re'])
 })
 
+// A variable of a template stands where a number is meant, as the generator's kind templatePlaceholder writes it.
+const withPlaceholder = {
+  id: 'made-up-4', from: 'a test', note: undefined, debatable: false,
+  intended: '{"userId": 48213, "active": true}',
+  broken: '{"userId": {{user_id}}, "active": true}',
+}
+const placeholder = {position: 11, text: '{{user_id}}', reason: 'a variable of a template'}
+
+test('text that no-label.txt names has no label and is no dispute', () => {
+  // The writer has a number in the variable's place, and the repair puts quotes around the variable.
+  const repairs = [{name: 'part-1.a', repaired: '{"userId": "{{user_id}}", "active": true}', unsure: undefined}]
+  const withoutList = caseOf(withPlaceholder, 'made-up.txt', repairs)
+  expect(withoutList.agreement.slice(11, 22).join()).toBe(new Array<string>(11).fill('disputed').join())
+  expect(withoutList.disputedFromFirstError).toBe(true)
+  const withList = caseOf(withPlaceholder, 'made-up.txt', repairs, [], [placeholder])
+  expect(withList.agreement.slice(11, 22).join()).toBe(new Array<string>(11).fill('noLabel').join())
+  expect(withList.agreement).not.toContain('disputed')
+  expect(withList.disputedFromFirstError).toBe(false)
+  expect(withList.noLabel).toEqual([placeholder])
+  const labels = labelsOfWritten(withList)
+  for (let position = 11; position < 22; position++) expect(labels[position]).toBeUndefined()
+  // The code points around the variable keep their labels, and a score counts the 17 from the comma on: the parser
+  // as it is reports its first error at the variable's second brace.
+  expect(labels[10]).toEqual({kind: displayKind.whitespace, depth: 1, container: 1})
+  expect(labels[22]).toEqual({kind: displayKind.punctuation, depth: 1, container: 1})
+  expect(withList.firstErrorPosition).toBe(12)
+  expect(scoredCodePointsOfWritten(withList)).toBe(17)
+  expect(describeOpinions(withList)).toContain('agree          ...........-----------.................')
+  expect(describeOpinions(withList)).toContain('without a label by no-label.txt, at 11: "{{user_id}}", a variable of a template')
+  // The same holds where every opinion takes the variable for a string that lost its quotes, which a score would
+  // otherwise count as a string.
+  const asString = {...withPlaceholder, intended: '{"userId": "{{user_id}}", "active": true}'}
+  expect(scoredCodePointsOfWritten(caseOf(asString, 'made-up.txt', repairs))).toBe(27)
+  expect(scoredCodePointsOfWritten(caseOf(asString, 'made-up.txt', repairs, [], [placeholder]))).toBe(17)
+  // A line feed in the place of a space, inside a string that a mail program wrapped.
+  const wrapped = {...madeUp, intended: '{"note": "resync after the failure", "ok": true}', broken: '{"note": "resync after\nthe failure", "ok": true}'}
+  const lineFeed = wrapped.broken.indexOf('\n')
+  expect(labelsOfWritten(caseOf(wrapped, 'made-up.txt'))[lineFeed]).toEqual({kind: displayKind.string, depth: 1, container: 1})
+  expect(labelsOfWritten(caseOf(wrapped, 'made-up.txt', [], [], [{position: lineFeed, text: '\n', reason: 'a wrapped line'}]))[lineFeed]).toBeUndefined()
+  // An entry whose text does not stand at its position is refused.
+  expect(() => caseOf(withPlaceholder, 'made-up.txt', repairs, [], [{...placeholder, position: 12}])).toThrow('does not have "{{user_id}}" at code point 12')
+})
+
+test('readWritten takes the texts of no-label.txt, and a line that names none is a problem', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'written-'))
+  mkdirSync(join(folder, 'cases'))
+  mkdirSync(join(folder, 'repairs'))
+  const wrapped = {...madeUp, id: 'made-up-5', intended: '{"note": "resync after the failure", "ok": true}', broken: '{"note": "resync after\nthe failure", "ok": true}'}
+  writeFileSync(join(folder, 'cases', 'made-up.txt'), caseFileText([withPlaceholder, wrapped, madeUp]))
+  writeFileSync(join(folder, 'repairs', 'part-1.a.txt'), repairFileText([{id: blindIdOf(withPlaceholder.broken), repaired: '{"userId": "{{user_id}}", "active": true}', unsure: undefined}]))
+  const lines = (...entries: string[]) => writeFileSync(join(folder, 'no-label.txt'), `${entries.join('\n')}\n`)
+  // A line that starts with # explains the file, and a line feed is written as in a case file.
+  lines('# what the file is for', '', 'made-up-4 11 a variable of a template: {{user_id}}', 'made-up-5 22 a wrapped line: ⟦lf⟧')
+  const {cases, problems} = readWritten(folder)
+  expect(problems).toEqual([])
+  expect(cases.map(writtenCase => writtenCase.noLabel)).toEqual([[placeholder], [{position: 22, text: '\n', reason: 'a wrapped line'}], []])
+  expect(cases[0]!.agreement).not.toContain('disputed')
+  // The text is not at the position, the case is not in the folder, two lines name the same text, a line in another
+  // form, and text that every opinion calls added, here the word None of the third case.
+  const problemOf = (...entries: string[]) => {
+    lines(...entries)
+    return readWritten(folder).problems.join('\n')
+  }
+  expect(problemOf('made-up-4 12 a variable of a template: {{user_id}}')).toContain('no-label.txt, line 1: the broken text does not have "{{user_id}}" at code point 12, where "{user_id}}," stands')
+  expect(problemOf('made-up-9 11 a variable of a template: {{user_id}}')).toContain('no-label.txt, line 1: no case has the id made-up-9')
+  expect(problemOf('made-up-4 11 a variable of a template: {{user_id}}', 'made-up-4 13 its name: user_id')).toContain('no-label.txt, line 2: the text overlaps the text of another line of the case')
+  expect(problemOf('made-up-4 {{user_id}}')).toContain('no-label.txt, line 1: a line is the id of a case')
+  expect(problemOf('made-up-4 11 a tab that cannot be seen: {{user\t_id}}')).toContain('no-label.txt, line 1: the text: ')
+  expect(problemOf('made-up-1 13 a word of Python: None')).toContain('every opinion of the case made-up-1 calls "None" at code point 13 added')
+})
+
+test('the list of the set: no placeholder and no line feed for a space is scored', () => {
+  const {cases} = readWritten()
+  const listed = cases.filter(writtenCase => writtenCase.noLabel.length > 0)
+  expect(listed.length).toBeGreaterThan(0)
+  for (const writtenCase of listed) {
+    const labels = labelsOfWritten(writtenCase)
+    for (const entry of writtenCase.noLabel) {
+      Array.from(entry.text).forEach((_, offset) => expect([writtenCase.id, entry.position + offset, writtenCase.agreement[entry.position + offset], labels[entry.position + offset]]).toEqual([writtenCase.id, entry.position + offset, 'noLabel', undefined]))
+    }
+  }
+  // The variable of documents-and-web-33 stands where its `from` line says that a number will stand, and all three
+  // opinions put quotes around it. Its first brace reads as valid JSON, and none of the 11 code points after it, which
+  // a score would count, has a label.
+  const saved = cases.find(writtenCase => writtenCase.id === 'documents-and-web-33')!
+  const variable = saved.broken.indexOf('{{order_id}}')
+  expect(saved.opinions.map(opinion => opinion.text.includes('"{{order_id}}"'))).toEqual([true, true, true])
+  expect(saved.firstErrorPosition).toBe(variable + 1)
+  const savedLabels = labelsOfWritten(saved)
+  for (let position = variable; position < variable + 12; position++) expect(savedLabels[position]).toBeUndefined()
+  expect(saved.disputedFromFirstError).toBe(false)
+  // In no case of the set is a line feed scored that an opinion takes for a space inside a string.
+  for (const writtenCase of cases) {
+    const broken = Array.from(writtenCase.broken)
+    const labels = labelsOfWritten(writtenCase)
+    for (const opinion of writtenCase.opinions) {
+      const valid = Array.from(opinion.text)
+      opinion.alignment.forEach((counterpart, position) => {
+        if (broken[position] === '\n' && valid[counterpart] === ' ' && opinion.labels[position]!.kind === displayKind.string) expect([writtenCase.id, position, labels[position]]).toEqual([writtenCase.id, position, undefined])
+      })
+    }
+  }
+})
+
 test('a case with the writer\'s opinion alone, and its score', () => {
   const writtenCase = caseOf(madeUp, 'made-up.txt')
   expect(writtenCase.opinions.length).toBe(1)

@@ -1,0 +1,28 @@
+# Text of a broken text that has no label, whatever the opinions of its case make of it. README.md says why, under "Text without a label".
+# A line: the id of the case, the position of the text's first code point in the broken text, counted from 0, the reason, a colon and a space, and the text as a case file writes it.
+
+# A placeholder without quotes, where a value is meant that is not in the text.
+documents-and-web-31 14 a placeholder for the reader's key: <YOUR_API_KEY>
+documents-and-web-33 12 a variable of a saved request, where a number will stand: {{order_id}}
+hand-editing-11 124 a note to self in the place of a password that was taken out: TODO get from 1Password
+merges-and-tools-13 71 a mark in the place of a secret that a script took out: [REDACTED]
+merges-and-tools-13 113 a mark in the place of a secret that a script took out: [REDACTED]
+merges-and-tools-27 13 a variable of a template that is not rendered yet, where a number will stand: {{ .Values.replicaCount }}
+merges-and-tools-27 51 a variable of a template that is not rendered yet, where a string will stand: {{ .Values.region | quote }}
+merges-and-tools-29 12 a verb of a format string, where a number will stand: %d
+merges-and-tools-29 40 a verb of a format string, where a number will stand: %.2f
+merges-and-tools-29 58 a verb of a format string, where a literal will stand: %t
+merges-and-tools-30 7 a variable of a saved request, where a string will stand: {{recipient_email}}
+merges-and-tools-30 93 a variable of a saved request, where a string will stand: {{first_name}}
+merges-and-tools-31 172 a variable of a template for envsubst, where a number will stand: ${TASK_CPU}
+merges-and-tools-31 201 a variable of a template for envsubst, where a number will stand: ${TASK_MEMORY}
+merges-and-tools-32 36 a name of a format string, where a number will stand: {page}
+model-output-25 15 a placeholder for the reader's secret: <YOUR_API_KEY>
+other-notations-12 56 what Node prints in the place of an object that lies too deep: [Object]
+other-notations-12 73 what Node prints in the place of an array that lies too deep: [Array]
+
+# A line feed in the place of a space, inside a string that a program wrapped.
+documents-and-web-21 149 a mail program broke the line at a space of the string: ⟦lf⟧
+documents-and-web-22 70 a mail program broke the line at a space of the string: ⟦lf⟧
+documents-and-web-22 141 a mail program broke the line at a space of the string: ⟦lf⟧
+merges-and-tools-34 67 a mail program broke the line at a space of the string: ⟦lf⟧

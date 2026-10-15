@@ -212,6 +212,7 @@ When the list of changes is not the damage that you made, look for an unintended
 - Two repairers per part write repairs, by the rules of `REPAIR.md`. Their files go into `repairs/`.
 - `written.ts` reads `cases/` and `repairs/`. Per case it gives the opinions, i.e. your intended text and the repairs, the values of every code point by each opinion, and which code points are agreed, added by every opinion, or disputed. A value that the reading of one opinion does not score, by the rules of the `?` above, is no dispute with another opinion. `bun lab/recovery-parser/written/written.ts --disputed` prints every case with a disputed code point, opinion by opinion.
 - `left-out.txt` names the repairs that are left out of their case because they plainly break a rule of `REPAIR.md`. A line is the repair file without its ending, the id of the broken text, and the reason.
+- `no-label.txt` names text of a broken text that has no label, whatever the opinions make of it: `written.ts` takes it out before it holds the opinions against each other, so its code points are not scored and are no dispute. A line is the id of the case, the position of the text's first code point in the broken text, the reason, a colon and a space, and the text as a case file writes it, e.g. `⟦lf⟧` for a line feed. [Text without a label](#text-without-a-label) says what is on the list.
 - `score.ts` prints what today's highlighter and four hand-written settings of its tables get right on the set, and `scoreTables` scores any other tables.
 - `align.ts` pairs the code points of a broken text with those of a valid text, and `check-align.ts` measures it on generated samples whose changes are known: in 5,700 of them it finds the known pairing for 97.1% of the texts and for 99.96% of the code points. Taken as cases of this set, the same samples give today's highlighter and the four hand-written settings the scores that the samples' own values give, within 0.1 points per code point and about half a point per sample.
 - `format.ts` reads and writes the files, `show.ts` prints a case, `check-repairs.ts` is the check for a repairer, and `written.test.ts` tests the folder.
@@ -240,19 +241,36 @@ console.log(all.fullAgreement.right / all.fullAgreement.scored, all.fullAgreemen
 
 | Writer's file | Cases | With full agreement | With a disputed code point | Scored code points | Of them in cases with full agreement |
 | --- | --- | --- | --- | --- | --- |
-| `documents-and-web.txt` | 40 | 37 | 3 | 3,800 | 3,641 |
-| `hand-editing.txt` | 40 | 37 | 3 | 2,684 | 2,506 |
+| `documents-and-web.txt` | 40 | 37 | 3 | 3,772 | 3,613 |
+| `hand-editing.txt` | 40 | 37 | 3 | 2,661 | 2,483 |
 | `logs-and-transport.txt` | 40 | 38 | 2 | 3,563 | 3,339 |
-| `merges-and-tools.txt` | 40 | 32 | 8 | 3,194 | 2,468 |
-| `model-output.txt` | 40 | 38 | 2 | 3,561 | 3,512 |
-| `other-notations.txt` | 40 | 35 | 5 | 3,987 | 3,525 |
-| All | 240 | 217 | 23 | 20,789 | 18,991 |
+| `merges-and-tools.txt` | 40 | 36 | 4 | 3,142 | 2,852 |
+| `model-output.txt` | 40 | 38 | 2 | 3,547 | 3,498 |
+| `other-notations.txt` | 40 | 36 | 4 | 3,987 | 3,609 |
+| All | 240 | 222 | 18 | 20,672 | 19,394 |
 
-The broken texts have 35,429 code points, and 27,048 of them stand from the first error of today's highlighter on. Of these, 20,789 are scored, 5,924 are added by every opinion, and 335 are disputed. In 193 cases the three opinions are the same text, and in 23 more they differ without a disputed code point, e.g. a repair adds `null` where the writer knows the value that is missing.
+The broken texts have 35,429 code points, and 27,048 of them stand from the first error of today's highlighter on. Of these, 20,672 are scored, 5,924 are added by every opinion, 224 have no label by the list of `no-label.txt`, and 228 are disputed. In 193 cases all opinions are the same text, and in 29 more they differ without a disputed code point from the first error on, e.g. a repair adds `null` where the writer knows the value that is missing, or the opinions differ only on text of the list.
 
 7 cases have nothing to recover. A text that only stops early and a whole document with other text after it have no code point to score, as in the dataset, so the writers kept such cases few, and the set says nothing about them.
 
 No broken text and no intended text of the set is among the first 60,000 generated samples of the default seed, of which 57,016 are broken: neither as the same text nor as the same JSON value.
+
+### Text without a label
+
+Two sorts of text have no label in the dataset, and the opinions of a case keep them in different ways. `no-label.txt` lists every such text of the set, and its code points have no label: they are not scored, and they are no dispute.
+
+- **A placeholder without quotes that stands where a value is meant.** E.g. `{"userId": {{user_id}}, "active": true}` in the body of a saved request, where a number will stand. The generator's kind `templatePlaceholder` puts such text in the place of the whole value and gives it no label. In the set, a writer who knew the value wrote the value, and a repairer put quotes around the placeholder, as rule 4 of `REPAIR.md` says. So the same sort of text was scored as a string in one case and disputed in the next. The list has 18 placeholders in 11 cases: variables of templates and of saved requests, e.g. `{{user_id}}` and `${USER_ID}`, the verbs of a format string, e.g. `%d`, a name between angle brackets for a key that the reader has to fill in, a mark in the place of a secret that a script took out, the `[Object]` that Node prints for an object that lies too deep, and a note to self in the place of a password.
+- **A line feed that stands for a space, inside a string that a program wrapped.** E.g. a mail program breaks a long line at a space of a string. The generator's form of `rawLineFeedInString` for a wrapped string removes the space and adds the line feed, so the line feed has no label there. The tools of this folder take the line feed for the space and give it the label of the string. The list has 4 such line feeds in 3 cases.
+
+The edge of the first rule is the value: the list holds text that stands for a value that is not in the broken text. A value that is there, and only lacks its quotes or has another form, is no placeholder, and it is labeled as the dataset labels its kinds `unquotedValue`, `numberFormat` and `foreignLiteral`:
+
+- A word or a date where a string is meant has the string's label, and the display kind of a start that reads as a number or a literal is not scored, e.g. the `2031` of `"due": 2031-07-04`. The word that a model writes without quotes where its source says nothing, in `model-output-32`, is such a word: it is the value that the answer gives, and all three opinions take it for a string.
+- A number with text added to it keeps the labels of its digits, e.g. those of `1,400,000` and of `+5`, and the added text has none.
+- A word of another notation in the place of a literal or a number has no label, e.g. `True`, `nil` and `0x1F`.
+
+Where the opinions of a case differ on which of these three a text is, the text is disputed, e.g. `yes` as `true` or as the string `"yes"`, and `$9.99` as a number or as a string.
+
+With the list, 5 cases that were disputed have full agreement, and 224 code points from the first error on have no label: 107 of them were disputed, 113 were scored as a string, and 4 are the line feeds. One of the 11 cases is `documents-and-web-33`, whose `from` line says that a number will stand in the place of its variable, and whose intended text has a string there, as both repairs have by rule 4. None of the variable's code points is scored now, so the case stays as it is.
 
 ### What five readers get right
 
@@ -260,45 +278,48 @@ No broken text and no intended text of the set is among the first 60,000 generat
 
 | Cases | Count | Nothing to recover | Scored code points | `now` | `stay` | `resync` | `words` | `lines` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cases with full agreement | 217 | 6 | 18,991 | 21.6 / 1.9 | 49.5 / 14.7 | 61.8 / 40.8 | 75.1 / 46.4 | 75.6 / 46.9 |
-| All cases, the agreed code points | 240 | 7 | 20,789 | 21.3 / 2.1 | 50.2 / 16.3 | 62.3 / 41.6 | 76.3 / 47.6 | 76.7 / 48.1 |
-| `documents-and-web.txt`, full agreement | 37 | 1 | 3,641 | 15.2 / 0.0 | 56.1 / 13.9 | 77.9 / 58.3 | 88.7 / 63.9 | 88.7 / 63.9 |
-| `hand-editing.txt`, full agreement | 37 | 2 | 2,506 | 30.9 / 0.0 | 60.2 / 14.3 | 71.6 / 37.1 | 82.2 / 51.4 | 82.2 / 51.4 |
+| Cases with full agreement | 222 | 6 | 19,394 | 22.0 / 1.9 | 50.4 / 17.1 | 62.5 / 44.0 | 75.6 / 48.6 | 76.1 / 49.1 |
+| All cases, the agreed code points | 240 | 7 | 20,672 | 21.4 / 2.1 | 50.4 / 18.0 | 62.7 / 44.2 | 76.5 / 49.4 | 76.9 / 49.8 |
+| `documents-and-web.txt`, full agreement | 37 | 1 | 3,613 | 15.3 / 0.0 | 56.5 / 16.7 | 78.5 / 63.9 | 89.0 / 66.7 | 89.0 / 66.7 |
+| `hand-editing.txt`, full agreement | 37 | 2 | 2,483 | 31.2 / 0.0 | 60.8 / 17.1 | 72.3 / 40.0 | 82.4 / 54.3 | 82.4 / 54.3 |
 | `logs-and-transport.txt`, full agreement | 38 | 3 | 3,339 | 20.5 / 2.9 | 40.1 / 8.6 | 51.3 / 37.1 | 56.4 / 40.0 | 56.4 / 40.0 |
-| `merges-and-tools.txt`, full agreement | 32 | 0 | 2,468 | 15.7 / 3.1 | 43.1 / 15.6 | 49.0 / 40.6 | 70.6 / 46.9 | 70.6 / 46.9 |
-| `model-output.txt`, full agreement | 38 | 0 | 3,512 | 40.2 / 5.3 | 57.0 / 21.1 | 73.4 / 47.4 | 79.6 / 52.6 | 82.1 / 55.3 |
-| `other-notations.txt`, full agreement | 35 | 0 | 3,525 | 8.5 / 0.0 | 41.2 / 14.3 | 45.2 / 22.9 | 72.6 / 22.9 | 72.6 / 22.9 |
+| `merges-and-tools.txt`, full agreement | 36 | 0 | 2,852 | 18.8 / 2.8 | 49.1 / 25.0 | 54.8 / 50.0 | 73.5 / 55.6 | 73.5 / 55.6 |
+| `model-output.txt`, full agreement | 38 | 0 | 3,498 | 40.3 / 5.3 | 57.2 / 21.1 | 73.7 / 50.0 | 79.5 / 52.6 | 82.0 / 55.3 |
+| `other-notations.txt`, full agreement | 36 | 0 | 3,609 | 8.3 / 0.0 | 40.9 / 13.9 | 45.4 / 22.2 | 73.2 / 22.2 | 73.2 / 22.2 |
 
 Every reader gets less right here than on generated samples: for the broken samples of one document among the first 6,000, `check-align.ts` prints 41.7% of the code points for `now`, 73.8% for `stay`, 82.7% for `resync`, 91.4% for `words` and 91.3% for `lines`.
 
 ### Where the opinions differ
 
-When the repairs came in, 27 cases had a disputed code point from the first error on. Each of them was read with its three opinions side by side and put into one of four sorts:
+When the repairs came in, 27 cases had a disputed code point from the first error on. Each of them was read with its three opinions side by side and put into one of five sorts:
 
 | What the dispute is | Cases | What was done |
 | --- | --- | --- |
-| The opinions read the text differently | 23 | They stay disputed, with 335 code points |
+| The opinions read the text differently | 18 | They stay disputed, with 228 code points |
+| A placeholder stands where a value is meant, and the opinions keep it in different ways | 5 | The placeholders are on the list of `no-label.txt`, and the cases now have full agreement |
 | The tools gave the same reading other counterparts | 2 | The tools were changed, and both cases now have full agreement |
 | A repair is against a rule of `REPAIR.md` | 2 | The repair is left out, and both cases now have full agreement |
 | The writer's intended text does not follow from the broken text by the damage alone | 0 | |
 
-The 23 cases that stay disputed, by what the opinions differ on:
+The 18 cases that stay disputed, by what the opinions differ on:
 
 | What the opinions differ on | Cases | Disputed code points |
 | --- | --- | --- |
-| A word or a placeholder stands where a value is meant. One opinion writes the value, e.g. a number, and another puts quotes around what stands there, as rule 4 of `REPAIR.md` says | 10 | 148 |
+| A value stands in a form that JSON lacks, e.g. a number with a currency sign, a number as the expression that computes it, an amount inside a call, or a word for a literal. One opinion writes the value that is meant, e.g. the number, and another makes a string of what stands there, as rule 4 of `REPAIR.md` says for a value without quotes | 5 | 41 |
 | A program changed a character inside a string on the way, e.g. two hyphens into a dash. One opinion puts the character back that was meant, and another keeps what stands there as the string's content | 7 | 25 |
 | Of two things in the text one is too many, e.g. the two sides of a merge conflict, and the opinions keep different ones | 3 | 142 |
 | The writer knows of content that the broken text lacks, and `REPAIR.md` tells a repairer not to invent it, e.g. the entry after the last comma of a text that is cut off | 2 | 3 |
 | The opinions mean the same document and keep other white space and another of two commas, where a wrapper that is removed runs over three lines and the rules do not say which white space goes with it | 1 | 17 |
 
-- A value or a string: `documents-and-web-37`, `merges-and-tools-27`, `merges-and-tools-29`, `merges-and-tools-31`, `merges-and-tools-32`, `model-output-23`, `other-notations-08`, `other-notations-12`, `other-notations-25`, `other-notations-29`.
+- A value or a string: `documents-and-web-37`, `model-output-23`, `other-notations-08`, `other-notations-25`, `other-notations-29`.
 - A character inside a string: `documents-and-web-05`, `documents-and-web-06`, `hand-editing-22`, `logs-and-transport-15`, `logs-and-transport-31`, `merges-and-tools-12`, `merges-and-tools-35`.
 - One of two too many: `hand-editing-17`, `hand-editing-24`, `merges-and-tools-04`.
 - Content that is not invented: `merges-and-tools-11`, `model-output-12`.
 - White space: `other-notations-21`.
 
-The writers marked 31 cases as debatable, and 4 of those are among the 23. In 19 of the 23 a repairer marked the repair as unsure.
+The 5 cases with a placeholder are `merges-and-tools-27`, `merges-and-tools-29`, `merges-and-tools-31`, `merges-and-tools-32` and `other-notations-12`, with 107 code points that were disputed.
+
+The writers marked 31 cases as debatable, and 3 of those are among the 18. In 14 of the 18 a repairer marked the repair as unsure.
 
 The two cases where the tools were wrong are `logs-and-transport-02`, with 1 disputed code point, and `model-output-22`, with 6. In both, `align.ts` took a short part of the document for a chance match, i.e. the first brace after a log prefix and the last two braces before a closing code fence, and one repairer had written the repair in another way to get around that. `align.ts` no longer takes such parts for chance matches, see the list under "What the tools cannot know". In `model-output-22` that repair still puts the missing bracket at another place among the white space than the writer and the other repair do, which gives three white space code points another depth. `written.ts` no longer takes that for a dispute: a value that the reading of one opinion does not score is no dispute with another opinion, and by the rule on a missing bracket the repair's reading does not score the depth there.
 
