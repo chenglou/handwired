@@ -1,0 +1,139 @@
+// The search of ../../search/search.ts, restricted to some cells: for one of the cells at a time, try the cell's
+// choices in the exact parser on the train split and keep the best one, and go over the cells again until a pass
+// changes nothing. Every other cell keeps what the start tables hold.
+//
+// It is that search with its defaults, run by the search's own worker threads (../../search/search-worker.ts) on the
+// search's own parser loop (../../search/sample-runs.ts): the choices of `--pairs known` without the events of a
+// text's end, the cells of a pass from the most read one to the least read one, and a choice is kept when it has more
+// scored code points with every label right, or as many and more right labels. It has no budget of runs: a search of
+// this arm ends by a pass that changes nothing. check-search.ts shows that with every open cell as the cells it
+// gives the tables of search.ts.
+import {type RecoveryTables, actionByToken, actionCount, actionOfToken, copyTables, eventNames, today} from '../../recovery-tables.ts'
+import {type RunSamples, cellBitCount, messageOf, totalScore} from '../../search/sample-runs.ts'
+import type {Reply, Request} from '../../search/search-worker.ts'
+import type {Cell} from './holes.ts'
+
+const endEvents = new Set((['end', 'endInsideToken', 'truncatedEnd'] as const).map(name => eventNames.indexOf(name)))
+
+// The pairs of next state and event that today's tokenizer table holds somewhere, e.g. (string, stringStart).
+const knownPairs = [...new Set(Array.from(today.lexerNext, (next, cell) => next * 256 + today.lexerEvent[cell]!))].sort((left, right) => left - right)
+
+// The choices to try for a cell, two numbers each, without the one that the cell holds: as candidatesOf of search.ts
+// with `--pairs known`.
+function candidatesOf(tables: RecoveryTables, {grammar, cell}: Cell): Uint8Array {
+  const candidates: number[] = []
+  if (grammar) {
+    // A stack action that does what the cell's token does by itself is kept as `by token`, so there are four actions.
+    const token = Math.floor(cell / tables.contextCount) % tables.tokenCount
+    const kept = (action: number) => action === actionOfToken[token] ? actionByToken : action
+    const nextNow = tables.grammarNext[cell]!
+    const actionNow = kept(tables.grammarAction[cell]!)
+    for (let next = 0; next < tables.grammarStateCount; next++) {
+      for (let action = 0; action < actionCount; action++) {
+        if (action !== kept(action) || (next === nextNow && action === actionNow)) continue
+        candidates.push(next, action)
+      }
+    }
+    return Uint8Array.from(candidates)
+  }
+  const nextNow = tables.lexerNext[cell]!
+  const eventNow = tables.lexerEvent[cell]!
+  const seen = new Set<number>([nextNow * 256 + eventNow])
+  const add = (next: number, event: number) => {
+    if (endEvents.has(event) || seen.has(next * 256 + event)) return
+    seen.add(next * 256 + event)
+    candidates.push(next, event)
+  }
+  for (let next = 0; next < tables.lexerStateCount; next++) add(next, eventNow)
+  for (let event = 0; event < tables.eventCount; event++) add(nextNow, event)
+  for (const pair of knownPairs) add(pair >> 8, pair & 255)
+  return Uint8Array.from(candidates)
+}
+
+export type SearchResult = {
+  tables: RecoveryTables
+  // How many passes ran, and whether the last one changed nothing. Otherwise the limit of passes ended the search.
+  passes: number
+  lastPassChangedNothing: boolean
+  // How often a cell got another choice, and how many runs of a sample the search took.
+  changes: number
+  runs: number
+}
+
+// Searches the choices of `cells` from the tables `start`, which are not changed, on the broken samples of `train`,
+// e.g. prepareSamples(trainPartOfTheStandardSet()).
+export async function searchCells(start: RecoveryTables, cells: readonly Cell[], train: RunSamples, maximumPasses = 50): Promise<SearchResult> {
+  if (start.addedClasses.length > 0 || start.contextCount !== today.contextCount) throw new Error('the search does not run tables with added classes or with the bit "first on its line"')
+  const tables = copyTables(start)
+  const lexerCellCount = tables.lexerNext.length
+  const bitOf = ({grammar, cell}: Cell) => grammar ? lexerCellCount + cell : cell
+  for (const cell of cells) if ((cell.grammar ? tables.grammarOpen : tables.lexerOpen)[cell.cell] !== 1) throw new Error(`the search got the ${cell.grammar ? 'grammar' : 'tokenizer'} cell ${cell.cell}, which is frozen`)
+  const workerCount = 4
+  const workers = Array.from({length: workerCount}, () => new Worker(new URL('../../search/search-worker.ts', import.meta.url).href))
+  // One request to every worker, and their replies in the order of the workers.
+  const ask = (requestOf: (share: number) => Request): Promise<Reply[]> => Promise.all(workers.map((worker, share) => new Promise<Reply>((resolve, reject) => {
+    worker.onmessage = event => resolve(event.data as Reply)
+    worker.onerror = event => reject(new Error(`worker ${share}: ${event.message}`))
+    worker.postMessage(requestOf(share))
+  })))
+  try {
+    let total = totalScore(train, tables)
+    let runs = 0
+    let changes = 0
+    let passes = 0
+    let lastPassChangedNothing = false
+    await ask(share => ({type: 'start', samples: messageOf(train), tables, share, shares: workerCount}))
+    while (passes < maximumPasses && !lastPassChangedNothing) {
+      passes++
+      const readers = new Int32Array(cellBitCount(tables))
+      for (const reply of await ask(() => ({type: 'readers'}))) {
+        if (reply.type !== 'readers') throw new Error('a worker gave another reply than readers')
+        for (let bit = 0; bit < readers.length; bit++) readers[bit]! += reply.readers[bit]!
+      }
+      const order = [...cells].sort((left, right) => readers[bitOf(right)]! - readers[bitOf(left)]! || bitOf(left) - bitOf(right))
+      let changesOfPass = 0
+      for (const cell of order) {
+        const candidates = candidatesOf(tables, cell)
+        const candidateCount = candidates.length / 2
+        const allRight = new Int32Array(candidateCount)
+        const labelsRight = new Int32Array(candidateCount)
+        for (const reply of await ask(() => ({type: 'evaluate', grammar: cell.grammar, cell: cell.cell, candidates}))) {
+          if (reply.type !== 'evaluated') throw new Error('a worker gave another reply than evaluated')
+          runs += reply.runs
+          for (let candidate = 0; candidate < candidateCount; candidate++) {
+            allRight[candidate]! += reply.allRight[candidate]!
+            labelsRight[candidate]! += reply.labelsRight[candidate]!
+          }
+        }
+        // The best choice, and the first of several that are equally good. It has to be better than what the cell holds.
+        let best = -1
+        for (let candidate = 0; candidate < candidateCount; candidate++) {
+          const bestAllRight = best === -1 ? 0 : allRight[best]!
+          const bestLabelsRight = best === -1 ? 0 : labelsRight[best]!
+          if (allRight[candidate]! > bestAllRight || (allRight[candidate] === bestAllRight && labelsRight[candidate]! > bestLabelsRight)) best = candidate
+        }
+        if (best === -1) continue
+        const first = candidates[best * 2]!
+        const second = candidates[best * 2 + 1]!
+        if (cell.grammar) {
+          tables.grammarNext[cell.cell] = first
+          tables.grammarAction[cell.cell] = second
+        } else {
+          tables.lexerNext[cell.cell] = first
+          tables.lexerEvent[cell.cell] = second
+        }
+        for (const reply of await ask(() => ({type: 'apply', grammar: cell.grammar, cell: cell.cell, first, second}))) if (reply.type === 'applied') runs += reply.runs
+        total = {allRight: total.allRight + allRight[best]!, labelsRight: total.labelsRight + labelsRight[best]!}
+        changesOfPass++
+      }
+      changes += changesOfPass
+      lastPassChangedNothing = changesOfPass === 0
+    }
+    // The steps have to add up to what a run of every sample gives with the tables at the end.
+    const checked = totalScore(train, tables)
+    if (checked.allRight !== total.allRight || checked.labelsRight !== total.labelsRight) throw new Error(`the steps of the search add up to ${total.allRight} code points and ${total.labelsRight} labels, and a run of every sample gives ${checked.allRight} and ${checked.labelsRight}`)
+    return {tables, passes, lastPassChangedNothing, changes, runs}
+  } finally {
+    for (const worker of workers) worker.terminate()
+  }
+}
