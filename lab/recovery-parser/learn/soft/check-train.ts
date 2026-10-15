@@ -7,24 +7,30 @@
 // 2. Two runs with the same seed end with the same weights, bit for bit, and another seed with other weights.
 // 3. A model that starts at the base tables, or uniform, snaps to the base tables. Snapped tables of a trained model
 //    keep the ground rules, and are the same tables after saving and loading.
-// 4. With a tenth of the open cells trainable, only their weights move, and the snapped tables differ from the base
-//    tables in those cells only.
+// 4. With a tenth of the open cells trainable, the model's trainable cells are the ones it was given, every other
+//    cell's mix is the base tables' choice as exact 0 and 1, only the weights of the tenth move, and the snapped
+//    tables differ from the base tables in those cells only.
 // 5. With onlyReadCells, the tables that train returns hold the base tables' choice in every cell that the exact
 //    parser reads at no code point of a trained text, and give the trained texts the trace of the snapped tables.
 // 6. The same parts for tables with added structure, see ../structure/README.md: added classes, added states, open
-//    entries of the display table and the bit "first on its line". The gradients of 4 threads are one thread's, the snapped tables of a trained
-//    model keep the ground rules and are the same after saving and loading, and with onlyReadCells the returned
-//    tables give the trained texts the trace of the snapped ones.
+//    entries of the display table and the bit "first on its line". The gradients of 4 threads are one thread's, the
+//    snapped tables of a trained model keep the ground rules and are the same after saving and loading, and with
+//    onlyReadCells the returned tables give the trained texts the trace of the snapped ones. An open entry's mix
+//    gives `pastEnd` the share 0 and never snaps to it, also when the weight of `pastEnd` is the entry's largest.
+//    And part 4 again, with a tenth of the open entries trainable too.
 import {mkdirSync} from 'node:fs'
 import {join} from 'node:path'
+import {createRandom} from '../../random.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
-import {addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, differencesOf, grammarStateNames, loadTables, openDisplayEntries, saveTables, tablesToJson} from '../recovery-tables.ts'
+import {
+  type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, checkTables, differencesOf, displayKindNames, grammarStateNames, loadTables, openDisplayEntries, problemsOf, saveTables, tablesToJson,
+} from '../recovery-tables.ts'
 import {cellsReadAt, isRead, runOnSample} from '../score.ts'
 import {createBatchRunner, randomTrainableCells, train} from './train.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
-import {type LossOptions, createModel, mixesInto, snappedTables} from './twin.ts'
+import {type GroupName, type LossOptions, type TwinData, createCellArrays, createModel, exactMixesInto, groupNames, groupWidths, mixesInto, snappedTables} from './twin.ts'
 
 let failures = 0
 const check = (holds: boolean, message: string) => {
@@ -109,29 +115,55 @@ const trained = createModel(base)
   console.log(`3. A model at its start snaps to the base tables. The trained model's snapped tables differ from the base tables in ${differencesOf(base, snapped).length} cells, keep the ground rules, and are ${roundTrip}.`)
 }
 
-// 4. A tenth of the open cells.
-{
-  const trainable = randomTrainableCells(base, 0.1, 9)
-  const model = createModel(base, {trainable, start: 'uniform'})
-  await train(model, data, everyPlace, {...trainOptions, seed: 3})
-  const widths = {lexerNext: model.shape.lexerStateCount, lexerEvent: model.shape.eventCount, grammarNext: model.shape.grammarStateCount, grammarAction: 5}
+// 4. A tenth of the open cells, and with open entries of the display table a tenth of those too. The model's
+// trainable cells are the ones it was given. Every other cell holds the base tables' choice as exact 0 and 1 in the
+// mixes, also an open one. After training, no weight of another cell has moved, and the snapped tables differ from
+// the base tables in trainable cells only. Part 6 calls this a second time, for tables with added structure.
+async function checkTenthTrainable(tables: RecoveryTables, twinData: TwinData) {
+  const trainable = randomTrainableCells(tables, 0.1, 9)
+  const model = createModel(tables, {trainable, start: 'uniform'})
+  const maskOf = (group: GroupName) => group === 'display' ? trainable.display : group === 'lexerNext' || group === 'lexerEvent' ? trainable.lexer : trainable.grammar
+  const sameMask = (left: Uint8Array, right: Uint8Array) => left.length === right.length && left.every((bit, cell) => bit === right[cell])
+  check(sameMask(model.trainableLexer, trainable.lexer) && sameMask(model.trainableGrammar, trainable.grammar) && sameMask(model.trainableDisplay, trainable.display), 'the trainable cells of a model are not the masks that createModel was given')
+  const widths = groupWidths(model.shape)
+  const mixes = createCellArrays(model.shape)
+  const exact = createCellArrays(model.shape)
+  mixesInto(model, 1, mixes)
+  exactMixesInto(tables, exact)
+  let notTheBaseChoice = 0
+  for (const group of groupNames) {
+    const mask = maskOf(group)
+    for (let entry = 0; entry < mixes[group].length; entry++) if (mask[Math.floor(entry / widths[group])] === 0 && mixes[group][entry] !== exact[group][entry]) notTheBaseChoice++
+  }
+  check(notTheBaseChoice === 0, `${notTheBaseChoice} shares of cells that are not trainable are not the base tables' choice as exact 0 and 1`)
+  await train(model, twinData, everyPlace, {...trainOptions, seed: 3})
   let movedOutside = 0
   let movedInside = 0
-  for (const group of ['lexerNext', 'lexerEvent', 'grammarNext', 'grammarAction'] as const) {
-    const mask = group === 'lexerNext' || group === 'lexerEvent' ? trainable.lexer : trainable.grammar
+  let movedDisplay = 0
+  for (const group of groupNames) {
+    const mask = maskOf(group)
     const weights = model.weights[group]
     for (let entry = 0; entry < weights.length; entry++) {
       if (weights[entry] === 0) continue
-      if (mask[Math.floor(entry / widths[group])] === 1) movedInside++
-      else movedOutside++
+      if (mask[Math.floor(entry / widths[group])] === 0) movedOutside++
+      else {
+        movedInside++
+        if (group === 'display') movedDisplay++
+      }
     }
   }
-  const differences = differencesOf(base, snappedTables(model))
+  const snapped = snappedTables(model)
+  checkTables(snapped)
+  const differences = differencesOf(tables, snapped)
   const outside = differences.filter(difference => (difference.table === 'tokenizer' ? trainable.lexer : difference.table === 'grammar' ? trainable.grammar : trainable.display)[difference.cell] === 0).length
-  const trainableCells = trainable.lexer.reduce((total, bit) => total + bit, 0) + trainable.grammar.reduce((total, bit) => total + bit, 0)
+  const ones = (mask: Uint8Array) => mask.reduce((total, bit) => total + bit, 0)
   check(movedOutside === 0 && movedInside > 0, `${movedOutside} weights of cells that are not trainable moved, and ${movedInside} of trainable cells`)
   check(outside === 0, `${outside} cells that are not trainable changed`)
-  console.log(`4. With ${trainableCells} of the 1326 open cells trainable: ${movedInside} weights of trainable cells moved and ${movedOutside} of other cells. The snapped tables differ from the base tables in ${differences.length} cells, ${outside} of them not trainable.`)
+  return {trainableCells: ones(trainable.lexer) + ones(trainable.grammar), trainableEntries: ones(trainable.display), movedInside, movedOutside, movedDisplay, differences: differences.length, changedEntries: differences.filter(difference => difference.table === 'display').length, outside}
+}
+{
+  const tenth = await checkTenthTrainable(base, data)
+  console.log(`4. With ${tenth.trainableCells} of the 1326 open cells trainable: ${tenth.movedInside} weights of trainable cells moved and ${tenth.movedOutside} of other cells. The snapped tables differ from the base tables in ${tenth.differences} cells, ${tenth.outside} of them not trainable.`)
 }
 
 // 5. The cells that no trained text reads.
@@ -219,6 +251,46 @@ const trained = createModel(base)
   console.log(`6. With ${classesOfTheChecks.length} added classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit "first on its line": 4 threads differ from one thread by at most ${largestDifference.toExponential(2)} on a largest gradient of ${largest.toExponential(2)}. `
     + `The trained model's snapped tables differ from the base tables in ${count('tokenizer')} tokenizer cells, ${ofAddedClasses} of them of added classes, ${count('grammar')} grammar cells, ${withBit} of them with the bit, and ${count('display')} entries of the display table, keep the ground rules, and are ${roundTrip}. `
     + `With onlyReadCells the returned tables differ from the base tables in ${differencesOf(withStructure, result.last).length} cells and give the trained texts the same cells and the same trace.`)
+
+  // An open entry's mix leaves out `pastEnd`, the display kind of the cells after a text's end, whatever its weight
+  // is, and so does snapping. Here every entry's weight of `pastEnd` is larger than its other weights.
+  {
+    const kindCount = model.shape.displayKindCount
+    const pastEnd = displayKindNames.indexOf('pastEnd')
+    const random = createRandom(20261015, 6)
+    const largestPastEnd = createModel(withStructure, {start: 'uniform'})
+    for (let entry = 0; entry < withStructure.display.length; entry++) {
+      for (let kind = 0; kind < kindCount; kind++) largestPastEnd.weights.display[entry * kindCount + kind] = kind === pastEnd ? 5 : 4 * random.next()
+    }
+    const snappedEntries = snappedTables(largestPastEnd)
+    const openEntries = cellCounts(withStructure).displayOpen
+    let sharesOfPastEnd = 0
+    let totalsNotOne = 0
+    let snappedToPastEnd = 0
+    for (const temperature of [1, 0.5]) {
+      const mixes = createCellArrays(largestPastEnd.shape)
+      mixesInto(largestPastEnd, temperature, mixes)
+      for (let entry = 0; entry < withStructure.display.length; entry++) {
+        if (withStructure.displayOpen[entry] === 0) continue
+        if (mixes.display[entry * kindCount + pastEnd] !== 0) sharesOfPastEnd++
+        let total = 0
+        for (let kind = 0; kind < kindCount; kind++) total += mixes.display[entry * kindCount + kind]!
+        if (Math.abs(total - 1) > 1e-12) totalsNotOne++
+      }
+    }
+    for (let entry = 0; entry < withStructure.display.length; entry++) if (withStructure.displayOpen[entry] === 1 && snappedEntries.display[entry] === pastEnd) snappedToPastEnd++
+    const problems = problemsOf(snappedEntries)
+    check(sharesOfPastEnd === 0 && totalsNotOne === 0, `${sharesOfPastEnd} mixes of open entries give pastEnd a share, and ${totalsNotOne} do not add up to 1`)
+    check(snappedToPastEnd === 0 && problems.length === 0, `${snappedToPastEnd} open entries snap to pastEnd, and the snapped tables break the ground rules: ${problems.slice(0, 3).join('; ')}`)
+    console.log(`   With the weight of pastEnd the largest of each of the ${openEntries} open entries: ${sharesOfPastEnd} mixes give pastEnd a share at the temperatures 1 and 0.5, ${snappedToPastEnd} entries snap to pastEnd, and the snapped tables keep the ground rules.`)
+  }
+
+  // Part 4 with the same structure: a tenth of the open cells and of the open entries.
+  const tenth = await checkTenthTrainable(withStructure, dataWithStructure)
+  const counts = cellCounts(withStructure)
+  check(tenth.trainableEntries > 0 && tenth.trainableEntries < counts.displayOpen && tenth.movedDisplay > 0, `${tenth.trainableEntries} of the ${counts.displayOpen} open entries are trainable, and ${tenth.movedDisplay} of their weights moved`)
+  console.log(`   With ${tenth.trainableCells} of the ${counts.lexerOpen + counts.grammarOpen} open cells and ${tenth.trainableEntries} of the ${counts.displayOpen} open entries trainable: the model's trainable cells are the masks it was given, every other cell's mix is the base's choice as exact 0 and 1, `
+    + `${tenth.movedInside} weights of trainable cells moved, ${tenth.movedDisplay} of them of entries, and ${tenth.movedOutside} of other cells. The snapped tables differ from the base tables in ${tenth.differences} cells, ${tenth.changedEntries} of them entries and ${tenth.outside} not trainable.`)
 }
 
 if (failures > 0) {

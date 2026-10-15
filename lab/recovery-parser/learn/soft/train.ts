@@ -25,6 +25,7 @@
 //   and without keeping the run on track. Only this loss compares between runs with other options, since a run that
 //   is kept on track has a low loss whatever it would do by itself. Next to it, the same loss without the code
 //   points at which cells that are not trainable rule a label out: those cost 13.8 per label whatever is trained.
+//   The line gives their count, since a few of them round to 0.0% and still show in the loss.
 // - "reads as the snapped tables": at how many labeled code points of the fixed set the twin's largest shares are
 //   the display kind, the depth and the container that the exact parser gives with the snapped tables. A mix that
 //   starts with 0.9 on a choice is not that choice: 20 steps after a first error the twin's reading has drifted.
@@ -157,11 +158,15 @@ export type TrainPoint = {
   // On a fixed set of the trained samples, without the extra targets and without keeping the run on track: the loss
   // of the three labels per code point, the same without the code points at which a label has a share of exactly 0,
   // the share of those code points, and the share of the code points at which the twin's largest shares are what
-  // the exact parser gives with the snapped tables.
+  // the exact parser gives with the snapped tables. Then the numbers behind the share `ruledOut`: how many labeled
+  // code points the fixed set has, and at how many of them a label has a share of exactly 0. A few of many round to
+  // 0.0%, e.g. 5 of 15,063, and still show in the loss, at 13.8 per label.
   freeLoss: number
   freeLossWithoutRuledOut: number
   ruledOut: number
   readsAsSnapped: number
+  fixedCodePoints: number
+  ruledOutCodePoints: number
 }
 
 export type TrainResult = {
@@ -274,6 +279,7 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
       freeLossWithoutRuledOut: tally.codePoints === tally.ruledOut ? NaN : (labelLoss - tally.ruledOutLoss) / (tally.codePoints - tally.ruledOut),
       ruledOut: tally.codePoints === 0 ? NaN : tally.ruledOut / tally.codePoints,
       readsAsSnapped: compared === 0 ? NaN : same / compared,
+      fixedCodePoints: tally.codePoints, ruledOutCodePoints: tally.ruledOut,
     }
   }
 
@@ -308,7 +314,7 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
     const perCodePoint = (total: number) => sinceLog.codePoints === 0 ? '-' : (total / sinceLog.codePoints).toFixed(3)
     const sharpness = sharpnessOf(model, batches.mixes)
     log(`${String(samplesSeen).padStart(7)} samples  loss ${Number.isNaN(loss) ? '-' : loss.toFixed(4)} (kind ${perCodePoint(sinceLog.kindLoss)} depth ${perCodePoint(sinceLog.depthLoss)} container ${perCodePoint(sinceLog.containerLoss)} intended ${perCodePoint(sinceLog.intendedLoss)})`
-      + `  free run: loss ${point.freeLoss.toFixed(4)}, ${point.freeLossWithoutRuledOut.toFixed(4)} without the ${(100 * point.ruledOut).toFixed(1)}% of code points with a label ruled out, reads as the snapped tables at ${percent(point.readsAsSnapped).trim()}%`
+      + `  free run: loss ${point.freeLoss.toFixed(4)}, ${point.freeLossWithoutRuledOut.toFixed(4)} without the ${point.ruledOutCodePoints} of ${point.fixedCodePoints} code points with a label ruled out (${(100 * point.ruledOut).toFixed(1)}%), reads as the snapped tables at ${percent(point.readsAsSnapped).trim()}%`
       + `  temperature ${temperature.toFixed(2)}  entropy ${meanEntropy.toFixed(3)}  largest share ${sharpness.meanLargestShare.toFixed(3)}`
       + `  snapped on validation: all three ${percent(point.allThree)} (halves ${percent(point.pickingHalf).trim()} and ${percent(point.otherHalf).trim()}) kind ${percent(point.kind)} depth ${percent(point.depth)} container ${percent(point.container)} whole ${percent(point.whole)}`
       + `  ${point.changedCells} cells changed, ${point.changedAndRead} of them read by a trained text, with the others as in the base: all three ${percent(point.readCellsOnly).trim()}  ${trainingMilliseconds === 0 ? '-' : (samplesSeen / (trainingMilliseconds / 1000)).toFixed(0)} samples/s`)

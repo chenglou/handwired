@@ -35,9 +35,17 @@ const tokenNone = tokenNames.indexOf('none')
 // context of a token that is the first on its line.
 const contextsWithoutBit = today.contextCount
 
+// A short text that stands for the class table of some tables: two tables give every code point the same class when
+// their keys are the same. It is a 64-bit hash of the table, so that the samples and the twin can each carry it, and
+// not the table itself, which has 8,224 entries once a class holds a curly quote. Two lists of added classes with
+// the same number of classes have other keys, e.g. a class for the apostrophe and a class for #.
+export const classTableKeyOf = (tables: RecoveryTables) => Bun.hash(tables.classOfCodePoint).toString(16)
+
 // The sizes and the fixed tables of a set of tables, which is all a step needs besides the cells' mixes.
 export type TwinShape = {
   classCount: number
+  // The key of the tables' class table, see classTableKeyOf. A run compares it with the key of its samples.
+  classTable: string
   lexerStateCount: number
   eventCount: number
   tokenCount: number
@@ -58,7 +66,7 @@ export type TwinShape = {
 export function shapeOf(tables: RecoveryTables): TwinShape {
   if (tables.contextCount !== contextsWithoutBit && tables.contextCount !== 2 * contextsWithoutBit) throw new Error(`the twin is written for ${contextsWithoutBit} contexts, or ${2 * contextsWithoutBit} with the bit "first on its line", and these tables have ${tables.contextCount}`)
   return {
-    classCount: tables.classCount, lexerStateCount: tables.lexerStateCount, eventCount: tables.eventCount, tokenCount: tables.tokenCount,
+    classCount: tables.classCount, classTable: classTableKeyOf(tables), lexerStateCount: tables.lexerStateCount, eventCount: tables.eventCount, tokenCount: tables.tokenCount,
     contextCount: tables.contextCount, grammarStateCount: tables.grammarStateCount, displayKindCount,
     lexerCells: tables.lexerStateCount * tables.classCount, grammarCells: tables.grammarStateCount * tables.tokenCount * tables.contextCount, displayEntries: tables.display.length,
     tokenOfEvent: tables.tokenOfEvent.slice(), display: tables.display.slice(), displayMixed: tables.displayOpen.slice(),
@@ -310,10 +318,12 @@ export function sharpnessOf(model: TwinModel, mixes: CellArrays) {
 // SharedArrayBuffers, so that worker threads read the same memory.
 export type TwinData = {
   sampleCount: number
-  // The numbers of classes and of contexts of the tables that the samples were packed for, see packForTwin. A twin
-  // of tables with other classes would read other cells, and one with the bit "first on its line" needs the bit at
-  // the first error.
+  // The number of classes, the key of the class table (see classTableKeyOf) and the number of contexts of the tables
+  // that the samples were packed for, see packForTwin. A twin of tables that give a code point another class would
+  // read other cells, and one with the bit "first on its line" needs the bit at the first error. So a run on samples
+  // that were packed for another class table or another number of contexts throws.
   classCount: number
+  classTable: string
   contextCount: number
   // The sample's index in the dataset, e.g. for the random draws of one sample.
   index: Int32Array
@@ -416,7 +426,7 @@ const levelCount = maximumDepth + 1
 // step, everything the step computes and the state after it, so that the backward pass can read them.
 export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDepthLow, depthHigh: number = defaultDepthHigh, positions: number = positionCount) {
   if (depthLow > -1 || depthHigh < maximumDepth + 1) throw new Error(`the depth range has to hold -1 to ${maximumDepth + 1}, and is ${depthLow} to ${depthHigh}`)
-  const {classCount, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, tokenOfEvent, display, displayMixed} = shape
+  const {classCount, classTable, lexerStateCount, eventCount, tokenCount, contextCount, grammarStateCount, displayKindCount, tokenOfEvent, display, displayMixed} = shape
   const depthCount = depthHigh - depthLow + 1
   const numbers = (perPosition: number) => new Float64Array(positions * perPosition)
   // The state before each position: the shares of the tokenizer states, of the grammar states and of the depths, and
@@ -912,7 +922,9 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   // `end` given, e.g. 513 for the positions after the text too. Adds the sample's loss to `tally`, and with
   // `gradients`, the gradients of the loss by the cells' mixes to it. Neither is divided by the number of code points.
   function runSample(data: TwinData, place: number, options: LossOptions, tally: LossTally, gradients?: CellArrays, end?: number) {
-    if (data.classCount !== classCount || data.contextCount !== contextCount) throw new Error(`the samples were packed for tables with ${data.classCount} classes and ${data.contextCount} contexts, and the twin's tables have ${classCount} and ${contextCount}: give packForTwin the twin's tables`)
+    if (data.classTable !== classTable || data.contextCount !== contextCount) {
+      throw new Error(`the samples were packed for tables with ${data.classCount} classes and ${data.contextCount} contexts, and the twin's tables have ${classCount} and ${contextCount}${data.classCount === classCount && data.contextCount === contextCount ? ', with other code points in their added classes' : ''}: give packForTwin the twin's tables`)
+    }
     const start = data.start[place]!
     const length = data.start[place + 1]! - start
     const first = data.firstError[place]!

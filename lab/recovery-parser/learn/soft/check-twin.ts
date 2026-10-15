@@ -17,6 +17,12 @@
 // open entries of the display table, with the bit "first on its line", and with all three, each with today's choices
 // in every cell and with random settings. The context that the comparison checks at every position holds the bit.
 //
+// For the tables with the bit, each of those tables also runs kept on track, where no parser gives the trace: the
+// bit is the one part of the state that is not replaced by the intended state, and it has to be what the text's line
+// feeds and the run's tokens give, see checkBitOnTrack.
+//
+// Samples that were packed for tables with other classes, or without the bit, have to be refused.
+//
 // It also checks the intended stacks of twin-data.ts against the exact parser on the originals of the first 2,000
 // samples that are not in the test split.
 import {createRandom} from '../../random.ts'
@@ -24,8 +30,10 @@ import {defaultSeed, sampleAt} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
 import {type RecoveryTrace, containerObject, createTrace, positionCount, runRecoveryParser, runRecoveryParserInto} from '../recovery-parser.ts'
-import {type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, openDisplayEntries, randomizeOpenCells} from '../recovery-tables.ts'
-import {intendedObjectsOf, packForTwin, placesForTwin} from './twin-data.ts'
+import {
+  type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, classNames, openDisplayEntries, randomizeOpenCells, tokenNames,
+} from '../recovery-tables.ts'
+import {intendedObjectsOf, loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type TwinData, type TwinRunner, createCellArrays, createTally, createTwinRunner, defaultDepthHigh, defaultDepthLow, exactMixesInto, shapeOf} from './twin.ts'
 
 const sampleCount = Number(process.argv[2] ?? 2500)
@@ -178,6 +186,47 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
   console.log(`  with the depths ${defaultDepthLow} to ${defaultDepthHigh}: ${describe(training)}, all of them among the ${training.runsThatLeaveTheRange} runs that reach an end of the range.`)
 }
 
+// A run that is kept on track, for tables with the bit "first on its line": after every code point whose intended
+// state can be followed, the tokenizer state, the grammar state, the depth and the stack are replaced by the intended
+// ones, and the bit is not. No parser gives the trace of such a run, so the check counts the bit itself, from the
+// text's line feeds and the run's own tokens: a line feed sets the bit, and any other code point whose token is not
+// `none` clears it. The bit before and after every step has to be that count, exactly 0 or 1.
+const classLineFeed = classNames.indexOf('lineFeed')
+const tokenNone = tokenNames.indexOf('none')
+type OnTrack = {runs: number, positions: number, replaced: number, replacedWithBit: number}
+function checkBitOnTrack(name: string, tables: RecoveryTables, data: TwinData, tally: OnTrack) {
+  const shape = shapeOf(tables)
+  const mixes = createCellArrays(shape)
+  exactMixesInto(tables, mixes)
+  const runner = createTwinRunner(shape)
+  runner.setMixes(mixes)
+  for (let place = 0; place < data.sampleCount; place++) {
+    const first = data.firstError[place]!
+    const start = data.start[place]!
+    const length = data.start[place + 1]! - start
+    runner.runSample(data, place, {onTrackProbability: 1, onTrackSeed: 3}, createTally(), undefined, positionCount)
+    tally.runs++
+    let bit: number = data.startFirstOnLine[place]!
+    for (let position = first; position < positionCount; position++) {
+      tally.positions++
+      const before = runner.firstOnLineBefore[position]!
+      const token = oneHotIndex(runner.tokens, position * shape.tokenCount, shape.tokenCount)
+      // The positions after the text read the class `end`, as runSample gives it to the twin.
+      const characterClass = position < length ? data.classes[start + position]! : 0
+      const after = token === -1 ? -1 : characterClass === classLineFeed ? 1 : token === tokenNone ? bit : 0
+      if (before !== bit || runner.firstOnLineAfter[position] !== after) {
+        fail(`${name}, sample ${data.index[place]}, kept on track: the bit "first on its line" is ${before} before position ${position} and ${runner.firstOnLineAfter[position]} after it, and the line feeds and tokens give ${bit} and ${after}`)
+        break
+      }
+      bit = after
+      if (runner.replaced[position] === 1) {
+        tally.replaced++
+        tally.replacedWithBit += bit
+      }
+    }
+  }
+}
+
 // Tables with added structure: today's choices in every cell, and random settings, the last one with added states.
 {
   const settingsPerVariant = Math.max(2, Math.round(settingCount / 5))
@@ -187,22 +236,67 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
     {name: 'the bit "first on its line"', make: () => addFirstOnLineBit(asIsTables())},
     {name: 'all three', make: () => addFirstOnLineBit(openDisplayEntries(addClasses(asIsTables(), classesOfTheChecks)))},
   ]
+  const intendedObjects = loadIntendedObjects(samples, softCacheFolderOf())
   for (const variant of variants) {
-    const data = packForTwin(samples, places, undefined, variant.make())
+    const hasBit = variant.make().contextCount > asIsTables().contextCount
+    const data = packForTwin(samples, places, hasBit ? intendedObjects : undefined, variant.make())
     const wide = newComparison()
     const training = newComparison()
+    const onTrack: OnTrack = {runs: 0, positions: 0, replaced: 0, replacedWithBit: 0}
     checkTablesAgainstParser(`${variant.name}, today's choices`, variant.make(), data, wide, training)
+    if (hasBit) checkBitOnTrack(`${variant.name}, today's choices`, variant.make(), data, onTrack)
     for (let setting = 0; setting < settingsPerVariant; setting++) {
       const random = createRandom(defaultSeed + 37, setting)
       // The last setting has 2 more tokenizer states and a grammar state more.
       const tables = setting === settingsPerVariant - 1 ? addStates(variant.make(), 2, [random.integer(0, 7)]) : variant.make()
       randomizeOpenCells(tables, random)
       checkTablesAgainstParser(`${variant.name}, random setting ${setting}`, tables, data, wide, training)
+      if (hasBit) checkBitOnTrack(`${variant.name}, random setting ${setting}`, tables, data, onTrack)
     }
     console.log(`Tables with ${variant.name}, with today's choices and with ${settingsPerVariant} random settings of every open cell${variant.make().displayOpen.includes(1) ? ' and every open entry' : ''}, on the same samples:`)
     console.log(`  with a depth range that holds the run's depths: ${describe(wide)}.`)
     console.log(`  with the depths ${defaultDepthLow} to ${defaultDepthHigh}: ${describe(training)}, all of them among the ${training.runsThatLeaveTheRange} runs that reach an end of the range.`)
+    if (hasBit) {
+      if (onTrack.replacedWithBit === 0) fail(`${variant.name}: no state was replaced while the bit "first on its line" was set, so the runs that are kept on track say nothing about the bit`)
+      console.log(`  kept on track after every code point whose intended state can be followed: ${onTrack.runs} runs, ${onTrack.positions} positions, ${onTrack.replaced} states replaced, ${onTrack.replacedWithBit} of them with the bit set. The bit before and after every step is the one that the text's line feeds and the run's tokens give.`)
+    }
   }
+}
+
+// Samples that were packed for other tables are refused: the twin would read the cells of another class for a code
+// point, or would start without the bit "first on its line". Two lists of added classes with the same number of
+// classes are told apart, and two lists that give every code point the same class are not.
+{
+  const few = places.subarray(0, 20)
+  const apostrophe = addClasses(asIsTables(), [{name: 'apostrophe', codePoints: [0x27]}])
+  const hash = addClasses(asIsTables(), [{name: 'hash', codePoints: [0x23]}])
+  const curly = addClasses(asIsTables(), [{name: 'curlyQuote', codePoints: [0x201c, 0x201d]}])
+  const curlyInOtherWords = addClasses(asIsTables(), [{name: 'quoteMark', codePoints: [0x201d, 0x201c]}])
+  const runs = (tablesOfTwin: RecoveryTables, tablesOfSamples: RecoveryTables) => {
+    const shape = shapeOf(tablesOfTwin)
+    const mixes = createCellArrays(shape)
+    exactMixesInto(tablesOfTwin, mixes)
+    const runner = createTwinRunner(shape)
+    runner.setMixes(mixes)
+    const data = packForTwin(samples, few, undefined, tablesOfSamples)
+    try {
+      for (let place = 0; place < data.sampleCount; place++) runner.runSample(data, place, {}, createTally())
+    } catch {
+      return false
+    }
+    return true
+  }
+  const cases: [string, RecoveryTables, RecoveryTables, boolean][] = [
+    ['a twin with a class for the apostrophe on samples packed for today\'s classes', apostrophe, asIsTables(), false],
+    ['a twin with a class for # on samples packed for a class for the apostrophe', hash, apostrophe, false],
+    ['a twin of today\'s tables on samples packed for a class for the apostrophe', asIsTables(), apostrophe, false],
+    ['a twin with the bit on samples packed for tables without the bit', addFirstOnLineBit(apostrophe), apostrophe, false],
+    ['a twin without the bit on samples packed for tables with the bit', apostrophe, addFirstOnLineBit(apostrophe), false],
+    ['a twin with a class for the apostrophe on samples packed for the same class', apostrophe, addStates(apostrophe, 2, [0]), true],
+    ['a twin with a class for the two curly quotes on samples packed for the same class under another name, with its code points in the other order', curly, curlyInOtherWords, true],
+  ]
+  for (const [what, tablesOfTwin, tablesOfSamples, expected] of cases) if (runs(tablesOfTwin, tablesOfSamples) !== expected) fail(`${what} ${expected ? 'is refused' : 'runs'}`)
+  console.log(`Samples packed for other tables: ${cases.filter(([, , , expected]) => !expected).length} runs with other classes or without the bit are refused, among them two lists of added classes of the same length, and ${cases.filter(([, , , expected]) => expected).length} runs with the same classes are not.`)
 }
 
 // The intended stacks: for a valid text, the stack that intendedObjectsOf gives after every code point has to be the
