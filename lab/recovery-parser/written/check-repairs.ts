@@ -13,7 +13,7 @@ import {readFileSync} from 'node:fs'
 import {basename} from 'node:path'
 import {visible} from '../dump.ts'
 import {mistypedNames, readPartFile, readRepairFile} from './format.ts'
-import {changeRunsOf, describeCase} from './show.ts'
+import {describeCase, whiteSpaceOnlyChanges} from './show.ts'
 import {type WrittenCase, brokenTextProblems, caseOf, validTextProblems} from './written.ts'
 
 const isWhiteSpace = (character: string | undefined) => character === ' ' || character === '\t' || character === '\n' || character === '\r'
@@ -26,7 +26,7 @@ export function repairNotes(repaired: WrittenCase): string[] {
   const kept = new Set(opinion.alignment)
   const addedWhiteSpace = valid.filter((character, index) => isWhiteSpace(character) && !kept.has(index)).length
   if (addedWhiteSpace >= 3) notes.push(`the repair has ${addedWhiteSpace} white space code points that the broken text lacks. A repair adds only what is missing and keeps the layout of the broken text`)
-  const whiteSpaceChanges = changeRunsOf(opinion, repaired.broken).filter(change => change.codePoints.every(isWhiteSpace)).length
+  const whiteSpaceChanges = whiteSpaceOnlyChanges(opinion, repaired.broken)
   if (whiteSpaceChanges >= 3) notes.push(`the repair and the broken text differ by white space alone in ${whiteSpaceChanges} places. Was the text laid out anew? A repair keeps the layout of the broken text`)
   const keptCount = opinion.alignment.filter(counterpart => counterpart !== -1).length
   if (keptCount * 2 < opinion.alignment.length) notes.push(`the tools pair only ${keptCount} of the broken text's ${opinion.alignment.length} code points with the repair. That is right when most of the broken text is not a part of the document`)

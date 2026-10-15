@@ -14,7 +14,7 @@ import {caseNotes, caseProblems} from './check-cases.ts'
 import {repairNotes} from './check-repairs.ts'
 import {type CaseEntry, caseFileText, linesOfText, mistypedNames, partFileText, readCaseFile, readPartFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
 import {scoreCases, scoreTables} from './score.ts'
-import {changesOf, describeCase, describeOpinions} from './show.ts'
+import {changesOf, describeCase, describeOpinions, whiteSpaceOnlyChanges} from './show.ts'
 import {blindIdOf, brokenTextProblems, caseOf, labelsOfWritten, readWritten, scoredCodePointsOfWritten, validTextProblems, writtenFolder} from './written.ts'
 
 // Texts that a file format gets wrong when it quotes or escapes: each must come back as it went in.
@@ -149,6 +149,29 @@ const pairs: [broken: string, valid: string, marks: string][] = [
   // The brace at the end is kept after a word of another notation.
   ['{"ok": FALSE\n}', '{"ok": false\n}', '.......+++++..'],
   ['{ id: 1, name: \'Ada\', manager: undefined }', '{"id": 1, "name": "Ada", "manager": null}', '.+.............~...~...........++++++++++.'],
+  // What stands between two replacements of one kind is kept, however short: `&quot;` stands for every quote here.
+  ['{&quot;id&quot;:7,&quot;tags&quot;:[&quot;a&quot;,&quot;b&quot;]}', '{"id":7,"tags":["a","b"]}', '.++++++..++++++...++++++....++++++..++++++.++++++.++++++.++++++..'],
+  // The space between two dashes that each stand for two hyphens.
+  ['{"note": "tea – –milk"}', '{"note": "tea -- --milk"}', '..............+.+......'],
+  // The document's first brace is kept after a log prefix, before the `#012` that stands for every line feed.
+  ['Mar  3 08:15:42 host7 app[311]: {#012  "level": "warn",#012  "code": 7#012}', '{\n  "level": "warn",\n  "code": 7\n}', `${'+'.repeat(32)}.++++${'.'.repeat(18)}++++${'.'.repeat(11)}++++.`],
+  // The document's last braces are kept between a line that is missing and a closing code fence.
+  ['```json\n{"job": {\n  "steps": [\n    {"id": 1}\n}}\n```', '{"job": {\n  "steps": [\n    {"id": 1}\n  ]\n}}', `${'+'.repeat(8)}${'.'.repeat(39)}++++`],
+  // So is the brace between a word of another notation and a code fence, and the bracket between a fence and a word.
+  ['{"value": NaN}\n```', '{"value": null}', '..........+++.++++'],
+  ['```json\n[NaN, 1]', '[null, 1]', '++++++++.+++....'],
+  // No letter of a notice after the cut is paired, also where only one or two letters of the notice stand between
+  // two letters that the missing part holds too, and its bracket is not the bracket that ends the document.
+  ['[{"state": "queu...\n\n[Preview ends here]  Open the whole file', '[{"state": "queued", "tries": 1}]', `${'.'.repeat(16)}${'+'.repeat(45)}`],
+  // The bracket that ends a marker does not stand for the one bracket that is missing.
+  ['{"period":null\n[output truncated]', '{"period":null}', `${'.'.repeat(14)}${'+'.repeat(19)}`],
+  // What is before the cut is kept: the digits of a number that is cut off before a quote, which is no part of a
+  // word, and the `":` after an added backslash.
+  ['write(2, "{\\"job\\":77,\\"size\\":409"..., 24) = 24', '{"job":77,"size":4096}', `${'+'.repeat(10)}.+....+.....+.....+.....${'+'.repeat(14)}`],
+  ['write(2, "{\\"job\\":77,\\"size\\":"..., 24) = 24', '{"job":77,"size":4096}', `${'+'.repeat(10)}.+....+.....+.....+..${'+'.repeat(14)}`],
+  // The placeholder `%t` is another word than `true`, and a literal with two letters swapped is another word too.
+  ['{"verified": %t, "score": %d}', '{"verified": true, "score": 12}', '.............++...........++.'],
+  ['{"k": unll}', '{"k": null}', '......++++.'],
 ]
 
 test('the alignment of pairs made by hand', () => {
@@ -289,6 +312,14 @@ test('what the checks say about texts that cannot be a case', () => {
   expect(caseNotes(withFence).join()).toContain('ends with white space')
   const reformatted = caseOf({...madeUp, intended: '{\n  "a": 1,\n  "b": null\n}', broken: madeUp.broken}, 'made-up.txt')
   expect(repairNotes(reformatted).join()).toContain('white space code points that the broken text lacks')
+  // A raw line feed in the place of the two characters \n is no place that differs by white space alone, and the
+  // space that a diff puts before every unchanged line is.
+  const rawLineFeeds = caseOf({...madeUp, intended: '{"a": "1\\n2", "b": "3\\n4", "c": "5\\n6"}', broken: '{"a": "1\n2", "b": "3\n4", "c": "5\n6"}'}, 'made-up.txt')
+  expect(whiteSpaceOnlyChanges(rawLineFeeds.opinions[0]!, rawLineFeeds.broken)).toBe(0)
+  expect(caseNotes(rawLineFeeds).join()).not.toContain('white space alone')
+  const diff = caseOf({...madeUp, intended: '{\n"a": 1,\n"b": 2,\n"c": 3\n}', broken: ' {\n "a": 1,\n+"b": 2,\n "c": 3\n }'}, 'made-up.txt')
+  expect(whiteSpaceOnlyChanges(diff.opinions[0]!, diff.broken)).toBe(4)
+  expect(caseNotes(diff).join()).toContain('white space alone in 4 places')
 })
 
 // The fenced blocks of a markdown file, each without its fence lines.

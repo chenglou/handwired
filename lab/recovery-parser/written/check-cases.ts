@@ -12,7 +12,7 @@ import {readFileSync} from 'node:fs'
 import {basename} from 'node:path'
 import {visible} from '../dump.ts'
 import {type CaseEntry, mistypedNames, readCaseFile} from './format.ts'
-import {changeRunsOf, describeCase} from './show.ts'
+import {describeCase, whiteSpaceOnlyChanges} from './show.ts'
 import {type WrittenCase, brokenTextProblems, caseOf, scoredCodePointsOfWritten, validTextProblems} from './written.ts'
 
 export const shortestBroken = 20
@@ -36,7 +36,7 @@ export function caseNotes(writtenCase: WrittenCase): string[] {
   const intended = Array.from(writtenCase.original)
   const kept = writer.alignment.filter(counterpart => counterpart !== -1).length
   if (kept * 2 < writer.alignment.length) notes.push(`the tools pair only ${kept} of the broken text's ${writer.alignment.length} code points with the intended text. Is the broken text the intended text with the damage and no other change?`)
-  const whiteSpaceChanges = changeRunsOf(writer, writtenCase.broken).filter(change => change.codePoints.every(isWhiteSpace)).length
+  const whiteSpaceChanges = whiteSpaceOnlyChanges(writer, writtenCase.broken)
   if (whiteSpaceChanges >= 3) notes.push(`the two texts differ by white space alone in ${whiteSpaceChanges} places. Was one of them laid out anew? The broken text has the layout of the intended text wherever the damage did not touch it`)
   // White space outside the document, on a side where the broken text has other text: see the README's rule.
   const firstKept = writer.alignment.findIndex(counterpart => counterpart !== -1)

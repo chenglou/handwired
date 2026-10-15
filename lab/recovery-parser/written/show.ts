@@ -100,6 +100,22 @@ export function changeRunsOf(opinion: Opinion, brokenText: string): Change[] {
   return changes
 }
 
+// How many places differ by white space alone. An added run and the removed run at its end are one place, so a raw
+// line feed in the place of the two characters `\n`, or `<br>` in the place of a line feed, is no such place.
+export function whiteSpaceOnlyChanges(opinion: Opinion, brokenText: string): number {
+  const isWhiteSpace = (character: string) => character === ' ' || character === '\t' || character === '\n' || character === '\r'
+  const changes = changeRunsOf(opinion, brokenText)
+  let places = 0
+  for (let index = 0; index < changes.length; index++) {
+    const change = changes[index]!
+    const after = changes[index + 1]
+    const samePlace = change.kind === 'added' && after?.kind === 'removed' && after.position === change.position + change.codePoints.length
+    if ([...change.codePoints, ...(samePlace ? after.codePoints : [])].every(isWhiteSpace)) places++
+    if (samePlace) index++
+  }
+  return places
+}
+
 // The same in words, with the code points that stand one for one for another. Positions are code points of the
 // broken text, counted from 0.
 export function changesOf(opinion: Opinion, brokenText: string): string[] {

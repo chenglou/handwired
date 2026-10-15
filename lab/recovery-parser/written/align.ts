@@ -20,18 +20,24 @@
 //    pairs is taken.
 // 3. A kept run of 3 code points or fewer between two edits that are both longer than it, which together both remove
 //    and add text, is a chance match and is not kept, e.g. the `t` and the `r` of `[truncated]` that the removed rest
-//    of the document also holds. At the end of a text that is cut off, such runs are also not kept when the broken
-//    text adds more code points after its last longer kept run than the runs keep, e.g. the `]` of that marker.
+//    of the document also holds. After the cut of a text that is cut off, every such run is a chance match when the
+//    broken text adds more code points there than the runs keep, e.g. the letters that `[Preview ends here]` shares
+//    with the part that is missing. Three kinds of short run are never a chance match: one beside an edit that the
+//    script makes at two places or more, e.g. the `:` of `&quot;:&quot;`, and the document's first code points
+//    after other text and its last code points before other text, when the edit on their other side only removes
+//    text or stays inside one value. See `withoutChanceMatches`.
 // 4. A code point that stands for another needs a kept code point or another pair beside it, unless the edit around
-//    it removes nothing else. So the `]` of `[output truncated]` does not stand for the bracket that ends the
-//    document, and the `=` of `"id" => 42` still stands for the colon.
+//    it removes nothing else and the code point is not the broken text's first or last. So the `]` of
+//    `[output truncated]` does not stand for the bracket that ends the document, and the `=` of `"id" => 42` still
+//    stands for the colon.
 // 5. A string that lost its end keeps its own closing quote. In `"exclu"⏎}` for `"exclude": ["dist"]⏎}` the script
 //    with the fewest edits removes `de": ["dist` and keeps the quote after `dist`, which is the quote of a value. The
 //    quote after `exclu` is taken for the closing quote of the key that it closes in the broken text.
 // 6. A number or a literal is one word. Its code points keep their counterparts when the word is whole, e.g. the
 //    digits of `1,400,000` and of `NumberLong(15)`, or when only code points are missing from it, e.g. `tru`, `59.`
-//    and `.5`. Otherwise the word in the broken text is another word and all of it is added, e.g. `True`, `nil`, `NaN`
-//    and `0x1F`: the highlighter has no display kind for a word that is not JSON's.
+//    and `.5`, also before added text that is no part of a word, e.g. the `409` of `"size":409"..., 24) = 24`.
+//    Otherwise the word in the broken text is another word and all of it is added, e.g. `True`, `nil`, `NaN`, `0x1F`
+//    and the `%t` of a format string: the highlighter has no display kind for a word that is not JSON's.
 //
 // What these rules do not give is listed in the README of this folder under "What the tools cannot know".
 import {type Edit, applyEdits, canonicalEdits} from '../edits.ts'
@@ -58,6 +64,11 @@ const quoteMarks = '\'`“”„‟‘’‚‛«»‹›'
 // White space in the wide sense of JavaScript's \s: with the no-break space, the byte order mark and every other space
 // of Unicode.
 const isWhiteSpace = (character: string) => /^\s$/u.test(character)
+
+// Whether an added code point right against what is left of a number or a literal can be a part of one word with
+// it: any code point but white space, JSON's punctuation, a quote mark and a round bracket. E.g. the `e` of `None`
+// after the `n` that `null` also has, but not the quote after `409` in `"size":409"..., 24) = 24`.
+const joinsWord = (character: string) => !isWhiteSpace(character) && !'{}[]:,"()'.includes(character) && !quoteMarks.includes(character)
 
 // Whether a code point of the broken text can stand in the place of a code point of the valid text that differs from
 // it: both play the same part in the text.
@@ -167,13 +178,51 @@ function runsOf(steps: readonly Step[]): Run[] {
 // Rule 3: a kept run of 3 code points or fewer between two edits that are both longer than it, and that together both
 // remove and add text, becomes a part of one edit. The edit that results can make the kept run next to it a chance
 // match too, so the runs are gone over until none is left. A pair counts as a kept code point here.
-function withoutChanceMatches(steps: readonly Step[]): Step[] {
+//
+// Three kinds of kept run are no chance match, however short:
+// - A run beside an edit that the script makes at two places or more, with the same text removed and the same text
+//   added, e.g. `&quot;` for `"`. Such an edit is a rule of the text's source, and what stands between two of them
+//   is the document's own, e.g. the `:` of `&quot;:&quot;`.
+// - The run with the valid text's last code point, when the script only adds text after it, and the edit before it
+//   only removes text or changes nothing outside one number, literal or string: the end of the document before
+//   other text. E.g. the `}⏎}` between a missing line `    ]` and a closing code fence, and the `}` between `NaN`
+//   and such a fence. The `]` of `[Preview ends here]  Open the whole file` after a cut is none: the edit before it
+//   removes the rest of the document.
+// - The run with the valid text's first code point, when the script only adds text before it, and the edit after it
+//   is of the same two sorts: the start of the document after other text, e.g. the `[` between a code fence and
+//   `NaN`.
+function withoutChanceMatches(steps: readonly Step[], broken: readonly string[], valid: readonly string[]): Step[] {
   let runs = runsOf(steps)
+  const noChanceMatch = new Set<Run>()
+  const editsByTexts = new Map<string, number[]>()
+  const {strings, words} = partsOf(valid)
+  // Whether an edit, which removes the valid code points from `from` up to `to`, only removes text or changes
+  // nothing outside one number, literal or string.
+  const removesOnlyOrInsideOneValue = (edit: Run, from: number, to: number) =>
+    edit.added === 0 || words.some(word => word.start <= from && to <= word.end) || strings.some(string => string.open <= from && to <= string.close + 1)
+  let validIndex = 0
+  let brokenIndex = 0
+  runs.forEach((run, index) => {
+    if (run.isEdit && run.removed > 0 && run.added > 0) {
+      const texts = `${valid.slice(validIndex, validIndex + run.removed).join('')}\u0000${broken.slice(brokenIndex, brokenIndex + run.added).join('')}`
+      editsByTexts.set(texts, [...(editsByTexts.get(texts) ?? []), index])
+    }
+    if (run.isEdit && removesOnlyOrInsideOneValue(run, validIndex, validIndex + run.removed)) {
+      if (index === 2 && runs[0]!.isEdit && runs[0]!.removed === 0) noChanceMatch.add(runs[1]!)
+      if (index === runs.length - 3 && runs.at(-1)!.isEdit && runs.at(-1)!.removed === 0) noChanceMatch.add(runs.at(-2)!)
+    }
+    validIndex += run.isEdit ? run.removed : run.steps.length
+    brokenIndex += run.isEdit ? run.added : run.steps.length
+  })
+  for (const indexes of editsByTexts.values()) {
+    if (indexes.length < 2) continue
+    for (const index of indexes) for (const beside of [runs[index - 1], runs[index + 1]]) if (beside !== undefined) noChanceMatch.add(beside)
+  }
   for (let index = 1; index < runs.length - 1; index++) {
     const run = runs[index]!
     const before = runs[index - 1]!
     const after = runs[index + 1]!
-    if (run.isEdit || run.steps.length > chanceMatchLength) continue
+    if (run.isEdit || run.steps.length > chanceMatchLength || noChanceMatch.has(run)) continue
     if (before.removed + after.removed === 0 || before.added + after.added === 0) continue
     if (run.steps.length >= Math.max(before.removed, before.added) || run.steps.length >= Math.max(after.removed, after.added)) continue
     const merged: Run = {
@@ -184,26 +233,32 @@ function withoutChanceMatches(steps: readonly Step[]): Step[] {
     // The merged edit now stands at index - 1, and the kept run before it is looked at next.
     index = Math.max(0, index - 3)
   }
-  // The end of a text that is cut off, i.e. the script ends with a removal: the kept runs of 3 code points or fewer
-  // after the last longer kept run are chance matches when the broken text adds more code points there than these
-  // runs keep. E.g. `ed]` at the end of `["x... [truncated]` for `["x-ray", "urgent", "retired"]}`, where the rule
-  // above keeps `ed` because only a quote is removed after it.
+  // The end of a text that is cut off, i.e. the script's last edit removes the valid text's end. The cut is taken to
+  // be at the first edit of more than 3 code points after the last kept run that is longer than 3, or that is no
+  // chance match by the list above. The kept runs after the cut are chance matches when the broken text adds
+  // more code points from the cut on than these runs keep. E.g. `ed]` at the end of `["x... [truncated]` for
+  // `["x-ray", "urgent", "retired"]}`, where the rule above keeps `ed` because only a quote is removed after it, and
+  // the letters that `[Preview ends here]  Open the whole file` shares with the part that is missing, where the
+  // edits between two such letters are as short as the letters. The `":` of `\"size\":"..., 24) = 24` stands before
+  // the cut, since the edit before it adds one backslash. A short run of the document between a longer edit and
+  // the cut is lost with the chance matches, e.g. the `, 2` of `[1, NaN, 2 ...` for `[1, null, 2, 3]`.
   const last = runs.at(-1)
-  if (last !== undefined && last.isEdit && last.added === 0) {
-    const lastLongRun = runs.findLastIndex(run => !run.isEdit && run.steps.length > chanceMatchLength)
-    // Without a longer kept run, the first run is left out: a kept run at the very start of both texts, or text
-    // before the whole original, e.g. the line of a code fence before `nul`, after which `nul` is kept.
-    const from = lastLongRun !== -1 ? lastLongRun + 1 : 1
-    const end = runs.slice(from)
+  if (last !== undefined && last.isEdit && last.removed > 0) {
+    const lastLongRun = runs.findLastIndex(run => !run.isEdit && (run.steps.length > chanceMatchLength || noChanceMatch.has(run)))
+    // Without such a kept run, the first run is left out: a kept run at the very start of both texts.
+    const cut = runs.findIndex((run, index) => index >= (lastLongRun !== -1 ? lastLongRun + 1 : 1) && run.isEdit && run.removed + run.added > chanceMatchLength)
+    const end = cut === -1 ? [] : runs.slice(cut)
     const kept = end.reduce((total, run) => total + (run.isEdit ? 0 : run.steps.length), 0)
     const added = end.reduce((total, run) => total + run.added, 0)
-    if (kept > 0 && kept < added) return [...runs.slice(0, from).flatMap(run => run.steps), ...end.flatMap(run => run.isEdit ? run.steps : run.steps.flatMap((): Step[] => ['remove', 'add']))]
+    if (kept > 0 && kept < added) return [...runs.slice(0, cut).flatMap(run => run.steps), ...end.flatMap(run => run.isEdit ? run.steps : run.steps.flatMap((): Step[] => ['remove', 'add']))]
   }
   return runs.flatMap(run => run.steps)
 }
 
-// Rule 4: a pair with no kept code point and no other pair beside it in the broken text, inside an edit that removes
-// more than the pair's own counterpart, is no pair: its code point is added and its counterpart removed.
+// Rule 4: a pair with no kept code point and no other pair beside it in the broken text is no pair when the edit
+// around it removes more than the pair's own counterpart, or when the pair is the broken text's first or last code
+// point, e.g. the `]` of `"period":null⏎[output truncated]` for `"period":null}`. Its code point is added and its
+// counterpart removed.
 function withoutLonePairs(steps: readonly Step[]): Step[] {
   const isAnchor = (step: Step | undefined) => step === 'keep' || step === 'pair'
   // The neighbor of a step in the broken text: the nearest step on that side that is no removal.
@@ -219,7 +274,7 @@ function withoutLonePairs(steps: readonly Step[]): Step[] {
     return false
   }
   return steps.flatMap((step, index): Step[] =>
-    step === 'pair' && !isAnchor(neighbor(index, -1)) && !isAnchor(neighbor(index, 1)) && removesBeside(index) ? ['remove', 'add'] : [step])
+    step === 'pair' && !isAnchor(neighbor(index, -1)) && !isAnchor(neighbor(index, 1)) && (removesBeside(index) || neighbor(index, -1) === undefined || neighbor(index, 1) === undefined) ? ['remove', 'add'] : [step])
 }
 
 // The edits of a script. A pair is an edit of its own that replaces one for one.
@@ -282,7 +337,10 @@ function partsOf(valid: readonly string[]) {
 export function align(broken: string, valid: string): Aligned {
   const brokenCodePoints = Array.from(broken)
   const validCodePoints = Array.from(valid)
-  const steps = withoutLonePairs(withoutChanceMatches(scriptOf(brokenCodePoints, 0, brokenCodePoints.length, validCodePoints, 0, validCodePoints.length)))
+  // A pair that is alone is no pair before the chance matches are looked for, so that the script of a text that is
+  // cut off ends with its removal, and again after it, when the kept code points beside a pair may be gone.
+  const script = withoutLonePairs(scriptOf(brokenCodePoints, 0, brokenCodePoints.length, validCodePoints, 0, validCodePoints.length))
+  const steps = withoutLonePairs(withoutChanceMatches(script, brokenCodePoints, validCodePoints))
   const applied = applyEdits(validCodePoints, canonicalEdits(validCodePoints, editsOf(steps, brokenCodePoints, validCodePoints)))
   if (applied.broken !== broken) throw new Error('align.ts found edits that do not give the broken text')
   const {alignment, replaced} = applied
@@ -308,8 +366,8 @@ export function align(broken: string, valid: string): Aligned {
   }
 
   // Rule 6: a number or a literal that is not whole in the broken text. What is left of it keeps its counterparts
-  // when only code points are missing: nothing is added inside it, nothing right before it unless the word's first
-  // code point is there, and nothing right after it unless its last one is there.
+  // when only code points are missing: nothing is added inside it, and no code point that can be a part of a word is
+  // added right before it or right after it, see `joinsWord`.
   for (const {start, end} of words) {
     const kept: number[] = []
     let paired = false
@@ -325,8 +383,8 @@ export function align(broken: string, valid: string): Aligned {
       const first = kept[0]!
       const last = kept.at(-1)!
       for (let position = first; position <= last; position++) if (alignment[position] === -1) onlyMissing = false
-      if (positionOf[start] === -1 && first > 0 && alignment[first - 1] === -1) onlyMissing = false
-      if (positionOf[end - 1] === -1 && last + 1 < alignment.length && alignment[last + 1] === -1) onlyMissing = false
+      if (first > 0 && alignment[first - 1] === -1 && joinsWord(brokenCodePoints[first - 1]!)) onlyMissing = false
+      if (last + 1 < alignment.length && alignment[last + 1] === -1 && joinsWord(brokenCodePoints[last + 1]!)) onlyMissing = false
     }
     if (onlyMissing) continue
     for (let index = start; index < end; index++) {
