@@ -7,8 +7,14 @@
 // counterpart's label, as in a sample of the dataset. The opinions are then held against each other per code point
 // of the broken text:
 // - agreed: every opinion gives it a label, and the same display kind, depth and container. Only these are scored.
+//   A value that an opinion's own reading leaves unscored, see unscoredOf, is no dispute with another opinion: e.g.
+//   one opinion misses a `]` right after a `}` and another on a line of its own, so they give the white space
+//   between another depth, which the rule on a missing bracket does not score in the first of them.
 // - added: every opinion says that it has no counterpart. It has no label, as in the dataset.
 // - disputed: anything else, e.g. one repair keeps a comma and the other removes it. It is kept apart.
+//
+// A repair that plainly breaks a rule of REPAIR.md can be left out for its one case: a line of left-out.txt names the
+// repair file without its ending, the id of the broken text, and the reason. The README lists these repairs.
 //
 // A written case is as near to a Sample of samples.ts as its making allows: the fields that both have are named as in
 // Sample and mean the same, see WrittenCase, and labelsOfWritten is what labelsOf is for a sample. What a written case
@@ -58,6 +64,9 @@ export type Opinion = {
 
 export type Agreement = 'agreed' | 'added' | 'disputed'
 
+// A repair that is left out of its case: the name of its opinion, and why.
+export type LeftOut = {name: string, reason: string}
+
 // The fields of Sample that a written case has with the same meaning, where `original` is the writer's intended text
 // and `alignment`, `replaced` and `firstDamage` are the writer's opinion. `debatable` is the writer's mark, where a
 // sample's is the judgment of its form.
@@ -71,6 +80,8 @@ export type WrittenCase = Pick<Sample, 'id' | 'documents' | 'original' | 'broken
   note: string | undefined
   // The writer's opinion first, then the repairs in the order of their files' names.
   opinions: Opinion[]
+  // The repairs of this case that left-out.txt names, which are no opinions of the case.
+  leftOut: LeftOut[]
   // Per code point of the broken text.
   agreement: Agreement[]
   // Positions in the broken text of agreed code points whose display kind is not scored, and of those whose depth and
@@ -218,23 +229,25 @@ export type RepairText = {name: string, repaired: string, unsure: string | undef
 // A case with its opinions and their agreement. It works with the writer's opinion alone, before any repair exists:
 // every code point is then agreed or added. Throws when a text is not what validTextProblems and brokenTextProblems
 // ask for.
-export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairText[] = []): WrittenCase {
+export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairText[] = [], leftOut: readonly LeftOut[] = []): WrittenCase {
   const problems = [...validTextProblems(texts.intended).map(problem => `the intended text: ${problem}`), ...brokenTextProblems(texts.broken).map(problem => `the broken text: ${problem}`)]
   if (problems.length > 0) throw new Error(problems.join('; '))
   const broken = Array.from(texts.broken)
   const trace = runTableParser(texts.broken)
   const opinions = [opinionOf('writer', texts.intended, undefined, texts.broken), ...repairs.map(repair => opinionOf(repair.name, repair.repaired, repair.unsure, texts.broken))]
   const writer = opinions[0]!
-  const agreement = broken.map((_, position): Agreement => {
-    const first = writer.labels[position]
-    if (opinions.every(opinion => opinion.labels[position] === undefined)) return 'added'
-    return first !== undefined && opinions.every(opinion => {
-      const label = opinion.labels[position]
-      return label !== undefined && label.kind === first.kind && label.depth === first.depth && label.container === first.container
-    }) ? 'agreed' : 'disputed'
-  })
-  // A value is not scored when the rules say so for any of the opinions.
+  // A value is not scored when the rules say so for any of the opinions, and such an opinion says nothing about the
+  // value: the opinions agree on a code point when those that score its display kind give the same one, and those
+  // that score its depth and container give the same two.
   const unscored = opinions.map(opinion => unscoredOf(opinion, broken, trace))
+  const agreement = broken.map((_, position): Agreement => {
+    if (opinions.every(opinion => opinion.labels[position] === undefined)) return 'added'
+    if (opinions.some(opinion => opinion.labels[position] === undefined)) return 'disputed'
+    const labelsThatScore = (pick: (sets: typeof unscored[number]) => Set<number>) => opinions.flatMap((opinion, index) => pick(unscored[index]!).has(position) ? [] : [opinion.labels[position]!])
+    const kinds = labelsThatScore(sets => sets.kinds)
+    const nestings = labelsThatScore(sets => sets.nesting)
+    return kinds.every(label => label.kind === kinds[0]!.kind) && nestings.every(label => label.depth === nestings[0]!.depth && label.container === nestings[0]!.container) ? 'agreed' : 'disputed'
+  })
   const positionsOf = (pick: (sets: typeof unscored[number]) => Set<number>) =>
     broken.flatMap((_, position) => agreement[position] === 'agreed' && unscored.some(sets => pick(sets).has(position)) ? [position] : [])
   const draft = {
@@ -242,16 +255,17 @@ export function caseOf(texts: CaseTexts, file: string, repairs: readonly RepairT
     documents: [texts.intended], original: texts.intended, broken: texts.broken, lineEnd: texts.intended.includes('\r\n') ? '\r\n' as const : '\n' as const,
     alignment: writer.alignment, replaced: writer.replaced, firstDamage: firstDamageOf(writer.alignment, writer.replaced, codePointLength(texts.intended)),
     firstErrorPosition: trace.firstErrorPosition, firstErrorKind: trace.firstErrorKind,
-    opinions, agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
+    opinions, leftOut: [...leftOut], agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
     disputedFromFirstError: agreement.some((state, position) => state === 'disputed' && position >= trace.firstErrorPosition),
   }
   const limits = limitsOf(broken, labelsOfWritten(draft), trace.firstErrorPosition)
   return {...draft, needsNestingFix: limits.needsNestingFix, needsDisplayFix: limits.needsDisplayFix}
 }
 
-// What labelsOf is for a sample: one entry per code point of the broken text. The entry is the label that every
-// opinion gives, with `undefined` for a value that is not scored, see Label. It is undefined for a code point that
-// every opinion calls added, and also for a disputed one, which no score counts: `agreement` tells the two apart.
+// What labelsOf is for a sample: one entry per code point of the broken text. The entry is the label that the
+// opinions give, with `undefined` for a value that is not scored by the reading of any of them, see Label. It is
+// undefined for a code point that every opinion calls added, and also for a disputed one, which no score counts:
+// `agreement` tells the two apart.
 export function labelsOfWritten(writtenCase: Pick<WrittenCase, 'opinions' | 'agreement' | 'unscoredKindPositions' | 'unscoredNestingPositions'>): (Label | undefined)[] {
   const unscoredKinds = new Set(writtenCase.unscoredKindPositions)
   const unscoredNesting = new Set(writtenCase.unscoredNestingPositions)
@@ -319,7 +333,23 @@ export function readWritten(folder: string = writtenFolder): {cases: WrittenCase
     if (repairs === undefined) repairsOf.set(entry.id, repairs = [])
     repairs.push({name: file.replace(/\.txt$/, ''), repaired: entry.repaired, unsure: entry.unsure})
   }
-  const cases = caseTexts.map(({file, texts}) => caseOf(texts, file, repairsOf.get(blindIdOf(texts.broken)) ?? []))
+  // The repairs that left-out.txt names are taken out of their cases. A line that names no repair of the folder is
+  // a problem, so that the list cannot outlive the repairs.
+  const leftOutOf = new Map<string, LeftOut[]>()
+  const leftOutFile = join(folder, 'left-out.txt')
+  const leftOutLines = existsSync(leftOutFile) ? readFileSync(leftOutFile, 'utf8').split('\n').filter(line => line.trim() !== '') : []
+  for (const line of leftOutLines) {
+    const [, name, id, reason] = /^(\S+) ([0-9a-f]{8}) (\S.*)$/.exec(line) ?? []
+    const repairs = id === undefined ? undefined : repairsOf.get(id)
+    const index = repairs?.findIndex(repair => repair.name === name) ?? -1
+    if (name === undefined || id === undefined || reason === undefined) problems.push(`left-out.txt: a line is the name of a repair file without its ending, the id of a broken text and the reason, with one space between them, and this line is not: ${line}`)
+    else if (repairs === undefined || index === -1) problems.push(`left-out.txt: repairs/${name}.txt has no repair of ${id} that could be left out`)
+    else {
+      repairs.splice(index, 1)
+      leftOutOf.set(id, [...(leftOutOf.get(id) ?? []), {name, reason}])
+    }
+  }
+  const cases = caseTexts.map(({file, texts}) => caseOf(texts, file, repairsOf.get(blindIdOf(texts.broken)) ?? [], leftOutOf.get(blindIdOf(texts.broken)) ?? []))
   return {cases, problems}
 }
 
@@ -333,13 +363,14 @@ if (import.meta.main) {
   console.log('Per case: the writer\'s file and id, the repairs, where the parser as it is has its first error, and from that code point on the')
   console.log('scored code points, the code points that every opinion calls added, and the disputed ones.')
   for (const writtenCase of cases) {
-    const marks = [...(writtenCase.debatable ? ['debatable'] : []), ...writtenCase.opinions.filter(opinion => opinion.unsure !== undefined).map(opinion => `${opinion.name} is unsure`)]
+    const marks = [...(writtenCase.debatable ? ['debatable'] : []), ...writtenCase.opinions.filter(opinion => opinion.unsure !== undefined).map(opinion => `${opinion.name} is unsure`), ...writtenCase.leftOut.map(repair => `${repair.name} is left out`)]
     console.log(`  ${writtenCase.file} ${writtenCase.id}: ${writtenCase.opinions.length - 1} repairs, first error at ${writtenCase.firstErrorPosition} of ${writtenCase.agreement.length} (${errorKinds[writtenCase.firstErrorKind]}), `
       + `${scoredCodePointsOfWritten(writtenCase)} scored, ${count(writtenCase.agreement, writtenCase.firstErrorPosition, 'added')} added, ${count(writtenCase.agreement, writtenCase.firstErrorPosition, 'disputed')} disputed${marks.length > 0 ? `, ${marks.join(', ')}` : ''}`)
   }
   const disputed = cases.filter(writtenCase => writtenCase.disputedFromFirstError)
   if (showDisputed) for (const writtenCase of disputed) console.log(`\n${describeOpinions(writtenCase)}`)
   const repaired = (wanted: number) => cases.filter(writtenCase => writtenCase.opinions.length - 1 === wanted).length
+  for (const writtenCase of cases) for (const repair of writtenCase.leftOut) console.log(`Left out: the repair of ${writtenCase.id} in ${repair.name}, which ${repair.reason}`)
   console.log(`${cases.length} cases: ${repaired(2)} with two repairs, ${repaired(1)} with one, ${repaired(0)} with none, ${cases.length - repaired(0) - repaired(1) - repaired(2)} with more. ${cases.length - disputed.length} with full agreement from the first error on, ${disputed.length} with a disputed code point there. ${problems.length} problems.`)
   if (problems.length > 0) process.exitCode = 1
 }

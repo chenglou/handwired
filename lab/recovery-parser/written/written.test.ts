@@ -2,10 +2,11 @@
 // agreement of several opinions, and the score.
 // Run from the repo root: bun test lab/recovery-parser
 import {expect, test} from 'bun:test'
-import {readFileSync} from 'node:fs'
+import {mkdirSync, mkdtempSync, readFileSync, writeFileSync} from 'node:fs'
+import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
-import {handRuleTables} from '../hand-rules.ts'
+import {handRuleTables, handRules} from '../hand-rules.ts'
 import {defaultSeed} from '../samples.ts'
 import {defaultTables} from '../table-parser.ts'
 import {align, standsFor} from './align.ts'
@@ -13,7 +14,7 @@ import {agreementWithDataset, writtenCasesAgainstDataset} from './check-align.ts
 import {caseNotes, caseProblems} from './check-cases.ts'
 import {repairNotes} from './check-repairs.ts'
 import {type CaseEntry, caseFileText, linesOfText, mistypedNames, partFileText, readCaseFile, readPartFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
-import {scoreCases, scoreTables} from './score.ts'
+import {type Score, scoreCases, scoreTables} from './score.ts'
 import {changesOf, describeCase, describeOpinions, whiteSpaceOnlyChanges} from './show.ts'
 import {blindIdOf, brokenTextProblems, caseOf, labelsOfWritten, readWritten, scoredCodePointsOfWritten, validTextProblems, writtenFolder} from './written.ts'
 
@@ -265,6 +266,44 @@ test('three opinions about a made-up case', () => {
   expect(describeOpinions(writtenCase)).toContain('agree          .............!!!!+.')
 })
 
+test('a value that an opinion does not score is no dispute with another opinion', () => {
+  // A `]` is missing after the entry of "teams". The writer has it on a line of its own, and the repair has it
+  // right after the brace, so the line feed after the brace is inside the array by the one and after it by the other.
+  const texts = {...madeUp, intended: '{"teams": [\n  {"id": 1}\n],\n"count": 1}', broken: '{"teams": [\n  {"id": 1}\n,\n"count": 1}'}
+  const writtenCase = caseOf(texts, 'made-up.txt', [{name: 'part-1.a', repaired: '{"teams": [\n  {"id": 1}]\n,\n"count": 1}', unsure: undefined}])
+  const lineFeed = texts.broken.indexOf('\n,')
+  expect(writtenCase.opinions.map(opinion => opinion.labels[lineFeed]!.depth)).toEqual([2, 1])
+  // The repair's reading does not score the depth there, since a bracket is missing before the line feed, so the two
+  // opinions agree, and the label has the display kind alone.
+  expect(writtenCase.agreement[lineFeed]).toBe('agreed')
+  expect(labelsOfWritten(writtenCase)[lineFeed]).toEqual({kind: displayKind.whitespace, depth: undefined, container: undefined})
+  expect(writtenCase.agreement).not.toContain('disputed')
+  // A display kind that both opinions score still makes a dispute.
+  const otherKind = caseOf(madeUp, 'made-up.txt', [{name: 'part-1.a', repaired: '{"a": 1, "b": "None"}', unsure: undefined}])
+  expect(otherKind.agreement).toContain('disputed')
+})
+
+test('a repair that left-out.txt names is no opinion of its case', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'written-'))
+  mkdirSync(join(folder, 'cases'))
+  mkdirSync(join(folder, 'repairs'))
+  const texts = {...madeUp, intended: '{"retries": 3, "timeout": 30}', broken: '{"retries": 3, "timeout": 30,}'}
+  const id = blindIdOf(texts.broken)
+  writeFileSync(join(folder, 'cases', 'made-up.txt'), caseFileText([texts]))
+  writeFileSync(join(folder, 'repairs', 'part-1.a.txt'), repairFileText([{id, repaired: texts.intended, unsure: undefined}]))
+  // The second repair lays the text out anew, against the rule.
+  writeFileSync(join(folder, 'repairs', 'part-1.b.txt'), repairFileText([{id, repaired: '{\n  "retries": 3,\n  "timeout": 30\n}', unsure: undefined}]))
+  expect(readWritten(folder).cases[0]!.opinions.map(opinion => opinion.name)).toEqual(['writer', 'part-1.a', 'part-1.b'])
+  writeFileSync(join(folder, 'left-out.txt'), `part-1.b ${id} lays the text out anew\n`)
+  const {cases, problems} = readWritten(folder)
+  expect(problems).toEqual([])
+  expect(cases[0]!.opinions.map(opinion => opinion.name)).toEqual(['writer', 'part-1.a'])
+  expect(cases[0]!.leftOut).toEqual([{name: 'part-1.b', reason: 'lays the text out anew'}])
+  // A line that names no repair of the folder, and a line in another form, are problems.
+  writeFileSync(join(folder, 'left-out.txt'), `part-1.c ${id} lays the text out anew\nsome other line\n`)
+  expect(readWritten(folder).problems.map(problem => problem.slice(0, 40))).toEqual(['left-out.txt: repairs/part-1.c.txt has n', 'left-out.txt: a line is the name of a re'])
+})
+
 test('a case with the writer\'s opinion alone, and its score', () => {
   const writtenCase = caseOf(madeUp, 'made-up.txt')
   expect(writtenCase.opinions.length).toBe(1)
@@ -368,6 +407,28 @@ test('the examples of README.md and of REPAIR.md are what the two pages say', ()
   const unsure = caseOf({id: part.items[1]!.id, from: '', note: undefined, debatable: false, intended: repairs.items[1]!.repaired, broken: part.items[1]!.broken}, 'REPAIR.md')
   unsure.opinions[0]!.unsure = repairs.items[1]!.unsure
   expect(repairBlocks.find(block => block.startsWith('--- 62b4f3bc'))).toBe(`${describeCase(unsure, 'rep')}\n`)
+})
+
+test('the README has the numbers that score.ts gives', () => {
+  const {cases} = readWritten()
+  const readers = [defaultTables, ...handRules.map(rule => handRuleTables(rule))].map(tables => scoreTables(tables, cases))
+  const percent = (part: number, whole: number) => (100 * part / whole).toFixed(1)
+  const row = (name: string, pick: (score: typeof readers[number]) => Score) => {
+    const first = pick(readers[0]!)
+    const cells = readers.map(score => `${percent(pick(score).right, pick(score).scored)} / ${percent(pick(score).wholeRight, pick(score).cases - pick(score).nothingToRecover)}`)
+    return `| ${name} | ${first.cases} | ${first.nothingToRecover} | ${first.scored.toLocaleString('en-US')} | ${cells.join(' | ')} |`
+  }
+  const readme = readFileSync(join(writtenFolder, 'README.md'), 'utf8')
+  expect(readme).toContain(row('Cases with full agreement', score => score.all.fullAgreement))
+  expect(readme).toContain(row('All cases, the agreed code points', score => score.all.agreedCodePoints))
+  for (const file of readers[0]!.perFile.keys()) expect(readme).toContain(row(`\`${file}\`, full agreement`, score => score.perFile.get(file)!.fullAgreement))
+  const disputed = cases.filter(writtenCase => writtenCase.disputedFromFirstError)
+  const disputedCodePoints = disputed.reduce((total, writtenCase) => total + writtenCase.agreement.filter((state, position) => state === 'disputed' && position >= writtenCase.firstErrorPosition).length, 0)
+  expect(readme).toContain(`| All | ${cases.length} | ${cases.length - disputed.length} | ${disputed.length} |`)
+  expect(readme).toContain(`They stay disputed, with ${disputedCodePoints} code points`)
+  // Every case that the page names as disputed is, and the page names every disputed case.
+  for (const writtenCase of disputed) expect(readme).toContain(`\`${writtenCase.id}\``)
+  expect(cases.flatMap(writtenCase => writtenCase.leftOut.map(() => writtenCase.id))).toEqual(['logs-and-transport-11', 'logs-and-transport-14'])
 })
 
 test('the cases and the repairs of the folder have no problem', () => {
