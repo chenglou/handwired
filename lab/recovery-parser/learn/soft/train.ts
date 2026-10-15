@@ -176,7 +176,8 @@ export type TrainPoint = {
 export type TrainResult = {
   // The snapped tables of the log point with the best share of all three labels on the picking half of the
   // validation split, and the ones after the last sample. With TrainOptions.onlyReadCells both hold the base tables'
-  // choice in the cells that no trained text reads.
+  // choice in the cells that no trained text reads. Without TrainOptions.validation nothing is scored, so no log
+  // point is the best one: `best` is then `last`, and `bestPoint` is undefined.
   best: RecoveryTables
   bestPoint: TrainPoint | undefined
   last: RecoveryTables
@@ -382,6 +383,8 @@ export async function train(model: TwinModel, data: TwinData, options: TrainOpti
     }
   }
   await batches.close()
+  // Without a validation split no log point was scored, and `best` still holds the tables from before training.
+  if (bestPoint === undefined) best = last
   return {best, bestPoint, last, points, samplesPerSecond: samplesSeen / (trainingMilliseconds / 1000)}
 }
 

@@ -4,7 +4,8 @@
 //   bun lab/recovery-parser/learn/soft/check-train.ts
 //
 // 1. The gradients of a batch from 4 worker threads are the gradients from one thread.
-// 2. Two runs with the same seed end with the same weights, bit for bit, and another seed with other weights.
+// 2. Two runs with the same seed end with the same weights, bit for bit, and another seed with other weights. A run
+//    without a validation split returns its last tables as its best ones.
 // 3. A model that starts at the base tables, or uniform, snaps to the base tables. Snapped tables of a trained model
 //    keep the ground rules, and are the same tables after saving and loading.
 // 4. With a tenth of the open cells trainable, the model's trainable cells are the ones it was given, every other
@@ -82,7 +83,9 @@ const trained = createModel(base)
 {
   const again = createModel(base)
   const other = createModel(base)
-  await train(trained, data, {...trainOptions, seed: 3})
+  const result = await train(trained, data, {...trainOptions, seed: 3})
+  // Without a validation split no log point is scored, and the best tables are the last ones, not the base tables.
+  check(result.bestPoint === undefined && tablesToJson(result.best) === tablesToJson(result.last) && differencesOf(base, result.best).length > 0, 'without a validation split, the best tables of a run are not its last tables')
   await train(again, data, {...trainOptions, seed: 3, places: everyPlace})
   await train(other, data, {...trainOptions, seed: 4})
   let same = 0
