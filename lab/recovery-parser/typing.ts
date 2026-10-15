@@ -42,7 +42,8 @@ export type TypingReplay = {
   // bracket when the opening one is typed, e.g. VS Code.
   editor: 'plain' | 'auto-closing'
   // When the comma that joins a new last entry to the entry before it is typed: before the entry, after it, or never.
-  // 'none' when the typed range needs no such comma.
+  // 'never' is also a new entry on a line before another entry whose own comma is never typed. 'none' in every other
+  // replay: the range needs no comma, or its comma is typed in its place.
   comma: 'first' | 'last' | 'never' | 'none'
   // What is typed, in words, e.g. "the last member of an object at depth 2".
   target: string
@@ -90,7 +91,11 @@ type Target = {
   // The range of the finished document that is typed, in typing order.
   from: number
   to: number
-  // The position of the joining comma when it is typed apart from the range, or -1.
+  // Where the cursor is after the last key press: `to`, or the place before the range's last code point, a comma, when
+  // that comma is never typed.
+  typedUpTo: number
+  // The position of the comma that joins a new last entry to the entry before it, when it is typed apart from the
+  // range, or -1. It comes before the range.
   comma: number
   commaMode: TypingReplay['comma']
   // The entry that is added, deleted or changed, or null when the whole document is typed.
@@ -103,7 +108,7 @@ function chooseTarget(random: Random, scanned: Scan): Target | undefined {
   const action = random.weighted([['add an entry', 58], ['delete an entry', 17], ['change a value', 17], ['type the document', 8]] as const)
   if (action === 'type the document' || scanned.entries.length === 0) {
     // White space before the document, e.g. an empty first line, is there from the start.
-    return {action: 'type the document', from: scanned.root.start, to: codePoints.length, comma: -1, commaMode: 'none', entry: null, description: 'the whole document'}
+    return {action: 'type the document', from: scanned.root.start, to: codePoints.length, typedUpTo: codePoints.length, comma: -1, commaMode: 'none', entry: null, description: 'the whole document'}
   }
   if (action === 'change a value') {
     // Mostly the value of a member, and mostly a scalar or a string.
@@ -111,7 +116,7 @@ function chooseTarget(random: Random, scanned: Scan): Target | undefined {
     const pool = members.length > 0 && random.chance(0.85) ? members : scanned.entries
     const short = pool.filter(entry => entry.value.container === null)
     const entry = random.pick(short.length > 0 && random.chance(0.9) ? short : pool)
-    return {action, from: entry.value.start, to: entry.value.end, comma: -1, commaMode: 'none', entry, description: `the ${entry.value.type} value of ${entry.key === null ? 'an item' : 'a member'} at depth ${entry.container.depth}`}
+    return {action, from: entry.value.start, to: entry.value.end, typedUpTo: entry.value.end, comma: -1, commaMode: 'none', entry, description: `the ${entry.value.type} value of ${entry.key === null ? 'an item' : 'a member'} at depth ${entry.container.depth}`}
   }
   // People append: the new entry is the last of its container in most replays.
   const last = scanned.entries.filter(entry => entry.commaAfter === -1 && entry.index > 0)
@@ -128,12 +133,13 @@ function chooseTarget(random: Random, scanned: Scan): Target | undefined {
     const comma = container.entries[entry.index - 1]!.commaAfter
     // Backspace over a last entry ends at the comma before it, which is the order "comma first" read backwards.
     const commaMode = action === 'delete an entry' ? 'first' : random.weighted([['first', 60], ['last', 25], ['never', 15]] as const)
-    return {action, from: commaMode === 'first' ? comma : comma + 1, to: entry.end, comma: commaMode === 'first' ? -1 : comma, commaMode, entry, description: `the last ${what}`}
+    return {action, from: commaMode === 'first' ? comma : comma + 1, to: entry.end, typedUpTo: entry.end, comma: commaMode === 'first' ? -1 : comma, commaMode, entry, description: `the last ${what}`}
   }
   if (place === 'only') {
     // The brackets were there before. When the closer is on a line of its own, that line was there too.
     const closerOnOwnLine = codePoints.slice(entry.end, container.close).includes('\n')
-    return {action, from: container.open + 1, to: closerOnOwnLine ? entry.end : container.close, comma: -1, commaMode: 'none', entry, description: `the only ${what}`}
+    const to = closerOnOwnLine ? entry.end : container.close
+    return {action, from: container.open + 1, to, typedUpTo: to, comma: -1, commaMode: 'none', entry, description: `the only ${what}`}
   }
   // An entry before another one. In a container on several lines the person presses Enter at the end of the line
   // above and types the entry and its comma. Inside a line the person types the entry, its comma and the space.
@@ -141,10 +147,12 @@ function chooseTarget(random: Random, scanned: Scan): Target | undefined {
   while (before > 0 && isWhitespace(codePoints[before - 1])) before--
   const ownLine = codePoints.slice(before, entry.start).includes('\n')
   const next = container.entries[entry.index + 1]!
-  // In some replays of a new line, the comma after the new entry is never typed.
+  // In some replays of a new line, the comma after the new entry is never typed. The comma is then still the end of
+  // the range, and the typing stops before it, so that every text of such a replay is a text of the replay that goes
+  // on to the comma, with the same edits.
   const never = action === 'add an entry' && ownLine && random.chance(0.15)
-  const to = never ? entry.end : ownLine ? entry.commaAfter + 1 : next.start
-  return {action, from: ownLine ? before : entry.start, to, comma: never ? entry.commaAfter : -1, commaMode: never ? 'never' : 'none', entry, description: `${entry.index === 0 ? 'the first' : 'a middle'} ${what}`}
+  const to = ownLine ? entry.commaAfter + 1 : next.start
+  return {action, from: ownLine ? before : entry.start, to, typedUpTo: never ? entry.end : to, comma: -1, commaMode: never ? 'never' : 'none', entry, description: `${entry.index === 0 ? 'the first' : 'a middle'} ${what}`}
 }
 
 // The cursor positions after each key press while the range is typed: one code point per key press, and a line feed
@@ -189,6 +197,7 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
         }
       }
     }
+    // The removals in text order: the joining comma, which comes before the range, and then what is not typed yet.
     const edits: Edit[] = []
     if (!commaTyped && target.comma !== -1) edits.push(removeRange(target.comma, target.comma + 1))
     let start = -1
@@ -200,13 +209,7 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
         start = -1
       }
     }
-    let text = ''
-    let position = 0
-    for (const edit of edits) {
-      text += codePoints.slice(position, edit.at).join('')
-      position = edit.at + edit.remove
-    }
-    text += codePoints.slice(position).join('')
+    const text = applyEdits(codePoints, edits).broken
     const valid = parses(text)
     const step: TypingStep = {key, text, edits, valid, kinds: [], reachable: 'yes', needsRules: [], unscoredKinds: [], debatable: false}
     if (valid) return step
@@ -347,7 +350,7 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
     return {...before, key: `${wrong} in place of ${right}`, text, edits, valid, kinds: valid ? [] : [...before.kinds, 'typingSlip'], needsRules: [...before.needsRules], unscoredKinds: [...before.unscoredKinds]}
   }
 
-  const stops = cursorStops(codePoints, from, to)
+  const stops = cursorStops(codePoints, from, target.typedUpTo)
   const steps: TypingStep[] = []
   // The text before the first key press: the document without the typed range. A document typed from the top starts
   // from an empty text, which is not a step.

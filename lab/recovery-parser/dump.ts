@@ -24,7 +24,7 @@ import {mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {errorKinds} from '../../src/json-search/highlighter/kinds.ts'
 import {kinds} from './damage.ts'
-import {applyEdits} from './edits.ts'
+import {applyEdits, mergeEdits} from './edits.ts'
 import {kindLetters, labelsOfValidText} from './labels.ts'
 import {createRandom} from './random.ts'
 import {type Sample, defaultSeed, groupOf, labelsOf, sampleAt, scoredCodePoints, typingReplayOf} from './samples.ts'
@@ -147,8 +147,10 @@ function describeReplay(seed: number, index: number): string | undefined {
     lines.push(`  text  ${visible(step.text)}`)
     if (step.valid) return
     const trace = runTableParser(step.text)
-    // The label of every code point of the step's text, through the step's edits. A wrong key press adds one.
-    const {alignment} = applyEdits(finished, step.edits)
+    // The label of every code point of the step's text, through the step's edits. A wrong key press adds one. The
+    // edits of a step are in text order, which invariants.test.ts checks, and they are sorted here all the same, so
+    // that a replay can still be printed when a step breaks that rule.
+    const {alignment} = applyEdits(finished, mergeEdits([step.edits], finished.length) ?? step.edits)
     const unscored = new Set(step.unscoredKinds)
     lines.push(`  want  ${alignment.map(original => original === -1 ? ' ' : unscored.has(original) ? '?' : kindLetters[labels[original]!.kind]).join('')}`)
     lines.push(`  now   ${alignment.map((_, brokenIndex) => kindLetters[trace.displayKind[brokenIndex]!]).join('')}`)

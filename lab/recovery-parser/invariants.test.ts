@@ -10,7 +10,8 @@ import {contradictions, kinds} from './damage.ts'
 import {applyEdits, canonicalEdits} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
 import {labelsOfValidText, tokenSequenceOf} from './labels.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, sampleAt, splitOf} from './samples.ts'
+import {createRandom} from './random.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, sampleAt, splitOf, typingReplayOf} from './samples.ts'
 import {capacity, defaultTables, isLexerErrorEvent, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
@@ -227,6 +228,53 @@ test('the split is a function of the original\'s tokens, and held-out kinds and 
   // not in most of its samples.
   const withHeldOutKind = samples.filter(sample => sample.kinds.some(kind => heldOutKinds.includes(kind)))
   expect(withHeldOutKind.filter(sample => sample.template === heldOutTemplate).length).toBeLessThan(withHeldOutKind.length * 0.3)
+})
+
+test('every text of a typing replay is what its edits give from the finished document', () => {
+  let brokenSteps = 0
+  let wrongKeys = 0
+  // Replays in which the comma after a new first or middle entry is never typed, and replays in which the comma
+  // before a new last entry is typed last or never: the two ways in which a comma is typed apart from its entry.
+  let commaNeverAfter = 0
+  let commaApartBefore = 0
+  for (const [seed, count] of [[defaultSeed, 1200], [271828, 600]] as const) {
+    for (let index = 0; index < count; index++) {
+      const made = typingReplayOf(createRandom(seed, index))
+      if (made === undefined || 'otherSplit' in made) continue
+      const {replay} = made
+      const finished = Array.from(replay.finished)
+      const what = `replay ${seed}:${index} (${replay.editor} editor, ${replay.action}: ${replay.target}, its comma ${replay.comma})`
+      if (replay.comma === 'never' && !replay.target.startsWith('the last')) commaNeverAfter++
+      if (replay.comma !== 'none' && replay.target.startsWith('the last')) commaApartBefore++
+      for (const step of replay.steps) {
+        // applyEdits throws when the edits overlap or are not in text order.
+        let applied
+        try {
+          applied = applyEdits(finished, step.edits)
+        } catch (error) {
+          throw new Error(`${what}: the edits of the step ${JSON.stringify(step.key)} cannot be applied: ${(error as Error).message}`)
+        }
+        if (applied.broken !== step.text) throw new Error(`${what}: the text of the step ${JSON.stringify(step.key)} is not what its edits give\n  text  ${JSON.stringify(step.text)}\n  edits ${JSON.stringify(applied.broken)}`)
+        if (step.valid !== parses(step.text)) throw new Error(`${what}: the step ${JSON.stringify(step.key)} says ${step.valid ? 'valid' : 'broken'} against JSON.parse`)
+        if (step.valid) continue
+        brokenSteps++
+        if (step.kinds.length === 0) throw new Error(`${what}: the broken step ${JSON.stringify(step.key)} has no kind`)
+        if (step.kinds.includes('typingSlip')) wrongKeys++
+        // A wrong key press adds one code point, and every other step only removes.
+        const added = applied.alignment.filter(counterpart => counterpart === -1).length
+        if (added !== Number(step.kinds.includes('typingSlip'))) throw new Error(`${what}: the step ${JSON.stringify(step.key)} adds ${added} code points`)
+        for (const unscored of step.unscoredKinds) {
+          if (!applied.alignment.includes(unscored)) throw new Error(`${what}: the step ${JSON.stringify(step.key)} lists the code point ${unscored} as not scored, and its text does not hold it`)
+        }
+      }
+      // A replay whose comma is never typed ends with the entry and without that comma.
+      if (replay.comma === 'never' && !replay.steps.at(-1)!.kinds.includes('missingComma')) throw new Error(`${what}: the last step is not an entry without its comma`)
+    }
+  }
+  expect(brokenSteps).toBeGreaterThan(10_000)
+  expect(wrongKeys).toBeGreaterThan(100)
+  expect(commaNeverAfter).toBeGreaterThan(10)
+  expect(commaApartBefore).toBeGreaterThan(50)
 })
 
 test('the same seed and index give the same sample twice, another index gives another sample, and two seeds are unrelated', () => {
