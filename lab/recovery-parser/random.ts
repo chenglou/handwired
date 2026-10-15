@@ -1,15 +1,18 @@
 // Random choices for the dataset. Every choice is a hash of the seed, the sample's index and a counter, with lowbias32 as
 // in src/json-search/documents.ts, and never Math.random or the clock. So sample 73,512 can be made without making the
-// ones before it, and two runs make the same samples.
+// ones before it, and two runs make the same samples. Two seeds give unrelated samples.
 
 function lowbias32(n: number) {
   n = Math.imul((n >>> 16) ^ n, 0x21f0aaad)
   n = Math.imul((n >>> 15) ^ n, 0xd35a2d97)
   return (n >>> 15) ^ n
 }
-// A number in [0, 1) from three integers.
-function hash3(a: number, b: number, c: number) {
-  return (lowbias32(lowbias32(lowbias32(a) ^ b) ^ c) >>> 0) / 0x100000000
+// A number in [0, 1) from the seed, the sample's index and the counter. The counter is mixed with the seed before the
+// index comes in, so that no single number stands for a pair of seed and index: with lowbias32(lowbias32(seed) ^ index)
+// as the state, index i of one seed would give the same numbers as index i ^ d of another seed, for one d per pair of
+// seeds.
+function hash3(seed: number, index: number, counter: number) {
+  return (lowbias32(lowbias32(lowbias32(seed) ^ lowbias32(counter)) ^ index) >>> 0) / 0x100000000
 }
 
 // A hash of a text as an unsigned 32-bit integer, e.g. for the split of a sample by its original document.
