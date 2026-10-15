@@ -1,6 +1,6 @@
-// Two settings of the tables that are written by hand and train nothing. Both change only cells that invalid input
-// reaches, so valid JSON is read as before. They are what a trained result is to be compared with: the parser as it is
-// gives up at the first error on purpose, so nearly any change to those cells scores better than it does.
+// Three settings of the tables that are written by hand and train nothing. All change only cells that valid JSON
+// never reads, so valid JSON is read as before. They are what a trained result is to be compared with: the parser as
+// it is gives up at the first error on purpose, so nearly any change to those cells scores better than it does.
 //
 // - 'stay': a tokenizer error does not start an error line, so the next character starts a token again, and a token
 //   that the grammar does not accept is ignored, so the grammar stays in its state.
@@ -12,6 +12,10 @@
 //   'resync' also gives the tokenizer's error cells another event where what the character is is plain, see
 //   `plainEvents`. Without that the one code point at which the tokenizer's error is found stays shown as an error, and
 //   a sample that the rule otherwise reads in full is never right as a whole.
+// - 'words': as 'resync', and a word where no token of JSON starts is read as a string, see `wordEvents`. E.g. in
+//   {port: 8080, 'env': production} the tokenizer gives `port`, `'env'` and `production` the events of a string, and
+//   the grammar shows the first two as keys and the third as a string, as it does with strings between quotes. It is
+//   one more row of the tokenizer's table, and it scores about 8 points of code points above 'resync'.
 import {type ParserTables, classNames, defaultTables, eventNames, grammarStateNames, lexerStateNames, tokenNames} from './table-parser.ts'
 
 type LexerState = typeof lexerStateNames[number]
@@ -52,7 +56,33 @@ function plainEvents(): [LexerState, CharacterClass, typeof eventNames[number], 
   return cells
 }
 
-export const handRules = ['stay', 'resync'] as const
+// What 'words' puts into error cells of the tokenizer on top of 'resync'. The row of the state errorLine, which
+// 'stay' never enters, is the state inside a word.
+function wordEvents(): [LexerState, CharacterClass, typeof eventNames[number], LexerState][] {
+  const letters: readonly CharacterClass[] = ['a', 'b', 'e', 'capitalE', 'f', 'l', 'n', 'r', 's', 't', 'u', 'otherHexLetter', 'other']
+  const literalStates: readonly LexerState[] = ['t', 'tr', 'tru', 'f', 'fa', 'fal', 'fals', 'n', 'nu', 'nul']
+  const numberStates: readonly LexerState[] = ['minus', 'zero', 'integer', 'dot', 'fraction', 'exponent', 'exponentSign', 'exponentDigits']
+  const cells: [LexerState, CharacterClass, typeof eventNames[number], LexerState][] = []
+  // A letter between two tokens opens a word. The class `other` holds most characters, e.g. the apostrophe, $ and (.
+  // The letters t, f and n start a literal there by cells that valid JSON reads, which stay as they are.
+  for (const letter of letters) cells.push(['between', letter, 'stringStart', 'errorLine'])
+  // A literal or a number that goes on with a character that it cannot have is a word from there on, e.g. the i of
+  // nil, the a of name, the second dot of 1.4.2 and the second minus of 2026-04-08.
+  for (const state of literalStates) for (const characterClass of [...letters, 'zero', 'digit', 'minus', 'dot'] as const) cells.push([state, characterClass, 'stringContent', 'errorLine'])
+  for (const state of numberStates) for (const characterClass of [...letters, 'dot', 'minus'] as const) cells.push([state, characterClass, 'stringContent', 'errorLine'])
+  // Inside a word: white space, a bracket, a colon and a comma end it and are read as between two tokens, a quote
+  // opens a string, as after ObjectId(, and every other character goes on with the word.
+  const between = lexerStateNames.indexOf('between') * defaultTables.classCount
+  for (const characterClass of classNames) {
+    if (characterClass === 'end' || characterClass === 'truncatedEnd') continue
+    if (afterAValue.includes(characterClass) || characterClass === 'openBrace' || characterClass === 'openBracket') cells.push(['errorLine', characterClass, eventNames[defaultTables.lexerEvent[between + classNames.indexOf(characterClass)]!]!, 'between'])
+    else if (characterClass === 'quote') cells.push(['errorLine', characterClass, 'stringStart', 'string'])
+    else cells.push(['errorLine', characterClass, 'stringContent', 'errorLine'])
+  }
+  return cells
+}
+
+export const handRules = ['stay', 'resync', 'words'] as const
 export type HandRule = typeof handRules[number]
 
 export function handRuleTables(rule: HandRule): ParserTables {
@@ -62,9 +92,9 @@ export function handRuleTables(rule: HandRule): ParserTables {
   const {symbolCount, contextCount, errorState} = defaultTables
   const lexerNext = defaultTables.lexerNext.map(next => next === errorLine ? between : next)
   const lexerEvent = [...defaultTables.lexerEvent]
-  if (rule === 'resync') {
+  if (rule !== 'stay') {
     const errorToken = tokenNames.indexOf('lexerError')
-    for (const [state, characterClass, event, next] of plainEvents()) {
+    for (const [state, characterClass, event, next] of [...plainEvents(), ...(rule === 'words' ? wordEvents() : [])]) {
       const cell = lexerStateNames.indexOf(state) * defaultTables.classCount + classNames.indexOf(characterClass)
       if (defaultTables.grammarToken[defaultTables.lexerEvent[cell]!] !== errorToken) continue
       lexerEvent[cell] = eventNames.indexOf(event)
@@ -79,7 +109,7 @@ export function handRuleTables(rule: HandRule): ParserTables {
         const cell = state * symbolCount + token * contextCount + context
         if (grammarNext[cell] !== errorState) continue
         let next = state
-        if (rule === 'resync') {
+        if (rule !== 'stay') {
           const depthClass = Math.floor(context / 2)
           const inObject = context % 2 === 1
           const name = tokenNames[token]!

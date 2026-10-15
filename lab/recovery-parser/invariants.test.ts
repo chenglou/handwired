@@ -9,7 +9,7 @@ import {tableParserDifference} from './check-table-parser.ts'
 import {contradictions, kinds} from './damage.ts'
 import {type Edit, applyEdits, canonicalEdits, insertAt, removeRange, replaceOneForOne} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
-import {labelsOfValidText, tokenSequenceOf} from './labels.ts'
+import {kindLetters, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
 import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, typingReplayOf} from './samples.ts'
@@ -416,6 +416,9 @@ test('the hand-written settings of the tables read valid documents exactly as th
     // And they change something: a broken text is read in another way.
     expect(samples.some(sample => sample.source !== 'valid' && runTableParser(sample.broken, tables).displayKind.join() !== runTableParser(sample.broken, defaultTables).displayKind.join())).toBe(true)
   }
+  // The hand rule words shows a key and a value without quotes as what they are, and a word in single quotes too.
+  const shown = runTableParser("{port: 8080, 'env': production}", handRuleTables('words'))
+  expect(Array.from(shown.displayKind.slice(0, shown.length), kind => kindLetters[kind]).join('')).toBe('pkkkkpwnnnnpwkkkkkpwssssssssssp')
 })
 
 test('the split is a function of the original\'s tokens, and held-out kinds and the held-out template only sit in the test split', () => {

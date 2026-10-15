@@ -73,6 +73,7 @@ const readerNotes: Record<Reader, string> = {
   now: 'the parser as it is, which shows everything after its first error as an error',
   stay: 'hand-rules.ts: a tokenizer error starts no error line, and a token that the grammar does not accept is ignored',
   resync: 'hand-rules.ts: as stay, and such a token moves the grammar to the state that follows it in valid JSON',
+  words: 'hand-rules.ts: as resync, and a word where no token of JSON starts is read as a string, which the grammar shows as a key or a string',
 }
 // The hand rule that the mean of the samples' own shares is printed for: the last one, which scores highest.
 const lastRule: HandRule = handRules[handRules.length - 1]!
