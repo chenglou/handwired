@@ -217,7 +217,14 @@ export function sampleProblems(sample: Sample): string[] {
     // leave the broken text the same, unless it would run into the next edit.
     const limit = sample.edits[index + 1]?.at ?? original.length
     if (edit.oneForOne !== true && edit.insert === '' && edit.remove > 0 && edit.at + edit.remove < limit && original[edit.at + edit.remove] === original[edit.at]) problems.push(`the removal at ${edit.at} could start one code point later`)
-    if (edit.remove === 0 && edit.insert !== '' && edit.at < limit && original[edit.at] === inserted[0]) problems.push(`the insertion at ${edit.at} could sit one code point later`)
+    // Text before the whole original is the exception: it stays there, unless it is one code point, once or repeated.
+    // So the first edit is never such a text with its first code points taken for the original's, e.g. the prefix
+    // `2026-06-19 … - ` before `20142` as `26-06-19 … - 20` added after a kept `20`.
+    const oneCodePoint = inserted.every(character => character === inserted[0])
+    if (edit.remove === 0 && edit.insert !== '' && edit.at < limit && original[edit.at] === inserted[0] && (edit.at > 0 || oneCodePoint)) problems.push(`the insertion at ${edit.at} could sit one code point later`)
+    if (index === 0 && edit.remove === 0 && edit.at > 0 && edit.at <= inserted.length && !oneCodePoint && inserted.slice(inserted.length - edit.at).join('') === original.slice(0, edit.at).join('')) {
+      problems.push(`the insertion at ${edit.at} is text that stands before the whole original, with its first code points taken for the original's`)
+    }
   }
   for (; position < original.length; position++) {
     ownBroken.push(original[position]!)

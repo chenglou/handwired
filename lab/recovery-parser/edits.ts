@@ -14,6 +14,9 @@
 // that it can stand for. That is a rule for each edit alone: an edit moves as a whole and stops at the next edit, so
 // it is no rule for every way of pairing the two texts. E.g. when the line of an inner `}` is removed and the line of
 // the outer `}` follows, the `}` that is left is the outer one.
+//
+// Text that is added before the whole original stays there when it holds more than one code point repeated, e.g. a log
+// prefix that happens to start with the document's first characters: the prefix is added, and the document is kept.
 
 export type Edit = {
   // An index into the original's code points.
@@ -69,6 +72,12 @@ export type AppliedEdits = {
 // the dataset always says the later one: then the code points that a reader meets first are kept ones, with the labels
 // of the earlier code points of the original. The edits are in text order and don't overlap, as mergeEdits returns
 // them, and an edit never moves into the place of the edit after it.
+//
+// One insertion does not move: text before the whole original, unless it is one code point, once or repeated. Such a
+// text came from somewhere else as a whole, e.g. the log prefix `2026-06-19 12:23:40,515 - app.orders - ERROR - `
+// before the document `20142`. Moved, the `20` of the year would be kept as the start of the number, and the text
+// `26-06-19 … ERROR - 20` would be the added one. A second `{` before the `{` of a document still moves: there the
+// two readings add the same text, and the first brace is the kept one.
 export function canonicalEdits(original: readonly string[], edits: readonly Edit[]): Edit[] {
   const moved: Edit[] = [...edits]
   // From the last edit to the first, so that each edit moves up to where the edit after it now is.
@@ -82,6 +91,7 @@ export function canonicalEdits(original: readonly string[], edits: readonly Edit
       if (at !== edit.at) moved[index] = {...edit, at}
     } else if (edit.remove === 0 && edit.insert !== '') {
       const inserted = Array.from(edit.insert)
+      if (edit.at === 0 && inserted.some(character => character !== inserted[0])) continue
       let at = edit.at
       while (at < limit && original[at] === inserted[0]) {
         inserted.push(inserted.shift()!)

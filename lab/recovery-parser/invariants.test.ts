@@ -87,6 +87,33 @@ test('the edits give the broken text, are in the canonical form, and the alignme
   }
 })
 
+test('text that is added before the whole original stays there, unless it is one code point, and the second derivation follows', () => {
+  // A log prefix that starts with the document's first code points is the added text as a whole.
+  const prefix = '2026-06-19 12:23:40,515 - app.orders - ERROR - '
+  expect(canonicalEdits(Array.from('20142'), [insertAt(0, prefix)])).toEqual([insertAt(0, prefix)])
+  // One code point before the same code point moves, so the first brace is the kept one. So does a run of one code point.
+  expect(canonicalEdits(Array.from('{"a": 1}'), [insertAt(0, '{')])).toEqual([insertAt(1, '{')])
+  expect(canonicalEdits(Array.from('""'), [insertAt(0, '""')])).toEqual([insertAt(2, '""')])
+  // After the start of the original, an added text still moves with its code points in another order: a line `}`
+  // before the `}` that ends a document is that `}` kept, and a line feed and a `}` added.
+  expect(canonicalEdits(Array.from('{"a": 1\n}'), [insertAt(8, '}\n')])).toEqual([insertAt(9, '\n}')])
+  // Such a sample is rare, about one in 10,000 with the kind logPrefix: a lone number that starts with 2 after a
+  // prefix that starts with the year. Its number is kept whole, and the second derivation agrees.
+  const sample = sampleAt(defaultSeed, 4593, {kind: 'logPrefix'})
+  expect([sample.original, sample.broken]).toEqual(['21101', '2026-03-01 15:25:41,257 - http - WARNING - 21101'])
+  expect(sample.edits).toEqual([{at: 0, remove: 0, insert: '2026-03-01 15:25:41,257 - http - WARNING - ', rank: -3}])
+  expect([sample.firstDamage, sample.alignment.slice(-6)]).toEqual([0, [-1, 0, 1, 2, 3, 4]])
+  expect(sampleProblems(sample)).toEqual([])
+  // The same texts with the prefix moved into the number, as the edits were before: the 2 of the year is kept as the
+  // start of the number. The second derivation reports it.
+  const moved: Sample = structuredClone(sample)
+  moved.edits = [{at: 1, remove: 0, insert: '026-03-01 15:25:41,257 - http - WARNING - 2', rank: -3}]
+  moved.alignment = [0, ...sample.alignment.slice(1, -5), -1, 1, 2, 3, 4]
+  moved.firstDamage = 1
+  expect(applyEdits(Array.from(moved.original), moved.edits).broken).toBe(sample.broken)
+  expect(sampleProblems(moved)).toEqual(['the insertion at 1 is text that stands before the whole original, with its first code points taken for the original\'s'])
+})
+
 test('before its first error, the parser as it is gives every scored label, and the first error is not before the first damage', () => {
   for (const sample of samples) {
     if (sample.source === 'valid') continue
