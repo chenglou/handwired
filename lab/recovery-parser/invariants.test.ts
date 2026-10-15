@@ -541,6 +541,64 @@ test('every text of a typing replay is what its edits give from the finished doc
   expect(semicolonsBeforeAKey).toBeGreaterThan(0)
 })
 
+test('the form texts of raw line feeds and of single quotes give the numbers that the edits give', () => {
+  const stated = (form: string, pattern: RegExp) => Number(pattern.exec(form)?.[1] ?? 0)
+  // Raw line feeds, carriage returns and tabs in the place of their escapes, counted apart.
+  let withCarriageReturns = 0
+  const pasted = [...samples, ...Array.from({length: 400}, (_, index) => sampleAt(defaultSeed, index, {kind: 'rawLineFeedInString'}))]
+  for (const sample of pasted) {
+    const form = sample.forms.find(text => text.startsWith('rawLineFeedInString: ') && text.includes('for the escapes of'))
+    if (form === undefined) continue
+    const original = Array.from(sample.original)
+    const added = {n: 0, r: 0, t: 0}
+    for (const edit of sample.edits) {
+      const escaped = original[edit.at + 1]
+      // In a file with \r\n line ends a raw line feed has a carriage return before it, as every line feed of the file has.
+      const raw = escaped === 'n' ? (sample.lineEnd === '\r\n' ? '\r\n' : '\n') : escaped === 'r' ? '\r' : '\t'
+      if (edit.remove === 2 && original[edit.at] === '\\' && (escaped === 'n' || escaped === 'r' || escaped === 't') && edit.insert === raw) added[escaped]++
+    }
+    if (added.r > 0) withCarriageReturns++
+    // A combination that asks for every string leaves the tabs to rawTabInString, which has a form text of its own.
+    const tabs = sample.forms.some(text => text.startsWith('rawTabInString: ')) ? 0 : added.t
+    if (stated(form, /(\d+) raw line feed/) !== added.n || stated(form, /(\d+) raw carriage return/) !== added.r || stated(form, /(\d+) raw tab/) !== tabs) {
+      fail(sample, `the form text "${form}" does not give the ${added.n} raw line feeds, ${added.r} raw carriage returns and ${tabs} raw tabs of the edits`)
+    }
+  }
+  expect(withCarriageReturns).toBeGreaterThan(10)
+  // Strings in other quotes: a quote that stands for a double quote opens one, and the next such quote closes it.
+  // A requoted string that holds an apostrophe holds both kinds of quote, and the form text says how many there are.
+  let inBackticks = 0
+  let withEscapedApostrophe = 0
+  const requotedSamples = [...samples, ...Array.from({length: 400}, (_, index) => sampleAt(defaultSeed, index, {kind: 'singleQuotedString'}))]
+  for (const sample of requotedSamples) {
+    const form = sample.forms.find(text => text.startsWith('singleQuotedString: '))
+    if (form === undefined) continue
+    const broken = Array.from(sample.broken)
+    const requoted: {quote: string, holdsApostrophe: boolean}[] = []
+    let open = -1
+    broken.forEach((character, position) => {
+      if (sample.replaced[position] !== true || (character !== '\'' && character !== '`')) return
+      if (open === -1) return void (open = position)
+      requoted.push({quote: character, holdsApostrophe: broken.slice(open + 1, position).includes('\'')})
+      open = -1
+    })
+    const withBoth = requoted.filter(part => part.holdsApostrophe).length
+    const found = /(\d+) with both kinds of quote|only the (\d+) strings with both kinds of quote|only the string with both kinds of quote/.exec(form)
+    const statedBoth = found === null ? 0 : Number(found[1] ?? found[2] ?? 1)
+    if (statedBoth !== withBoth) fail(sample, `the form text "${form}" does not give the ${withBoth} requoted strings that hold both kinds of quote`)
+    const backticks = requoted.some(part => part.quote === '`')
+    if (backticks) inBackticks++
+    if (requoted.some(part => part.quote === '\'' && part.holdsApostrophe)) withEscapedApostrophe++
+    // A sample with nothing to recover needs no class. Otherwise a string in backticks needs the backtick as a quote,
+    // and the apostrophe as a quote is only needed by a string in single quotes.
+    if (scoredCodePoints(sample) === 0) continue
+    if (backticks !== sample.needsClass.includes('the backtick as a quote')) fail(sample, 'a string in backticks and the class "the backtick as a quote" do not come together')
+    if (sample.needsClass.includes('the apostrophe as a quote') && !requoted.some(part => part.quote === '\'')) fail(sample, 'the class "the apostrophe as a quote" without a string in single quotes')
+  }
+  expect(inBackticks).toBeGreaterThan(0)
+  expect(withEscapedApostrophe).toBeGreaterThan(0)
+})
+
 test('a damaged document with carriage return line ends has them at every line end, in the original and in the broken text', () => {
   let found = 0
   let withOpenString = 0

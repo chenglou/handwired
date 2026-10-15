@@ -62,7 +62,7 @@ function joined(damages: readonly Damage[]): Pick<PlannedDamage, 'reachable' | '
   return {
     reachable: settleReachable(damages.map(damage => damage.reachable), needsRules), needsRules,
     unscoredKinds: [...new Set(damages.flatMap(damage => damage.unscoredKinds ?? []))].sort((left, right) => left - right),
-    needsClass: [...new Set(damages.flatMap(damage => damage.needsClass === undefined ? [] : [damage.needsClass]))],
+    needsClass: [...new Set(damages.flatMap(damage => [damage.needsClass, damage.alsoNeedsClass].filter(need => need !== undefined)))],
     debatable: damages.some(damage => damage.debatable === true),
   }
 }

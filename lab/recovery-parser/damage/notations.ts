@@ -71,8 +71,26 @@ function singleQuotedString(random: Random, scanned: Scan, options: KindOptions 
     const hasBoth = (part: StringPart) => part.content.includes('\'') && escapedQuotes(scanned, part).length > 0
     const changed = considered.filter(part => !part.content.includes('\'') || hasBoth(part))
     if (changed.length === 0) return undefined
-    for (const part of changed) requote(part, hasBoth(part) && form === 'every but word keys' ? '`' : '\'')
-    return {edits, unscoredKinds, form: `every string${form === 'every' ? '' : ' that keeps its quotes'}${changed.length < considered.length ? ' without an apostrophe' : ''}, ${changed.length} of them`, reachable: 'yes', ...classFor(changed)}
+    const withBoth = changed.filter(hasBoth)
+    const inBackticks = form === 'every but word keys' ? withBoth : []
+    for (const part of changed) requote(part, inBackticks.includes(part) ? '`' : '\'')
+    // The form text says how many of the requoted strings hold no apostrophe and how many hold both kinds of quote,
+    // e.g. "every string that keeps its quotes without an apostrophe, 5 of them, and 1 with both kinds of quote, in
+    // backticks". "That keeps its quotes" leaves out the keys that are words, which stand without quotes in such a text.
+    const which = `string${form === 'every' ? '' : ' that keeps its quotes'}`
+    const without = changed.length - withBoth.length
+    const how = form === 'every' ? 'in single quotes with \\\' for each apostrophe' : 'in backticks'
+    const text = withBoth.length === 0 ? `every ${which}${changed.length < considered.length ? ' without an apostrophe' : ''}, ${changed.length} of them`
+      : without === 0 ? `only the ${withBoth.length === 1 ? 'string' : `${withBoth.length} strings`} with both kinds of quote, ${how}`
+      : `every ${which} without an apostrophe, ${without} of them, and ${withBoth.length} with both kinds of quote, ${how}`
+    // A string in backticks holds a double quote, which ends a word, so the tables need the backtick as a quote for
+    // it. That is another class than the apostrophe as a quote, which the strings in single quotes need when one of
+    // them holds a character that ends a word.
+    const apostrophe = classFor(changed.filter(part => !inBackticks.includes(part)))
+    const backtick = 'the backtick as a quote'
+    const classes: Pick<Damage, 'needsClass' | 'alsoNeedsClass'> = inBackticks.length === 0 ? apostrophe
+      : apostrophe.needsClass === undefined ? {needsClass: backtick} : {...apostrophe, alsoNeedsClass: backtick}
+    return {edits, unscoredKinds, form: text, reachable: 'yes', ...classes}
   }
   if (form === 'one member' && members.length > 0) {
     const entry = random.pick(members)
@@ -506,7 +524,7 @@ export const notationKinds: KindDefinition[] = [
   {
     name: 'singleQuotedString', family: 'other notation', origin: 'either', weight: 1,
     example: '{"roles": [\'admin\', \'billing\'], "active": true}',
-    reachable: 'yes for a parser that reads the apostrophe as a quote. The highlighter\'s classes lump the apostrophe with letters, so its tables read \'admin\' as one word, which is enough unless the string holds a space, a comma, a colon, a bracket, a quote or a backslash',
+    reachable: 'yes for a parser that reads the apostrophe as a quote. The highlighter\'s classes lump the apostrophe with letters, so its tables read \'admin\' as one word, which is enough unless the string holds a space, a comma, a colon, a bracket, a quote or a backslash. A string that holds both kinds of quote stands in single quotes with \\\' in a Python print and in backticks in a Node print, and the tables then need the backtick as a quote',
     apply: singleQuotedString,
   },
   {
