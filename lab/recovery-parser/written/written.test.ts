@@ -1,0 +1,346 @@
+// The tools of the written evaluation set: the file format, the alignment of a broken text with a valid one, the
+// agreement of several opinions, and the score.
+// Run from the repo root: bun test lab/recovery-parser
+import {expect, test} from 'bun:test'
+import {readFileSync} from 'node:fs'
+import {join} from 'node:path'
+import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
+import {handRuleTables} from '../hand-rules.ts'
+import {defaultSeed} from '../samples.ts'
+import {defaultTables} from '../table-parser.ts'
+import {align, standsFor} from './align.ts'
+import {agreementWithDataset, writtenCasesAgainstDataset} from './check-align.ts'
+import {caseNotes, caseProblems} from './check-cases.ts'
+import {repairNotes} from './check-repairs.ts'
+import {type CaseEntry, caseFileText, linesOfText, mistypedNames, partFileText, readCaseFile, readPartFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
+import {scoreCases, scoreTables} from './score.ts'
+import {changesOf, describeCase, describeOpinions} from './show.ts'
+import {blindIdOf, brokenTextProblems, caseOf, labelsOfWritten, readWritten, scoredCodePointsOfWritten, validTextProblems, writtenFolder} from './written.ts'
+
+// Texts that a file format gets wrong when it quotes or escapes: each must come back as it went in.
+const awkwardTexts = [
+  '{"path": "C:\\\\Users\\\\zoe", "quote": "she said \\"hi\\""}',
+  '{"a": "C:\\Users\\zoe"}',
+  '{\n\t"tabs": true\n}',
+  '\ufeff{\r\n  "bom and carriage returns": 1\r\n}\r\n',
+  '{"a":\u00a01,\u2003"b":\u200b2}',
+  '\u001b[32m{"ok": true}\u001b[0m',
+  'no line feed at the end',
+  'one line feed at the end\n',
+  'three line feeds at the end\n\n\n',
+  '\n\nstarts with two line feeds',
+  '\n',
+  'a space at the end \nand on the last line ',
+  '   ',
+  'empty lines\n\n\nin the middle',
+  'the brackets ⟦ and ⟧ and a name that is none: ⟦tab⟧ ⟦end⟧',
+  '⟦end⟧',
+  '⟦case fake⟧\n⟦broken⟧\nlines that look like markers\n⟦end⟧',
+  '👨\u200d👩 and a lone \u0000 and \u007f and \u2028',
+  '',
+]
+
+const charactersThatCannotBeSeen = ['\t', '\r', '\u00a0', '\ufeff', '\u001b', '\u200b', '\u200d', '\u2003', '\u2028', '\u0000', '\u007f']
+
+test('a text comes back from its lines as it went in', () => {
+  for (const text of awkwardTexts) {
+    const lines = linesOfText(text)
+    for (const line of lines) {
+      // What a file shows is what the text holds: no character that cannot be seen, and no space at a line's end.
+      expect(Array.from(line).filter(character => charactersThatCannotBeSeen.includes(character))).toEqual([])
+      expect(line.endsWith(' ')).toBe(false)
+    }
+    if (lines.length > 0) {
+      expect(lines[0]).not.toBe('')
+      expect(lines.at(-1)).not.toBe('')
+    }
+    expect(textOfLines(lines, 1)).toEqual({text, problems: []})
+  }
+})
+
+test('case files, part files and repair files come back as they went in', () => {
+  const cases: Omit<CaseEntry, 'line'>[] = awkwardTexts.map((text, index) => ({
+    id: `awkward-${index}`, from: 'a test with "quotes" and a \\ backslash', note: index % 2 === 0 ? 'a note: with a colon' : undefined, debatable: index % 3 === 0,
+    intended: text, broken: awkwardTexts[(index + 1) % awkwardTexts.length]!,
+  }))
+  const readCases = readCaseFile(caseFileText(cases))
+  expect(readCases.problems).toEqual([])
+  expect(readCases.items.map(({line: _line, ...rest}) => rest)).toEqual(cases)
+  const parts = cases.map(entry => ({id: blindIdOf(entry.broken), broken: entry.broken}))
+  const readParts = readPartFile(partFileText(parts))
+  expect(readParts.problems).toEqual([])
+  expect(readParts.items.map(({line: _line, ...rest}) => rest)).toEqual(parts)
+  const repairs = cases.map((entry, index) => ({id: blindIdOf(entry.broken), repaired: entry.intended, unsure: index % 2 === 0 ? 'the other reading' : undefined}))
+  const readRepairs = readRepairFile(repairFileText(repairs))
+  expect(readRepairs.problems).toEqual([])
+  expect(readRepairs.items.map(({line: _line, ...rest}) => rest)).toEqual(repairs)
+})
+
+test('a file that does not show what its texts hold is refused', () => {
+  const file = (lines: string[]) => `${lines.join('\n')}\n`
+  const good = ['⟦case good-1⟧', 'from: a test', '⟦intended⟧', '{"a": 1}', '⟦broken⟧', '{"a": 1,}', '⟦end⟧']
+  expect(readCaseFile(file(good))).toEqual({items: [{id: 'good-1', from: 'a test', note: undefined, debatable: false, intended: '{"a": 1}', broken: '{"a": 1,}', line: 1}], problems: []})
+  const problemsOf = (lines: string[]) => readCaseFile(file(lines)).problems.join('\n')
+  const changed = (from: string, to: string[]) => good.flatMap(line => line === from ? to : [line])
+  expect(problemsOf(changed('{"a": 1,}', ['{\t"a": 1,}']))).toContain('⟦tab⟧')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a":\u00a01,}']))).toContain('⟦nbsp⟧')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a": 1,} ']))).toContain('ends with a space')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a": 1,}', '']))).toContain('ends with an empty line')
+  expect(problemsOf(changed('{"a": 1,}', ['', '{"a": 1,}']))).toContain('starts with an empty line')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a": ⟦tabb⟧1,}']))).toContain('names no character')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a": ⟦tab 1,}']))).toContain('without ⟧')
+  expect(problemsOf(changed('{"a": 1,}', ['{"a": 1,}⟧']))).toContain('⟦U+27E7⟧')
+  expect(problemsOf(changed('⟦end⟧', ['  ⟦end⟧']))).toContain('a marker stands alone on its line')
+  expect(problemsOf(changed('⟦end⟧', []))).toContain('has no ⟦end⟧ line')
+  expect(problemsOf(changed('from: a test', []))).toContain('from: …')
+  expect(problemsOf(changed('from: a test', ['from: a test', 'debatable: yes']))).toContain('alone on its line')
+  expect(problemsOf(changed('from: a test', ['from: a test', 'kind: trailing comma']))).toContain('"kind"')
+  expect(problemsOf(changed('⟦broken⟧', ['⟦repaired⟧']))).toContain('⟦broken⟧ is missing')
+  expect(problemsOf([...good, ...good])).toContain('the id stands twice')
+  expect(problemsOf(['some text', ...good])).toContain('outside an entry')
+  expect(readCaseFile(good.join('\r\n')).problems.join('\n')).toContain('carriage returns')
+  // A problem in one entry leaves the entries after it readable.
+  const second = good.map(line => line.replace('good-1', 'good-2'))
+  expect(readCaseFile(file([...changed('{"a": 1,}', ['{\t"a": 1,}']), '', ...second])).items.map(entry => entry.id)).toEqual(['good-2'])
+  // The marks of a case and of a repair.
+  expect(readCaseFile(file(changed('from: a test', ['from: a test', 'note: why', 'debatable']))).items[0]).toMatchObject({note: 'why', debatable: true})
+  expect(readRepairFile(file(['⟦repair 0a1b2c3d⟧', 'unsure: the other reading', '⟦repaired⟧', '{"a": 1}', '⟦end⟧'])).items).toEqual([{id: '0a1b2c3d', repaired: '{"a": 1}', unsure: 'the other reading', line: 1}])
+  expect(readRepairFile(file(good)).problems.join('\n')).toContain('⟦repair id⟧')
+  expect(mistypedNames('{"a":[[tab]]1, "b": "<U+00A0>", "c": [1, 2]}')).toEqual(['[[tab]]', '<U+00A0>'])
+})
+
+// A broken text, the valid text, and under each code point of the broken text: . kept, ~ in the place of another,
+// + added.
+const pairs: [broken: string, valid: string, marks: string][] = [
+  // Single quotes stand for double quotes.
+  ['{\'a\': 1}', '{"a": 1}', '.~.~....'],
+  // A word of another notation is added as a whole, and a literal that only lost its end is kept.
+  ['{"a": True}', '{"a": true}', '......++++.'],
+  ['{"m": nil}', '{"m": null}', '......+++.'],
+  ['{"a": tru, "b": 1}', '{"a": true, "b": 1}', '..................'],
+  ['{"lat": 59., "lon": .5}', '{"lat": 59.0, "lon": 0.5}', '.......................'],
+  ['{"paid": ture}', '{"paid": true}', '.........++++.'],
+  // A number is kept when text is added around it or between its digits.
+  ['{"n": NumberLong(15)}', '{"n": 15}', '......+++++++++++..+.'],
+  ['{"total": 1,400,000}', '{"total": 1400000}', '...........+...+....'],
+  // Of two equal code points the later one is the added one, and text before the whole original stays there.
+  ['[[1]]]', '[[1]]', '.....+'],
+  ['{{"a": 1}', '{"a": 1}', '.+.......'],
+  ['2026-06-19 12:23:40 ERROR 20142', '20142', '++++++++++++++++++++++++++.....'],
+  ['{\n  // note\n  "a": 1\n}', '{\n  "a": 1\n}', '....++++++++++........'],
+  // = stands for the colon, with and without spaces around the arrow.
+  ['{"id"=>42}', '{"id": 42}', '.....~+...'],
+  ['{"id" => 42}', '{"id": 42}', '.....+~+....'],
+  // Round brackets for an array, no-break spaces for the indentation, and a quote before an added comma.
+  ['{"point": (12.5, 41.9)}', '{"point": [12.5, 41.9]}', '..........~..........~.'],
+  ['{\n\u00a0\u00a0"a": 1\n}', '{\n  "a": 1\n}', '..~~........'],
+  ['[\'a\', \'b\',]', '["a", "b"]', '.~.~..~.~+.'],
+  // Only removals.
+  ['{"a": 1 "b": 2}', '{"a": 1, "b": 2}', '...............'],
+  ['{a: 1}', '{"a": 1}', '......'],
+  ['{"note": "call "Ana" back"}', '{"note": "call \\"Ana\\" back"}', '...........................'],
+  // A long shared run is kept first: the sentence is added, and the start of the document is kept.
+  ['Here is the record you asked for:\n{"version": "0.2.0", "con', '{"version": "0.2.0", "configurations": [{"type": "lldb", "request": "launch"}]}', `${'+'.repeat(34)}${'.'.repeat(25)}`],
+  // No letter of a marker is paired with a letter of the part that is missing, also when the missing part is short.
+  ['{"name": "Ada", "tags": ["x... [truncated]', '{"name": "Ada", "tags": ["x-ray", "urgent", "retired"]}', `${'.'.repeat(27)}${'+'.repeat(15)}`],
+  ['{"name": "Ada", "tags": ["x... [truncated]', '{"name": "Ada", "tags": ["x"]}', `${'.'.repeat(27)}${'+'.repeat(15)}`],
+  // The brace at the end is kept after a word of another notation.
+  ['{"ok": FALSE\n}', '{"ok": false\n}', '.......+++++..'],
+  ['{ id: 1, name: \'Ada\', manager: undefined }', '{"id": 1, "name": "Ada", "manager": null}', '.+.............~...~...........++++++++++.'],
+]
+
+test('the alignment of pairs made by hand', () => {
+  for (const [broken, valid, marks] of pairs) {
+    const {alignment, replaced} = align(broken, valid)
+    const brokenCodePoints = Array.from(broken)
+    const validCodePoints = Array.from(valid)
+    expect([broken, alignment.map((counterpart, position) => counterpart === -1 ? '+' : replaced[position] === true ? '~' : '.').join('')]).toEqual([broken, marks])
+    // The counterparts rise, a kept code point is its counterpart, and one in the place of another is not.
+    let before = -1
+    alignment.forEach((counterpart, position) => {
+      if (counterpart === -1) {
+        expect(replaced[position]).toBe(false)
+        return
+      }
+      expect(counterpart).toBeGreaterThan(before)
+      before = counterpart
+      expect(brokenCodePoints[position] === validCodePoints[counterpart]).toBe(replaced[position] === false)
+      if (replaced[position] === true) expect(standsFor(brokenCodePoints[position]!, validCodePoints[counterpart]!)).toBe(true)
+    })
+  }
+})
+
+test('which code point is which, where the marks do not say it', () => {
+  // The literal that lost its end: the comma after it is the comma after the whole literal.
+  expect(align('{"a": tru, "b": 1}', '{"a": true, "b": 1}').alignment.slice(6, 11)).toEqual([6, 7, 8, 10, 11])
+  // The quote after the half of a key is the key's own closing quote, and no quote of the value that is missing.
+  expect(align('{"exclu"\n}', '{"exclude": ["dist"]\n}').alignment).toEqual([0, 1, 2, 3, 4, 5, 6, 9, 20, 21])
+  // A quote that opens the next key is left with that key: the string before it is open.
+  expect(align('{"cons"stop": false}', '{"console": "integratedTerminal", "stop": false}').alignment.slice(5, 8)).toEqual([5, 34, 35])
+  // The comma that is added before a line end is the added one, and the line feed after it is kept.
+  expect(align('{"a": 1,\n}\n', '{"a": 1\n}\n').alignment).toEqual([0, 1, 2, 3, 4, 5, 6, -1, 7, 8, 9])
+  // The quotes that lost their backslash are the second halves of the escapes.
+  expect(align('{"note": "call "Ana" back"}', '{"note": "call \\"Ana\\" back"}').alignment.slice(14, 21)).toEqual([14, 16, 17, 18, 19, 21, 22])
+})
+
+test('align.ts gives the dataset\'s alignment for most generated samples', () => {
+  const {total} = agreementWithDataset(defaultSeed, 600)
+  expect(total.samples).toBeGreaterThan(500)
+  expect(total.sameAlignment / total.samples).toBeGreaterThan(0.95)
+  expect(total.sameLabels / total.samples).toBeGreaterThan(0.95)
+  expect(total.sameLabelCodePoints / total.codePoints).toBeGreaterThan(0.999)
+  // A code point with another label than the dataset's is the kind of difference that would spoil a score.
+  expect(total.otherLabel / total.codePoints).toBeLessThan(0.0001)
+})
+
+test('a generated sample as a written case has the dataset\'s scored labels, and the readers score the same', () => {
+  const written = writtenCasesAgainstDataset(defaultSeed, 600)
+  expect(written.sameScoredLabels / written.samples).toBeGreaterThan(0.95)
+  for (const {byDataset, asWritten} of written.readers) {
+    expect(Math.abs(asWritten.right / asWritten.scored - byDataset.right / byDataset.scored)).toBeLessThan(0.005)
+    expect(Math.abs(asWritten.wholeRight / asWritten.withSomething - byDataset.wholeRight / byDataset.withSomething)).toBeLessThan(0.02)
+  }
+})
+
+const madeUp = {
+  id: 'made-up-1', from: 'a test', note: undefined, debatable: false,
+  // A comma is missing after the 1, the Python word None stands for null, and a comma follows the last entry.
+  intended: '{"a": 1, "b": null}',
+  broken: '{"a": 1 "b": None,}',
+}
+
+test('three opinions about a made-up case', () => {
+  const writtenCase = caseOf(madeUp, 'made-up.txt', [
+    {name: 'part-1.a', repaired: '{"a": 1, "b": null}', unsure: undefined},
+    // The second repairer takes None for a string that lost its quotes.
+    {name: 'part-1.b', repaired: '{"a": 1, "b": "None"}', unsure: 'None could be the string "None"'},
+  ])
+  expect(writtenCase.opinions.map(opinion => opinion.name)).toEqual(['writer', 'part-1.a', 'part-1.b'])
+  const marksOf = (index: number) => writtenCase.opinions[index]!.alignment.map(counterpart => counterpart === -1 ? '+' : '.').join('')
+  //                        {"a": 1 "b": None,}
+  expect(marksOf(0)).toBe('.............+++++.')
+  expect(marksOf(1)).toBe(marksOf(0))
+  expect(marksOf(2)).toBe('.................+.')
+  expect(writtenCase.agreement.map(state => state === 'agreed' ? '.' : state === 'added' ? '+' : '!').join('')).toBe('.............!!!!+.')
+  // The parser as it is reports its first error at the quote of "b", where a comma was expected.
+  expect(writtenCase.firstErrorPosition).toBe(8)
+  // The first damaged code point is the space before it: the first kept code point after the comma that is missing.
+  expect(writtenCase.firstDamage).toBe(7)
+  expect(writtenCase.disputedFromFirstError).toBe(true)
+  expect(writtenCase.blindId).toBe(blindIdOf(madeUp.broken))
+  expect(writtenCase.opinions[2]!.unsure).toBe('None could be the string "None"')
+  const labels = labelsOfWritten(writtenCase)
+  // The key "b" is a key at depth 1 inside an object by every opinion.
+  for (const position of [8, 9, 10]) expect(labels[position]).toEqual({kind: displayKind.key, depth: 1, container: 1})
+  // A disputed code point and one that every opinion calls added have no label, and the last brace closes the object.
+  for (const position of [13, 14, 15, 16, 17]) expect(labels[position]).toBeUndefined()
+  expect(labels[18]).toEqual({kind: displayKind.punctuation, depth: 0, container: 0})
+  // From the first error on: "b": and the space after it, and the last brace.
+  expect(scoredCodePointsOfWritten(writtenCase)).toBe(6)
+  expect(describeOpinions(writtenCase)).toContain('agree          .............!!!!+.')
+})
+
+test('a case with the writer\'s opinion alone, and its score', () => {
+  const writtenCase = caseOf(madeUp, 'made-up.txt')
+  expect(writtenCase.opinions.length).toBe(1)
+  expect(writtenCase.agreement.join()).not.toContain('disputed')
+  expect(writtenCase.disputedFromFirstError).toBe(false)
+  expect(scoredCodePointsOfWritten(writtenCase)).toBe(6)
+  expect(writtenCase).toMatchObject({original: madeUp.intended, documents: [madeUp.intended], lineEnd: '\n', needsNestingFix: false, needsDisplayFix: false, debatable: false})
+  expect(changesOf(writtenCase.opinions[0]!, madeUp.broken)).toEqual(['removed before 7: ","', 'added at 13 to 17: "None,"', 'removed before 18: "null"'])
+  expect(describeCase(writtenCase)).toContain('brok  {"a": 1 "b": None,}')
+  // The parser as it is shows "b" as a string and everything after the word None as an error, and the hand rule
+  // `words` reads the text as the labels say.
+  const now = scoreCases(defaultTables, [writtenCase])
+  expect(now).toMatchObject({cases: 1, nothingToRecover: 0, scored: 6, wholeRight: 0})
+  expect(now.right).toBeLessThan(6)
+  expect(scoreCases(handRuleTables('words'), [writtenCase])).toMatchObject({scored: 6, right: 6, wholeRight: 1})
+  // A text that is cut off has nothing to recover, and counts as a case without being right or wrong.
+  const cutOff = caseOf({...madeUp, id: 'made-up-2', intended: '{"id": 42, "name": "Ada Lovelace"}', broken: '{"id": 42, "name": "Ada Lovel'}, 'made-up.txt')
+  expect(scoreCases(defaultTables, [cutOff])).toMatchObject({cases: 1, nothingToRecover: 1, scored: 0, wholeRight: 0})
+  // scoreTables counts the cases with full agreement apart, per file too.
+  const disputed = caseOf({...madeUp, id: 'made-up-3'}, 'other.txt', [{name: 'part-1.b', repaired: '{"a": 1, "b": "None"}', unsure: undefined}])
+  const scores = scoreTables(handRuleTables('words'), [writtenCase, cutOff, disputed])
+  expect(scores.all.fullAgreement).toMatchObject({cases: 2, scored: 6})
+  expect(scores.all.agreedCodePoints).toMatchObject({cases: 3, scored: 12})
+  expect([...scores.perFile.keys()]).toEqual(['made-up.txt', 'other.txt'])
+  expect(scores.perFile.get('other.txt')!.fullAgreement.cases).toBe(0)
+})
+
+test('what the checks say about texts that cannot be a case', () => {
+  expect(validTextProblems('{"a": 1}')).toEqual([])
+  expect(validTextProblems('{"a": 1,}').join()).toContain('not valid JSON')
+  expect(validTextProblems(`[${'1,'.repeat(300)}1]`).join()).toContain('code points')
+  expect(validTextProblems(`${'['.repeat(17)}${']'.repeat(17)}`).join()).toContain('16 levels')
+  // Two documents, one per line, are no intended text.
+  expect(validTextProblems('{"a": 1}\n{"a": 2}\n').join()).toContain('not valid JSON')
+  expect(brokenTextProblems('{"a": 1,}')).toEqual([])
+  expect(brokenTextProblems('{"a": 1}').join()).toContain('valid JSON')
+  // An open string hides 16 closing brackets, and the parser as it is then counts a 17th level.
+  expect(brokenTextProblems(`${'['.repeat(16)}"${']'.repeat(16)}"[`).join()).toContain('more than 16 open brackets')
+  expect(caseProblems({intended: '[1]', broken: '[1,]'}).join()).toContain('20 to 500')
+  expect(caseProblems({intended: '{"retries": 3, "timeout": 30}', broken: '{"retries": 3, "timeout": 30,}'})).toEqual([])
+  // A broken text that is laid out anew, and white space that goes with text around the document.
+  const laidOutAnew = caseOf({...madeUp, intended: '{\n    "retries": 3,\n    "timeout": 30,\n    "hosts": ["a", "b"]\n}', broken: '{"retries":3,"timeout":30,"hosts":["a","b"],}'}, 'made-up.txt')
+  expect(changesOf(laidOutAnew.opinions[0]!, laidOutAnew.broken).length).toBeGreaterThan(8)
+  const withFence = caseOf({...madeUp, intended: '{"retries": 3, "timeout": 30}\n', broken: '```json\n{"retries": 3, "timeout": 30}\n```\n'}, 'made-up.txt')
+  expect(caseNotes(withFence).join()).toContain('ends with white space')
+  const reformatted = caseOf({...madeUp, intended: '{\n  "a": 1,\n  "b": null\n}', broken: madeUp.broken}, 'made-up.txt')
+  expect(repairNotes(reformatted).join()).toContain('white space code points that the broken text lacks')
+})
+
+// The fenced blocks of a markdown file, each without its fence lines.
+function fencedBlocks(markdown: string): string[] {
+  const blocks: string[] = []
+  const lines = markdown.split('\n')
+  for (let index = 0; index < lines.length; index++) {
+    const fence = /^(`{3,})/.exec(lines[index]!)?.[1]
+    if (fence === undefined) continue
+    const block: string[] = []
+    for (index++; index < lines.length && lines[index] !== fence; index++) block.push(lines[index]!)
+    blocks.push(`${block.join('\n')}\n`)
+  }
+  return blocks
+}
+
+test('the examples of README.md and of REPAIR.md are what the two pages say', () => {
+  const caseBlocks = fencedBlocks(readFileSync(join(writtenFolder, 'README.md'), 'utf8')).filter(block => block.startsWith('⟦case'))
+  expect(caseBlocks.length).toBe(3)
+  const read = readCaseFile(caseBlocks.join('\n'))
+  expect(read.problems).toEqual([])
+  expect(read.items.map(entry => entry.id)).toEqual(['python-print-01', 'model-answer-01', 'windows-file-01'])
+  for (const entry of read.items) {
+    expect(caseProblems(entry)).toEqual([])
+    expect(caseNotes(caseOf(entry, 'README.md'))).toEqual([])
+  }
+  expect(read.items[1]!.broken.endsWith('```\n')).toBe(true)
+  expect(read.items[2]).toMatchObject({debatable: true, broken: '\ufeff{\r\n\t"name": "Zoë"\r\n\t"path": "C:\\Users\\zoe"\r\n}'})
+  // What the page prints for its first case is what the check prints.
+  const printed = fencedBlocks(readFileSync(join(writtenFolder, 'README.md'), 'utf8')).find(block => block.startsWith('--- python-print-01'))
+  expect(printed).toBe(`${describeCase(caseOf(read.items[0]!, 'README.md'))}\n`)
+
+  const repairBlocks = fencedBlocks(readFileSync(join(writtenFolder, 'REPAIR.md'), 'utf8'))
+  const part = readPartFile(repairBlocks.find(block => block.startsWith('⟦case'))!)
+  const repairs = readRepairFile(repairBlocks.find(block => block.startsWith('⟦repair'))!)
+  expect([part.problems, repairs.problems]).toEqual([[], []])
+  expect(part.items.length).toBe(3)
+  expect(repairs.items.map(repair => repair.id)).toEqual(part.items.map(entry => entry.id))
+  for (const [index, entry] of part.items.entries()) {
+    const repair = repairs.items[index]!
+    // An id of a part file is the hash of its broken text.
+    expect(entry.id).toBe(blindIdOf(entry.broken))
+    expect([brokenTextProblems(entry.broken), validTextProblems(repair.repaired)]).toEqual([[], []])
+    expect(repairNotes(caseOf({id: entry.id, from: '', note: undefined, debatable: false, intended: repair.repaired, broken: entry.broken}, 'REPAIR.md'))).toEqual([])
+  }
+  const unsure = caseOf({id: part.items[1]!.id, from: '', note: undefined, debatable: false, intended: repairs.items[1]!.repaired, broken: part.items[1]!.broken}, 'REPAIR.md')
+  unsure.opinions[0]!.unsure = repairs.items[1]!.unsure
+  expect(repairBlocks.find(block => block.startsWith('--- 62b4f3bc'))).toBe(`${describeCase(unsure, 'rep')}\n`)
+})
+
+test('the cases and the repairs of the folder have no problem', () => {
+  const {cases, problems} = readWritten()
+  expect(problems).toEqual([])
+  // Every case of the set is within the rules that the check of a case file asks for.
+  for (const writtenCase of cases) expect([writtenCase.id, caseProblems({intended: writtenCase.original, broken: writtenCase.broken})]).toEqual([writtenCase.id, []])
+  expect(new Set(cases.map(writtenCase => writtenCase.blindId)).size).toBe(cases.length)
+})
