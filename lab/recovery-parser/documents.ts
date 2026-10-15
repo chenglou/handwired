@@ -306,12 +306,27 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       discount: random.chance(0.3) ? -Math.round(random.next() * 2000) / 100 : 0,
     }, 3, size)
   },
+  // A GeoJSON feature. Its geometry is a point, a line, several points or the ring of a polygon, and it has an id, a
+  // bounding box and a source or lacks them, as features of different producers do.
   mapFeature(random, size) {
     const coordinate = (): Json => [Math.round((random.next() * 360 - 180) * 1e5) / 1e5, Math.round((random.next() * 170 - 85) * 1e5) / 1e5]
-    const line = random.chance(0.4)
+    const several = () => Array.from({length: 2 + Math.round(size * 6)}, coordinate)
+    const geometry = random.weighted<() => Json>([
+      [() => ({type: 'Point', coordinates: coordinate()}), 45], [() => ({type: 'LineString', coordinates: several()}), 30], [() => ({type: 'MultiPoint', coordinates: several()}), 10],
+      [() => {
+        // A ring ends with its first coordinate.
+        const ring = Array.from({length: 3 + Math.round(size * 3)}, coordinate)
+        return {type: 'Polygon', coordinates: [[...ring, ring[0]!]]}
+      }, 15],
+    ])()
+    const id = random.weighted<Json | undefined>([[undefined, 50], [random.integer(1, 99_999), 30], [`feature-${hexId(random, 6)}`, 20]])
+    const west = random.integer(-180, 170)
+    const south = random.integer(-85, 75)
     return {
       type: 'Feature',
-      geometry: line ? {type: 'LineString', coordinates: Array.from({length: 2 + Math.round(size * 6)}, coordinate)} : {type: 'Point', coordinates: coordinate()},
+      ...(id === undefined ? {} : {id}),
+      ...(random.chance(0.25) ? {bbox: [west, south, west + random.integer(1, 10), south + random.integer(1, 10)]} : {}),
+      geometry,
       properties: someKeys(random, {
         name: random.pick(cities),
         population: random.integer(900, 14_000_000),
@@ -319,17 +334,29 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
         area: random.pick<Json>([1.5e3, 8.25e2, raw('6.02e+23'), 3e-9, raw('1.5E3')]),
         capital: random.chance(0.2),
         tags: Array.from({length: Math.round(size * 3)}, () => random.pick(tags)),
+        source: {name: random.pick(['survey', 'census', 'import']), year: random.integer(1990, 2026)},
         note: freeText(random, 2 + Math.round(size * 8)),
       }, 1, size),
     }
   },
+  // The readings of one sensor: an array of readings that each name the sensor, or an object that names it once and
+  // holds the readings. Which members a reading has beside its time and its value is decided per document, as the
+  // program that writes the file decides it, e.g. one file has a battery level in every reading and another has none.
   sensorReadings(random, size) {
     const sensor = random.integer(0, sensors.length - 1)
     const start = 1_790_000_000 + random.integer(0, 9_000_000)
-    return Array.from({length: 1 + Math.round(size * 7)}, (_, reading): Json => ({
-      sensor: sensors[sensor]!, t: start + reading * 60, v: sensors[sensor] === 'door-north' ? random.chance(0.5) : Math.round(random.next() * 5000 - 500) / 100, unit: units[sensor]!,
-      ...(random.chance(0.15) ? {gap: null} : {}),
+    const grouped = random.chance(0.35)
+    const has = {unit: random.chance(0.6), ok: random.chance(0.35), battery: random.chance(0.35), at: random.chance(0.25)}
+    const readings = Array.from({length: 1 + Math.round(size * (grouped ? 9 : 7))}, (_, reading): Json => ({
+      ...(grouped ? {} : {sensor: sensors[sensor]!}), t: start + reading * 60, v: sensors[sensor] === 'door-north' ? random.chance(0.5) : Math.round(random.next() * 5000 - 500) / 100,
+      ...(has.unit && !grouped ? {unit: units[sensor]!} : {}), ...(has.ok ? {ok: random.chance(0.9)} : {}), ...(has.battery ? {battery: random.integer(5, 100)} : {}),
+      ...(has.at && !grouped ? {at: [random.integer(0, 40), random.integer(0, 40)]} : {}), ...(random.chance(0.15) ? {gap: null} : {}),
     }))
+    if (!grouped) return readings
+    return {
+      sensor: sensors[sensor]!, ...(has.unit ? {unit: units[sensor]!} : {}), ...(random.chance(0.4) ? {intervalSeconds: 60} : {}),
+      ...(has.at ? {location: {room: random.pick(['roof', 'kitchen', 'lab', 'hall']), floor: random.integer(0, 9)}} : {}), readings,
+    }
   },
   // A tsconfig.json: nested options, short arrays, and an object of arrays.
   compilerConfig(random, size) {
@@ -426,11 +453,17 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   // One chunk of a stream, or a call that a language model makes.
   chatChunk(random, size) {
     if (random.chance(0.4)) {
-      return {
+      const call = {
         name: random.pick(toolNames),
         arguments: someKeys(random, {city: random.pick(cities), units: random.pick(['metric', 'imperial']), days: random.integer(1, 7), includeHourly: random.chance(0.3), ids: [random.integer(1, 99), random.integer(100, 999)], filter: null}, 1, size),
       }
+      // The call alone, or the call inside the message that carries it.
+      return random.weighted<() => Json>([
+        [() => call, 55], [() => ({id: `call_${hexId(random, 8)}`, type: 'function', function: call}), 25],
+        [() => ({role: 'assistant', content: null, tool_calls: [{id: `call_${hexId(random, 8)}`, type: 'function', function: call}]}), 20],
+      ])()
     }
+    // Some producers send the id of the chunk's request and a fingerprint of the system beside the usual members.
     const choice = (index: number): Json => ({
       index, delta: random.pick<Json>([{content: random.pick(fragments)}, {role: 'assistant', content: ''}, {}]), logprobs: null, finish_reason: random.pick<Json>([null, null, 'stop', 'length']),
     })
@@ -441,6 +474,8 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       model: random.pick(['harbor-small', 'harbor-large-2026']),
       choices: Array.from({length: 1 + Math.round(size * 2)}, (_, index) => choice(index)),
       usage: random.pick<Json>([null, {prompt_tokens: random.integer(5, 900), completion_tokens: random.integer(1, 400)}]),
+      system_fingerprint: `fp_${hexId(random, 6)}`,
+      request: {id: `req-${hexId(random, 6)}`, attempt: random.integer(1, 3)},
     }, 2, size)
   },
   // A JSON-RPC request, notification, result or error, as a language server and a tool server exchange them. Which
@@ -562,12 +597,23 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
     ])()
     const rows = 1 + Math.round(size * 5)
     const columns = random.integer(1, 2 + Math.round(size * 6))
-    const grid: Json = Array.from({length: rows}, () => Array.from({length: columns}, number))
+    const grid = (): Json[] => Array.from({length: rows}, () => Array.from({length: columns}, number))
     return random.weighted<() => Json>([
-      [() => grid, 3],
+      [() => grid(), 3],
+      // Rows of different lengths, e.g. the neighbors of each node of a graph.
+      [() => Array.from({length: rows}, () => Array.from({length: random.integer(0, columns)}, number)), 1],
+      // A grid below a row with the names of its columns.
+      [() => [Array.from({length: columns}, (_, column) => `${random.pick(['x', 'y', 'z', 'q', 'col'])}${column + 1}`), ...grid()], 1],
       [() => Array.from({length: 2 + Math.round(size * 40)}, number), 3],
-      [() => ({shape: [rows, columns], dtype: random.pick(['float32', 'int64']), data: grid}), 2],
-      [() => ({bins: Array.from({length: columns + 1}, (_, index) => index * 10), counts: Array.from({length: columns}, () => random.integer(0, 500)), empty: [], nested: [[], [[]], [[1]]]}), 1],
+      // An array as a numeric library stores it, with some of the members that such a file may have.
+      [() => someKeys(random, {
+        shape: [rows, columns], dtype: random.pick(['float32', 'int64']), data: grid(), order: random.pick(['C', 'F']), name: random.pick(words), min: random.integer(-999, 0),
+        max: random.integer(1, 99_999), mask: random.pick<Json>([null, []]),
+      }, 3, size * 0.5), 2],
+      [() => ({
+        bins: Array.from({length: columns + 1}, (_, index) => index * 10), counts: Array.from({length: columns}, () => random.integer(0, 500)),
+        ...(random.chance(0.4) ? {underflow: random.integer(0, 20), overflow: random.integer(0, 20)} : {}), ...(random.chance(0.3) ? {label: random.pick(words)} : {}), empty: [], nested: [[], [[]], [[1]]],
+      }), 1],
       [() => Array.from({length: rows}, () => [random.pick(words), random.integer(0, 99), random.chance(0.5)]), 1],
     ])()
   },
