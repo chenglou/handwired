@@ -1,0 +1,305 @@
+// The broken samples of one split as the search holds them, and a parser loop that only computes a sample's score.
+//
+// The search runs a sample again for every choice it tries, many million times, so the loop here skips what no choice
+// of the open cells can change: the part of a sample before the first position that reads an open cell. That position
+// is the sample's first error, see recovery-tables.ts. prepareSamples finds it with today's tables and the parser of
+// recovery-parser.ts, and keeps the parser's state there and the score of the code points before it.
+//
+// The loop has to count exactly what score.ts counts. check.ts compares the two on today's tables and on random
+// settings of every open cell, and search.ts compares them after every pass.
+import {type Samples, codePointKindScored, codePointLabeled} from '../data.ts'
+import {containerArray, containerNone, containerObject, createTrace, maximumDepth, runRecoveryParserInto} from '../recovery-parser.ts'
+import {type RecoveryTables, actionByToken, actionOfToken, actionPop, actionPushArray, actionPushObject, asIsTables, today} from '../recovery-tables.ts'
+
+export type RunSamples = {
+  // Broken samples only, in the order of the set they came from.
+  sampleCount: number
+  // The sample's place in the set it came from.
+  place: Int32Array
+  // The code points of sample s are the entries start[s] to start[s + 1] - 1 of the arrays per code point.
+  start: Int32Array
+  // Per code point: the class, the flags of data.ts, and the label.
+  classes: Uint8Array
+  flags: Uint8Array
+  labelKind: Int8Array
+  labelDepth: Int8Array
+  labelContainer: Int8Array
+  // Per sample: the first position that reads an open cell, or the sample's length when no code point does. No choice
+  // of the open cells changes what the parser does before this position.
+  changeableFrom: Int32Array
+  // The parser's state before that position: the tokenizer state, the grammar state, the depth, and one bit per open
+  // level that says whether the level is an object, bit 0 for level 1.
+  lexerStateThere: Uint8Array
+  grammarStateThere: Uint8Array
+  depthThere: Int8Array
+  objectLevelsThere: Uint16Array
+  // The score of the labeled code points from the first damage up to that position, as scoreOfSample packs a score.
+  fixedScore: Int32Array
+  // Labeled code points at or after the first damage, over all samples.
+  scoredCodePoints: number
+}
+
+// A sample's score in one number: the code points with all three labels right × scorePack, plus the labels that are
+// right one by one (the display kind where it is scored, the depth, the container). A sample has at most 512 code
+// points, so the second count is at most 1536.
+export const scorePack = 4096
+
+const arrayFields = ['place', 'start', 'classes', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'changeableFrom', 'lexerStateThere', 'grammarStateThere', 'depthThere', 'objectLevelsThere', 'fixedScore'] as const
+
+// The broken samples of `samples`, with what scoreOfSample needs. The arrays sit in shared memory, so that worker
+// threads read them without a copy each.
+export function prepareSamples(samples: Samples): RunSamples {
+  const places: number[] = []
+  let codePointCount = 0
+  for (let place = 0; place < samples.sampleCount; place++) {
+    if (samples.firstDamage[place] === -1) continue
+    places.push(place)
+    codePointCount += samples.start[place + 1]! - samples.start[place]!
+  }
+  const sampleCount = places.length
+  const shared = <Typed>(create: new (buffer: SharedArrayBuffer) => Typed, bytes: number) => new create(new SharedArrayBuffer(bytes))
+  const prepared: RunSamples = {
+    sampleCount, scoredCodePoints: 0,
+    place: shared(Int32Array, 4 * sampleCount), start: shared(Int32Array, 4 * (sampleCount + 1)),
+    classes: shared(Uint8Array, codePointCount), flags: shared(Uint8Array, codePointCount),
+    labelKind: shared(Int8Array, codePointCount), labelDepth: shared(Int8Array, codePointCount), labelContainer: shared(Int8Array, codePointCount),
+    changeableFrom: shared(Int32Array, 4 * sampleCount), lexerStateThere: shared(Uint8Array, sampleCount), grammarStateThere: shared(Uint8Array, sampleCount),
+    depthThere: shared(Int8Array, sampleCount), objectLevelsThere: shared(Uint16Array, 2 * sampleCount), fixedScore: shared(Int32Array, 4 * sampleCount),
+  }
+  const tables = asIsTables()
+  const trace = createTrace()
+  const lastClassEntry = tables.classOfCodePoint.length - 1
+  const kindAtLevel = new Uint8Array(maximumDepth + 1)
+  let at = 0
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const place = places[sample]!
+    const first = samples.start[place]!
+    const length = samples.start[place + 1]! - first
+    prepared.place[sample] = place
+    prepared.start[sample] = at
+    for (let position = 0; position < length; position++) {
+      prepared.classes[at + position] = tables.classOfCodePoint[Math.min(samples.codePoints[first + position]! + 1, lastClassEntry)]!
+      prepared.flags[at + position] = samples.flags[first + position]!
+      prepared.labelKind[at + position] = samples.labelKind[first + position]!
+      prepared.labelDepth[at + position] = samples.labelDepth[first + position]!
+      prepared.labelContainer[at + position] = samples.labelContainer[first + position]!
+    }
+    runRecoveryParserInto(trace, samples.codePoints, first, length, false, tables, length)
+    let changeableFrom = 0
+    let depth = 0
+    while (changeableFrom < length && tables.lexerOpen[trace.lexerCell[changeableFrom]!] === 0 && tables.grammarOpen[trace.grammarCell[changeableFrom]!] === 0) {
+      const action = trace.action[changeableFrom]!
+      if (action === actionPushObject || action === actionPushArray) kindAtLevel[++depth] = action === actionPushObject ? containerObject : containerArray
+      else if (action === actionPop) depth--
+      changeableFrom++
+    }
+    if (depth < 0 || depth > maximumDepth) throw new Error(`sample at place ${place}: the depth before its first open cell is ${depth}`)
+    let objectLevels = 0
+    for (let level = 1; level <= depth; level++) if (kindAtLevel[level] === containerObject) objectLevels |= 1 << (level - 1)
+    prepared.changeableFrom[sample] = changeableFrom
+    prepared.lexerStateThere[sample] = changeableFrom < length ? trace.lexerStateBefore[changeableFrom]! : 0
+    prepared.grammarStateThere[sample] = changeableFrom < length ? trace.grammarBefore[changeableFrom]! : 0
+    prepared.depthThere[sample] = depth
+    prepared.objectLevelsThere[sample] = objectLevels
+    let fixedScore = 0
+    const firstDamage = samples.firstDamage[place]!
+    for (let position = firstDamage; position < length; position++) {
+      const flags = samples.flags[first + position]!
+      if ((flags & codePointLabeled) === 0) continue
+      prepared.scoredCodePoints++
+      if (position >= changeableFrom) continue
+      const depthIsRight = trace.depthAfter[position] === samples.labelDepth[first + position]
+      const containerIsRight = trace.containerAfter[position] === samples.labelContainer[first + position]
+      const kindIsScored = (flags & codePointKindScored) !== 0
+      const kindIsRight = !kindIsScored || trace.displayKind[position] === samples.labelKind[first + position]
+      fixedScore += Number(depthIsRight) + Number(containerIsRight) + Number(kindIsScored && kindIsRight) + (depthIsRight && containerIsRight && kindIsRight ? scorePack : 0)
+    }
+    if (firstDamage > changeableFrom) throw new Error(`sample at place ${place}: it reads an open cell at ${changeableFrom}, before its first damage at ${firstDamage}`)
+    prepared.fixedScore[sample] = fixedScore
+    at += length
+  }
+  prepared.start[sampleCount] = at
+  return prepared
+}
+
+// What a worker thread needs of the samples: the arrays, which are shared, and the two counts.
+export function messageOf(samples: RunSamples) {
+  return {sampleCount: samples.sampleCount, scoredCodePoints: samples.scoredCodePoints, arrays: arrayFields.map(field => samples[field])}
+}
+export function samplesOfMessage(message: ReturnType<typeof messageOf>): RunSamples {
+  const samples: Record<string, unknown> = {sampleCount: message.sampleCount, scoredCodePoints: message.scoredCodePoints}
+  arrayFields.forEach((field, index) => { samples[field] = message.arrays[index] })
+  return samples as unknown as RunSamples
+}
+
+// A bit per cell: the tokenizer's cells first, then the grammar's. The bit of a tokenizer cell is the cell's index,
+// and the bit of a grammar cell is the number of tokenizer cells plus the cell's index.
+export const cellBitCount = (tables: RecoveryTables) => tables.lexerNext.length + tables.grammarNext.length
+
+const kindAtLevel = new Uint8Array(maximumDepth + 1)
+const setKinds = (depth: number, objectLevels: number) => {
+  for (let level = 1; level <= depth && level <= maximumDepth; level++) kindAtLevel[level] = (objectLevels >> (level - 1)) & 1 ? containerObject : containerArray
+}
+
+// Runs the parser on the code points `at` to `end - 1` from the given state, and returns the packed score of those
+// code points. With `cellsRead`, it also sets the bit of every cell that the run reads, from the byte `cellsOffset`
+// on. The steps are those of runRecoveryParserInto.
+function scoreOfRun(samples: RunSamples, tables: RecoveryTables, at: number, end: number, lexerState: number, grammarState: number, depth: number, objectLevels: number, cellsRead: Uint8Array | null, cellsOffset: number): number {
+  const {classCount, tokenCount, contextCount, grammarStateCount, tokenOfEvent, display, lexerNext, lexerEvent, grammarNext, grammarAction} = tables
+  const {classes, flags, labelKind, labelDepth, labelContainer} = samples
+  const depthClass = today.depthClass
+  const lexerCellCount = lexerNext.length
+  setKinds(depth, objectLevels)
+  let score = 0
+  for (; at < end; at++) {
+    const lexerCell = lexerState * classCount + classes[at]!
+    const event = lexerEvent[lexerCell]!
+    const token = tokenOfEvent[event]!
+    const level = depth > maximumDepth ? maximumDepth : depth
+    const context = depthClass[level < 0 ? 0 : level]! * 2 + (level >= 1 && kindAtLevel[level] === containerObject ? 1 : 0)
+    const grammarCell = (grammarState * tokenCount + token) * contextCount + context
+    const grammarAfter = grammarNext[grammarCell]!
+    let action = grammarAction[grammarCell]!
+    if (action === actionByToken) action = actionOfToken[token]!
+    if (action === actionPushObject || action === actionPushArray) {
+      depth++
+      if (depth >= 1 && depth <= maximumDepth) kindAtLevel[depth] = action === actionPushObject ? containerObject : containerArray
+    } else if (action === actionPop) {
+      depth--
+    }
+    if (cellsRead !== null) {
+      cellsRead[cellsOffset + (lexerCell >> 3)]! |= 1 << (lexerCell & 7)
+      const bit = lexerCellCount + grammarCell
+      cellsRead[cellsOffset + (bit >> 3)]! |= 1 << (bit & 7)
+    }
+    const flag = flags[at]!
+    if ((flag & codePointLabeled) !== 0) {
+      const depthIsRight = depth === labelDepth[at]
+      const containerIsRight = (depth <= 0 ? containerNone : kindAtLevel[depth > maximumDepth ? maximumDepth : depth]!) === labelContainer[at]
+      let right = (depthIsRight ? 1 : 0) + (containerIsRight ? 1 : 0)
+      let allRight = depthIsRight && containerIsRight
+      if ((flag & codePointKindScored) !== 0) {
+        if (display[event * grammarStateCount + grammarAfter] === labelKind[at]) right++
+        else allRight = false
+      }
+      score += allRight ? scorePack + right : right
+    }
+    lexerState = lexerNext[lexerCell]!
+    grammarState = grammarAfter
+  }
+  return score
+}
+
+// The packed score of one sample's code points from its first changeable position on. The sample's whole score is
+// this plus fixedScore.
+export function scoreOfSample(samples: RunSamples, sample: number, tables: RecoveryTables, cellsRead: Uint8Array | null = null, cellsOffset = 0): number {
+  return scoreOfRun(samples, tables, samples.start[sample]! + samples.changeableFrom[sample]!, samples.start[sample + 1]!, samples.lexerStateThere[sample]!,
+    samples.grammarStateThere[sample]!, samples.depthThere[sample]!, samples.objectLevelsThere[sample]!, cellsRead, cellsOffset)
+}
+
+// Where a run stands before the first position that reads one cell: the index of that code point in the arrays per
+// code point, and the parser's state before it. No other choice of that cell changes the run up to there, so the
+// search tries a cell's choices from this state on instead of from the sample's first changeable position.
+type FirstRead = {at: number, lexerState: number, grammarState: number, depth: number, objectLevels: number}
+
+// Fills `firstRead` for the tokenizer cell `lexerCell` or the grammar cell `grammarCell` (the other one is -1), and
+// returns false when the sample's run does not read the cell.
+function findFirstRead(firstRead: FirstRead, samples: RunSamples, sample: number, tables: RecoveryTables, lexerCell: number, grammarCell: number): boolean {
+  const {classCount, tokenCount, contextCount, tokenOfEvent, lexerNext, lexerEvent, grammarNext, grammarAction} = tables
+  const classes = samples.classes
+  const depthClass = today.depthClass
+  const end = samples.start[sample + 1]!
+  let lexerState = samples.lexerStateThere[sample]!
+  let grammarState = samples.grammarStateThere[sample]!
+  let depth = samples.depthThere[sample]!
+  setKinds(depth, samples.objectLevelsThere[sample]!)
+  for (let at = samples.start[sample]! + samples.changeableFrom[sample]!; at < end; at++) {
+    const lexerCellHere = lexerState * classCount + classes[at]!
+    const token = tokenOfEvent[lexerEvent[lexerCellHere]!]!
+    const level = depth > maximumDepth ? maximumDepth : depth
+    const context = depthClass[level < 0 ? 0 : level]! * 2 + (level >= 1 && kindAtLevel[level] === containerObject ? 1 : 0)
+    const grammarCellHere = (grammarState * tokenCount + token) * contextCount + context
+    if (lexerCellHere === lexerCell || grammarCellHere === grammarCell) {
+      let objectLevels = 0
+      for (let open = 1; open <= depth && open <= maximumDepth; open++) if (kindAtLevel[open] === containerObject) objectLevels |= 1 << (open - 1)
+      firstRead.at = at
+      firstRead.lexerState = lexerState
+      firstRead.grammarState = grammarState
+      firstRead.depth = depth
+      firstRead.objectLevels = objectLevels
+      return true
+    }
+    let action = grammarAction[grammarCellHere]!
+    if (action === actionByToken) action = actionOfToken[token]!
+    if (action === actionPushObject || action === actionPushArray) {
+      depth++
+      if (depth >= 1 && depth <= maximumDepth) kindAtLevel[depth] = action === actionPushObject ? containerObject : containerArray
+    } else if (action === actionPop) {
+      depth--
+    }
+    lexerState = lexerNext[lexerCellHere]!
+    grammarState = grammarNext[grammarCellHere]!
+  }
+  return false
+}
+
+// The packed score of a sample's code points from a first read on.
+function scoreFromFirstRead(firstRead: FirstRead, samples: RunSamples, sample: number, tables: RecoveryTables): number {
+  return scoreOfRun(samples, tables, firstRead.at, samples.start[sample + 1]!, firstRead.lexerState, firstRead.grammarState, firstRead.depth, firstRead.objectLevels, null, 0)
+}
+
+// What other choices of one cell change: for each choice in `candidates` (two numbers each: the next state and the
+// event of a tokenizer cell, or the next state and the stack action of a grammar cell), the change of the two counts
+// of a packed score over the samples in `among`, against the choice that the cell holds. Only a sample whose run
+// reads the cell can change, and only from its first read on. `readers` is how many of the samples read the cell.
+export function changesOfChoices(samples: RunSamples, among: ArrayLike<number>, tables: RecoveryTables, grammar: boolean, cell: number, candidates: Uint8Array) {
+  const firstPart = grammar ? tables.grammarNext : tables.lexerNext
+  const secondPart = grammar ? tables.grammarAction : tables.lexerEvent
+  const candidateCount = candidates.length / 2
+  const allRight = new Int32Array(candidateCount)
+  const labelsRight = new Int32Array(candidateCount)
+  // Where each reader's run first reads the cell, and its score from there on with the cell as it is.
+  const readers: number[] = []
+  const firstReads: FirstRead[] = []
+  const scoresBefore: number[] = []
+  for (let index = 0; index < among.length; index++) {
+    const firstRead: FirstRead = {at: 0, lexerState: 0, grammarState: 0, depth: 0, objectLevels: 0}
+    const sample = among[index]!
+    if (!findFirstRead(firstRead, samples, sample, tables, grammar ? -1 : cell, grammar ? cell : -1)) continue
+    readers.push(sample)
+    firstReads.push(firstRead)
+    scoresBefore.push(scoreFromFirstRead(firstRead, samples, sample, tables))
+  }
+  const firstBefore = firstPart[cell]!
+  const secondBefore = secondPart[cell]!
+  for (let candidate = 0; candidate < candidateCount; candidate++) {
+    firstPart[cell] = candidates[candidate * 2]!
+    secondPart[cell] = candidates[candidate * 2 + 1]!
+    let allRightChange = 0
+    let labelsRightChange = 0
+    for (let reader = 0; reader < readers.length; reader++) {
+      const after = scoreFromFirstRead(firstReads[reader]!, samples, readers[reader]!, tables)
+      const before = scoresBefore[reader]!
+      allRightChange += Math.floor(after / scorePack) - Math.floor(before / scorePack)
+      labelsRightChange += after % scorePack - before % scorePack
+    }
+    allRight[candidate] = allRightChange
+    labelsRight[candidate] = labelsRightChange
+  }
+  firstPart[cell] = firstBefore
+  secondPart[cell] = secondBefore
+  return {allRight, labelsRight, readers: readers.length}
+}
+
+// The packed score of every sample together, as two counts: the code points with all three labels right, and the
+// labels that are right one by one.
+export function totalScore(samples: RunSamples, tables: RecoveryTables) {
+  let allRight = 0
+  let labelsRight = 0
+  for (let sample = 0; sample < samples.sampleCount; sample++) {
+    const score = samples.fixedScore[sample]! + (samples.changeableFrom[sample]! < samples.start[sample + 1]! - samples.start[sample]! ? scoreOfSample(samples, sample, tables) : 0)
+    allRight += Math.floor(score / scorePack)
+    labelsRight += score % scorePack
+  }
+  return {allRight, labelsRight}
+}
