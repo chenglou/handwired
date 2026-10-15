@@ -8,11 +8,12 @@ import {join} from 'node:path'
 import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
 import {kinds} from '../damage.ts'
 import {handRuleTables, handRules} from '../hand-rules.ts'
-import {defaultSeed} from '../samples.ts'
+import {defaultSeed, sampleAt} from '../samples.ts'
 import {defaultTables} from '../table-parser.ts'
 import {align, standsFor} from './align.ts'
 import {agreementWithDataset, writtenCasesAgainstDataset} from './check-align.ts'
 import {caseNotes, caseProblems} from './check-cases.ts'
+import {overlapWithSamples, textsOfSet} from './check-overlap.ts'
 import {repairNotes} from './check-repairs.ts'
 import {type CaseEntry, caseFileText, linesOfText, mistypedNames, partFileText, readCaseFile, readPartFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
 import {type Score, scoreCases, scoreTables} from './score.ts'
@@ -664,6 +665,22 @@ test('a repair of the set that is left out changes no scored code point', () => 
     const labels = labelsOfWritten(writtenCase)
     labelsOfWritten(withAll).forEach((label, position) => { if (label !== undefined) expect(label).toEqual(labels[position]!) })
   }
+})
+
+test('no text of the set is among generated samples, and a text that is among them is found', () => {
+  // Every case with both of its repairs, also the repair that is left out.
+  const cases = textsOfSet()
+  expect(cases.length).toBe(readWritten().cases.length)
+  expect(cases.filter(entry => entry.repairs.length !== 2)).toEqual([])
+  const sampleCount = 600
+  const none = overlapWithSamples(cases, sampleCount)
+  expect([none.broken, none.intended, none.repairs]).toEqual([[], [], []])
+  expect(none.brokenSamples).toBeGreaterThan(500)
+  // A case that is a generated sample is found by its two texts, and a repair by its JSON value in another layout.
+  const sample = Array.from({length: sampleCount}, (_, index) => sampleAt(defaultSeed, index)).find(candidate => candidate.source === 'damage' && candidate.documents.length === 1 && candidate.original.startsWith('{'))!
+  const laidOutAnew = JSON.stringify(JSON.parse(sample.original), null, 7)
+  const found = overlapWithSamples([{id: 'a-sample', broken: sample.broken, intended: sample.original, repairs: [laidOutAnew, '{"not": "a sample"}']}], sampleCount)
+  expect([found.broken, found.intended, found.repairs]).toEqual([['a-sample'], ['a-sample'], ['a-sample']])
 })
 
 test('the cases and the repairs of the folder have no problem', () => {

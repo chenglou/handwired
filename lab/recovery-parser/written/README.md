@@ -217,6 +217,7 @@ When the list of changes is not the damage that you made, look for an unintended
 - `kinds.txt` says for every case which of the generator's kinds describe its damage, by the names of the table of kinds in the dataset's README, and whether the case also has damage that no kind makes. A line is the id of the case, the names of the kinds, each after a space, and for a case with damage that no kind makes ` new: ` and that damage in a few words. [What the damage is](#what-the-damage-is) says how the line between the two was drawn. `bun lab/recovery-parser/written/written.ts --kinds` counts the cases per writer's file and per kind.
 - `score.ts` prints what today's highlighter and four hand-written settings of its tables get right on the set, also for the two parts that `kinds.txt` makes of the set and without the cases that someone marked as open to another reading, and `scoreTables` scores any other tables.
 - `align.ts` pairs the code points of a broken text with those of a valid text, and `check-align.ts` measures it on generated samples whose changes are known: in 5,700 of them it finds the known pairing for 97.1% of the texts and for 99.96% of the code points. Taken as cases of this set, the same samples give today's highlighter and the four hand-written settings the scores that the samples' own values give, within 0.1 points per code point and about half a point per sample.
+- `check-overlap.ts` checks that no broken text, no intended text and no repair of the set is among generated samples, as the same text or as the same JSON value.
 - `format.ts` reads and writes the files, `show.ts` prints a case, `check-repairs.ts` is the check for a repairer, and `written.test.ts` tests the folder.
 
 ## The set as it is
@@ -257,7 +258,7 @@ The broken texts have 35,429 code points, and 27,048 of them stand from the firs
 
 7 cases have nothing to recover. A text that only stops early and a whole document with other text after it have no code point to score, as in the dataset, so the writers kept such cases few, and the set says nothing about them.
 
-No broken text and no intended text of the set is among the first 60,000 generated samples of the default seed, of which 57,016 are broken: neither as the same text nor as the same JSON value.
+No broken text, no intended text and no repair of the set is among the first 60,000 generated samples of the default seed, of which 57,016 are broken: neither as the same text nor as the same JSON value. `bun lab/recovery-parser/written/check-overlap.ts` checks it in about 15 seconds, and its last line is `60000 samples of seed 20261015, 57016 of them broken: 0 of 240 broken texts, 0 of 240 intended texts and 0 of 480 repairs are among them.` Parts of the texts are in both: 558 of the 1,204 keys of the intended texts and 102 of their 746 string values are also in the documents of these samples, e.g. the names of fields that many examples of JSON have. The writers and the generator's templates draw on the same stock of examples.
 
 ### What the damage is
 
