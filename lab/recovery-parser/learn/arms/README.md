@@ -27,7 +27,7 @@ export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-parser/learn/data.ts                    # the cache of the samples, about 12 s once
 bun lab/recovery-parser/learn/arms/baselines.ts          # the rows that every arm is read against, under 1 s
 bun lab/recovery-parser/learn/arms/plain-pass/run.ts     # the first arm, 5 seeds, about 2.5 minutes
-bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and every check, about a minute
+bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and every check, 1 to 1.5 minutes
 ```
 
 ## The shortest arm

@@ -178,7 +178,7 @@ Run from the repo root. `RECOVERY_SCRATCH` is a folder outside the repo for the 
 ```sh
 export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-parser/learn/data.ts                              # makes the cache of the standard set, about 12 s once
-bun lab/recovery-parser/learn/check-all.ts                         # the type check, the lint and every check of learn/, about a minute
+bun lab/recovery-parser/learn/check-all.ts                         # the type check, the lint and every check of learn/, 1 to 1.5 minutes
 bun lab/recovery-parser/learn/score.ts                             # today's tables on the validation split, every row
 bun lab/recovery-parser/learn/score.ts --tables <file.json> --base <base.json> --cells
 bun lab/recovery-parser/learn/score.ts --to 20000 --split train,validation
@@ -187,7 +187,7 @@ bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth o
 bun lab/recovery-parser/learn/intended-reached.ts <name>=<file.json> ...   # where saved tables are in the intended state
 ```
 
-`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in 57 to 73 s over five runs on an 18 core machine with the cache of the samples in place, and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
+`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in one to one and a half minutes on an 18 core machine with other jobs running and the cache of the samples in place (57 to 90 s in six runs), and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
 
 The table of scores, from an empty scratch folder, in about 10 minutes with two commands at a time:
 
