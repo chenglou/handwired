@@ -7,12 +7,13 @@ import {highlightReference} from '../../tests/json-search/highlighter/reference.
 import {sampleProblems} from './check-samples.ts'
 import {tableParserDifference} from './check-table-parser.ts'
 import {contradictions, kinds} from './damage.ts'
+import {drawLayout, makeDocumentOf} from './documents.ts'
 import {type Edit, applyEdits, canonicalEdits, insertAt, removeRange, replaceOneForOne} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
 import {kindLetters, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, typingReplayOf} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, splits, typingReplayOf} from './samples.ts'
 import {type ParserTables, capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
@@ -436,7 +437,7 @@ test('the hand-written settings of the tables read valid documents exactly as th
   for (const rule of ['stay', 'resync', 'words'] as const) expect(handRuleTables(rule).lexerNext.length).toBe(lexerStateNames.length * defaultTables.classCount)
 })
 
-test('the split is a function of a document\'s tokens, also for each record of a text of several documents, and held-out kinds and the held-out template only sit in the test split', () => {
+test('the split is a function of a document\'s tokens, also for each record of a text of several documents, the literals and the ten smallest sequences are in all three splits, and held-out kinds and the held-out template only sit in the test split', () => {
   const kindNames = new Set(kinds.map(kind => kind.name))
   const splitOfSequence = new Map<string, string>()
   const splitsOfLoneScalars = new Set<string>()
@@ -478,6 +479,24 @@ test('the split is a function of a document\'s tokens, also for each record of a
   expect(splitsOfLoneScalars.has('train')).toBe(true)
   expect(splitsOfLoneScalars.size).toBeGreaterThan(1)
   expect([splitOf('true'), splitOf(' false\n'), splitOf('null'), splitOf('"abc"'), splitOf('"abc"\n')]).toEqual(['train', 'validation', 'test', splitOf(' "abc"'), splitOf(' "abc"')])
+  // The template scalar has ten sequences of more than one token, e.g. [] and {s:{}}. A hash puts all ten into the
+  // train split, so they are split by hand: four in train, three in validation and three in test. Each of validation
+  // and test has one of the two empty containers, one container that holds an empty one, and one with one entry.
+  const smallSequences = new Map<string, string>()
+  for (let index = 0; index < 1500; index++) {
+    const random = createRandom(defaultSeed, index)
+    const document = makeDocumentOf(random, 'scalar', drawLayout(random))
+    if (document === undefined) continue
+    const sequence = tokenSequenceOf(document.text)
+    if (sequence.length === 1) continue
+    expect(splitKeyOf(document.text)).toBe(sequence)
+    smallSequences.set(sequence, splitOf(document.text))
+  }
+  const byHand = {train: ['[s]', '[{}]', '{s:[]}', '{s:n}'], validation: ['[]', '[n]', '{s:{}}'], test: ['[[]]', '{s:s}', '{}']}
+  for (const split of splits) expect([split, [...smallSequences].filter(([, of]) => of === split).map(([sequence]) => sequence).sort()]).toEqual([split, byHand[split]])
+  expect(smallSequences.size).toBe(10)
+  // The layout does not matter, and a document of another template with the same tokens is in the same split.
+  expect([splitOf('[ ]\n'), splitOf('{\n}'), splitOf('{"list": []}'), splitOf('{\n  "retries": 3\n}'), splitOf('[[\n]]'), splitOf('["x"]')]).toEqual(['validation', 'test', 'train', 'train', 'test', 'train'])
   expect(samples.some(sample => sample.template === heldOutTemplate)).toBe(true)
   for (const kind of heldOutKinds) expect(samples.some(sample => sample.kinds.includes(kind))).toBe(true)
   // A held-out kind sits on the held-out template about as often as on any template that it can be made from, and
