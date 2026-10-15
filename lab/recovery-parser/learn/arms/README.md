@@ -27,38 +27,66 @@ Run everything from the repo root.
 export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-parser/learn/data.ts                    # the cache of the samples, about 12 s once
 bun lab/recovery-parser/learn/arms/baselines.ts          # the rows that every arm is read against, under 1 s
+bun lab/recovery-parser/learn/handwritten/rules.ts       # the hand-written tables, which the next command starts from
+bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json   # the number to beat
 bun lab/recovery-parser/learn/arms/plain-pass/run.ts     # the first arm, 5 seeds, about 2.5 minutes
 bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and every check, 1 to 1.7 minutes
 ```
 
 ## The shortest arm
 
-`plain-pass/run.ts` is one pass of the trainer over the train split, with 5 seeds. All of it:
+`plain-pass/run.ts` is one pass of the trainer over the train split, with 5 seeds. All of it, without its first comment:
 
 ```ts
+import {optionOf, refuseUnknownOptions} from '../../data.ts'
 import {asIsTables} from '../../recovery-tables.ts'
 import {train} from '../../soft/train.ts'
 import {createModel} from '../../soft/twin.ts'
-import {baselines, describeComparison, describeSettings, runArm, trainDataFor} from '../harness.ts'
+import {baselines, describeComparison, describeSettings, numberToBeat, runArm, trainDataFor} from '../harness.ts'
 
+refuseUnknownOptions('arms/plain-pass/run.ts', ['--seeds'])
+const seeds = (optionOf('--seeds') ?? '1,2,3,4,5').split(',').map(Number)
+// The number to beat is read before anything trains, so that a missing file of its tables stops the arm here.
+const toBeat = numberToBeat()
 const base = asIsTables()
-// The train samples that give the twin a step, packed once for the base tables.
+// The train samples that give the twin a step, packed once: every seed trains on the same samples in another order.
 const data = trainDataFor(base)
 
 const results = await runArm({
-  name: 'plain-pass',
+  name: 'plain-pass', seeds,
   settings: [{
     name: 'one pass of the trainer from today\'s tables, defaults',
     build: async seed => {
+      // `train` changes the model that it is given, so every seed gets a model of its own.
       const model = createModel(base)
+      // Without `validation` the trainer scores nothing while it trains: the harness scores the last tables.
       const result = await train(model, data, {seed, epochs: 1, logEverySamples: 1e9, log: () => {}})
       return {tables: result.last, base}
     },
   }],
 })
-console.log(describeSettings([...baselines(), ...results]))
-console.log(describeComparison(results[0]!, baselines().at(-1)!))
+
+const rows = baselines()
+console.log('')
+console.log('Next to the baselines and the number to beat:')
+console.log('')
+console.log(describeSettings([...rows, toBeat, ...results]))
+if (seeds.length >= 3) {
+  // Against the hand-written tables and against the number to beat, on all samples and in the group that is within
+  // reach of the tables.
+  for (const other of [rows.at(-1)!, toBeat]) {
+    console.log('')
+    for (const rowName of ['all', 'group: within reach of the tables']) console.log(describeComparison(results[0]!, other, rowName))
+  }
+}
 ```
+
+What to keep of it in every arm:
+
+- **The script calls `refuseUnknownOptions` with the options that it has.** Without the call, `run.ts --seed 3` would run the five default seeds as if nothing had been asked, where it now stops with "arms/plain-pass/run.ts has no option --seed. Its options: --seeds."
+- **The model is made inside `build`.** `train` changes the model in place, so a model that is made once, above `runArm`, would go on training from the weights that the seed before left: the second seed would be a second pass, not a second run.
+- **The seed goes into everything that is random**, here into `train`. A build that draws something itself draws from `createRandom(seed, stream)` of `../../random.ts`, never from `Math.random()`, which gives other tables on every run of the same seed.
+- **Two rows are compared**: all samples, and the group "within reach of the tables".
 
 An arm with two settings gives `runArm` two entries in `settings`, e.g. one with `createModel(base)` and one with `createModel(base, {trainable: {lexer: 'none', grammar: 'open', display: 'none'}})`, and compares them with `describeComparison(results[0]!, results[1]!)`.
 
@@ -69,9 +97,11 @@ All in `harness.ts`, unless a file is named.
 **`runArm({name, settings, seeds})`** runs each setting's `build(seed)` for every seed, one after the other, and returns one result per setting.
 
 - `build` returns `{tables, base}`: snapped tables, and the tables that the build started from. It may be async. `base` is another object than `tables`, with the same states, classes, contexts and open entries: `recordOf` throws otherwise, e.g. for a build that changed its base in place and returns it twice.
-- `seeds` are 1 to 5 unless you pass others. With fewer than 5 the summary says that the run is a try-out. An empty list throws, and so does a seed that is named twice, e.g. `[1, 1, 2]`.
+- **`build` makes its model itself, once per seed.** `train` changes the model that it is given: the weights after the call are the trained ones. A model that is made once outside `build` is trained by the first seed, and the second seed then starts from the first seed's weights.
+- `seeds` are 1 to 5 unless you pass others. With fewer than 5 the summary says that the run is a try-out. An empty list throws, and so do a seed that is named twice, e.g. `[1, 1, 2]`, and a seed that is no whole number, e.g. `2.5`.
 - Per setting and seed it saves `<RECOVERY_SCRATCH>/arms/<name>/<setting>/seed-<seed>.tables.json` and `seed-<seed>.record.json`, and it prints and saves `summary.md`: one markdown row per setting with the mean, the lowest and the highest over the seeds, e.g. `96.62 (96.23 to 96.92)`. What an earlier run left in a setting's folder is moved into a folder `earlier-<time>` there first, so the files next to a summary are the files of that run.
-- The seed has to reach everything that is random in the build: the order of the samples (`train`'s `seed`), a random choice of trainable cells, a random start. **When every seed gives the same tables, the build does not use its seed**: `runArm` says so in the summary, e.g. "5, which all gave the same tables" in the column of the seeds, and `describeComparison` then calls the setting one run and no spread.
+- The seed has to reach everything that is random in the build: the order of the samples (`train`'s `seed`), a random choice of trainable cells, a random start. **All randomness of a build comes from its seed**: a build that draws something of its own takes `createRandom(seed, stream)` of `../../random.ts`, e.g. `createRandom(seed, 0).integer(0, 9)`, and never `Math.random()`. With `Math.random()` two runs of one seed give two tables, so a record cannot be made again, and the spread over the seeds also holds what the seed does not decide.
+- **When every seed gives the same tables, the build does not use its seed**: `runArm` says so in the summary, e.g. "5, which all gave the same tables" in the column of the seeds, and `describeComparison` then calls the setting one run and no spread. A setting whose first seeds give the same tables and a later one other tables is not named.
 - **A setting in which nothing is random** says so: `{name: 'search from the votes', withoutSeed: true, build: () => ...}`. It is built once, saved as `no-seed.tables.json` and `no-seed.record.json`, and reported and compared as one number, like a baseline.
 
 **`recordOf(tables, base)`** returns the standard record of some tables. `runArm` calls it for you. It always scores the exact parser on the validation split of the standard set, and it throws for tables with a changed frozen cell. The record holds:
@@ -88,9 +118,13 @@ All in `harness.ts`, unless a file is named.
 
 **`describeSettings(results)`** gives the three markdown tables of some results: the scores, all three per group, and what the main number does not show. The table per group starts with the group "within reach of the tables".
 
-**`describeComparison(first, second)`** gives one sentence with both means, both ranges and whether the ranges overlap. It throws for a setting with a seed and fewer than 3 seeds. A setting without a seed is one number. Do not print a difference between two settings in any other way: a difference between two means says nothing without the spread.
+**`describeComparison(first, second, rowName)`** gives one sentence with both means, both ranges and whether the ranges overlap. The third parameter is the row of the score that is compared, as a record names it. Without it the row is `'all'`, every validation sample. **An arm reports the row `'group: within reach of the tables'` beside `'all'`**: the row "all" also holds the samples that no tables of this layout can label, and two settings can differ in one of the two rows and not in the other. A row that the records do not have throws. The function also throws for a setting with a seed and fewer than 3 seeds. A setting without a seed is one number. Do not print a difference between two settings in any other way: a difference between two means says nothing without the spread.
 
-**`baselines()`** gives the results of the five baselines, to print next to your rows.
+**`baselines()`** gives the results of the six baselines, to print next to your rows: the parser as it is, the dataset's four hand rules, and the hand-written tables.
+
+**`numberToBeat()`** gives the number to beat as a setting without a seed, for `describeSettings` and `describeComparison`: the tables of the plain search that starts from the hand-written tables, read from `<RECOVERY_SCRATCH>/search/search-from-handwritten.json`, with the hand-written tables as their base. It throws when the file is missing and when the file was saved with another dataset key, and the error names the two commands that make the file, see [Setup](#setup). Call it once, before `runArm`: the record is made on every call, and an arm that finds the file missing only after its training has lost the training.
+
+**`savedResultOf(armName, settingName)`** gives the result of a setting that `runArm` ran before, read from the records that it saved, e.g. `savedResultOf('plain-pass', 'one pass of the trainer from today\'s tables, defaults')`. So an arm is compared with another arm without running that arm again: the result goes into `describeSettings` and `describeComparison` like one of your own. It throws when the setting's folder holds no record, for a record of another dataset key, since its score is then of other samples, and for a record that another run saved. After a rerun of the other arm it gives the rerun: the files of the run before are in a folder `earlier-<time>`, which it does not read.
 
 **`trainDataFor(base)`** gives the train samples of the standard set that give the twin a step, packed for `base`, the tables that the build trains: what `train` takes. Its second argument are the intended stacks, `loadIntendedObjects(samplesOfTheStandardSet(), softCacheFolderOf())` of `../soft/twin-data.ts`, which only a run that is kept on track needs. **`trainPartOfTheStandardSet()`** gives the train split as a set of its own, for `countVotes` of `../search/votes.ts` and for `prepareSamples` of `../search/sample-runs.ts`, which take every broken sample of the set that they are given.
 
@@ -98,9 +132,9 @@ All in `harness.ts`, unless a file is named.
 
 What a build function calls from the rest of `learn/`:
 
-- **`train(model, data, options)`** of `../soft/train.ts` trains on every sample of `data` and returns `{best, last, bestPoint, points, samplesPerSecond}`. The tables of a seed are `result.last`. With `options.validation`, `result.best` are the tables of the log point with the best score on one half of the validation split.
+- **`train(model, data, options)`** of `../soft/train.ts` trains on every sample of `data` and returns `{best, last, bestPoint, points, samplesPerSecond}`. It changes `model` in place. The tables of a seed are `result.last`. With `options.validation`, `result.best` are the tables of the log point with the best score on one half of the validation split.
 - **`createModel(base, {trainable, start, startShare})`** of `../soft/twin.ts`. Without `trainable`, every open cell and every open entry of the display table is trainable. With it, name all three tables, each as `'open'`, `'none'` or a mask. **A mask** is a `Uint8Array` with one entry per cell of the table, 1 for a trainable cell and 0 for every other one, e.g. a copy of `base.grammarOpen` in which the cells of one grammar state are set to 0. Only an open cell may be trainable, and an entry other than 0 and 1 throws.
-- **`randomTrainableCells(tables, share, seed)`** of `../soft/train.ts` gives the three masks of a random share of the open cells, e.g. a tenth with 0.1. **`createRandom(seed, stream)`** of `../../random.ts` is the random source of the repo, for a build that draws something of its own, e.g. `createRandom(seed, 0).integer(0, 9)`.
+- **`randomTrainableCells(tables, share, seed)`** of `../soft/train.ts` gives the three masks of a random share of the open cells, e.g. a tenth with 0.1. **`createRandom(seed, stream)`** of `../../random.ts` is the random source of the repo, and the only one that a build uses, e.g. `createRandom(seed, 0).integer(0, 9)`.
 - **Structure**, all of `../recovery-tables.ts` and explained in `../structure/README.md`: `addStates(tables, addedTokenizerStates, [grammarStateShownAs, ...])` adds tokenizer states and grammar states, `addClasses(tables, [{name: 'apostrophe', codePoints: [0x27]}])` gives code points a character class of their own, `openDisplayEntries(tables)` lets entries of the display table change, and `addFirstOnLineBit(tables)` tells the grammar whether a token is the first on its line. Each takes tables and returns tables, in any order. The result is the arm's `base`, and `trainDataFor(base)` packs the samples for it.
 - **`scoreTables(tables, samples, {splits})`**, `sharesOf(row)` and `cellCountsOf(tables, base)` of `../score.ts`, for a score that is no record, e.g. on the train split.
 
@@ -185,11 +219,15 @@ A later commit of the dataset can move a sample from the train split to the vali
 
 ## What can still go wrong
 
+- **A model that is made once for every seed.** `train` changes the model in place, and nothing throws when it gets a model that was trained before: the second seed goes on from the first seed's weights, and its record looks like any other. Make the model inside `build`, as the example does.
+- **Randomness that does not come from the seed.** `Math.random()` in a build, or a `createRandom` with a fixed number in the place of the seed, e.g. a random tenth of the cells that is the same tenth for every seed. The first makes a record that no rerun gives again. The second is not seen by the harness when something else in the build still uses the seed, since the seeds then give other tables.
+- **One row of a comparison.** `describeComparison(first, second)` compares all validation samples. Print the comparison on `'group: within reach of the tables'` beside it, as the third parameter.
+- **A number to beat or a saved result of another dataset.** `numberToBeat()` and `savedResultOf` refuse a file that was saved with another dataset key. After a new commit of the dataset, make the search from the hand-written tables again, and run the other arm again.
 - **`train(model, data, options)` trains on every sample of `data`.** `options.places` are places in `data`, from 0 to `data.sampleCount - 1`, not places in the samples that `data` was packed from. A place outside `data` throws. A place inside `data` that you did not mean does not. So pack exactly the samples of the run, with `trainDataFor(base)`, and pass no places.
 - **`createModel(base, {trainable})` needs all three of `lexer`, `grammar` and `display`**, each as a mask, `'open'` or `'none'`. Without `trainable`, every open cell and every open entry of the display table is trainable. A model without any trainable cell makes `train` throw.
 - **Pack the samples for the tables that you train.** `trainDataFor(base)` gives every code point the class that `base` gives it. A run on samples that were packed for other classes or without the bit throws. Tables with the same classes and more states are fine.
 - **Two counts of cells.** "Cells changed against the base" is what your run changed. "Cells that differ from today's parser" also holds every cell of an added state, and the changed cells that an added class or the bit copied. E.g. two added tokenizer states and one grammar state are 154 cells that differ from today's parser before a run changes anything. Report the first, and name both. `recordOf` throws for a base with other states, classes, contexts or open entries than the tables. A base with the right layout and the wrong cells still gives a wrong count without an error, e.g. today's tables for a run that started from the votes.
-- **An option that a command does not have is an error**, e.g. `search/mistakes.ts --split test`. Read the error: the command names its options.
+- **An option that a command does not have is an error**, e.g. `search/mistakes.ts --split test`. Read the error: the command names its options. That only holds for a script that calls `refuseUnknownOptions`, so an arm's script calls it first, as the example does.
 - **The last tables of a run are one draw.** The score of snapped tables moves by more than half a point between two log points of one run. Take the last tables (`result.last`), or tables chosen on one half of the validation split and scored on the other (`result.best` of a call with `validation`), and never the best of many log points on the whole split. Without `validation`, `result.best` is `result.last`.
 - **A low loss is not a good parser.** The twin is not the parser once its cells hold mixes. Only the record counts.
 - **Check the columns that the main number does not show.** Tables can gain a point and break the depth of valid JSON that is too deep, or show characters of the text as "past the end".
@@ -197,14 +235,15 @@ A later commit of the dataset can move a sample from the train split to the vali
 
 ## Files
 
-- `harness.ts`: `recordOf`, `runArm`, `describeSettings`, `describeComparison`, `spreadOf`, `percentSpread`, `baselines`, `baselineTables`, `trainDataFor`, `trainPartOfTheStandardSet`, `groundRulesOn`, `armFolderOf`.
+- `harness.ts`: `recordOf`, `runArm`, `describeSettings`, `describeComparison`, `spreadOf`, `percentSpread`, `baselines`, `baselineTables`, `numberToBeat`, `savedResultOf`, `trainDataFor`, `trainPartOfTheStandardSet`, `groundRulesOn`, `armFolderOf`.
 - `baselines.ts`: prints and saves the baselines' rows.
 - `final.ts`: the test split, only with `RECOVERY_FINAL=yes`.
-- `check.ts`, in six parts:
-  1. The dataset's cells of valid JSON are the experiment's frozen cells. The dataset's hand rules as tables of the experiment hold the hand rule's cells, cell by cell, and give the depth of the dataset's plain table parser on 4,530 broken texts.
-  2. The record: for today's tables, for the hand-written tables (every row is the row of `scoreTables` for those tables, 915 cells changed against today's tables by a count made in the check, and 0 with themselves as the base), and for tables with random open cells (the wrong depths on valid JSON that is too deep are the ones of `../check-deep.ts`, 74.2% and 80.6%). `recordOf` refuses a changed frozen cell, the tables as their own base and a base of another layout.
+- `check.ts`, in seven parts:
+  1. The dataset's cells of valid JSON are the experiment's frozen cells. The dataset's four hand rules as tables of the experiment hold the hand rule's cells, cell by cell, and give the depth of the dataset's plain table parser on 4,512 broken texts. The hand rule `lines` has a tokenizer state of its own: 623 code points are read in it, and its record counts 1,108 cells changed against today's tables with that state added, as a count made in the check does.
+  2. The record: for today's tables, for the hand-written tables (every row is the row of `scoreTables` for those tables, 915 cells changed against today's tables by a count made in the check, and 0 with themselves as the base), and for tables with random open cells (the wrong depths on valid JSON that is too deep are the ones of `../check-deep.ts`, 74.2% and 80.6%). The three fields of how the damage is shown are the counts of `scoreTables`, for the hand-written tables, where all three are 0, and for today's tables and the random ones, where they are not. `recordOf` refuses a changed frozen cell, the tables as their own base and a base of another layout, each by the sentence of its reason, e.g. a base without the tables' added class, or with a class for another code point.
   3. The ground rules hold on the fixed texts for 12 random settings, and do not hold for tables with one changed frozen cell, for each of 40 frozen cells.
-  4. The arithmetic of a report on records made up with known shares, e.g. 0.92, 0.90 and 0.91 give "91.00 (90.00 to 92.00)", and the sentence of `describeComparison` with ranges that overlap and with ranges that do not.
-  5. `runArm` with toy builds: a seed that picks one of the dataset's hand rules, so that every seed has another score and the summary's row is the mean, the lowest and the highest that the check works out, a setting without a seed, a build that ignores its seed, lists of seeds that throw, and a rerun with fewer seeds.
+  4. The arithmetic of a report on records made up with known numbers, e.g. 0.92, 0.90 and 0.91 give "91.00 (90.00 to 92.00)": every cell of a setting's row in each of the three tables of `describeSettings`, for a setting of 3 seeds and for one without a seed, and the sentence of `describeComparison` with ranges that overlap and with ranges that do not, on the row "all" and on the row of a group.
+  5. `runArm` with toy builds: a seed that picks one of the dataset's hand rules, so that every seed has another score and the summary's row is the mean, the lowest and the highest that the check works out, a setting without a seed, a build that ignores its seed, a build whose third seed gives other tables than its first two, lists of seeds that throw (none, a seed twice, the seed 2.5), and a rerun with fewer seeds. `savedResultOf` reads every setting back as the result that `runArm` returned, and refuses a setting that was never run, a record of another dataset and a record of another run.
   6. `final.ts` without a test sample: its report on validation samples with made-up held-out bits, and its refusal of tables of another dataset.
+  7. `numberToBeat` on scratch folders that the check makes: the tables of the file as a setting without a seed, with the hand-written tables as the base, and its refusal of a missing file, of a file of another dataset and of a file without a dataset key.
 - `plain-pass/`: the first arm.

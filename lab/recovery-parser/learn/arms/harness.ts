@@ -5,24 +5,28 @@
 // - runArm({name, settings, seeds}): runs each setting's build function for every seed, saves each seed's tables and
 //   record under <RECOVERY_SCRATCH>/arms/<name>/, and prints one markdown row per setting with the mean, the lowest
 //   and the highest over the seeds.
-// - describeComparison(first, second): two settings next to each other, always with the spread of each.
+// - describeComparison(first, second, rowName): two settings next to each other on one row of the score, always with
+//   the spread of each.
 // - baselines(): the rows that every arm is read against, through the same record.
+// - numberToBeat(): the search from the hand-written tables, which an arm without added structure has to pass.
+// - savedResultOf(armName, settingName): the saved records of a setting that runArm ran before, so that an arm can
+//   be compared with another arm without running that arm again.
 // - trainDataFor(base) and trainPartOfTheStandardSet(): the train split, which is all that a build function trains on.
 //
 // README.md of this folder says how to write an arm with them. Nothing here reads the test split: the samples that
 // loadStandardSamples gives hold no test sample. final.ts is the one script for the test split.
-import {existsSync, mkdirSync, readdirSync, renameSync, writeFileSync} from 'node:fs'
+import {existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {type HandRule, handRuleTables, handRules} from '../../hand-rules.ts'
 import {createRandom} from '../../random.ts'
 import {type ParserTrace, positionCount, runTableParser} from '../../table-parser.ts'
 import {wrongDepthsOnDeepTexts} from '../check-deep.ts'
 import {checkTexts, textWithAddedClasses} from '../check-texts.ts'
-import {type Samples, groupNames, loadStandardSamples, standardRange, textOf, trainPart, validationPart} from '../data.ts'
+import {type Samples, datasetKey, groupNames, loadStandardSamples, standardRange, textOf, trainPart, validationPart} from '../data.ts'
 import {handwrittenTables} from '../handwritten/rules.ts'
 import {plainParserProblems, recoveryTablesOf} from '../plain-tables.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from '../recovery-parser.ts'
-import {type RecoveryTables, addStates, asIsTables, cellCounts, checkTables, differencesOf, saveTables, tablesToJson, today} from '../recovery-tables.ts'
+import {type RecoveryTables, addStates, asIsTables, cellCounts, checkTables, differencesOf, loadTables, loadTablesOfThisDataset, otherDatasetOf, saveTables, tablesToJson, today} from '../recovery-tables.ts'
 import {type CellCounts, type ScoreRow, cellsReadAt, countCells, isRead, scoreTables, sharesOf} from '../score.ts'
 import {packForTwin, placesForTwin} from '../soft/twin-data.ts'
 import type {TwinData} from '../soft/twin.ts'
@@ -351,7 +355,7 @@ export async function runArm(options: ArmOptions): Promise<SettingResult[]> {
       log(`${options.name}, ${setting.name}, ${seed === null ? 'no seed' : `seed ${seed}`}: all three ${(100 * sharesOf(rowNamed(record, 'all')).allThree).toFixed(2)}% on the validation split, ${record.cellsChangedAgainstBase.total} cells changed against the base, ${((performance.now() - started) / 1000).toFixed(0)} s`)
     }
     const result: SettingResult = {name: setting.name, seeds: setting.withoutSeed === true ? [] : [...seeds], records}
-    if (result.seeds.length >= 2 && tablesOfSeeds.every(text => text === tablesOfSeeds[0])) {
+    if (everySeedGaveTheSame(result.seeds, tablesOfSeeds)) {
       result.everySeedGaveTheSameTables = true
       log(sameTablesNote(result))
     }
@@ -363,6 +367,43 @@ export async function runArm(options: ArmOptions): Promise<SettingResult[]> {
   log('')
   log(summary)
   return results
+}
+
+// Whether a setting has two seeds or more and each of them gave the same tables, as the text of tablesToJson.
+const everySeedGaveTheSame = (seeds: readonly number[], tablesOfSeeds: readonly string[]) => seeds.length >= 2 && tablesOfSeeds.every(text => text === tablesOfSeeds[0])
+
+// The saved records of one setting of an arm, as the result that runArm returned for the setting: what
+// describeSettings and describeComparison take. So an arm can be compared with another arm without running that arm
+// again, e.g. with the plain pass:
+//   describeComparison(results[0]!, savedResultOf('plain-pass', 'one pass of the trainer from today\'s tables, defaults'))
+// The records are read from <RECOVERY_SCRATCH>/arms/<arm>/<setting>/, where runArm saved them. Throws:
+// - when the folder holds no record: run the arm first,
+// - for a record of another dataset, i.e. one whose key is not the dataset's key as it is now: its score is of other
+//   samples, so run the arm again,
+// - for a record that is not the one that runArm saved under its file name, e.g. after a file was copied from the
+//   folder of another setting.
+export function savedResultOf(armName: string, settingName: string): SettingResult {
+  const folder = join(armFolderOf(armName), fileNameOf(settingName))
+  const saved = (existsSync(folder) ? readdirSync(folder) : []).flatMap(fileName => {
+    const match = /^(?:no-seed|seed-(-?\d+))\.record\.json$/.exec(fileName)
+    return match === null ? [] : [{fileName, seed: match[1] === undefined ? null : Number(match[1])}]
+  }).sort((left, right) => (left.seed ?? 0) - (right.seed ?? 0))
+  if (saved.length === 0) throw new Error(`${folder} holds no record of the setting ${JSON.stringify(settingName)} of the arm ${JSON.stringify(armName)}: run the arm first, so that runArm saves its records there`)
+  if (saved.length > 1 && saved.some(({seed}) => seed === null)) throw new Error(`${folder} holds a record without a seed next to records with a seed: a setting has a seed or has none`)
+  const records = saved.map(({fileName, seed}) => {
+    const file = join(folder, fileName)
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as {format?: unknown}
+    if (parsed.format !== 'recovery arm record 2') throw new Error(`${file} is no record of an arm: its format is ${JSON.stringify(parsed.format)}`)
+    const record = parsed as ArmRecord
+    if (record.datasetKey !== datasetKey()) throw new Error(`${file} was saved with the dataset ${record.datasetKey}, and the dataset is ${datasetKey()} now: its score is of other samples. Run the arm ${JSON.stringify(armName)} again.`)
+    if (record.run?.arm !== armName || record.run.setting !== settingName || record.run.seed !== seed) throw new Error(`${file} holds the record of the run ${JSON.stringify(record.run)}, and not of the arm ${JSON.stringify(armName)}, the setting ${JSON.stringify(settingName)} and ${seed === null ? 'no seed' : `the seed ${seed}`}`)
+    return record
+  })
+  const seeds = saved.flatMap(({seed}) => seed === null ? [] : [seed])
+  const result: SettingResult = {name: settingName, seeds, records}
+  // The tables of every seed are saved next to its record. They say whether the build used its seed.
+  if (everySeedGaveTheSame(seeds, seeds.map(seed => tablesToJson(loadTablesOfThisDataset(join(folder, `seed-${seed}.tables.json`)).tables)))) result.everySeedGaveTheSameTables = true
+  return result
 }
 
 // Today's tables with the states of `tables`, as the base of tables that a person wrote: an added state holds what
@@ -397,4 +438,32 @@ export function baselineTables(): {name: string, tables: RecoveryTables, base: R
 // The records of the baselines, one setting each, without seeds.
 export function baselines(): SettingResult[] {
   return baselineTables().map(({name, tables, base}) => ({name, seeds: [], records: [recordOf(tables, base)]}))
+}
+
+// The file of the tables of the number to beat in a scratch folder.
+export const numberToBeatFileOf = (scratchFolder: string) => join(scratchFolder, 'search', 'search-from-handwritten.json')
+
+// The number to beat, as a setting without a seed: the tables of the plain search that starts from the hand-written
+// tables, see ../search/README.md. An arm without added structure that ends below it has found nothing that a plain
+// search does not find. Its base is the hand-written tables, which the search started from, and for which no split
+// counts as unseen, so the same holds for this row.
+//
+// The tables are read from <scratch>/search/search-from-handwritten.json, which these two commands make, in about 5
+// minutes:
+//   bun lab/recovery-parser/learn/handwritten/rules.ts
+//   bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json
+// Throws when the file is missing, and when it was saved with another dataset key than the dataset's as it is now:
+// a search before a later commit of the dataset may have run on samples that are validation samples now.
+//
+// The record is made on every call, so an arm calls it once, and before it trains anything: a missing file then
+// stops the arm at its start.
+export function numberToBeat(scratchFolder: string | undefined = process.env['RECOVERY_SCRATCH']): SettingResult {
+  if (scratchFolder === undefined || scratchFolder === '') throw new Error('set RECOVERY_SCRATCH to a folder outside the repo: the tables of the number to beat are read from there')
+  const file = numberToBeatFileOf(scratchFolder)
+  const howToMake = 'Make it with `bun lab/recovery-parser/learn/handwritten/rules.ts` and then `bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json`.'
+  if (!existsSync(file)) throw new Error(`the number to beat has no tables yet: ${file} is missing. ${howToMake}`)
+  const loaded = loadTables(file)
+  const otherDataset = otherDatasetOf(file, loaded)
+  if (otherDataset !== undefined) throw new Error(`the number to beat is of another dataset: ${otherDataset}. ${howToMake}`)
+  return {name: 'search from the hand-written tables', seeds: [], records: [recordOf(loaded.tables, handwrittenTables().tables)]}
 }
