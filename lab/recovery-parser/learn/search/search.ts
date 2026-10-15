@@ -5,7 +5,7 @@
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/search/search.ts [--from <tables.json>] [--out <tables.json>] [--pairs known]
 //       [--passes 50] [--runs 1400] [--minutes 9.5] [--workers 4] [--order 0] [--without-kinds hashComment,foreignLiteral]
-//       [--scratch <folder>]
+//       [--end-events] [--scratch <folder>]
 // --from   the tables to start from, e.g. the ones votes.ts saved. Without it, today's tables.
 // --out    where the tables go after every pass. Without it, <scratch>/search/search-from-<today or the name of --from>.json.
 //          A log goes next to it, with the same name and .log.
@@ -16,6 +16,10 @@
 //                 (string, stringStart)
 //          all    every pair
 //          A grammar cell's choices are always tried as pairs of next state and stack action.
+// --end-events  also tries the three events of a text's end (end, endInsideToken, truncatedEnd) in a tokenizer cell.
+//          Without it they are left out: a code point with such an event is shown as "past the end", the display kind
+//          of the cells after a text, which no recovery would show for a character of the text. The first searches of
+//          this folder tried them, and used the event `end` to give the grammar its token.
 // --runs   the budget, in millions of runs of a sample. The search stops inside a pass when it is used up. It is a
 //          count and not a time, so a rerun stops at the same step.
 // --minutes  a second stop, by the clock, for a machine that is slower than expected. When it is the one that stops
@@ -35,10 +39,10 @@
 import {appendFileSync, mkdirSync, writeFileSync} from 'node:fs'
 import {basename, dirname, join} from 'node:path'
 import {createRandom} from '../../random.ts'
-import {loadStandardSamples, optionOf, selectSamples, trainPart, validationPart} from '../data.ts'
+import {cacheFolderOf, loadStandardSamples, optionOf, selectSamples, trainPart, validationPart} from '../data.ts'
 import {
-  type RecoveryTables, actionByToken, actionCount, actionOfToken, asIsTables, checkTables, differencesOf, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTables,
-  saveTables, today,
+  type RecoveryTables, actionByToken, actionCount, actionOfToken, asIsTables, checkTables, differencesOf, eventNames, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName,
+  loadTables, saveTables, today,
 } from '../recovery-tables.ts'
 import {scoreTables, sharesOf} from '../score.ts'
 import {cellBitCount, messageOf, prepareSamples, totalScore} from './sample-runs.ts'
@@ -53,6 +57,10 @@ const maximumRuns = Number(optionOf('--runs') ?? 1400) * 1e6
 const maximumMinutes = Number(optionOf('--minutes') ?? 9.5)
 const orderSeed = Number(optionOf('--order') ?? 0)
 const withoutKinds = (optionOf('--without-kinds') ?? '').split(',').filter(name => name !== '')
+const withEndEvents = process.argv.includes('--end-events')
+// The events of a text's end. Only a cell of the two classes of a text's end holds one today, and the search reads
+// no such cell, since it runs the code points of a text and not the position after them.
+const endEvents = new Set((['end', 'endInsideToken', 'truncatedEnd'] as const).map(name => eventNames.indexOf(name)))
 const workerCount = Math.min(4, Math.max(1, Number(optionOf('--workers') ?? 4)))
 const startName = fromFile === undefined ? 'today' : basename(fromFile).replace(/\.json$/, '')
 const outFile = optionOf('--out') ?? (scratchFolder === undefined ? undefined : join(scratchFolder, 'search', `search-from-${startName}${orderSeed === 0 ? '' : `-order-${orderSeed}`}${withoutKinds.length === 0 ? '' : `-without-${withoutKinds.join('-')}`}.json`))
@@ -67,7 +75,7 @@ const log = (line: string) => {
 
 const started = performance.now()
 const seconds = () => ((performance.now() - started) / 1000).toFixed(1)
-const samples = loadStandardSamples(scratchFolder === undefined ? undefined : join(scratchFolder, 'cache'))
+const samples = loadStandardSamples(cacheFolderOf(scratchFolder))
 const wholeTrain = trainPart(samples)
 for (const kind of withoutKinds) if (!wholeTrain.kindNames.includes(kind)) throw new Error(`--without-kinds names ${kind}, which is no kind of damage`)
 const leftOut = withoutKinds.map(kind => wholeTrain.kindNames.indexOf(kind))
@@ -94,7 +102,7 @@ const checkedTotal = () => {
   return total
 }
 let total = checkedTotal()
-log(`Search from ${fromFile ?? 'today\'s tables'}, choices of a tokenizer cell: ${pairs}, ${orderSeed === 0 ? 'most read cells first' : `random order ${orderSeed}`}, ${workerCount} worker threads, at most ${maximumPasses} passes, ${maximumRuns / 1e6} million runs and ${maximumMinutes} minutes.`)
+log(`Search from ${fromFile ?? 'today\'s tables'}, choices of a tokenizer cell: ${pairs}${withEndEvents ? ', with the events of a text\'s end' : ', without the events of a text\'s end'}, ${orderSeed === 0 ? 'most read cells first' : `random order ${orderSeed}`}, ${workerCount} worker threads, at most ${maximumPasses} passes, ${maximumRuns / 1e6} million runs and ${maximumMinutes} minutes.`)
 log(`Train split${withoutKinds.length === 0 ? '' : ` without the kinds ${withoutKinds.join(', ')}`}: ${prepared.sampleCount} broken samples, ${prepared.scoredCodePoints} labeled code points from the first damage on.`)
 log(`Start: train all three ${percent(total.allRight, prepared.scoredCodePoints)}% (${total.allRight} code points, ${total.labelsRight} right labels). ${validationLine()}`)
 
@@ -133,6 +141,7 @@ function candidatesOf(grammar: boolean, cell: number): Uint8Array {
   const eventNow = tables.lexerEvent[cell]!
   const seen = new Set<number>([nextNow * 256 + eventNow])
   const add = (next: number, event: number) => {
+    if (!withEndEvents && endEvents.has(event)) return
     if (seen.has(next * 256 + event)) return
     seen.add(next * 256 + event)
     candidates.push(next, event)
@@ -227,7 +236,7 @@ for (; pass < maximumPasses && stoppedBy === '';) {
   const checked = checkedTotal()
   if (checked.allRight !== total.allRight || checked.labelsRight !== total.labelsRight) throw new Error(`after pass ${pass} the steps add up to ${total.allRight} code points and ${total.labelsRight} labels, and a run of every sample gives ${checked.allRight} and ${checked.labelsRight}`)
   const differences = differencesOf(asIsTables(), tables)
-  const note = `search from ${fromFile === undefined ? 'today\'s tables' : basename(fromFile)}, --pairs ${pairs}${orderSeed === 0 ? '' : `, --order ${orderSeed}`}${withoutKinds.length === 0 ? '' : `, without the kinds ${withoutKinds.join(', ')}`}, after pass ${pass}${stoppedBy === '' ? '' : `, which stopped by ${stoppedBy}`}: ${differences.length} cells differ from today's, train all three ${percent(total.allRight, prepared.scoredCodePoints)}%`
+  const note = `search from ${fromFile === undefined ? 'today\'s tables' : basename(fromFile)}, --pairs ${pairs}${withEndEvents ? ', --end-events' : ''}${orderSeed === 0 ? '' : `, --order ${orderSeed}`}${withoutKinds.length === 0 ? '' : `, without the kinds ${withoutKinds.join(', ')}`}, after pass ${pass}${stoppedBy === '' ? '' : `, which stopped by ${stoppedBy}`}: ${differences.length} cells differ from today's, train all three ${percent(total.allRight, prepared.scoredCodePoints)}%`
   saveTables(outFile, tables, note)
   log(`Pass ${pass} ${stoppedBy === '' ? 'done' : `stopped by ${stoppedBy}`} at ${seconds()} s: ${tried} of ${order.length} open cells tried (${readAtStart} were read at the start of the pass), ${changes} changed, ${((runs - passRuns) / 1e6).toFixed(1)} million runs. ${differences.length} cells differ from today's and ${differencesOf(startTables, tables).length} from the start.`)
   log(`  train: all three ${percent(total.allRight, prepared.scoredCodePoints)}% (${total.allRight} code points, ${total.labelsRight} right labels). ${validationLine()}`)

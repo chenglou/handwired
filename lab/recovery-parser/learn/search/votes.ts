@@ -31,7 +31,7 @@
 //           right for a comment and wrong for the first quote of a string that the damage quoted.
 import {mkdirSync} from 'node:fs'
 import {dirname, join} from 'node:path'
-import {type Samples, codePointLabeled, loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
+import {type Samples, cacheFolderOf, codePointLabeled, loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
 import {containerArray, containerNone, containerObject, maximumDepth} from '../recovery-parser.ts'
 import {
   type RecoveryTables, actionByToken, actionCount, actionNames, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, asIsTables, cellCounts, differencesOf,
@@ -263,7 +263,7 @@ if (import.meta.main) {
   const options: VoteOptions = {follow: process.argv.includes('--follow'), stay: process.argv.includes('--stay')}
   const scratchFolder = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']
   const outFile = optionOf('--out') ?? (scratchFolder === undefined ? undefined : join(scratchFolder, 'search', `votes${options.follow ? '-follow' : ''}${options.stay ? '-stay' : ''}.json`))
-  const samples = loadStandardSamples(scratchFolder === undefined ? undefined : join(scratchFolder, 'cache'))
+  const samples = loadStandardSamples(cacheFolderOf(scratchFolder))
   const train = trainPart(samples)
   const started = performance.now()
   const votes = countVotes(train, options)

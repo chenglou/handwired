@@ -15,10 +15,9 @@
 //   wantd, gotd  the depth after the code point, 0 to 9 and then a to g, - below 0 and + above 16.
 //   wantc, gotc  the innermost open container after the code point: o for an object, a for an array, - for none.
 //   miss   from the first damage on: k where the display kind is wrong, d the depth, c the container, * more than one.
-import {join} from 'node:path'
 import {kindLetters} from '../../labels.ts'
 import {createRandom} from '../../random.ts'
-import {codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, optionOf, reachableNames, validationPart} from '../data.ts'
+import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, optionOf, reachableNames, validationPart} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, checkTables, loadTables} from '../recovery-tables.ts'
 import {runOnSample} from '../score.ts'
@@ -30,7 +29,7 @@ const pick = Number(optionOf('--pick') ?? 1)
 const onlyKind = optionOf('--kind')
 const tables = tablesFile === undefined ? asIsTables() : loadTables(tablesFile).tables
 checkTables(tables)
-const samples = validationPart(loadStandardSamples(scratchFolder === undefined ? undefined : join(scratchFolder, 'cache')))
+const samples = validationPart(loadStandardSamples(cacheFolderOf(scratchFolder)))
 const trace = createTrace()
 
 const depthLetter = (depth: number) => depth < 0 ? '-' : depth > 16 ? '+' : '0123456789abcdefg'[depth]!
