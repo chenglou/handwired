@@ -7,12 +7,14 @@ import {highlightReference} from '../../tests/json-search/highlighter/reference.
 import {sampleProblems} from './check-samples.ts'
 import {tableParserDifference} from './check-table-parser.ts'
 import {contradictions, kinds} from './damage.ts'
+import {drawLayout, makeDocumentOf} from './documents.ts'
 import {type Edit, applyEdits, canonicalEdits, insertAt, removeRange, replaceOneForOne} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
 import {kindLetters, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, typingReplayOf} from './samples.ts'
+import {isWordKey, scan} from './scan.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, splits, typingReplayOf} from './samples.ts'
 import {type ParserTables, capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
@@ -84,6 +86,33 @@ test('the edits give the broken text, are in the canonical form, and the alignme
       if (!sample.alignment.includes(index)) fail(sample, `the unscored code point ${index} of the original is not in the broken text`)
     }
   }
+})
+
+test('text that is added before the whole original stays there, unless it is one code point, and the second derivation follows', () => {
+  // A log prefix that starts with the document's first code points is the added text as a whole.
+  const prefix = '2026-06-19 12:23:40,515 - app.orders - ERROR - '
+  expect(canonicalEdits(Array.from('20142'), [insertAt(0, prefix)])).toEqual([insertAt(0, prefix)])
+  // One code point before the same code point moves, so the first brace is the kept one. So does a run of one code point.
+  expect(canonicalEdits(Array.from('{"a": 1}'), [insertAt(0, '{')])).toEqual([insertAt(1, '{')])
+  expect(canonicalEdits(Array.from('""'), [insertAt(0, '""')])).toEqual([insertAt(2, '""')])
+  // After the start of the original, an added text still moves with its code points in another order: a line `}`
+  // before the `}` that ends a document is that `}` kept, and a line feed and a `}` added.
+  expect(canonicalEdits(Array.from('{"a": 1\n}'), [insertAt(8, '}\n')])).toEqual([insertAt(9, '\n}')])
+  // Such a sample is rare, about one in 10,000 with the kind logPrefix: a lone number that starts with 2 after a
+  // prefix that starts with the year. Its number is kept whole, and the second derivation agrees.
+  const sample = sampleAt(defaultSeed, 4593, {kind: 'logPrefix'})
+  expect([sample.original, sample.broken]).toEqual(['21101', '2026-03-01 15:25:41,257 - http - WARNING - 21101'])
+  expect(sample.edits).toEqual([{at: 0, remove: 0, insert: '2026-03-01 15:25:41,257 - http - WARNING - ', rank: -3}])
+  expect([sample.firstDamage, sample.alignment.slice(-6)]).toEqual([0, [-1, 0, 1, 2, 3, 4]])
+  expect(sampleProblems(sample)).toEqual([])
+  // The same texts with the prefix moved into the number, as the edits were before: the 2 of the year is kept as the
+  // start of the number. The second derivation reports it.
+  const moved: Sample = structuredClone(sample)
+  moved.edits = [{at: 1, remove: 0, insert: '026-03-01 15:25:41,257 - http - WARNING - 2', rank: -3}]
+  moved.alignment = [0, ...sample.alignment.slice(1, -5), -1, 1, 2, 3, 4]
+  moved.firstDamage = 1
+  expect(applyEdits(Array.from(moved.original), moved.edits).broken).toBe(sample.broken)
+  expect(sampleProblems(moved)).toEqual(['the insertion at 1 is text that stands before the whole original, with its first code points taken for the original\'s'])
 })
 
 test('before its first error, the parser as it is gives every scored label, and the first error is not before the first damage', () => {
@@ -419,9 +448,24 @@ test('the hand-written settings of the tables read valid documents exactly as th
   // The hand rule words shows a key and a value without quotes as what they are, and a word in single quotes too.
   const shown = runTableParser("{port: 8080, 'env': production}", handRuleTables('words'))
   expect(Array.from(shown.displayKind.slice(0, shown.length), kind => kindLetters[kind]).join('')).toBe('pkkkkpwnnnnpwkkkkkpwssssssssssp')
+  // The hand rule lines has one more tokenizer state than the tables as they are. After a string that a line feed
+  // ended, the brace at the very start of the next line does not open, so the second line of a file with one document
+  // per line stays at depth 1 when the first line is cut short inside a string, and the third line starts at depth 0.
+  // The hand rule words opens a second level there. With a space before the brace, both open it.
+  const cutLine = '{"id": "7a919a\n{"id": "7a919a-2", "ok": true}\n{"id": 3}'
+  const read = (text: string, rule: typeof handRules[number]) => {
+    const trace = runTableParser(text, handRuleTables(rule))
+    return [Array.from(trace.displayKind.slice(0, trace.length), kind => kindLetters[kind]).join(''), Array.from(trace.depthAfter.slice(0, trace.length)).join('')]
+  }
+  expect(handRuleTables('lines').lexerNext.length).toBe((lexerStateNames.length + 1) * defaultTables.classCount)
+  expect(read(cutLine, 'lines')).toEqual(['pkkkkpwssssssswpkkkkpwsssssssssspwkkkkpwllllpwpkkkkpwnp', '1111111111111111111111111111111111111111111100111111110'])
+  expect(read(cutLine, 'words')).toEqual(['pkkkkpwssssssswpkkkkpwsssssssssspwkkkkpwllllpwpkkkkpwnp', '1111111111111112222222222222222222222222222211222222221'])
+  expect(read('{"id": "7a\n {"id": 2}', 'lines')).toEqual(read('{"id": "7a\n {"id": 2}', 'words'))
+  // The three earlier settings have the 26 tokenizer states of the tables as they are.
+  for (const rule of ['stay', 'resync', 'words'] as const) expect(handRuleTables(rule).lexerNext.length).toBe(lexerStateNames.length * defaultTables.classCount)
 })
 
-test('the split is a function of a document\'s tokens, also for each record of a text of several documents, and held-out kinds and the held-out template only sit in the test split', () => {
+test('the split is a function of a document\'s tokens, also for each record of a text of several documents, the literals and the ten smallest sequences are in all three splits, and held-out kinds and the held-out template only sit in the test split', () => {
   const kindNames = new Set(kinds.map(kind => kind.name))
   const splitOfSequence = new Map<string, string>()
   const splitsOfLoneScalars = new Set<string>()
@@ -463,6 +507,24 @@ test('the split is a function of a document\'s tokens, also for each record of a
   expect(splitsOfLoneScalars.has('train')).toBe(true)
   expect(splitsOfLoneScalars.size).toBeGreaterThan(1)
   expect([splitOf('true'), splitOf(' false\n'), splitOf('null'), splitOf('"abc"'), splitOf('"abc"\n')]).toEqual(['train', 'validation', 'test', splitOf(' "abc"'), splitOf(' "abc"')])
+  // The template scalar has ten sequences of more than one token, e.g. [] and {s:{}}. A hash puts all ten into the
+  // train split, so they are split by hand: four in train, three in validation and three in test. Each of validation
+  // and test has one of the two empty containers, one container that holds an empty one, and one with one entry.
+  const smallSequences = new Map<string, string>()
+  for (let index = 0; index < 1500; index++) {
+    const random = createRandom(defaultSeed, index)
+    const document = makeDocumentOf(random, 'scalar', drawLayout(random))
+    if (document === undefined) continue
+    const sequence = tokenSequenceOf(document.text)
+    if (sequence.length === 1) continue
+    expect(splitKeyOf(document.text)).toBe(sequence)
+    smallSequences.set(sequence, splitOf(document.text))
+  }
+  const byHand = {train: ['[s]', '[{}]', '{s:[]}', '{s:n}'], validation: ['[]', '[n]', '{s:{}}'], test: ['[[]]', '{s:s}', '{}']}
+  for (const split of splits) expect([split, [...smallSequences].filter(([, of]) => of === split).map(([sequence]) => sequence).sort()]).toEqual([split, byHand[split]])
+  expect(smallSequences.size).toBe(10)
+  // The layout does not matter, and a document of another template with the same tokens is in the same split.
+  expect([splitOf('[ ]\n'), splitOf('{\n}'), splitOf('{"list": []}'), splitOf('{\n  "retries": 3\n}'), splitOf('[[\n]]'), splitOf('["x"]')]).toEqual(['validation', 'test', 'train', 'train', 'test', 'train'])
   expect(samples.some(sample => sample.template === heldOutTemplate)).toBe(true)
   for (const kind of heldOutKinds) expect(samples.some(sample => sample.kinds.includes(kind))).toBe(true)
   // A held-out kind sits on the held-out template about as often as on any template that it can be made from, and
@@ -539,6 +601,104 @@ test('every text of a typing replay is what its edits give from the finished doc
   expect(commaApartBefore).toBeGreaterThan(50)
   expect(wholeNumbers).toBeGreaterThan(0)
   expect(semicolonsBeforeAKey).toBeGreaterThan(0)
+})
+
+test('the form texts of raw line feeds and of single quotes give the numbers that the edits give', () => {
+  const stated = (form: string, pattern: RegExp) => Number(pattern.exec(form)?.[1] ?? 0)
+  // Raw line feeds, carriage returns and tabs in the place of their escapes, counted apart.
+  let withCarriageReturns = 0
+  const pasted = [...samples, ...Array.from({length: 400}, (_, index) => sampleAt(defaultSeed, index, {kind: 'rawLineFeedInString'}))]
+  for (const sample of pasted) {
+    const form = sample.forms.find(text => text.startsWith('rawLineFeedInString: ') && text.includes('for the escapes of'))
+    if (form === undefined) continue
+    const original = Array.from(sample.original)
+    const added = {n: 0, r: 0, t: 0}
+    for (const edit of sample.edits) {
+      const escaped = original[edit.at + 1]
+      // In a file with \r\n line ends a raw line feed has a carriage return before it, as every line feed of the file has.
+      const raw = escaped === 'n' ? (sample.lineEnd === '\r\n' ? '\r\n' : '\n') : escaped === 'r' ? '\r' : '\t'
+      if (edit.remove === 2 && original[edit.at] === '\\' && (escaped === 'n' || escaped === 'r' || escaped === 't') && edit.insert === raw) added[escaped]++
+    }
+    if (added.r > 0) withCarriageReturns++
+    // A combination that asks for every string leaves the tabs to rawTabInString, which has a form text of its own.
+    const tabs = sample.forms.some(text => text.startsWith('rawTabInString: ')) ? 0 : added.t
+    if (stated(form, /(\d+) raw line feed/) !== added.n || stated(form, /(\d+) raw carriage return/) !== added.r || stated(form, /(\d+) raw tab/) !== tabs) {
+      fail(sample, `the form text "${form}" does not give the ${added.n} raw line feeds, ${added.r} raw carriage returns and ${tabs} raw tabs of the edits`)
+    }
+  }
+  expect(withCarriageReturns).toBeGreaterThan(10)
+  // Strings in other quotes: a quote that stands for a double quote opens one, and the next such quote closes it.
+  // A requoted string that holds an apostrophe holds both kinds of quote, and the form text says how many there are.
+  let inBackticks = 0
+  let withEscapedApostrophe = 0
+  let leavingOutWordKeys = 0
+  let wordKeysInDoubleQuotes = 0
+  const requotedSamples = [...samples, ...Array.from({length: 400}, (_, index) => sampleAt(defaultSeed, index, {kind: 'singleQuotedString'}))]
+  for (const sample of requotedSamples) {
+    const form = sample.forms.find(text => text.startsWith('singleQuotedString: '))
+    if (form === undefined) continue
+    const broken = Array.from(sample.broken)
+    const requoted: {quote: string, holdsApostrophe: boolean}[] = []
+    let open = -1
+    broken.forEach((character, position) => {
+      if (sample.replaced[position] !== true || (character !== '\'' && character !== '`')) return
+      if (open === -1) return void (open = position)
+      requoted.push({quote: character, holdsApostrophe: broken.slice(open + 1, position).includes('\'')})
+      open = -1
+    })
+    const withBoth = requoted.filter(part => part.holdsApostrophe).length
+    const found = /(\d+) with both kinds of quote|only the (\d+) strings with both kinds of quote|only the string with both kinds of quote/.exec(form)
+    const statedBoth = found === null ? 0 : Number(found[1] ?? found[2] ?? 1)
+    if (statedBoth !== withBoth) fail(sample, `the form text "${form}" does not give the ${withBoth} requoted strings that hold both kinds of quote`)
+    const backticks = requoted.some(part => part.quote === '`')
+    if (backticks) inBackticks++
+    if (requoted.some(part => part.quote === '\'' && part.holdsApostrophe)) withEscapedApostrophe++
+    // A sample with nothing to recover needs no class. Otherwise a string in backticks needs the backtick as a quote,
+    // and the apostrophe as a quote is only needed by a string in single quotes.
+    if (scoredCodePoints(sample) === 0) continue
+    if (backticks !== sample.needsClass.includes('the backtick as a quote')) fail(sample, 'a string in backticks and the class "the backtick as a quote" do not come together')
+    if (sample.needsClass.includes('the apostrophe as a quote') && !requoted.some(part => part.quote === '\'')) fail(sample, 'the class "the apostrophe as a quote" without a string in single quotes')
+    // "Every string": a string that still stands in double quotes holds an apostrophe, or is a key that is a word
+    // when the form text leaves those out.
+    if (!form.startsWith('singleQuotedString: every string') || form.startsWith('singleQuotedString: every string value') || sample.documents.length !== 1) continue
+    const leavesOutWordKeys = form.includes('but not the keys that are words')
+    if (leavesOutWordKeys) leavingOutWordKeys++
+    for (const part of scan(sample.original).strings) {
+      const opening = sample.alignment.indexOf(part.start)
+      if (opening === -1 || broken[opening] !== '"') continue
+      const isWordKeyPart = part.role === 'key' && !part.hasEscape && isWordKey(part.content)
+      if (isWordKeyPart && leavesOutWordKeys) {
+        wordKeysInDoubleQuotes++
+        continue
+      }
+      if (!part.content.includes('\'')) fail(sample, `the form text "${form}" says every string, and "${part.content}" still stands in double quotes`)
+    }
+  }
+  expect(inBackticks).toBeGreaterThan(0)
+  expect(withEscapedApostrophe).toBeGreaterThan(0)
+  expect(leavingOutWordKeys).toBeGreaterThan(0)
+  expect(wordKeysInDoubleQuotes).toBeGreaterThan(0)
+})
+
+test('a string without its opening quote is flagged yes exactly when the closing quote ends what is left, as the README says', () => {
+  const seen = new Set<string>()
+  for (let index = 0; index < 500; index++) {
+    const sample = sampleAt(defaultSeed, index, {kind: 'missingOpeningQuote'})
+    // The one edit removes the opening quote, and the content runs from there to the closing quote of the original.
+    const original = Array.from(sample.original)
+    const start = sample.edits[0]!.at + 1
+    let end = start
+    while (original[end] !== '"') end += original[end] === '\\' ? 2 : 1
+    const content = original.slice(start, end).join('')
+    const isKey = sample.forms[0]!.includes('of a key')
+    // What ends the string before its closing quote: a comma, a bracket, a quote, a backslash, a tab or a line feed,
+    // which are escapes in the original, a space at either end, and in a key any space or a colon.
+    const endsEarly = /[,{}[\]\\]/.test(content) || content.startsWith(' ') || content.endsWith(' ') || (isKey && /[ :]/.test(content))
+    if ((sample.reachable === 'yes') !== !endsEarly && scoredCodePoints(sample) > 0) fail(sample, `the content ${JSON.stringify(content)} ${endsEarly ? 'ends' : 'does not end'} before its closing quote, and the flag is ${sample.reachable}`)
+    seen.add(`${isKey ? 'key' : 'value'}, ${endsEarly ? 'ends early' : content.includes(' ') ? 'several words' : 'one word'}`)
+  }
+  // A value of several words that the closing quote ends is among them, e.g. "street": 362 Rua das Flores",
+  for (const what of ['key, one word', 'value, ends early', 'value, one word', 'value, several words']) expect([...seen]).toContain(what)
 })
 
 test('a damaged document with carriage return line ends has them at every line end, in the original and in the broken text', () => {

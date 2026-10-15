@@ -1,6 +1,9 @@
-// Three settings of the tables that are written by hand and train nothing. All change only cells that valid JSON
+// Four settings of the tables that are written by hand and train nothing. All change only cells that valid JSON
 // never reads, so valid JSON is read as before. They are what a trained result is to be compared with: the parser as
 // it is gives up at the first error on purpose, so nearly any change to those cells scores better than it does.
+// They are a floor that was found by hand, and no best table: one more rule can always score higher on some samples,
+// as 'lines' does over 'words'. The README gives the scores of a table that a reader of the dataset built with a
+// second copy of the tokenizer's states, which is not a setting here.
 //
 // - 'stay': a tokenizer error does not start an error line, so the next character starts a token again, and a token
 //   that the grammar does not accept is ignored, so the grammar stays in its state.
@@ -16,6 +19,12 @@
 //   {port: 8080, 'env': production} the tokenizer gives `port`, `'env'` and `production` the events of a string, and
 //   the grammar shows the first two as keys and the third as a string, as it does with strings between quotes. It is
 //   one more row of the tokenizer's table, and it scores about 9 points of code points above 'resync'.
+// - 'lines': as 'words', with one more tokenizer state, which the tables as they are do not have: after a string that
+//   a line feed ended, an opening brace at the very start of the next line does not open, see `handRuleTables`. It is
+//   the rule for a file with one document per line in which a length limit cut one line short inside a string, e.g.
+//   {"id": "7a919a<line feed>{"id": "7a919a-2", "ok": true}: the second line's labels are those of a document of its
+//   own, at depth 1 inside its braces, and that is the depth that the cut line left open. In the group "needs a line
+//   rule" it has 98.7% of the code points right where 'words' has 95.3%.
 import {type ParserTables, classNames, defaultTables, eventNames, grammarStateNames, lexerStateNames, tokenNames} from './table-parser.ts'
 
 type LexerState = typeof lexerStateNames[number]
@@ -85,24 +94,40 @@ function wordEvents(): [LexerState, CharacterClass, typeof eventNames[number], L
   return cells
 }
 
-export const handRules = ['stay', 'resync', 'words'] as const
+export const handRules = ['stay', 'resync', 'words', 'lines'] as const
 export type HandRule = typeof handRules[number]
 
 export function handRuleTables(rule: HandRule): ParserTables {
   const stateNamed = (name: string) => grammarStateNames.indexOf(name)
   const between = lexerStateNames.indexOf('between')
   const errorLine = lexerStateNames.indexOf('errorLine')
-  const {symbolCount, contextCount, errorState} = defaultTables
+  const {classCount, symbolCount, contextCount, errorState} = defaultTables
   const lexerNext = defaultTables.lexerNext.map(next => next === errorLine ? between : next)
   const lexerEvent = [...defaultTables.lexerEvent]
   if (rule !== 'stay') {
     const errorToken = tokenNames.indexOf('lexerError')
-    for (const [state, characterClass, event, next] of [...plainEvents(), ...(rule === 'words' ? wordEvents() : [])]) {
+    for (const [state, characterClass, event, next] of [...plainEvents(), ...(rule === 'words' || rule === 'lines' ? wordEvents() : [])]) {
       const cell = lexerStateNames.indexOf(state) * defaultTables.classCount + classNames.indexOf(characterClass)
       if (defaultTables.grammarToken[defaultTables.lexerEvent[cell]!] !== errorToken) continue
       lexerEvent[cell] = eventNames.indexOf(event)
       lexerNext[cell] = lexerStateNames.indexOf(next)
     }
+  }
+  if (rule === 'lines') {
+    // One more tokenizer state, "at the start of the line after a string that a line feed ended". Its row is the row
+    // of the state between, so any character but an opening brace is read as between two tokens. An opening brace
+    // gets the event of a comma: it is shown as punctuation, the depth stays, and the grammar expects the next key.
+    // Every cell that leads to the state is one that valid JSON never reads, so valid JSON never enters it.
+    const afterCutString = lexerStateNames.length
+    for (let characterClass = 0; characterClass < classCount; characterClass++) {
+      lexerNext.push(lexerNext[between * classCount + characterClass]!)
+      lexerEvent.push(lexerEvent[between * classCount + characterClass]!)
+    }
+    const lineFeed = classNames.indexOf('lineFeed')
+    const openBrace = classNames.indexOf('openBrace')
+    for (const state of ['string', ...insideAnEscape] as const) lexerNext[lexerStateNames.indexOf(state) * classCount + lineFeed] = afterCutString
+    lexerEvent[afterCutString * classCount + openBrace] = eventNames.indexOf('comma')
+    lexerNext[afterCutString * classCount + openBrace] = between
   }
   const grammarNext = [...defaultTables.grammarNext]
   for (let state = 0; state < defaultTables.grammarStateCount; state++) {

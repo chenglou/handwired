@@ -83,6 +83,9 @@ export type Damage = {
   // What the tokenizer must tell apart and cannot with the highlighter's 33 character classes, which lump most
   // characters with letters, e.g. the apostrophe as a quote.
   needsClass?: string
+  // A second class of that sort, when one damage needs two, e.g. the backtick as a quote in a text that also has
+  // strings in single quotes.
+  alsoNeedsClass?: string
   // True when another sensible repair of the broken text gives other scored labels to kept code points.
   debatable?: boolean
   // Other kinds that this damage brings with it, e.g. the trailing comma left behind when the last member of an object

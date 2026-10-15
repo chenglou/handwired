@@ -74,6 +74,7 @@ const readerNotes: Record<Reader, string> = {
   stay: 'hand-rules.ts: a tokenizer error starts no error line, and a token that the grammar does not accept is ignored',
   resync: 'hand-rules.ts: as stay, and such a token moves the grammar to the state that follows it in valid JSON',
   words: 'hand-rules.ts: as resync, and a word where no token of JSON starts is read as a string, which the grammar shows as a key or a string',
+  lines: 'hand-rules.ts: as words, with one more tokenizer state: after a string that a line feed ended, an opening brace at the very start of the next line does not open',
 }
 // The hand rule that the mean of the samples' own shares is printed for: the last one, which scores highest.
 const lastRule: HandRule = handRules[handRules.length - 1]!
@@ -628,6 +629,7 @@ export function report(seed: number, sampleCount: number): string {
   lines.push('goes on reads other error cells later in the text, and which ones depends on its tables, so the cells that get any signal in')
   lines.push('training are not the same for two arms. Per hand rule and table: the cells that some sample makes the rule read, of all error cells,')
   lines.push('how many samples reach a cell (a sample counts once per cell), and the samples that the rarest quarter of the visited cells has in all.')
+  lines.push('The cells of the tokenizer state that the hand rule lines adds are not among the error cells, so they are not counted.')
   for (const rule of handRules) {
     for (const [name, cells, reached] of [['grammar table', grammarErrorCells, visited[rule].grammar], ['tokenizer table', lexerErrorCells, visited[rule].lexer]] as const) {
       const counts = [...reached.values()].sort((left, right) => left - right)

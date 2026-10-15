@@ -127,21 +127,29 @@ function rawLineFeedInString(random: Random, scanned: Scan, options: KindOptions
     // tabs to rawTabInString, which then takes those of every string.
     const alsoTabs = options.scope !== 'every' && random.chance(0.5)
     const edits: Edit[] = []
+    // A text that came from Windows has \r\n in its strings, e.g. "Dear {name},\r\n\r\nThank you.", and its carriage
+    // returns are raw too. The form text counts them apart from the line feeds.
+    let carriageReturns = 0
     let tabs = 0
     for (const {escapes} of changed) {
       for (const escape of escapes) {
         if (escape.character === 'n') edits.push({at: escape.at, remove: 2, insert: '\n'})
-        else if (escape.character === 'r') edits.push({at: escape.at, remove: 2, insert: '\r'})
-        else if (escape.character === 't' && alsoTabs) {
+        else if (escape.character === 'r') {
+          edits.push({at: escape.at, remove: 2, insert: '\r'})
+          carriageReturns++
+        } else if (escape.character === 't' && alsoTabs) {
           edits.push({at: escape.at, remove: 2, insert: '\t'})
           tabs++
         }
       }
     }
-    const lineFeeds = edits.length - tabs
+    const lineFeeds = edits.length - carriageReturns - tabs
+    const counted = (count: number, what: string) => count === 0 ? [] : [`${count} raw ${what}${count > 1 ? 's' : ''}`]
+    const raw = [...counted(lineFeeds, 'line feed'), ...counted(carriageReturns, 'carriage return'), ...counted(tabs, 'tab')]
     return {
       edits, reachable: 'yes', needsRules: ['a line feed inside a string is content'], ...(tabs > 0 ? {alsoKinds: ['rawTabInString']} : {}),
-      form: `${lineFeeds} raw line feed${lineFeeds > 1 ? 's' : ''}${tabs > 0 ? ` and ${tabs} raw tab${tabs > 1 ? 's' : ''}` : ''} for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
+      // E.g. "2 raw line feeds and 2 raw carriage returns", or "1 raw line feed, 1 raw carriage return and 2 raw tabs".
+      form: `${raw.length === 3 ? `${raw[0]}, ${raw[1]} and ${raw[2]}` : raw.join(' and ')} for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
     }
   }
   if (long.length === 0) return undefined
@@ -171,7 +179,9 @@ function missingOpeningQuote(random: Random, scanned: Scan): Damage | undefined 
   const ofKey = keys.length > 0 && (stringValues.length === 0 || random.chance(0.3))
   if (!ofKey && stringValues.length === 0) return undefined
   const part = random.pick(ofKey ? keys : stringValues)
-  // What is left reads as a word that the closing quote ends, unless the word holds a character that ends it early.
+  // What is left runs on to the closing quote, unless it holds a character that ends it early. A key must be one
+  // word. A value may be several words with spaces between them, e.g. 362 Rua das Flores", as a value without quotes
+  // of several words runs on to its comma, see unquotedValue. A colon inside a value ends nothing either.
   const breaks = ofKey ? /[\s",:{}[\]\\]/ : /[\n\t",{}[\]\\]|^ | $/
   const readable = !breaks.test(part.content)
   return {
@@ -226,7 +236,7 @@ export const stringKinds: KindDefinition[] = [
   {
     name: 'missingOpeningQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": Lisbon",⏎  "country": "PT"⏎}',
-    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
+    reachable: 'yes when the closing quote ends what is left: a key that is one word, or a value of one word or of several words with spaces between them, e.g. 362 Rua das Flores", which runs on to the quote as a value without quotes runs on to its comma. no when the content holds a character that ends it before the closing quote: a comma, a bracket, a quote, a backslash, a tab or a line feed, a space at either end, and in a key any space or a colon. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
     apply: missingOpeningQuote,
   },
   {
