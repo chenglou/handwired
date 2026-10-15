@@ -17,6 +17,7 @@ The samples are the dataset of `lab/recovery-parser/`: broken JSON, the text tha
 - A score counts the **scored code points**: the ones from the first error on whose label has a scored value. "All three" is the share of them at which the display kind, the depth and the container are right, each where it is scored.
 - Every broken sample is in one of **six groups**, by what it takes to label it: "within reach of the tables" (72.7% of the broken validation samples), "needs a display fix", "needs a line rule", "needs a character class", "needs a nesting fix", "out of reach". Report the group "within reach of the tables" first: one number over all samples says little.
 - The splits are train, validation and test. Train on the train split, choose on the validation split, and leave the test split alone, see [The test split](#the-test-split).
+- Every record, every saved file of tables and every cache file holds the **dataset's key**, a hash of the dataset's source files, e.g. `8ba8aa239ccd8c78`. Results of two keys are results on two datasets, see [Tables of another dataset](#tables-of-another-dataset).
 
 ## Setup
 
@@ -37,14 +38,12 @@ bun lab/recovery-parser/learn/check-all.ts               # the type check, the l
 ```ts
 import {asIsTables} from '../../recovery-tables.ts'
 import {train} from '../../soft/train.ts'
-import {packForTwin, placesForTwin} from '../../soft/twin-data.ts'
 import {createModel} from '../../soft/twin.ts'
-import {baselines, describeComparison, describeSettings, runArm, samplesOfTheStandardSet} from '../harness.ts'
+import {baselines, describeComparison, describeSettings, runArm, trainDataFor} from '../harness.ts'
 
-const samples = samplesOfTheStandardSet()
 const base = asIsTables()
 // The train samples that give the twin a step, packed once for the base tables.
-const data = packForTwin(samples, placesForTwin(samples, 'train'), undefined, base)
+const data = trainDataFor(base)
 
 const results = await runArm({
   name: 'plain-pass',
@@ -65,14 +64,15 @@ An arm with two settings gives `runArm` two entries in `settings`, e.g. one with
 
 ## The calls
 
-All in `harness.ts`.
+All in `harness.ts`, unless a file is named.
 
 **`runArm({name, settings, seeds})`** runs each setting's `build(seed)` for every seed, one after the other, and returns one result per setting.
 
-- `build` returns `{tables, base}`: snapped tables, and the tables that the build started from. It may be async.
-- `seeds` are 1 to 5 unless you pass others. With fewer than 5 the summary says that the run is a try-out.
-- Per setting and seed it saves `<RECOVERY_SCRATCH>/arms/<name>/<setting>/seed-<seed>.tables.json` and `seed-<seed>.record.json`, and it prints and saves `summary.md`: one markdown row per setting with the mean, the lowest and the highest over the seeds, e.g. `96.62 (96.23 to 96.92)`.
-- The seed has to reach everything that is random in the build: the order of the samples (`train`'s `seed`), a random choice of trainable cells, a random start.
+- `build` returns `{tables, base}`: snapped tables, and the tables that the build started from. It may be async. `base` is another object than `tables`, with the same states, classes, contexts and open entries: `recordOf` throws otherwise, e.g. for a build that changed its base in place and returns it twice.
+- `seeds` are 1 to 5 unless you pass others. With fewer than 5 the summary says that the run is a try-out. An empty list throws, and so does a seed that is named twice, e.g. `[1, 1, 2]`.
+- Per setting and seed it saves `<RECOVERY_SCRATCH>/arms/<name>/<setting>/seed-<seed>.tables.json` and `seed-<seed>.record.json`, and it prints and saves `summary.md`: one markdown row per setting with the mean, the lowest and the highest over the seeds, e.g. `96.62 (96.23 to 96.92)`. What an earlier run left in a setting's folder is moved into a folder `earlier-<time>` there first, so the files next to a summary are the files of that run.
+- The seed has to reach everything that is random in the build: the order of the samples (`train`'s `seed`), a random choice of trainable cells, a random start. **When every seed gives the same tables, the build does not use its seed**: `runArm` says so in the summary, e.g. "5, which all gave the same tables" in the column of the seeds, and `describeComparison` then calls the setting one run and no spread.
+- **A setting in which nothing is random** says so: `{name: 'search from the votes', withoutSeed: true, build: () => ...}`. It is built once, saved as `no-seed.tables.json` and `no-seed.record.json`, and reported and compared as one number, like a baseline.
 
 **`recordOf(tables, base)`** returns the standard record of some tables. `runArm` calls it for you. It always scores the exact parser on the validation split of the standard set, and it throws for tables with a changed frozen cell. The record holds:
 
@@ -84,14 +84,25 @@ All in `harness.ts`.
 - `groundRules`: whether 2,800 fixed texts have today's trace up to their first error and today's verdict.
 - `plainParserProblems`: what keeps the tables from being tables of the dataset's plain table parser, as sentences, see the next section.
 - `datasetKey`: a key of the dataset's source files. Two records compare only when their keys are the same.
+- `run`: the arm's name, the setting's name and the seed (`null` for a setting without a seed) when `runArm` made the record, and `null` for a record that `recordOf` was called for by itself.
 
-**`describeSettings(results)`** gives the three markdown tables of some results: the scores, all three per group, and what the main number does not show.
+**`describeSettings(results)`** gives the three markdown tables of some results: the scores, all three per group, and what the main number does not show. The table per group starts with the group "within reach of the tables".
 
-**`describeComparison(first, second)`** gives one sentence with both means, both ranges and whether the ranges overlap. It throws for a setting with fewer than 3 seeds. Do not print a difference between two settings in any other way: a difference between two means says nothing without the spread.
+**`describeComparison(first, second)`** gives one sentence with both means, both ranges and whether the ranges overlap. It throws for a setting with a seed and fewer than 3 seeds. A setting without a seed is one number. Do not print a difference between two settings in any other way: a difference between two means says nothing without the spread.
 
 **`baselines()`** gives the results of the five baselines, to print next to your rows.
 
+**`trainDataFor(base)`** gives the train samples of the standard set that give the twin a step, packed for `base`, the tables that the build trains: what `train` takes. Its second argument are the intended stacks, `loadIntendedObjects(samplesOfTheStandardSet(), softCacheFolderOf())` of `../soft/twin-data.ts`, which only a run that is kept on track needs. **`trainPartOfTheStandardSet()`** gives the train split as a set of its own, for `countVotes` of `../search/votes.ts` and for `prepareSamples` of `../search/sample-runs.ts`, which take every broken sample of the set that they are given.
+
 **`samplesOfTheStandardSet()`** and **`validationOfTheStandardSet()`** give the samples of the standard set (seed 20261015, indexes 0 to 59,999, without the test split) and their validation part, loaded once.
+
+What a build function calls from the rest of `learn/`:
+
+- **`train(model, data, options)`** of `../soft/train.ts` trains on every sample of `data` and returns `{best, last, bestPoint, points, samplesPerSecond}`. The tables of a seed are `result.last`. With `options.validation`, `result.best` are the tables of the log point with the best score on one half of the validation split.
+- **`createModel(base, {trainable, start, startShare})`** of `../soft/twin.ts`. Without `trainable`, every open cell and every open entry of the display table is trainable. With it, name all three tables, each as `'open'`, `'none'` or a mask. **A mask** is a `Uint8Array` with one entry per cell of the table, 1 for a trainable cell and 0 for every other one, e.g. a copy of `base.grammarOpen` in which the cells of one grammar state are set to 0. Only an open cell may be trainable, and an entry other than 0 and 1 throws.
+- **`randomTrainableCells(tables, share, seed)`** of `../soft/train.ts` gives the three masks of a random share of the open cells, e.g. a tenth with 0.1. **`createRandom(seed, stream)`** of `../../random.ts` is the random source of the repo, for a build that draws something of its own, e.g. `createRandom(seed, 0).integer(0, 9)`.
+- **Structure**, all of `../recovery-tables.ts` and explained in `../structure/README.md`: `addStates(tables, addedTokenizerStates, [grammarStateShownAs, ...])` adds tokenizer states and grammar states, `addClasses(tables, [{name: 'apostrophe', codePoints: [0x27]}])` gives code points a character class of their own, `openDisplayEntries(tables)` lets entries of the display table change, and `addFirstOnLineBit(tables)` tells the grammar whether a token is the first on its line. Each takes tables and returns tables, in any order. The result is the arm's `base`, and `trainDataFor(base)` packs the samples for it.
+- **`scoreTables(tables, samples, {splits})`**, `sharesOf(row)` and `cellCountsOf(tables, base)` of `../score.ts`, for a score that is no record, e.g. on the train split.
 
 ## The bound of the plain table parser is not this parser's bound
 
@@ -103,10 +114,11 @@ The parser of this experiment has a stack action in every grammar cell, e.g. a c
 
 ## What a build function may read
 
-- **The train split**, for training: `placesForTwin(samples, 'train')`, `trainPart(samples)`.
+- **The train split**, for training: `trainDataFor(base)` and `trainPartOfTheStandardSet()`. `train` throws for a sample of another split, and so does `countVotes`: `samplesOfTheStandardSet()` holds the validation split too, and a build that packed `placesForTwin(samples, 'validation')` by mistake would train on the split that its record scores. `alsoOtherSplits: true` switches the error off, and no arm should need it.
 - **The validation split**, to choose between tables, e.g. the best of several log points. Then say so in the README: the validation score of tables that were chosen on the validation split is optimistic. `train` picks its `best` tables on one half of the validation split and reports the other half for this reason. The record of `runArm` is always the whole validation split.
 - **Never the test split.** It is not in the samples, see below.
-- The hand-written tables as a base, with care: their rules were written with the old snapshot's samples in view, so for them, and for everything that starts from them, no split of this dataset counts as unseen.
+- **The dataset's hand rules `stay`, `resync` and `words` as a base, with care.** For them no split counts as unseen, the test split included: `../../hand-rules.ts` chooses between rules by the dataset's statistics, which are over the samples of every split. An arm that starts from one of them has no unseen split either, and their rows in `baselines()` and in `final.ts` are no numbers on unseen data.
+- **The hand-written tables as a base, with care**: their rules were written with the old snapshot's samples in view, so for them, and for everything that starts from them, no split of this dataset counts as unseen.
 
 ## The rows that every arm is read against
 
@@ -157,15 +169,27 @@ The test split is for final numbers only, after every choice is made. It holds f
 - `loadSamples` leaves every sample of the test split out when it makes the samples, so a script that reads the arrays cannot score, print or train on one. A sample's place in the arrays is therefore not its index in the dataset: `samples.index[place]` is.
 - `allowedSampleAt(seed, index)` of `../data.ts` gives one sample of the dataset, and `undefined` for a sample of the test split. No file of `learn/` but `data.ts` may call the dataset's `sampleAt`: `../check-guard.ts` fails when one does.
 - `scoreTables` with the split `test`, `loadSamples` with `withTest` and `placesOfSplit(samples, 'test')` throw unless the environment variable `RECOVERY_FINAL` is `yes`. `--split test` throws on every command, with or without it.
-- `final.ts` is the one script that is meant to run with it: `RECOVERY_FINAL=yes bun lab/recovery-parser/learn/arms/final.ts <name>=<tables.json> ...`. It prints, per tables and for the baselines, a row for each of the four ways a test sample can be held out: nothing held out, a held-out kind on a template that training has, kinds that training has on the held-out template, and both. About a half of the test split is held out, so one number for the whole split is not to be reported alone. **It was never run.**
+- `final.ts` is the one script that is meant to run with it: `RECOVERY_FINAL=yes bun lab/recovery-parser/learn/arms/final.ts <name>=<tables.json> ...`. It prints, per tables and for the baselines, a row for each of the four ways a test sample can be held out: nothing held out, a held-out kind on a template that training has, kinds that training has on the held-out template, and both. About a half of the test split is held out, so one number for the whole split is not to be reported alone.
+- `final.ts` refuses a file of tables that was not saved with the dataset as it is now, see the next section. And every run appends a line to `<RECOVERY_SCRATCH>/arms/final-runs.log` before it loads a sample: the time, the dataset's key, and the name, the path and a hash of each file of tables. So the scratch folder says which tables were scored on the test split, and when.
+- **`final.ts` was never run.** `check.ts` runs its report on validation samples whose held-out bits are made up, where the four rows hold the samples that they should and add up to the validation row. The loading of the test split itself is the one code path of `learn/` that no check has run, so read its first output with care.
 - Do not read the files that `lab/recovery-parser/dump.ts` writes: they hold test samples.
+
+## Tables of another dataset
+
+A later commit of the dataset can move a sample from the train split to the validation split or to the test split. Tables that were trained before it have then trained on samples that are scored after it, see "Taking a new commit of the dataset" in `../README.md`. So:
+
+- Every file that `saveTables` writes holds the dataset's key of the moment it was saved, as the field `datasetKey`. `runArm`, the trainer, the search and the votes all save with it.
+- `final.ts`, `../search/search.ts --from` and `../soft/train.ts --base` refuse a file with another key, or with none. Make the tables again with the dataset as it is.
+- `../compare.ts`, `../score.ts` and the other commands that only report load such a file and print a line that starts with "Note:".
+- A record holds the key too. Compare two records only when their keys are the same, and after a merge of a later commit of the dataset, make every table again.
 
 ## What can still go wrong
 
-- **`train(model, data, options)` trains on every sample of `data`.** `options.places` are places in `data`, from 0 to `data.sampleCount - 1`, not places in the samples that `data` was packed from. A place outside `data` throws. A place inside `data` that you did not mean does not.
-- **`createModel(base, {trainable})` needs all three of `lexer`, `grammar` and `display`**, each as a mask, `'open'` or `'none'`. Without `trainable`, every open cell and every open entry of the display table is trainable.
-- **Pack the samples for the tables that you train.** `packForTwin(samples, places, undefined, base)` gives every code point the class that `base` gives it. A run on samples that were packed for other classes or without the bit throws. Tables with the same classes and more states are fine.
-- **Two counts of cells.** "Cells changed against the base" is what your run changed. "Cells that differ from today's parser" also holds every cell of an added state, and the changed cells that an added class or the bit copied. E.g. two added tokenizer states and one grammar state are 154 cells that differ from today's parser before a run changes anything. Report the first, and name both.
+- **`train(model, data, options)` trains on every sample of `data`.** `options.places` are places in `data`, from 0 to `data.sampleCount - 1`, not places in the samples that `data` was packed from. A place outside `data` throws. A place inside `data` that you did not mean does not. So pack exactly the samples of the run, with `trainDataFor(base)`, and pass no places.
+- **`createModel(base, {trainable})` needs all three of `lexer`, `grammar` and `display`**, each as a mask, `'open'` or `'none'`. Without `trainable`, every open cell and every open entry of the display table is trainable. A model without any trainable cell makes `train` throw.
+- **Pack the samples for the tables that you train.** `trainDataFor(base)` gives every code point the class that `base` gives it. A run on samples that were packed for other classes or without the bit throws. Tables with the same classes and more states are fine.
+- **Two counts of cells.** "Cells changed against the base" is what your run changed. "Cells that differ from today's parser" also holds every cell of an added state, and the changed cells that an added class or the bit copied. E.g. two added tokenizer states and one grammar state are 154 cells that differ from today's parser before a run changes anything. Report the first, and name both. `recordOf` throws for a base with other states, classes, contexts or open entries than the tables. A base with the right layout and the wrong cells still gives a wrong count without an error, e.g. today's tables for a run that started from the votes.
+- **An option that a command does not have is an error**, e.g. `search/mistakes.ts --split test`. Read the error: the command names its options.
 - **The last tables of a run are one draw.** The score of snapped tables moves by more than half a point between two log points of one run. Take the last tables (`result.last`), or tables chosen on one half of the validation split and scored on the other (`result.best` of a call with `validation`), and never the best of many log points on the whole split. Without `validation`, `result.best` is `result.last`.
 - **A low loss is not a good parser.** The twin is not the parser once its cells hold mixes. Only the record counts.
 - **Check the columns that the main number does not show.** Tables can gain a point and break the depth of valid JSON that is too deep, or show characters of the text as "past the end".
@@ -173,8 +197,14 @@ The test split is for final numbers only, after every choice is made. It holds f
 
 ## Files
 
-- `harness.ts`: `recordOf`, `runArm`, `describeSettings`, `describeComparison`, `baselines`, `baselineTables`, `groundRulesOn`, `armFolderOf`.
+- `harness.ts`: `recordOf`, `runArm`, `describeSettings`, `describeComparison`, `spreadOf`, `percentSpread`, `baselines`, `baselineTables`, `trainDataFor`, `trainPartOfTheStandardSet`, `groundRulesOn`, `armFolderOf`.
 - `baselines.ts`: prints and saves the baselines' rows.
 - `final.ts`: the test split, only with `RECOVERY_FINAL=yes`.
-- `check.ts`: the dataset's cells of valid JSON against the experiment's frozen cells, the dataset's hand rules as tables of the experiment against the dataset's plain table parser, the record of today's tables, the ground rules for random settings, and `runArm` with a toy build function.
+- `check.ts`, in six parts:
+  1. The dataset's cells of valid JSON are the experiment's frozen cells. The dataset's hand rules as tables of the experiment hold the hand rule's cells, cell by cell, and give the depth of the dataset's plain table parser on 4,530 broken texts.
+  2. The record: for today's tables, for the hand-written tables (every row is the row of `scoreTables` for those tables, 915 cells changed against today's tables by a count made in the check, and 0 with themselves as the base), and for tables with random open cells (the wrong depths on valid JSON that is too deep are the ones of `../check-deep.ts`, 74.2% and 80.6%). `recordOf` refuses a changed frozen cell, the tables as their own base and a base of another layout.
+  3. The ground rules hold on the fixed texts for 12 random settings, and do not hold for tables with one changed frozen cell, for each of 40 frozen cells.
+  4. The arithmetic of a report on records made up with known shares, e.g. 0.92, 0.90 and 0.91 give "91.00 (90.00 to 92.00)", and the sentence of `describeComparison` with ranges that overlap and with ranges that do not.
+  5. `runArm` with toy builds: a seed that picks one of the dataset's hand rules, so that every seed has another score and the summary's row is the mean, the lowest and the highest that the check works out, a setting without a seed, a build that ignores its seed, lists of seeds that throw, and a rerun with fewer seeds.
+  6. `final.ts` without a test sample: its report on validation samples with made-up held-out bits, and its refusal of tables of another dataset.
 - `plain-pass/`: the first arm.

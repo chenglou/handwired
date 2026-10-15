@@ -70,7 +70,7 @@ What the main number does not show, for the same tables on the validation split 
 
 ## The votes
 
-`votes.ts` walks every broken train sample with the parser forced onto the intended state (`../intended.ts`) after every kept code point. Where the walk knows the state before a kept code point and the cell that the code point reads is open, the sample votes for the choice that gives the intended state after the code point: a tokenizer cell's next state and event as one choice, a grammar cell's next state and stack action as one choice. Each cell takes its most voted choice. Of several choices with the same votes, today's wins. A cell without votes keeps today's choice.
+`votes.ts` walks every broken train sample with the parser forced onto the intended state (`../intended.ts`) after every kept code point. `countVotes` lets every broken sample of the set vote that it is given, so the set is the train split: a set with a sample of another split throws, unless the call says `alsoOtherSplits: true`. Where the walk knows the state before a kept code point and the cell that the code point reads is open, the sample votes for the choice that gives the intended state after the code point: a tokenizer cell's next state and event as one choice, a grammar cell's next state and stack action as one choice. Each cell takes its most voted choice. Of several choices with the same votes, today's wins. A cell without votes keeps today's choice.
 
 The votes change 211 cells: 163 of the 710 open tokenizer cells and 59 of the 616 open grammar cells get votes, 222 of 1,326. There are 84,881 votes, and 76.9% of them are for the choice that their cell took. The most contested cell is (between, other), which every letter without a class of its own reads between tokens, and so do the apostrophe and the curly quotes: 35,891 votes for (string, stringStart), 10,230 for (between, whitespace) and 8,274 for (string, stringContent).
 
@@ -115,6 +115,7 @@ Two options change the walk. Both go beyond "forced after every kept code point"
 - **What makes it fast**: only a sample whose run reads the cell can change, and only from its first read of the cell on. Each worker thread keeps one bit per sample and cell that says whether the sample's run reads the cell, and runs a sample again only from the state before that first read. The part of a sample before its first error is never run again. Up to four worker threads each take a share of the samples. All counts are whole numbers and every worker gets the same changes in the same order, so the result does not depend on the number of workers.
 - **The limits** are counts, so a run can be repeated: `--passes` is the most passes over the cells, and `--runs` is a budget of sample runs, in millions. A stop by the clock is off unless `--minutes` is given, and the log says when it is the one that stopped the search, since a rerun may then stop at another step.
 - **The output** goes to `--out`. With `--from` the search needs `--out`: it does not make up a name from the name of the file it started from.
+- **The tables to start from have to be of this dataset.** `--from` refuses a file that was saved with another version of the dataset, or before the dataset's key was written into saved files: a later commit of the dataset can move train samples into the validation or the test split, see `../arms/README.md`. Make the tables again, e.g. with `votes.ts` or `../handwritten/rules.ts`.
 
 `sample-runs.ts` holds the parser loop of the search. It has to count what `../score.ts` counts, and `check.ts` compares the two. The search also compares its running counts with `scoreTables` after every pass.
 
@@ -178,7 +179,7 @@ Whether the dataset's own held-out kinds were seen by the hand-written rules is 
 Run from the repo root, with `RECOVERY_SCRATCH` set to a folder outside the repo as in the core's README. Tables and logs go to `$RECOVERY_SCRATCH/search/`.
 
 ```sh
-bun lab/recovery-parser/learn/search/check.ts                                  # the search counts what score.ts counts, about 20 s
+bun lab/recovery-parser/learn/search/check.ts                                  # the search counts what score.ts counts, and which samples vote, about 15 s
 bun lab/recovery-parser/learn/search/votes.ts                                  # votes.json, under 1 s after the samples are loaded
 bun lab/recovery-parser/learn/search/votes.ts --follow                         # votes-follow.json; also --stay, and both
 bun lab/recovery-parser/learn/search/votes.ts --cells                          # also lists every cell with votes and how they split
@@ -205,5 +206,5 @@ bun lab/recovery-parser/learn/check-deep.ts search=$RECOVERY_SCRATCH/search/sear
 - `search.ts`: the search's main thread: the order of the cells, the choices to try, the limits, the log, the checks after every pass.
 - `search-worker.ts`: a worker thread: its share of the samples, which cells each sample reads, and the tries.
 - `sample-runs.ts`: the samples as the search holds them, and the parser loop that only computes a sample's score, from the first position that reads an open cell or from the first read of one cell.
-- `check.ts`: the search's loop against `../score.ts`.
-- `mistakes.ts`: counts of the wrong labels and samples in fixed width, for reading.
+- `check.ts`: the search's loop against `../score.ts`, and that `countVotes` refuses a set with validation samples.
+- `mistakes.ts`: counts of the wrong labels and samples in fixed width, for reading. It shows the validation split and has no `--split`: an option that a command does not have is an error.

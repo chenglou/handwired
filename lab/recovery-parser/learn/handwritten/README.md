@@ -273,7 +273,7 @@ bun lab/recovery-parser/learn/score.ts --tables <scratch>/handwritten/tables.jso
 bun lab/recovery-parser/learn/search/search.ts --from <scratch>/handwritten/tables.json --out <scratch>/search/search-from-handwritten.json   # the search from these tables, about 140 s
 ```
 
-`show.ts`, `where-wrong.ts`, `worse.ts` and `two-readings.ts` read the train split, or the validation split with `--split validation`. `report.ts` takes `--split train`, `validation` or both. All of them refuse the test split, whose samples are not loaded, see `../arms/README.md`.
+`show.ts`, `where-wrong.ts` and `worse.ts` read the train split, or the validation split with `--split validation`. `two-readings.ts` reads the train split and has no `--split`. `report.ts` takes `--split train`, `validation` or both. All of them refuse the test split, whose samples are not loaded, see `../arms/README.md`, and an option that a script does not have is an error, e.g. `two-readings.ts --split validation`. A file for `--tables` that was saved with another version of the dataset is read after a line that starts with "Note:".
 
 ## Not checked
 
