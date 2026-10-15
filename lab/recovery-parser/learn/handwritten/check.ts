@@ -1,0 +1,78 @@
+// Checks the hand-written recovery on the train and validation splits, and lists what a person would read next:
+//
+// - The tables keep the ground rules (checkTables), and the parser's trace before a first error is today's.
+// - How often the parser reads an open cell that no rule set, per cell. Such a cell still holds today's choice, e.g.
+//   the grammar state `error`, so a cell that is read often is a rule that is missing.
+// - How many code points are read in the grammar state `error`, which the rules are meant never to enter.
+// - Per rule, how many samples read one of its cells from the first error on. A rule that no sample reads is there
+//   for completeness only.
+//
+// Run from the repo root: bun lab/recovery-parser/learn/handwritten/check.ts [--scratch <folder>] [--to 60000]
+import {cacheFolderOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
+import {createTrace} from '../recovery-parser.ts'
+import {asIsTables, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName} from '../recovery-tables.ts'
+import {runOnSample} from '../score.ts'
+import {handwrittenTables, rules} from './rules.ts'
+
+if (import.meta.main) {
+  const handwritten = handwrittenTables()
+  const {tables} = handwritten
+  const asIs = asIsTables()
+  const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
+  const trace = createTrace()
+  const traceAsIs = createTrace()
+  const lexerReads = new Int32Array(tables.lexerNext.length)
+  const grammarReads = new Int32Array(tables.grammarNext.length)
+  const samplesOfRule = rules.map(() => 0)
+  const seenRule = new Int32Array(rules.length).fill(-1)
+  let texts = 0
+  let codePointsInError = 0
+  let samplesInError = 0
+  let differencesBeforeError = 0
+  let codePointsFromError = 0
+  for (let place = 0; place < samples.sampleCount; place++) {
+    if (splitNames[samples.split[place]!] === 'test') continue
+    texts++
+    const length = samples.start[place + 1]! - samples.start[place]!
+    runOnSample(trace, samples, place, tables, true)
+    runOnSample(traceAsIs, samples, place, asIs, true)
+    if (trace.firstErrorPosition !== traceAsIs.firstErrorPosition || trace.firstErrorKind !== traceAsIs.firstErrorKind) differencesBeforeError++
+    const firstError = trace.firstErrorPosition === -1 ? length : Math.min(trace.firstErrorPosition, length)
+    for (let position = 0; position < firstError; position++) {
+      if (trace.displayKind[position] !== traceAsIs.displayKind[position] || trace.depthAfter[position] !== traceAsIs.depthAfter[position] || trace.containerAfter[position] !== traceAsIs.containerAfter[position]
+        || trace.grammarAfter[position] !== traceAsIs.grammarAfter[position] || trace.lexerStateAfter[position] !== traceAsIs.lexerStateAfter[position]) differencesBeforeError++
+    }
+    let inError = false
+    for (let position = firstError; position < length; position++) {
+      codePointsFromError++
+      const lexerCell = trace.lexerCell[position]!
+      const grammarCell = trace.grammarCell[position]!
+      for (const rule of [handwritten.ruleOfLexerCell[lexerCell]!, handwritten.ruleOfGrammarCell[grammarCell]!]) {
+        if (rule !== -1 && seenRule[rule] !== place) {
+          seenRule[rule] = place
+          samplesOfRule[rule]!++
+        }
+      }
+      if (tables.lexerOpen[lexerCell] === 1 && handwritten.ruleOfLexerCell[lexerCell] === -1) lexerReads[lexerCell]!++
+      if (tables.grammarOpen[grammarCell] === 1 && handwritten.ruleOfGrammarCell[grammarCell] === -1) grammarReads[grammarCell]!++
+      if (trace.grammarBefore[position] === tables.errorState) {
+        codePointsInError++
+        inError = true
+      }
+    }
+    if (inError) samplesInError++
+  }
+  console.log(`${texts} texts of the train and validation splits, ${codePointsFromError} code points at or after a first error.`)
+  console.log(`Before the first error, and in the first error's position and kind: ${differencesBeforeError} differences from today's parser (must be 0).`)
+  console.log(`Code points read in the grammar state error: ${codePointsInError}, in ${samplesInError} samples.`)
+  const unset = [
+    ...Array.from(lexerReads, (reads, cell) => ({reads, name: `tokenizer ${lexerCellName(tables, cell)} -> ${lexerChoiceName(tables, cell)}`})),
+    ...Array.from(grammarReads, (reads, cell) => ({reads, name: `grammar   ${grammarCellName(tables, cell)} -> ${grammarChoiceName(tables, cell)}`})),
+  ].filter(entry => entry.reads > 0).sort((left, right) => right.reads - left.reads)
+  console.log(`Open cells that no rule set and that a code point reads: ${unset.length}.`)
+  for (const entry of unset.slice(0, 60)) console.log(`${String(entry.reads).padStart(8)}  ${entry.name}`)
+  console.log('')
+  console.log('Samples that read a cell of each rule, from the first error on:')
+  rules.forEach((rule, index) => console.log(`${String(samplesOfRule[index]).padStart(8)}  ${rule.name}`))
+  if (differencesBeforeError > 0) process.exit(1)
+}

@@ -1,0 +1,43 @@
+// The score of the hand-written recovery next to the parser as it is, with every breakdown, and what each rule is
+// worth: the score without the rule.
+//
+// Run from the repo root:
+//   bun lab/recovery-parser/learn/handwritten/report.ts [--split validation] [--without-each-rule] [--scratch <folder>] [--to 60000]
+// --split takes one split or several with commas. The test split is read only when --split names it.
+// --without-each-rule adds, per rule, the main number of the tables that leave the rule out.
+import {cacheFolderOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
+import type {Split} from '../../samples.ts'
+import {asIsTables} from '../recovery-tables.ts'
+import {type ScoreRow, scoreTables, sharesOf} from '../score.ts'
+import {handwrittenTables, rules} from './rules.ts'
+
+const percent = (share: number) => Number.isNaN(share) ? '    -' : (100 * share).toFixed(1).padStart(5)
+
+if (import.meta.main) {
+  const splits = (optionOf('--split') ?? 'validation').split(',') as Split[]
+  for (const split of splits) if (!splitNames.includes(split)) throw new Error(`--split takes ${splitNames.join(', ')}, or several of them with commas, and got ${split}`)
+  const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
+  const asIs = scoreTables(asIsTables(), samples, {splits})
+  const handwritten = scoreTables(handwrittenTables().tables, samples, {splits})
+  const rowOfAsIs = new Map<string, ScoreRow>(asIs.rows.map(row => [row.group, row]))
+  console.log(`Split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}: ${handwritten.rows[0]!.samples} broken samples, ${handwritten.validSamples} valid ones left out.`)
+  console.log('Percentages of the labeled code points at or after the first damage. "as is" is the parser of today, "hand" the hand-written recovery.')
+  console.log('all 3: display kind, depth and container right. whole: samples with something to recover in which every such code point is right.')
+  console.log('')
+  console.log(`${'samples'.padStart(7)} ${'nothing'.padStart(7)}  ${'all 3'.padStart(5)} ${'all 3'.padStart(5)}  ${'kind'.padStart(5)} ${'kind'.padStart(5)}  ${'depth'.padStart(5)} ${'depth'.padStart(5)}  ${'cont.'.padStart(5)} ${'cont.'.padStart(5)}  ${'whole'.padStart(5)} ${'whole'.padStart(5)}`)
+  console.log(`${''.padStart(7)} ${''.padStart(7)}  ${'as is'.padStart(5)} ${'hand'.padStart(5)}  ${'as is'.padStart(5)} ${'hand'.padStart(5)}  ${'as is'.padStart(5)} ${'hand'.padStart(5)}  ${'as is'.padStart(5)} ${'hand'.padStart(5)}  ${'as is'.padStart(5)} ${'hand'.padStart(5)}  group`)
+  for (const row of handwritten.rows) {
+    const before = sharesOf(rowOfAsIs.get(row.group)!)
+    const after = sharesOf(row)
+    console.log(`${String(row.samples).padStart(7)} ${String(row.nothingToRecover).padStart(7)}  ${percent(before.allThree)} ${percent(after.allThree)}  ${percent(before.kind)} ${percent(after.kind)}  ${percent(before.depth)} ${percent(after.depth)}  ${percent(before.container)} ${percent(after.container)}  ${percent(before.whole)} ${percent(after.whole)}  ${row.group}`)
+  }
+  if (process.argv.includes('--without-each-rule')) {
+    console.log('')
+    console.log(`The main number without each rule (with every rule: ${percent(sharesOf(handwritten.rows[0]!).allThree).trim()}), and the difference:`)
+    const all = sharesOf(handwritten.rows[0]!).allThree
+    rules.forEach(rule => {
+      const without = sharesOf(scoreTables(handwrittenTables(rules.filter(other => other !== rule)).tables, samples, {splits, breakdowns: false}).rows[0]!).allThree
+      console.log(`${percent(without)}  ${(100 * (without - all)).toFixed(1).padStart(6)}  ${rule.name}`)
+    })
+  }
+}
