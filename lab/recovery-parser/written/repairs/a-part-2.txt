@@ -1,0 +1,680 @@
+⟦repair 2246e751⟧
+⟦repaired⟧
+{
+  "traceId": "4bf92f3577b34da6",
+  "spans": [
+    {"name": "GET /cart", "durationMs": 182},
+    {"name": "redis.get", "durationMs": 3}
+  ],
+  "sampled": true
+}
+⟦end⟧
+
+⟦repair 01fc90b1⟧
+⟦repaired⟧
+{
+    "aps" :     {
+        "alert" : "Your order has shipped",
+        "badge" : 2,
+        "sound" : "default"
+    },
+    "orderId" : 58213,
+    "tags" :     [
+        "orders",
+        "shipping"
+    ]
+}
+⟦end⟧
+
+⟦repair ed522d45⟧
+⟦repaired⟧
+{"200": 15342, "404": 187, "500": 12, "503": 4}
+⟦end⟧
+
+⟦repair e1d83d79⟧
+unsure: a [ may be missing before the third row, but then the matrix would have a different shape
+⟦repaired⟧
+{"labels": ["cat", "dog", "bird"], "confusion_matrix": [[42, 3, 1], [5, 38, 2], [0, 4, 47]], "accuracy": 0.894}
+⟦end⟧
+
+⟦repair 962cb11c⟧
+⟦repaired⟧
+{"repo": "acme/web", "pr": null, "labels": [], "sha": "9f3c2e7", "run_attempt": null}
+⟦end⟧
+
+⟦repair 77488beb⟧
+unsure: the comma inside the template tag may belong to the document, with a second host after the entry
+⟦repaired⟧
+{
+  "upstream": "app_servers",
+  "servers": [
+    {"address": "{{ host }}", "port": 8000, "weight": 1}
+  ]
+}⟦lf⟧
+⟦end⟧
+
+⟦repair c82ef7e8⟧
+⟦repaired⟧
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src"]
+}
+⟦end⟧
+
+⟦repair dac8018c⟧
+⟦repaired⟧
+{"subject":"Build #871 failed","body":"Step 3/7 failed:\n\tnpm ERR! code ELIFECYCLE\n\texit status 1","notify":["ana","li"]}⟦lf⟧
+⟦end⟧
+
+⟦repair 466f65b3⟧
+⟦repaired⟧
+{"title": "Weekly digest", "send_a": "09:00", "timezone": "Europe/Lisbon", "enabled": true}
+⟦end⟧
+
+⟦repair 7b3e3472⟧
+⟦repaired⟧
+{
+  "service": "billing-api",
+  "replicas": 3,
+  "healthCheck": {
+    "path": "/healthz",
+    "intervalSeconds": 30,
+    "timeoutSeconds": 5
+  },
+  "env": [
+    {"name": "LOG_LEVEL", "value": "info"},
+    {"name": "DB_POOL_SIZE", "value": "20"}
+  ],
+  "owners": ["payments-team"]
+}
+⟦end⟧
+
+⟦repair 82914b2e⟧
+⟦repaired⟧
+{
+  "queue": "emails",
+  "concurrency": 8,
+  "retry": {
+    "attempts": 5,
+    "backoffMs": [
+      1000,
+      30000
+    ]
+  },
+  "redis": "redis://cache:6379/2"
+}
+⟦end⟧
+
+⟦repair 3592124e⟧
+⟦repaired⟧
+{"intent": "book_flight", "slots": {"origin": "SFO", "destination": "NRT", "date": "2024-09-12", "passengers": 2}, "reply": "Searching flights SFO \u2192 NRT\u2026"}
+⟦end⟧
+
+⟦repair c08ac381⟧
+⟦repaired⟧
+{"user_id": 4821, "display_name": "r_tanaka", "team_ids": [12, 40], "last_login_at": null}
+⟦end⟧
+
+⟦repair cfc2082f⟧
+⟦repaired⟧
+{"rules": [{"field": "version", "pattern": "^v\\d+\\.\\d+(-rc\\.\\d+)?$"}], "strict": true}
+⟦end⟧
+
+⟦repair 52906c8d⟧
+⟦repaired⟧
+{"empty.title": "Nothing here yet", "empty.body": "You haven't added any projects.\nCreate one to get started.", "empty.action": "New project"}
+⟦end⟧
+
+⟦repair 29dfb53b⟧
+⟦repaired⟧
+[{"name": "New Year's Day", "date": "2025-01-01"}, {"name": "Midsummer Eve", "date": "2025-06-20"}, {"name": "Christmas Eve", "date": "2025-12-24"}]
+⟦end⟧
+
+⟦repair 67180a09⟧
+⟦repaired⟧
+{"node":"greenhouse-2","soil":[412,398,405],"valve":{"open":false,"last_ms":1840},"vbat":3.71}
+⟦end⟧
+
+⟦repair a2765fb2⟧
+⟦repaired⟧
+{"event": "order.shipped", "data": {"orderId": "A-20931", "carrier": "DHL", "items": 3}}
+⟦end⟧
+
+⟦repair bad50ae5⟧
+⟦repaired⟧
+{"name": "checkout-latency", "threshold_ms": 750, "channels": ["pager", "email"], "enabled": true, "owner": null}
+⟦end⟧
+
+⟦repair 2a56c6fa⟧
+⟦repaired⟧
+{
+  "learning_rate": 0.0003,
+  "batch_size": 64,
+  "epochs": 20,
+  "warmup_steps": 500,
+  "optimizer": "adamw"
+}
+⟦end⟧
+
+⟦repair 94bb3ef7⟧
+⟦repaired⟧
+{
+  "webhook": {
+    "url": "https://hooks.example.com/services/T0412/B0993/notify-on-call",
+    "secret": "whsec_test_51Nc",
+    "events": ["incident.opened", "incident.resolved"]
+  },
+  "enabled": true
+}
+⟦end⟧
+
+⟦repair 873446e5⟧
+⟦repaired⟧
+{
+  "role": "system",
+  "content": "You are a support agent for Brightline Internet. Answer in two sentences or fewer."
+}
+⟦end⟧
+
+⟦repair 01fb5fc9⟧
+unsure: the value could be the number 60 with the rest of the product removed
+⟦repaired⟧
+{"access_token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0MiJ9", "token_type": "Bearer", "expires_in": "60 * 60 * 24", "scope": "read write"}
+⟦end⟧
+
+⟦repair 8d427428⟧
+⟦repaired⟧
+{"build": 5312, "status": "failed", "log": "error: cannot find module \"left-pad\" in C:\\agent\\work\\src"}
+⟦end⟧
+
+⟦repair 3277f067⟧
+⟦repaired⟧
+{
+  "status": "shipped",
+  "carrier": "DHL",
+  "tracking_number": "JD014600003828",
+  "estimated_delivery": "2024-07-03"
+}
+⟦end⟧
+
+⟦repair 01699f4f⟧
+unsure: the quotes around the arguments may be the damage, so that arguments is an object and nothing is escaped
+⟦repaired⟧
+{"tool": "run_query", "arguments": "{\"table\": \"orders\", \"status\": \"refunded\", \"limit\": 10}"}
+⟦end⟧
+
+⟦repair c8717726⟧
+⟦repaired⟧
+{"id": "evt_3Pq8Zk", "type": "invoice.paid", "livemode": false, "created": 1718200000}
+⟦end⟧
+
+⟦repair a02de9aa⟧
+⟦repaired⟧
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "strict": true
+  },
+  "include": ["src/**/*"]
+}
+⟦end⟧
+
+⟦repair d1252ce4⟧
+⟦repaired⟧
+{"name":"张伟","city":"深圳","age":28,"tags":["会员","新用户"]}
+⟦end⟧
+
+⟦repair 8a0aa018⟧
+⟦repaired⟧
+{
+  "merchantId": "M-204817",
+  "settlementDate": "2026-10-13",
+  "currency": "PLN",
+  "grossAmount": 18240.5,
+  "fees": 529.0,
+  "chargebacks": [
+    {"id": "cb_8842", "amount": 149.0, "reason": "duplicate"}
+  ],
+  "payoutAmount": 17562.5
+}
+⟦end⟧
+
+⟦repair cc68c6b2⟧
+unsure: the document could be the second log line, {"level":"warn",...}, with the first one as the text that is mixed in
+⟦repaired⟧
+{"level":"info","worker":3,"msg":"job finished","job":"thumbnail-8812","took_ms":912}
+⟦end⟧
+
+⟦repair 9f1aceeb⟧
+⟦repaired⟧
+{
+  "apiBase": "https://staging-api.lumen.example",
+  "cdnBase": "https://staging-cdn.lumen.example",
+  "sentry": {
+    "dsn": "https://4f1c2a9b@o91822.ingest.sentry.io/5521904",
+    "tracesSampleRate": 0.25
+  },
+  "featureFlags": {
+    "newCheckout": true,
+    "betaBanner": false,
+    "giftCards": false
+  },
+  "supportEmail": "support@lumen.example"
+}
+⟦end⟧
+
+⟦repair c2b6e74c⟧
+⟦repaired⟧
+"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq3vT8mXw1ZpL0cR5\nyN7dUeGh2KbJ4sFoA9tWxV6iPzQ1rMnC3lHkEaBu8YgDf0Sj\n-----END PUBLIC KEY-----\n"
+⟦end⟧
+
+⟦repair 95d9bcc0⟧
+⟦repaired⟧
+{"order": {"id": "ORD-7731", "items": [{"sku": "A-1042", "qty": 2}, {"sku": "B-2210", "qty": 1}], "shipping": "express"}}
+⟦end⟧
+
+⟦repair fdc60658⟧
+⟦repaired⟧
+{
+  "error": {
+    "code": "order_not_found",
+    "message": "No order with id 9912",
+    "details": []
+  },
+  "requestId": "7c1e0b52a9d4"
+}⟦lf⟧
+⟦end⟧
+
+⟦repair cbac6c44⟧
+⟦repaired⟧
+[{"date": "2026-10-13 00:00:00", "close": 181.9, "volume": 1204500.0}, {"date": "2026-10-14 00:00:00", "close": 182.35, "volume": null}]
+⟦end⟧
+
+⟦repair efc12b96⟧
+⟦repaired⟧
+{"name": "pdf-export", "version": "3.12.0", "engines": {"node": ">=18"}, "license": "MIT"}
+⟦end⟧
+
+⟦repair 8b8da5a7⟧
+unsure: the cut-off line could be removed whole, as text that is not a part of the document
+⟦repaired⟧
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUnus": null,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
+⟦end⟧
+
+⟦repair 2f5ca6b3⟧
+⟦repaired⟧
+{
+  "feature": "dark-mode",
+  "rollout": 0.25,
+  "audiences": ["beta", "staff"]
+}
+⟦end⟧
+
+⟦repair 4fa9b23d⟧
+⟦repaired⟧
+{⟦cr⟧
+  "compilerOptions": {⟦cr⟧
+    "target": "ES2022",⟦cr⟧
+    "module": "NodeNext",⟦cr⟧
+    "strict": true,⟦cr⟧
+    "outDir": "dist"⟦cr⟧
+  },⟦cr⟧
+  "include": ["src/**/*.ts"],⟦cr⟧
+  "exclude": ["node_modules", "dist"]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦repair 73a63987⟧
+⟦repaired⟧
+{
+  "user": {
+    "name": "Tomás Rivera",
+    "email": "tomas.rivera@example.com",
+    "teams": [
+      {
+        "id": "design",
+        "role": "lead",
+        "permissions": {
+          "publish": true,
+          "billing": false
+        }
+      }
+    ]
+  }
+}
+⟦end⟧
+
+⟦repair b8cc04d9⟧
+⟦repaired⟧
+{
+  "name": "weather-widget",
+  "version": "0.9.2",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  }
+}
+⟦end⟧
+
+⟦repair e88daae3⟧
+⟦repaired⟧
+{
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 4,
+  "packageRules": [
+    { "matchPackageNames": ["typescript"], "enabled": false }
+  ]
+}
+⟦end⟧
+
+⟦repair e83ef208⟧
+⟦repaired⟧
+{"dish": "Chicken Caesar Salad", "calories": 520, "protein_g": 31, "gluten_free": false}
+⟦end⟧
+
+⟦repair 09c9ec57⟧
+⟦repaired⟧
+{
+  "sensor": "th-04",
+  "unit": "celsius",
+  "readings": [
+    21.5,
+    21.7,
+    22.0
+  ]
+}
+⟦end⟧
+
+⟦repair f9d8d5a4⟧
+⟦repaired⟧
+{
+  "theme": "solarized-dark",
+  "fontSize": 13,
+  "tabs": [
+    {"path": "src/index.ts", "pinned": true}
+  ]
+}
+⟦end⟧
+
+⟦repair 8f06c44b⟧
+⟦repaired⟧
+{"station":"LIS-04","unit":"km/h","gusts":[14,17.5,22,19.25,0,31],"calm":false}
+⟦end⟧
+
+⟦repair d7254be0⟧
+⟦repaired⟧
+{
+    "sku": "TSHIRT-M-BLK",
+    "quantity": 2,
+    "giftWrap": false
+  }
+⟦end⟧
+
+⟦repair 01814250⟧
+⟦repaired⟧
+{"title": "Don't Look Back", "artist": "Ana Moura", "year": 2019, "genres": ["fado", "folk"]}
+⟦end⟧
+
+⟦repair c8c32b2e⟧
+unsure: 12,5 could be kept as the string "12,5"
+⟦repaired⟧
+{"sku": "A-1042", "title": "Desk lamp", "price": 12.5, "inStock": true, "warehouses": ["HAM", "RTM"]}
+⟦end⟧
+
+⟦repair 1559822e⟧
+⟦repaired⟧
+{"sequence": "fibonacci", "values": [1, 1, 2, 3, 5, 8, 13, 21, 4181, 6765], "count": 20}
+⟦end⟧
+
+⟦repair 940fadd8⟧
+unsure: the first line is the end of a cut-off document, and the document could be that one, rebuilt
+⟦repaired⟧
+{"type":"heartbeat","seq":42,"ts":1760479279113}
+⟦end⟧
+
+⟦repair 18b813f5⟧
+⟦repaired⟧
+{"version": "1.8.2", "commit": "9f3c2ab", "branch": "main", "runner": "10.0.3.17", "dirty": false}
+⟦end⟧
+
+⟦repair ac23dc4e⟧
+⟦repaired⟧
+{"people": ["Dr. Amara Nwosu", "Luis Ortega"], "organizations": ["Helix Biolabs", "Port of Rotterdam Authority"], "locations": ["Rotterdam"], "dates": ["next Friday"]}
+⟦end⟧
+
+⟦repair bbb69462⟧
+⟦repaired⟧
+{"first_name": "Grace", "middle_name": null, "last_name": "Hopper"}
+⟦end⟧
+
+⟦repair fb4a74e3⟧
+unsure: yes could be kept as the string "yes"
+⟦repaired⟧
+{"sku": "MUG-113", "label": "Enamel mug", "priceCents": 1450, "inStock": true}
+⟦end⟧
+
+⟦repair 84a82796⟧
+⟦repaired⟧
+{
+    "success": true,
+    "page": 1,
+    "products": [
+        {
+            "sku": "TEA-200",
+            "price": "7.90"
+        },
+        {
+            "sku": "FLT-9",
+            "price": "3.20"
+        }
+    ]
+}
+⟦end⟧
+
+⟦repair 051c0e28⟧
+⟦repaired⟧
+{
+  "invoice_number": "INV-2024-0312",
+  "vendor": "Northwind Traders",
+  "line_items": [
+    {"description": "Oak desk", "quantity": 2, "unit_price": 489.00},
+    {"description": "Delivery", "quantity": 1, "unit_price": 306.50}
+  ],
+  "total": 1284.50,
+  "currency": "EUR",
+  "due_date": "2024-04-15"
+}
+⟦end⟧
+
+⟦repair af811a2a⟧
+⟦repaired⟧
+{
+⟦tab⟧"id": "cus_8842",
+⟦tab⟧"email": "lena.fischer@example.com",
+⟦tab⟧"address": {
+⟦tab⟧⟦tab⟧"street": "Hauptstr. 12",
+⟦tab⟧⟦tab⟧"city": "Leipzig",
+⟦tab⟧⟦tab⟧"zip": "04109"
+⟦tab⟧},
+⟦tab⟧"newsletter": false
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 8c349901⟧
+⟦repaired⟧
+["Don't forget to save your changes", "You're all set!", "We couldn't find that page"]
+⟦end⟧
+
+⟦repair 08ed6810⟧
+unsure: 1,299 could be kept as the string "1,299"
+⟦repaired⟧
+{"product": "Standing desk", "price": 1299, "stock": 37}
+⟦end⟧
+
+⟦repair 676c29f4⟧
+⟦repaired⟧
+{
+    "name": "Lemon Garlic Pasta",
+    "servings": 4,
+    "ingredients": [
+        "200 g spaghetti",
+        "3 cloves garlic",
+        "1 lemon"
+    ],
+    "note": "Salt the water well.\nKeep a cup of it before draining."
+}
+⟦end⟧
+
+⟦repair e3a5f5b6⟧
+⟦repaired⟧
+{
+  "api_key": "<YOUR_API_KEY>",
+  "model": "whisper-large-v3",
+  "language": "en",
+  "response_format": "srt"
+}
+⟦end⟧
+
+⟦repair ef71b47e⟧
+⟦repaired⟧
+{
+  "listen": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "workers": 4,
+  "tls": null
+}
+⟦end⟧
+
+⟦repair c879be0c⟧
+⟦repaired⟧
+{"title": "Ocean's Eleven", "director": "Steven Soderbergh", "year": 2001, "rewatch": true}
+⟦end⟧
+
+⟦repair bbc80924⟧
+⟦repaired⟧
+{"token": "eyJhbGciOiJIUzI1NiJ9", "scopes": ["read", "write"], "expiresIn": 3600, "refresh": null}
+⟦end⟧
+
+⟦repair d30fedfe⟧
+unsure: the two objects may be two documents, of which the first alone is the document
+⟦repaired⟧
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["src/**/*.test.ts"],
+  "delay": 500
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 3fe6f160⟧
+⟦repaired⟧
+{"bucket": "media-prod-eu", "prefix": "uploads/2026/10/", "maxKeys": 1000, "delimiter": "/"}
+⟦end⟧
+
+⟦repair f3efbf05⟧
+⟦repaired⟧
+"The waiter said \"it's on the house\" and left"
+⟦end⟧
+
+⟦repair 0b9586b1⟧
+⟦repaired⟧
+["CartTest.testCoupon", "LoginTest.testSso", "SearchTest.testEmptyQuery", "ProfileTest.testAvatarUpload"]
+⟦end⟧
+
+⟦repair ddc8fc32⟧
+⟦repaired⟧
+{"event": "signup", "userId": 88213, "name": "Zo\u00eb", "referrer": null, "utm": {"source": "newsletter", "campaign": "october"}}
+⟦end⟧
+
+⟦repair 91a3e8c7⟧
+⟦repaired⟧
+[
+  {"id": 1, "task": "Draft project proposal", "done": true},
+  {"id": 2, "task": "Review budget with finance", "done": false},
+  {"id": 3, "task": "Schedule kickoff meeting", "done": false},
+  {"id": 4, "task": "Order team laptops", "done": false}
+]
+⟦end⟧
+
+⟦repair 72710193⟧
+⟦repaired⟧
+{"semi": false, "singleQuote": true, "printWidth": 100}
+⟦end⟧
+
+⟦repair 2e8438d8⟧
+⟦repaired⟧
+{
+  "apiKey": "<YOUR_API_KEY>",
+  "region": "us-east-1",
+  "timeoutMs": 5000,
+  "retry": {"attempts": 3, "backoffMs": 250}
+}
+⟦end⟧
+
+⟦repair 7a43b283⟧
+unsure: the other side of the conflict, "Nothing in your cart yet", may be the one that stays
+⟦repaired⟧
+{
+  "nav.home": "Home",
+  "nav.pricing": "Pricing",
+  "cart.empty": "Your cart is empty",
+  "cart.checkout": "Check out"
+}
+⟦end⟧
+
+⟦repair e6645c26⟧
+⟦repaired⟧
+[100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000]
+⟦end⟧
+
+⟦repair c2996d5b⟧
+⟦repaired⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Tidy",
+  "version": "0.9.2",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["https://*.example.org/*"]
+}⟦lf⟧
+⟦end⟧
+
+⟦repair ec8dee55⟧
+⟦repaired⟧
+["order:update",{"orderId":9912,"status":"shipped","eta":null,"items":[{"sku":"TEA-200","qty":2}]}]
+⟦end⟧
+
+⟦repair 6a9c89e8⟧
+⟦repaired⟧
+{
+  "destination": "Kyoto",
+  "days": [
+    {"day": 1, "plan": "Fushimi Inari at sunrise, then Nishiki Market for lunch"},
+    {"day": 2, "plan": "Arashiyama bamboo grove and a tea ceremony"},
+    {"day": 3, "pl": null}]}
+⟦end⟧
+
+⟦repair 959ee15e⟧
+⟦repaired⟧
+{"event":"cache.evicted","keys":128,"freed_mb":41.5,"reason":"memory_pressure"}
+⟦end⟧

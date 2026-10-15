@@ -1,0 +1,517 @@
+⟦case other-notations-01⟧
+from: what Python prints for a dict that holds a string with an apostrophe, which Python puts between double quotes
+⟦intended⟧
+{"title": "Don't Look Back", "artist": "Ana Moura", "year": 2019, "genres": ["fado", "folk"]}
+⟦broken⟧
+{'title': "Don't Look Back", 'artist': 'Ana Moura', 'year': 2019, 'genres': ['fado', 'folk']}
+⟦end⟧
+
+⟦case other-notations-02⟧
+from: the answer of an AWS Lambda handler in Python, printed as a dict, whose body is itself a JSON string
+⟦intended⟧
+{"statusCode": 201, "headers": {"Content-Type": "application/json"}, "body": "{\"message\": \"created\", \"id\": 7}"}
+⟦broken⟧
+{'statusCode': 201, 'headers': {'Content-Type': 'application/json'}, 'body': '{"message": "created", "id": 7}'}
+⟦end⟧
+
+⟦case other-notations-03⟧
+from: Python's pprint of a nested dict, which sorts the keys and splits a long string into two literals on two lines
+⟦intended⟧
+{"data": {"invoice": "2026-0412",
+          "reasons": ["Payment failed: the card was declined by the issuing bank",
+                      "insufficient_funds"]},
+ "id": "evt_3PqLx2",
+ "livemode": false,
+ "retries": 2}
+⟦broken⟧
+{'data': {'invoice': '2026-0412',
+          'reasons': ['Payment failed: the card was declined by the issuing '
+                      'bank',
+                      'insufficient_funds']},
+ 'id': 'evt_3PqLx2',
+ 'livemode': False,
+ 'retries': 2}
+⟦end⟧
+
+⟦case other-notations-04⟧
+from: print(response.content) in Python, which shows the bytes of an HTTP response body
+⟦intended⟧
+{"job":{"id":15,"status":"queued"},"eta_seconds":42,"links":["/jobs/15","/jobs/15/log"]}
+⟦broken⟧
+b'{"job":{"id":15,"status":"queued"},"eta_seconds":42,"links":["/jobs/15","/jobs/15/log"]}\n'
+⟦end⟧
+
+⟦case other-notations-05⟧
+from: a Python Counter of HTTP status codes, printed into a log
+⟦intended⟧
+{"200": 15342, "404": 187, "500": 12, "503": 4}
+⟦broken⟧
+Counter({200: 15342, 404: 187, 500: 12, 503: 4})
+⟦end⟧
+
+⟦case other-notations-06⟧
+from: print(df.to_dict('records')) for a pandas table with a date column and a missing value
+⟦intended⟧
+[{"date": "2026-10-13 00:00:00", "close": 181.9, "volume": 1204500.0}, {"date": "2026-10-14 00:00:00", "close": 182.35, "volume": null}]
+⟦broken⟧
+[{'date': Timestamp('2026-10-13 00:00:00'), 'close': 181.9, 'volume': 1204500.0}, {'date': Timestamp('2026-10-14 00:00:00'), 'close': 182.35, 'volume': nan}]
+⟦end⟧
+
+⟦case other-notations-07⟧
+from: one detection of an object detector, printed in Python with NumPy 2, which shows a number as np.float32(…) and an array as array([…], dtype=float32)
+⟦intended⟧
+{"label": "bicycle", "score": 0.93, "bbox": [ 12.5,  48.0 , 130.0 , 220.5]}
+⟦broken⟧
+{'label': 'bicycle', 'score': np.float32(0.93), 'bbox': array([ 12.5,  48. , 130. , 220.5], dtype=float32)}
+⟦end⟧
+
+⟦case other-notations-08⟧
+from: a Django model's values printed in Python, with amounts of money as Decimal
+note: the amounts could also be meant as the strings "249.00" and "47.31", which is how many programs write a Decimal to JSON
+debatable
+⟦intended⟧
+{"invoice": "INV-2026-0412", "currency": "EUR", "net": 249.00, "vat": 47.31}
+⟦broken⟧
+{'invoice': 'INV-2026-0412', 'currency': 'EUR', 'net': Decimal('249.00'), 'vat': Decimal('47.31')}
+⟦end⟧
+
+⟦case other-notations-09⟧
+from: what Python prints for a dict that holds a tuple, a set and None
+⟦intended⟧
+{"name": "thumbnail", "size": [320, 180], "formats": ["jpeg", "webp"], "crop": null}
+⟦broken⟧
+{'name': 'thumbnail', 'size': (320, 180), 'formats': {'jpeg', 'webp'}, 'crop': None}
+⟦end⟧
+
+⟦case other-notations-10⟧
+from: the repr of a Python string that holds both kinds of quote, as the Python prompt shows it
+⟦intended⟧
+"The waiter said \"it's on the house\" and left"
+⟦broken⟧
+'The waiter said "it\'s on the house" and left'
+⟦end⟧
+
+⟦case other-notations-11⟧
+from: console.log of an order in Node.js, with a Date among the values
+⟦intended⟧
+{
+  "id": "ord_8Hk2",
+  "customer": { "name": "Mei Tanaka", "email": "mei@example.jp" },
+  "items": [ { "sku": "TEA-250", "qty": 2 }, { "sku": "FLT-01", "qty": 1 } ],
+  "total": 31.4,
+  "createdAt": "2026-10-14T16:20:05.120Z"
+}
+⟦broken⟧
+{
+  id: 'ord_8Hk2',
+  customer: { name: 'Mei Tanaka', email: 'mei@example.jp' },
+  items: [ { sku: 'TEA-250', qty: 2 }, { sku: 'FLT-01', qty: 1 } ],
+  total: 31.4,
+  createdAt: 2026-10-14T16:20:05.120Z
+}
+⟦end⟧
+
+⟦case other-notations-12⟧
+from: console.log of a nested answer in Node.js, which prints [Object] and [Array] for what lies more than two levels deep
+note: the two placeholders could also be kept as the strings "[Object]" and "[Array]"
+debatable
+⟦intended⟧
+{
+  "data": {
+    "user": { "id": 311, "name": "Lena", "profile": {}, "roles": [] }
+  },
+  "status": 200
+}
+⟦broken⟧
+{
+  data: {
+    user: { id: 311, name: 'Lena', profile: [Object], roles: [Array] }
+  },
+  status: 200
+}
+⟦end⟧
+
+⟦case other-notations-13⟧
+from: console.log of a parsed query string in Node.js, an object without a prototype, with one key that needs quotes
+⟦intended⟧
+{
+  "q": "green tea",
+  "page": "2",
+  "per-page": "24"
+}
+⟦broken⟧
+[Object: null prototype] {
+  q: 'green tea',
+  page: '2',
+  'per-page': '24'
+}
+⟦end⟧
+
+⟦case other-notations-14⟧
+from: console.log of a log entry in Node.js, which splits a long string at its line feed into two literals joined by a plus sign
+⟦intended⟧
+{
+  "level": "error",
+  "message": "Unhandled rejection: connect ECONNREFUSED 10.0.3.17:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)",
+  "pid": 4127
+}
+⟦broken⟧
+{
+  level: 'error',
+  message: 'Unhandled rejection: connect ECONNREFUSED 10.0.3.17:5432\n' +
+    '    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)',
+  pid: 4127
+}
+⟦end⟧
+
+⟦case other-notations-15⟧
+from: a request body built in JavaScript with a template string, where one variable was never set
+⟦intended⟧
+{"userId": null, "cart": [{"sku": "TEA-250", "qty": 2}], "coupon": "WELCOME10"}
+⟦broken⟧
+{"userId": undefined, "cart": [{"sku": "TEA-250", "qty": 2}], "coupon": "WELCOME10"}
+⟦end⟧
+
+⟦case other-notations-16⟧
+from: what Ruby before version 3.4 prints for a hash with symbols as keys and as values
+⟦intended⟧
+{"id":731, "email":"kofi@example.com", "roles":["admin", "billing"], "locked_at":null}
+⟦broken⟧
+{:id=>731, :email=>"kofi@example.com", :roles=>[:admin, :billing], :locked_at=>nil}
+⟦end⟧
+
+⟦case other-notations-17⟧
+from: the Parameters line of a Rails log, as Ruby 3.4 prints the hash
+⟦intended⟧
+{"authenticity_token" : "[FILTERED]", "user" : {"email" : "kofi@example.com", "password" : "[FILTERED]", "remember_me" : "1"}, "commit" : "Log in"}
+⟦broken⟧
+  Parameters: {"authenticity_token" => "[FILTERED]", "user" => {"email" => "kofi@example.com", "password" => "[FILTERED]", "remember_me" => "1"}, "commit" => "Log in"}
+⟦end⟧
+
+⟦case other-notations-18⟧
+from: PHP's var_export of a database configuration, which starts a nested array on a new line after a space
+⟦intended⟧
+{
+  "driver" : "mysql",
+  "host" : "127.0.0.1",
+  "port" : 3306,
+  "options" :⟦sp⟧
+  {
+    "charset" : "utf8mb4",
+    "strict" : true
+  }
+}
+⟦broken⟧
+array (
+  'driver' => 'mysql',
+  'host' => '127.0.0.1',
+  'port' => 3306,
+  'options' =>⟦sp⟧
+  array (
+    'charset' => 'utf8mb4',
+    'strict' => true,
+  ),
+)
+⟦end⟧
+
+⟦case other-notations-19⟧
+from: a line of a Go program's log that prints a struct with %+v, which gives field names but no quotes and no commas
+note: Roles could also hold the one string "admin editor", since Go prints a list of strings with spaces between them
+debatable
+⟦intended⟧
+{"ID":1042, "Name":"Ada Lovelace", "Email":"ada@example.com", "Roles":["admin", "editor"], "Active":true}
+⟦broken⟧
+2026/10/15 08:12:01 created user {ID:1042 Name:Ada Lovelace Email:ada@example.com Roles:[admin editor] Active:true}
+⟦end⟧
+
+⟦case other-notations-20⟧
+from: a Go struct printed with %#v, which adds type names and shows a pointer that is not set as (*type)(nil)
+⟦intended⟧
+{"Addr":":8080", "ReadTimeout":5000000000, "AllowedOrigins":["https://app.example.com", "https://admin.example.com"], "TLS":null}
+⟦broken⟧
+main.Config{Addr:":8080", ReadTimeout:5000000000, AllowedOrigins:[]string{"https://app.example.com", "https://admin.example.com"}, TLS:(*main.TLSConfig)(nil)}
+⟦end⟧
+
+⟦case other-notations-21⟧
+from: Rust's dbg! of a struct, which prints the place in the source first and then the value on many lines, with Some(…) around a value that may be missing
+⟦intended⟧
+{
+    "id": 1042,
+    "status": "Shipped",
+    "items": [
+        "tea",
+        "filter"
+    ],
+    "total": 31.4,
+    "coupon":⟦sp⟧
+        "WELCOME10",
+    "gift_note": null
+}
+⟦broken⟧
+[src/main.rs:8:5] &order = Order {
+    id: 1042,
+    status: Shipped,
+    items: [
+        "tea",
+        "filter",
+    ],
+    total: 31.4,
+    coupon: Some(
+        "WELCOME10",
+    ),
+    gift_note: None,
+}
+⟦end⟧
+
+⟦case other-notations-22⟧
+from: a Rust program that prints the start of a CSV file with {:?}, which writes the byte order mark as \u{feff}
+⟦intended⟧
+"\ufefforder_id,total\r\n1042,31.40\r\n"
+⟦broken⟧
+"\u{feff}order_id,total\r\n1042,31.40\r\n"
+⟦end⟧
+
+⟦case other-notations-23⟧
+from: a tsconfig.json that began as the output of tsc --init, with its comments, and got a trailing comma when an option was removed by hand
+⟦intended⟧
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "strict": true
+  },
+  "include": ["src/**/*"]
+}
+⟦broken⟧
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "es2022",                                  /* Set the JavaScript language version for emitted JavaScript. */
+    // "jsx": "preserve",                                /* Specify what JSX code is generated. */
+    "module": "nodenext",
+    "strict": true,                                      /* Enable all strict type-checking options. */
+  },
+  "include": ["src/**/*"]
+}
+⟦end⟧
+
+⟦case other-notations-24⟧
+from: a renovate.json5 file, read by a tool that expects plain JSON
+⟦intended⟧
+{
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 4,
+  "packageRules": [
+    { "matchPackageNames": ["typescript"], "enabled": false }
+  ]
+}
+⟦broken⟧
+{
+  // keep the lockfile fresh, but only on Mondays
+  extends: ['config:recommended'],
+  schedule: ['before 6am on monday'],
+  prConcurrentLimit: 4,
+  packageRules: [
+    { matchPackageNames: ['typescript'], enabled: false },
+  ],
+}
+⟦end⟧
+
+⟦case other-notations-25⟧
+from: a YAML mapping in flow style, which looks like JSON without quotes, pasted into a field that expects JSON
+⟦intended⟧
+{"name": "deploy-api", "image": "registry.example.com/api:1.8.2", "replicas": 3, "ports": [8080, 9090], "tls": true}
+⟦broken⟧
+{name: deploy-api, image: registry.example.com/api:1.8.2, replicas: 3, ports: [8080, 9090], tls: yes}
+⟦end⟧
+
+⟦case other-notations-26⟧
+from: a JSON file kept by people who also write YAML and shell scripts, with their # comments
+⟦intended⟧
+{
+  "service": "billing",
+  "replicas": 3,
+  "regions": ["eu-west-1", "us-east-1"]
+}
+⟦broken⟧
+# managed by ops, do not edit by hand
+{
+  "service": "billing",
+  "replicas": 3,  # was 2 until the launch
+  "regions": ["eu-west-1", "us-east-1"]
+}
+⟦end⟧
+
+⟦case other-notations-27⟧
+from: opening hours filled into a JSON template by a program that puts dates and times in without quotes
+⟦intended⟧
+[{"day": "2026-10-01", "open": "09:00", "close": "18:30"}, {"day": "2026-10-02", "open": "09:00", "close": "13:00"}]
+⟦broken⟧
+[{"day": 2026-10-01, "open": 09:00, "close": 18:30}, {"day": 2026-10-02, "open": 09:00, "close": 13:00}]
+⟦end⟧
+
+⟦case other-notations-28⟧
+from: Python's json.dumps of statistics over an empty column, which writes NaN and Infinity as bare words
+⟦intended⟧
+{"column": "latency_ms", "count": 0, "mean": null, "min": null, "max": null, "p95": null}
+⟦broken⟧
+{"column": "latency_ms", "count": 0, "mean": NaN, "min": Infinity, "max": -Infinity, "p95": NaN}
+⟦end⟧
+
+⟦case other-notations-29⟧
+from: a material from three.js code, moved into a JSON file with quotes added to the keys and the numbers left as JavaScript writes them
+⟦intended⟧
+{"color": 16746496, "opacity": 0.85, "transparent": true, "roughness": 0.4, "metalness": 0}
+⟦broken⟧
+{"color": 0xff8800, "opacity": .85, "transparent": true, "roughness": .4, "metalness": 0}
+⟦end⟧
+
+⟦case other-notations-30⟧
+from: a task for a tool that sets up servers, written as JSON by someone used to the tool's YAML form, where a file mode is an octal number
+note: the mode could also be meant as the number 420, which is 644 in octal, or as the number 644
+debatable
+⟦intended⟧
+{
+  "path": "/etc/nginx/conf.d/api.conf",
+  "owner": "www-data",
+  "backup": true,
+  "mode": "0644"
+}
+⟦broken⟧
+{
+  "path": "/etc/nginx/conf.d/api.conf",
+  "owner": "www-data",
+  "backup": true,
+  "mode": 0644
+}
+⟦end⟧
+
+⟦case other-notations-31⟧
+from: the bucket limits of a latency histogram, copied from Python source, where digits can be grouped with underscores
+⟦intended⟧
+[100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000]
+⟦broken⟧
+[100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000]
+⟦end⟧
+
+⟦case other-notations-32⟧
+from: a template that fills in numbers as they are shown to readers, e.g. with toLocaleString() in JavaScript
+⟦intended⟧
+{"country": "Portugal", "population": 10467366, "area_km2": 92212, "capital": "Lisbon"}
+⟦broken⟧
+{"country": "Portugal", "population": 10,467,366, "area_km2": 92,212, "capital": "Lisbon"}
+⟦end⟧
+
+⟦case other-notations-33⟧
+from: a Docker Compose service written by hand as JSON, with the sizes and durations as they stand in the YAML form, where they need no quotes
+note: the other repair drops the units and keeps the numbers 512, 10 and 2
+debatable
+⟦intended⟧
+{"image": "worker:1.8", "mem_limit": "512m", "healthcheck": {"test": ["CMD", "curl", "-f", "http://localhost:8080/healthz"], "interval": "10s", "timeout": "2s", "retries": 3}}
+⟦broken⟧
+{"image": "worker:1.8", "mem_limit": 512m, "healthcheck": {"test": ["CMD", "curl", "-f", "http://localhost:8080/healthz"], "interval": 10s, "timeout": 2s, "retries": 3}}
+⟦end⟧
+
+⟦case other-notations-34⟧
+from: a C program on a German system that builds JSON with printf, which there writes the decimal point as a comma
+⟦intended⟧
+{"station": "Köln-Stammheim", "temperatur": 21.5, "luftfeuchte": 48.2, "wind_kmh": 9}
+⟦broken⟧
+{"station": "Köln-Stammheim", "temperatur": 21,5, "luftfeuchte": 48,2, "wind_kmh": 9}
+⟦end⟧
+
+⟦case other-notations-35⟧
+from: a shell script in a build job that writes the build's facts with echo and puts its variables in without quotes
+⟦intended⟧
+{"version": "1.8.2", "commit": "9f3c2ab", "branch": "main", "runner": "10.0.3.17", "dirty": false}
+⟦broken⟧
+{"version": 1.8.2, "commit": 9f3c2ab, "branch": main, "runner": 10.0.3.17, "dirty": false}
+⟦end⟧
+
+⟦case other-notations-36⟧
+from: a line of a Java service's log that prints a Map with its toString
+⟦intended⟧
+{"orderId":58213, "status":"SHIPPED", "carrier":"DHL Express", "items":["TEA-250", "FLT-01"], "total":31.4}
+⟦broken⟧
+14:02:17.204 [http-nio-8080-exec-3] INFO  c.e.shop.OrderService - Order created: {orderId=58213, status=SHIPPED, carrier=DHL Express, items=[TEA-250, FLT-01], total=31.4}
+⟦end⟧
+
+⟦case other-notations-37⟧
+from: print of a Swift dictionary with optional values, which uses square brackets for the dictionary and wraps each value that is set in Optional(…)
+⟦intended⟧
+{"token": "eyJhbGciOiJIUzI1NiJ9", "scopes": ["read", "write"], "expiresIn": 3600, "refresh": null}
+⟦broken⟧
+["token": Optional("eyJhbGciOiJIUzI1NiJ9"), "scopes": Optional(["read", "write"]), "expiresIn": Optional(3600), "refresh": nil]
+⟦end⟧
+
+⟦case other-notations-38⟧
+from: NSLog of the payload of a push notification in an iOS app, in the notation that an NSDictionary prints itself in
+⟦intended⟧
+{
+    "aps" :     {
+        "alert" : "Your order has shipped",
+        "badge" : 2,
+        "sound" : "default"
+    },
+    "orderId" : 58213,
+    "tags" :     [
+        "orders",
+        "shipping"
+    ]
+}
+⟦broken⟧
+{
+    aps =     {
+        alert = "Your order has shipped";
+        badge = 2;
+        sound = default;
+    };
+    orderId = 58213;
+    tags =     (
+        orders,
+        shipping
+    );
+}
+⟦end⟧
+
+⟦case other-notations-39⟧
+from: what the MongoDB shell prints for a document found with findOne
+⟦intended⟧
+{
+  "_id": "670e1f4a9c3b2a0012d4e8f1",
+  "sku": "TEA-250",
+  "name": "Sencha, 250 g",
+  "price": 12.5,
+  "stock": 1800,
+  "tags": [ "green", "loose-leaf" ],
+  "suppliers": [
+    { "name": "Uji Kōen", "country": "JP", "leadDays": 21 },
+    { "name": "Chá Camélia", "country": "PT", "leadDays": 6 }
+  ],
+  "updatedAt": "2026-10-14T16:20:05.000Z"
+}
+⟦broken⟧
+{
+  _id: ObjectId('670e1f4a9c3b2a0012d4e8f1'),
+  sku: 'TEA-250',
+  name: 'Sencha, 250 g',
+  price: 12.5,
+  stock: 1800,
+  tags: [ 'green', 'loose-leaf' ],
+  suppliers: [
+    { name: 'Uji Kōen', country: 'JP', leadDays: 21 },
+    { name: 'Chá Camélia', country: 'PT', leadDays: 6 }
+  ],
+  updatedAt: ISODate('2026-10-14T16:20:05.000Z')
+}
+⟦end⟧
+
+⟦case other-notations-40⟧
+from: the answer of a web API that puts the line )]}' before the JSON, so that a browser cannot run the answer as a script
+⟦intended⟧
+{"items":[{"id":"a1","title":"Inbox","unread":12},{"id":"b7","title":"Sent","unread":0}],"nextPageToken":null}
+⟦broken⟧
+)]}'
+{"items":[{"id":"a1","title":"Inbox","unread":12},{"id":"b7","title":"Sent","unread":0}],"nextPageToken":null}
+⟦end⟧

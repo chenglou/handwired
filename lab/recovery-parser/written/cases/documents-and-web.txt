@@ -1,0 +1,553 @@
+⟦case documents-and-web-01⟧
+from: a Word document, where autocorrect turned every straight quote into a typographic one as the author typed
+⟦intended⟧
+{"firstName": "Marta", "lastName": "Kowalska", "title": "Head of \"People & Culture\"", "employeeId": 20417, "remote": false}
+⟦broken⟧
+{“firstName”: “Marta”, “lastName”: “Kowalska”, “title”: “Head of \”People & Culture\””, “employeeId”: 20417, “remote”: false}
+⟦end⟧
+
+⟦case documents-and-web-02⟧
+from: a specification written in a German Word, which puts the opening quote at the bottom of the line
+⟦intended⟧
+{
+  "kunde": {"name": "Jürgen Weiß", "ort": "Köln"},
+  "rechnungsnummer": "2026-0114",
+  "betrag": 249.9,
+  "bezahlt": true
+}
+⟦broken⟧
+{
+  „kunde“: {„name“: „Jürgen Weiß“, „ort“: „Köln“},
+  „rechnungsnummer“: „2026-0114“,
+  „betrag“: 249.9,
+  „bezahlt“: true
+}
+⟦end⟧
+
+⟦case documents-and-web-03⟧
+from: a chat message typed with a Chinese input method, where one comma and one colon came out in their full width forms
+⟦intended⟧
+{"name":"张伟","city":"深圳","age":28,"tags":["会员","新用户"]}
+⟦broken⟧
+{"name":"张伟","city":"深圳"，"age"：28,"tags":["会员","新用户"]}
+⟦end⟧
+
+⟦case documents-and-web-04⟧
+from: a table of measurements on a web page, whose typesetting shows every negative number with a true minus sign
+note: the tools take each negative number as a whole for added text, though only its sign is another character and its digits are kept
+⟦intended⟧
+[-4.5, -6.1, -2.0, 0.3, -1.8, 2.4, -0.7]
+⟦broken⟧
+[−4.5, −6.1, −2.0, 0.3, −1.8, 2.4, −0.7]
+⟦end⟧
+
+⟦case documents-and-web-05⟧
+from: a chat message typed on a phone, whose keyboard makes the quotes typographic and turns two hyphens into one long dash
+⟦intended⟧
+{"command": "deploy", "args": ["--force", "--env=staging"], "dryRun": false}
+⟦broken⟧
+{“command”: “deploy”, “args”: [“—force”, “—env=staging”], “dryRun”: false}
+⟦end⟧
+
+⟦case documents-and-web-06⟧
+from: a list of error messages in a Google Doc, each one a JSON string, after the editor's smart quotes
+⟦intended⟧
+"We couldn't verify your card. Please try again."
+⟦broken⟧
+“We couldn’t verify your card. Please try again.”
+⟦end⟧
+
+⟦case documents-and-web-07⟧
+from: a code block on a wiki page, copied from the browser, where every space of the indentation arrives as a no-break space
+⟦intended⟧
+{
+  "service": "billing-api",
+  "replicas": 3,
+  "healthCheck": {
+    "path": "/healthz",
+    "intervalSeconds": 30,
+    "timeoutSeconds": 5
+  },
+  "env": [
+    {"name": "LOG_LEVEL", "value": "info"},
+    {"name": "DB_POOL_SIZE", "value": "20"}
+  ],
+  "owners": ["payments-team"]
+}
+⟦broken⟧
+{
+⟦nbsp⟧⟦nbsp⟧"service": "billing-api",
+⟦nbsp⟧⟦nbsp⟧"replicas": 3,
+⟦nbsp⟧⟦nbsp⟧"healthCheck": {
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧"path": "/healthz",
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧"intervalSeconds": 30,
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧"timeoutSeconds": 5
+⟦nbsp⟧⟦nbsp⟧},
+⟦nbsp⟧⟦nbsp⟧"env": [
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧{"name": "LOG_LEVEL", "value": "info"},
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧{"name": "DB_POOL_SIZE", "value": "20"}
+⟦nbsp⟧⟦nbsp⟧],
+⟦nbsp⟧⟦nbsp⟧"owners": ["payments-team"]
+}
+⟦end⟧
+
+⟦case documents-and-web-08⟧
+from: a help page that puts a zero width space after every comma of its code samples so that a long line can break there
+⟦intended⟧
+{"bucket": "media-prod-eu", "prefix": "uploads/2026/10/", "maxKeys": 1000, "delimiter": "/"}
+⟦broken⟧
+{"bucket": "media-prod-eu",⟦U+200B⟧ "prefix": "uploads/2026/10/",⟦U+200B⟧ "maxKeys": 1000,⟦U+200B⟧ "delimiter": "/"}
+⟦end⟧
+
+⟦case documents-and-web-09⟧
+from: a text box on a slide, where a line break inside a paragraph is copied as the line separator character U+2028
+⟦intended⟧
+{
+  "feature": "dark-mode",
+  "rollout": 0.25,
+  "audiences": ["beta", "staff"]
+}
+⟦broken⟧
+{⟦U+2028⟧  "feature": "dark-mode",⟦U+2028⟧  "rollout": 0.25,⟦U+2028⟧  "audiences": ["beta", "staff"]⟦U+2028⟧}
+⟦end⟧
+
+⟦case documents-and-web-10⟧
+from: the source of a web page, where the document is the value of an attribute, so its quotes and its ampersand are written as HTML entities
+note: the tools take the punctuation and the short names between two entities for added text, e.g. the colon and the brace after the first key, though they are kept
+⟦intended⟧
+{"user":{"id":5512,"prefs":{"theme":"dark","columns":["name","due","owner"]}},"next":"/tasks?page=2&sort=due"}
+⟦broken⟧
+{&quot;user&quot;:{&quot;id&quot;:5512,&quot;prefs&quot;:{&quot;theme&quot;:&quot;dark&quot;,&quot;columns&quot;:[&quot;name&quot;,&quot;due&quot;,&quot;owner&quot;]}},&quot;next&quot;:&quot;/tasks?page=2&amp;sort=due&quot;}
+⟦end⟧
+
+⟦case documents-and-web-11⟧
+from: the HTML source of an e-mail, where the mail program wrote a tag in the place of every line end and an entity in the place of every space of the indentation
+⟦intended⟧
+[
+  {"ticket": 8841, "priority": "high"},
+  {"ticket": 8842, "priority": "low"}
+]
+⟦broken⟧
+[<br>&nbsp;&nbsp;{"ticket": 8841, "priority": "high"},<br>&nbsp;&nbsp;{"ticket": 8842, "priority": "low"}<br>]
+⟦end⟧
+
+⟦case documents-and-web-12⟧
+from: the exported text of a WhatsApp chat, where every message has its time and its sender before it, and an edited message has a mark after it
+⟦intended⟧
+{"door": "garage", "state": "open", "battery": 0.82}
+⟦broken⟧
+[14/10/2026, 22:41:07] Karim Haddad: {"door": "garage", "state": "open", "battery": 0.82} <This message was edited>
+⟦end⟧
+
+⟦case documents-and-web-13⟧
+from: the source of a forum post, whose software made a link of the address inside the string
+note: the other repair keeps the link's tag as the content of the string and puts a backslash before each of its quotes
+debatable
+⟦intended⟧
+{"name": "date-utils", "version": "2.4.1", "repository": {"type": "git", "url": "https://git.example.org/libs/date-utils"}, "license": "MIT"}
+⟦broken⟧
+{"name": "date-utils", "version": "2.4.1", "repository": {"type": "git", "url": "<a href="https://git.example.org/libs/date-utils" rel="nofollow">https://git.example.org/libs/date-utils</a>"}, "license": "MIT"}
+⟦end⟧
+
+⟦case documents-and-web-14⟧
+from: the source of a recipe page, where the structured data for search engines was copied together with its script tags
+⟦intended⟧
+{"@context":"https://schema.org","@type":"Recipe","name":"Lemon drizzle cake","author":{"@type":"Person","name":"Mary Ashdown"},"prepTime":"PT20M","recipeYield":8,"recipeIngredient":["225 g butter","225 g sugar","4 eggs","2 lemons"],"nutrition":{"@type":"NutritionInformation","calories":"320 kcal"}}
+⟦broken⟧
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Recipe","name":"Lemon drizzle cake","author":{"@type":"Person","name":"Mary Ashdown"},"prepTime":"PT20M","recipeYield":8,"recipeIngredient":["225 g butter","225 g sugar","4 eggs","2 lemons"],"nutrition":{"@type":"NutritionInformation","calories":"320 kcal"}}</script>
+⟦end⟧
+
+⟦case documents-and-web-15⟧
+from: the address bar of a browser, which gives the quotes of a filter in the address as percent codes when the address is copied
+note: the tools take the first brace and the punctuation between two percent codes for added text, though they are kept
+⟦intended⟧
+{"status":"open","assignee":"m.okafor","labels":["bug","p1"],"limit":25}
+⟦broken⟧
+https://tracker.example.com/issues?filter={%22status%22:%22open%22,%22assignee%22:%22m.okafor%22,%22labels%22:[%22bug%22,%22p1%22],%22limit%22:25}
+⟦end⟧
+
+⟦case documents-and-web-16⟧
+from: a Slack message copied as its author typed it, with a sentence before the document and the three backticks of the code block on the same line
+⟦intended⟧
+{"event": "invoice.paid", "invoiceId": "in_1Qx7", "amount": 4900, "currency": "eur"}
+⟦broken⟧
+@Dana the webhook sends this, the amount is in cents: ```{"event": "invoice.paid", "invoiceId": "in_1Qx7", "amount": 4900, "currency": "eur"}```
+⟦end⟧
+
+⟦case documents-and-web-17⟧
+from: the markdown source of a README, where the author made the line bold that a reader has to add
+⟦intended⟧
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src"]
+}
+⟦broken⟧
+{
+  "compilerOptions": {
+    "target": "es2022",
+    **"strict": true,**
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src"]
+}
+⟦end⟧
+
+⟦case documents-and-web-18⟧
+from: a web page saved as markdown by a converter, which puts a backslash before every underscore and every square bracket
+⟦intended⟧
+{"user_id": 4821, "display_name": "r_tanaka", "team_ids": [12, 40], "last_login_at": null}
+⟦broken⟧
+{"user\_id": 4821, "display\_name": "r\_tanaka", "team\_ids": \[12, 40\], "last\_login\_at": null}
+⟦end⟧
+
+⟦case documents-and-web-19⟧
+from: the markdown source of a table in the documentation of an API, where the example is one cell and the bar inside its string has a backslash so that the cell does not end there
+⟦intended⟧
+{"filter": "state=open|blocked", "sort": "-updated", "limit": 50}
+⟦broken⟧
+| Example body | `{"filter": "state=open\|blocked", "sort": "-updated", "limit": 50}` |
+⟦end⟧
+
+⟦case documents-and-web-20⟧
+from: a chat that renders markdown, where every doubled backslash of the message came out as one
+⟦intended⟧
+{"job": "backup-nightly", "source": "C:\\Users\\svc_backup\\Documents", "match": "^report_\\d{4}\\.xlsx$", "keep": 14}
+⟦broken⟧
+{"job": "backup-nightly", "source": "C:\Users\svc_backup\Documents", "match": "^report_\d{4}\.xlsx$", "keep": 14}
+⟦end⟧
+
+⟦case documents-and-web-21⟧
+from: a reply to an e-mail, where the mail program put a mark before every quoted line and then broke the line that had become too long
+⟦intended⟧
+[
+  {"host": "db-primary.internal", "role": "primary", "lagSeconds": 0},
+  {"host": "db-replica-2.internal", "role": "replica", "note": "resync after the storage failure on Tuesday night"}
+]
+⟦broken⟧
+> [
+>   {"host": "db-primary.internal", "role": "primary", "lagSeconds": 0},
+>   {"host": "db-replica-2.internal", "role": "replica", "note": "resync
+after the storage failure on Tuesday night"}
+> ]
+⟦end⟧
+
+⟦case documents-and-web-22⟧
+from: an e-mail in plain text, where the mail program broke the one long line of the document at the last space before the 72nd column
+⟦intended⟧
+{"subject": "Planned maintenance on 21 October", "body": "The customer portal will be read-only from 22:00 to 23:30 UTC.\nNo action is needed on your side.", "audience": "all-customers"}
+⟦broken⟧
+{"subject": "Planned maintenance on 21 October", "body": "The customer
+portal will be read-only from 22:00 to 23:30 UTC.\nNo action is needed
+on your side.", "audience": "all-customers"}
+⟦end⟧
+
+⟦case documents-and-web-23⟧
+from: the raw source of an e-mail in the quoted-printable encoding, where a line ends with an equals sign after 75 characters, and an equals sign and a letter with an accent are written as codes
+⟦intended⟧
+{"customer": "Renée Dubois", "resetLink": "https://accounts.example.com/reset?token=8f3a1c&lang=fr", "expiresInMinutes": 30, "sentBy": "support@example.com"}
+⟦broken⟧
+{"customer": "Ren=C3=A9e Dubois", "resetLink": "https://accounts.example.co=
+m/reset?token=3D8f3a1c&lang=3Dfr", "expiresInMinutes": 30, "sentBy": "suppo=
+rt@example.com"}
+⟦end⟧
+
+⟦case documents-and-web-24⟧
+from: a long e-mail in the web view of Gmail, which cuts the message off and puts three dots and its own notice there
+⟦intended⟧
+{"metric":"signups","week":"2026-W41","byCountry":{"DE":412,"FR":388,"GB":295,"US":1204,"JP":77,"BR":163,"IN":540}}
+⟦broken⟧
+{"metric":"signups","week":"2026-W41","byCountry":{"DE":412,"FR":388,"GB":295,"U...
+
+[Message clipped]  View entire message
+⟦end⟧
+
+⟦case documents-and-web-25⟧
+from: an e-mail with a greeting and a sentence before the document, and a question and the sender's name after it
+⟦intended⟧
+{
+  "merchantId": "M-204817",
+  "settlementDate": "2026-10-13",
+  "currency": "PLN",
+  "grossAmount": 18240.5,
+  "fees": 529.0,
+  "chargebacks": [
+    {"id": "cb_8842", "amount": 149.0, "reason": "duplicate"}
+  ],
+  "payoutAmount": 17562.5
+}
+⟦broken⟧
+Hi Tomasz,
+
+this is what the gateway sent us for yesterday's settlement:
+
+{
+  "merchantId": "M-204817",
+  "settlementDate": "2026-10-13",
+  "currency": "PLN",
+  "grossAmount": 18240.5,
+  "fees": 529.0,
+  "chargebacks": [
+    {"id": "cb_8842", "amount": 149.0, "reason": "duplicate"}
+  ],
+  "payoutAmount": 17562.5
+}
+
+Can you check the fees?
+
+Best,
+Priya
+⟦end⟧
+
+⟦case documents-and-web-26⟧
+from: a code listing in an e-book, where the line numbers at the left margin are copied along with the lines
+⟦intended⟧
+{
+  "sensor": "th-04",
+  "unit": "celsius",
+  "readings": [
+    21.5,
+    21.7,
+    22.0
+  ]
+}
+⟦broken⟧
+1 {
+2   "sensor": "th-04",
+3   "unit": "celsius",
+4   "readings": [
+5     21.5,
+6     21.7,
+7     22.0
+8   ]
+9 }
+⟦end⟧
+
+⟦case documents-and-web-27⟧
+from: a blog post whose code listing is a table, so that the whole column of line numbers is copied before the code
+⟦intended⟧
+{
+  "name": "weather-widget",
+  "version": "0.9.2",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  }
+}
+⟦broken⟧
+1
+2
+3
+4
+5
+6
+7
+8
+{
+  "name": "weather-widget",
+  "version": "0.9.2",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  }
+}
+⟦end⟧
+
+⟦case documents-and-web-28⟧
+from: a tutorial page that shows a command as it was typed in a terminal, with the shell's prompt on the first line and its continuation prompt on every further line
+⟦intended⟧
+{
+    "sku": "TSHIRT-M-BLK",
+    "quantity": 2,
+    "giftWrap": false
+  }
+⟦broken⟧
+$ curl -X POST https://shop.example.com/api/orders \
+>   -H 'Content-Type: application/json' \
+>   -d '{
+>     "sku": "TSHIRT-M-BLK",
+>     "quantity": 2,
+>     "giftWrap": false
+>   }'
+⟦end⟧
+
+⟦case documents-and-web-29⟧
+from: the page of a pull request, where the changed file is shown as a diff and was copied with the diff's first line and the mark at the start of every line
+note: the other repair keeps the lines with a minus, which is the file before the change, and drops the lines with a plus
+debatable
+⟦intended⟧
+{
+  "name": "@acme/design-tokens",
+  "version": "3.2.0",
+  "private": false,
+  "sideEffects": false,
+  "dependencies": {
+    "style-dictionary": "^4.1.0",
+    "tinycolor2": "^1.6.0"
+  }
+}
+⟦broken⟧
+@@ -1,9 +1,10 @@
+ {
+   "name": "@acme/design-tokens",
+-  "version": "3.1.4",
++  "version": "3.2.0",
+   "private": false,
+   "sideEffects": false,
+   "dependencies": {
+-    "style-dictionary": "^3.9.0"
++    "style-dictionary": "^4.1.0",
++    "tinycolor2": "^1.6.0"
+   }
+ }
+⟦end⟧
+
+⟦case documents-and-web-30⟧
+from: an issue on a project's web page that quotes the error of a build tool, which shows the config with line numbers, a mark at the line of the error and a caret under the place, here a missing comma
+⟦intended⟧
+{
+  "name": "checkout-service",
+  "port": 8443,
+  "tls": {"cert": "/etc/ssl/checkout.pem", "minVersion": "1.2"}
+}
+⟦broken⟧
+  1 | {
+  2 |   "name": "checkout-service",
+  3 |   "port": 8443
+> 4 |   "tls": {"cert": "/etc/ssl/checkout.pem", "minVersion": "1.2"}
+    |   ^
+  5 | }
+⟦end⟧
+
+⟦case documents-and-web-31⟧
+from: the setup page of an API's documentation, where a placeholder without quotes stands for the reader's key
+note: the other repair puts a value in the placeholder's place, e.g. null, and then the placeholder is added text and no string
+debatable
+⟦intended⟧
+{
+  "apiKey": "<YOUR_API_KEY>",
+  "region": "us-east-1",
+  "timeoutMs": 5000,
+  "retry": {"attempts": 3, "backoffMs": 250}
+}
+⟦broken⟧
+{
+  "apiKey": <YOUR_API_KEY>,
+  "region": "us-east-1",
+  "timeoutMs": 5000,
+  "retry": {"attempts": 3, "backoffMs": 250}
+}
+⟦end⟧
+
+⟦case documents-and-web-32⟧
+from: the reference page of an API, where three dots stand for the parts of the answer that the page leaves out
+⟦intended⟧
+{
+  "page": 1,
+  "totalPages": 12,
+  "results": [
+    {"id": 9001, "title": "Quarterly report", "owner": {}}
+  ]
+}
+⟦broken⟧
+{
+  "page": 1,
+  "totalPages": 12,
+  "results": [
+    {"id": 9001, "title": "Quarterly report", "owner": {...}},
+    ...
+  ]
+}
+⟦end⟧
+
+⟦case documents-and-web-33⟧
+from: a request body in the documentation of a collection of API requests, with variables in double braces, one of them without quotes because a number will stand there
+note: the other repair puts a number in the place of the first variable, and then the variable is added text and no string
+debatable
+⟦intended⟧
+{"orderId": "{{order_id}}", "status": "shipped", "carrier": "{{carrier}}", "notifyCustomer": true}
+⟦broken⟧
+{"orderId": {{order_id}}, "status": "shipped", "carrier": "{{carrier}}", "notifyCustomer": true}
+⟦end⟧
+
+⟦case documents-and-web-34⟧
+from: a slide, where the quotes around the keys were taken out to save room and the program made the other quotes typographic
+⟦intended⟧
+{ "id": 4172, "name": "Lena Fischer", "plan": "team", "seats": 12, "trial": false }
+⟦broken⟧
+{ id: 4172, name: “Lena Fischer”, plan: “team”, seats: 12, trial: false }
+⟦end⟧
+
+⟦case documents-and-web-35⟧
+from: a row of a CSV file exported from a spreadsheet, where the document is the last cell: the export doubles every quote of the cell and puts quotes around it
+⟦intended⟧
+{"event": "signup", "userId": 88213, "name": "Zo\u00eb", "referrer": null, "utm": {"source": "newsletter", "campaign": "october"}}
+⟦broken⟧
+8841,2026-10-14T09:12:44Z,"{""event"": ""signup"", ""userId"": 88213, ""name"": ""Zo\u00eb"", ""referrer"": null, ""utm"": {""source"": ""newsletter"", ""campaign"": ""october""}}"
+⟦end⟧
+
+⟦case documents-and-web-36⟧
+from: a monthly report in a document, where the numbers got thousands separators so that they read well
+note: the commas inside the array can also be read as they stand, which gives eight numbers
+debatable
+⟦intended⟧
+{"month": "2026-09", "weeklyVisits": [12400, 9850, 11320, 10675], "newSignups": 1204, "churned": 87}
+⟦broken⟧
+{"month": "2026-09", "weeklyVisits": [12,400, 9,850, 11,320, 10,675], "newSignups": 1,204, "churned": 87}
+⟦end⟧
+
+⟦case documents-and-web-37⟧
+from: a pricing table in a document, where one number was formatted as money and another as a percentage
+note: the other repair makes strings of the two values, "$12.50" and "15%"
+debatable
+⟦intended⟧
+{"plan": "Team", "pricePerSeat": 12.50, "annualDiscount": 15, "trialDays": 14}
+⟦broken⟧
+{"plan": "Team", "pricePerSeat": $12.50, "annualDiscount": 15%, "trialDays": 14}
+⟦end⟧
+
+⟦case documents-and-web-38⟧
+from: a manual in PDF, where the listing goes over a page break, so the page number and the header of the next page stand in the middle, and a long line is broken at the margin
+⟦intended⟧
+{
+  "webhook": {
+    "url": "https://hooks.example.com/services/T0412/B0993/notify-on-call",
+    "secret": "whsec_test_51Nc",
+    "events": ["incident.opened", "incident.resolved"]
+  },
+  "enabled": true
+}
+⟦broken⟧
+{
+  "webhook": {
+    "url": "https://hooks.example.com/services/T0412/B0993/notify-on-
+call",
+    "secret": "whsec_test_51Nc",
+14
+Acme Incident API · Reference Guide
+    "events": ["incident.opened", "incident.resolved"]
+  },
+  "enabled": true
+}
+⟦end⟧
+
+⟦case documents-and-web-39⟧
+from: a column of a spreadsheet that builds each document with a formula from the cells of its row, so a truth value and a number with decimals arrive in the spreadsheet's own form
+⟦intended⟧
+{"sku": "A-1042", "title": "Desk lamp", "price": 12.5, "inStock": true, "warehouses": ["HAM", "RTM"]}
+⟦broken⟧
+{"sku": "A-1042", "title": "Desk lamp", "price": 12,5, "inStock": TRUE, "warehouses": ["HAM", "RTM"]}
+⟦end⟧
+
+⟦case documents-and-web-40⟧
+from: the notification e-mail of an issue tracker, which shows a comment as its author typed it, with the marks of the tracker's code block around the document
+⟦intended⟧
+["CartTest.testCoupon", "LoginTest.testSso", "SearchTest.testEmptyQuery", "ProfileTest.testAvatarUpload"]
+⟦broken⟧
+{code:json}
+["CartTest.testCoupon", "LoginTest.testSso", "SearchTest.testEmptyQuery", "ProfileTest.testAvatarUpload"]
+{code}
+⟦end⟧

@@ -1,0 +1,570 @@
+⟦case hand-editing-01⟧
+from: a composer.json after the line of the last required package was deleted, with the comma of the line above left behind
+⟦intended⟧
+{
+    "name": "northwind/invoice-api",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "monolog/monolog": "^3.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Northwind\\Invoice\\": "src/"
+        }
+    }
+}
+⟦broken⟧
+{
+    "name": "northwind/invoice-api",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "monolog/monolog": "^3.6",
+    },
+    "autoload": {
+        "psr-4": {
+            "Northwind\\Invoice\\": "src/"
+        }
+    }
+}
+⟦end⟧
+
+⟦case hand-editing-02⟧
+from: the settings of an editor plugin, kept on one line: a member was typed in the middle and the comma after it forgotten
+⟦intended⟧
+{"theme": "dark", "fontSize": 13, "lineNumbers": true, "wordWrap": "on", "tabSize": 4}
+⟦broken⟧
+{"theme": "dark", "fontSize": 13, "lineNumbers": true "wordWrap": "on", "tabSize": 4}
+⟦end⟧
+
+⟦case hand-editing-03⟧
+from: a tsconfig.json while the name of a new option is being typed, in an editor that does not close quotes by itself
+⟦intended⟧
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUnusedLocals": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
+⟦broken⟧
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUnus
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
+⟦end⟧
+
+⟦case hand-editing-04⟧
+from: a .prettierrc on one line while the author changes true to false and has typed the first three letters
+⟦intended⟧
+{"semi": false, "singleQuote": true, "printWidth": 100}
+⟦broken⟧
+{"semi": fal, "singleQuote": true, "printWidth": 100}
+⟦end⟧
+
+⟦case hand-editing-05⟧
+from: the request body in an API client, typed up to the colon of a new member, in an editor that closes braces by itself
+⟦intended⟧
+{"query": "wireless headphones", "filters": {"brand": "Sony", "maxPrice": 150}, "page": 1}
+⟦broken⟧
+{"query": "wireless headphones", "filters": {"brand": "Sony", "maxPrice":}, "page": 1}
+⟦end⟧
+
+⟦case hand-editing-06⟧
+from: a GeoJSON file where the author counted the brackets of a ring by hand and typed one closing bracket too many
+⟦intended⟧
+{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[13.37, 52.51], [13.41, 52.51], [13.41, 52.53], [13.37, 52.51]]]}, "properties": {"name": "Tiergarten"}}
+⟦broken⟧
+{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[13.37, 52.51], [13.41, 52.51], [13.41, 52.53], [13.37, 52.51]]]]}, "properties": {"name": "Tiergarten"}}
+⟦end⟧
+
+⟦case hand-editing-07⟧
+from: the value of a feature flag typed into the JSON field of a web form, which closes no brackets by itself: the author has typed up to the end of the list, and the two closing braces not yet
+⟦intended⟧
+{"killSwitch": false, "rollout": {"percent": 25, "regions": ["eu-west-1", "us-east-1"]}}
+⟦broken⟧
+{"killSwitch": false, "rollout": {"percent": 25, "regions": ["eu-west-1", "us-east-1"]
+⟦end⟧
+
+⟦case hand-editing-08⟧
+from: the record of a weather station after a member was deleted from the middle of the line: the selection went one character too far and took the opening quote of the next key
+⟦intended⟧
+{"id": "stn-0417", "lat": 59.3293, "lon": 18.0686, "name": "Stockholm Observatory", "elevationM": 44}
+⟦broken⟧
+{"id": "stn-0417", "lat": 59.3293, lon": 18.0686, "name": "Stockholm Observatory", "elevationM": 44}
+⟦end⟧
+
+⟦case hand-editing-09⟧
+from: a fixture of an issue tracker's test, typed by hand, with the closing quote of the title forgotten
+⟦intended⟧
+{"id": 1042, "title": "Fix login redirect", "status": "open", "assignee": "mkowalski", "labels": ["bug", "auth"]}
+⟦broken⟧
+{"id": 1042, "title": "Fix login redirect, "status": "open", "assignee": "mkowalski", "labels": ["bug", "auth"]}
+⟦end⟧
+
+⟦case hand-editing-10⟧
+from: a translation file where a translator typed quotes inside a message without the backslashes
+⟦intended⟧
+{"confirm.title": "Delete file", "confirm.body": "Delete \"{name}\"?\nThis can't be undone.", "confirm.ok": "Delete"}
+⟦broken⟧
+{"confirm.title": "Delete file", "confirm.body": "Delete "{name}"?\nThis can't be undone.", "confirm.ok": "Delete"}
+⟦end⟧
+
+⟦case hand-editing-11⟧
+from: a mail config where the author took the password out before a commit and left a note to self in its place
+note: the note may also stand for a value that is not known yet, e.g. null or an empty string, and then its words are no part of the document
+debatable
+⟦intended⟧
+{
+  "smtp": {
+    "host": "smtp.fastmail.com",
+    "port": 465,
+    "user": "billing@kestrelbooks.example",
+    "password": "TODO get from 1Password"
+  },
+  "replyTo": "accounts@kestrelbooks.example"
+}
+⟦broken⟧
+{
+  "smtp": {
+    "host": "smtp.fastmail.com",
+    "port": 465,
+    "user": "billing@kestrelbooks.example",
+    "password": TODO get from 1Password
+  },
+  "replyTo": "accounts@kestrelbooks.example"
+}
+⟦end⟧
+
+⟦case hand-editing-12⟧
+from: an .eslintrc.json after the last rule was moved up one line with the editor's move line shortcut: the moved line has no comma, and the line that is now last still has one
+⟦intended⟧
+{
+  "root": true,
+  "env": {"browser": true, "es2022": true},
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "always"],
+    "no-unused-vars": "error"
+  }
+}
+⟦broken⟧
+{
+  "root": true,
+  "env": {"browser": true, "es2022": true},
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "always"]
+    "no-unused-vars": "error",
+  }
+}
+⟦end⟧
+
+⟦case hand-editing-13⟧
+from: a schedule config while the key sendAt is renamed to send_at: the author deleted backwards from the closing quote and has not typed the end of the new name yet
+⟦intended⟧
+{"title": "Weekly digest", "send_at": "09:00", "timezone": "Europe/Lisbon", "enabled": true}
+⟦broken⟧
+{"title": "Weekly digest", "send_a: "09:00", "timezone": "Europe/Lisbon", "enabled": true}
+⟦end⟧
+
+⟦case hand-editing-14⟧
+from: a deploy config while a value is changed from a string to a number: the closing quote is deleted and the opening quote is still there
+note: the value may also be meant as the string "3" with its closing quote forgotten, and the digit is then a part of a string
+debatable
+⟦intended⟧
+{"service": "checkout", "replicas": 3, "image": "registry.example.com/checkout:1.8.2", "healthPath": "/healthz"}
+⟦broken⟧
+{"service": "checkout", "replicas": "3, "image": "registry.example.com/checkout:1.8.2", "healthPath": "/healthz"}
+⟦end⟧
+
+⟦case hand-editing-15⟧
+from: the environment file of an API client with an entry pasted from JavaScript source, where keys have no quotes and strings have single quotes
+⟦intended⟧
+[{"key": "baseUrl", "value": "https://staging.api.example.com", "enabled": true}, {"key": "apiVersion", "value": "v2", "enabled": true}]
+⟦broken⟧
+[{"key": "baseUrl", "value": "https://staging.api.example.com", "enabled": true}, {key: 'apiVersion', value: 'v2', enabled: true}]
+⟦end⟧
+
+⟦case hand-editing-16⟧
+from: a nodemon.json where the author pasted a snippet from a README under the file's content, with the snippet's own braces
+note: the two objects may also be meant as the two entries of an array, and their members are then at depth 2
+debatable
+⟦intended⟧
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["src/**/*.test.ts"],
+  "delay": 500
+}⟦lf⟧
+⟦broken⟧
+{
+  "watch": ["src"],
+  "ext": "ts,json"
+}
+{
+  "ignore": ["src/**/*.test.ts"],
+  "delay": 500
+}⟦lf⟧
+⟦end⟧
+
+⟦case hand-editing-17⟧
+from: a file with the widths of a layout's breakpoints after one width was deleted from the middle and the commas on both sides stayed
+⟦intended⟧
+[1920, 1600, 1366, 1024, 768, 480, 360]
+⟦broken⟧
+[1920, 1600, 1366, , 1024, 768, 480, 360]
+⟦end⟧
+
+⟦case hand-editing-18⟧
+from: a CORS config after the author turned a single value into a list and then pressed undo once, which took back only the opening bracket that was typed last
+⟦intended⟧
+{"allowedOrigins": ["https://app.harborlight.example", "https://admin.harborlight.example"], "maxAgeSeconds": 600}
+⟦broken⟧
+{"allowedOrigins": "https://app.harborlight.example", "https://admin.harborlight.example"], "maxAgeSeconds": 600}
+⟦end⟧
+
+⟦case hand-editing-19⟧
+from: a webhook event written by hand as the fixture of a test, with one colon not typed
+⟦intended⟧
+{"id": "evt_3Pq8Zk", "type": "invoice.paid", "livemode": false, "created": 1718200000}
+⟦broken⟧
+{"id": "evt_3Pq8Zk", "type" "invoice.paid", "livemode": false, "created": 1718200000}
+⟦end⟧
+
+⟦case hand-editing-20⟧
+from: a .releaserc edited in vim: after typing a new branch name the author typed :wq without leaving insert mode
+⟦intended⟧
+{"branches": ["main", "next"], "plugins": ["@semantic-release/commit-analyzer", "@semantic-release/npm"]}
+⟦broken⟧
+{"branches": ["main", "next":wq], "plugins": ["@semantic-release/commit-analyzer", "@semantic-release/npm"]}
+⟦end⟧
+
+⟦case hand-editing-21⟧
+from: an editor's settings file with a Windows path pasted from the file manager, with single backslashes
+⟦intended⟧
+{"python.defaultInterpreterPath": "C:\\Users\\dana\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "python.terminal.activateEnvironment": true}
+⟦broken⟧
+{"python.defaultInterpreterPath": "C:\Users\dana\AppData\Local\Programs\Python\Python312\python.exe", "python.terminal.activateEnvironment": true}
+⟦end⟧
+
+⟦case hand-editing-22⟧
+from: the manifest of a browser extension where the author pressed Enter inside a long description to wrap it, and the editor indented the new line
+⟦intended⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Sweeper",
+  "version": "0.4.0",
+  "description": "Closes the tabs you have not looked at for a week and keeps a list of them, so nothing is lost.",
+  "permissions": ["tabs", "storage"]
+}
+⟦broken⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Sweeper",
+  "version": "0.4.0",
+  "description": "Closes the tabs you have not looked at for a week
+  and keeps a list of them, so nothing is lost.",
+  "permissions": ["tabs", "storage"]
+}
+⟦end⟧
+
+⟦case hand-editing-23⟧
+from: an address typed by hand into the seed data of an app, with the zip code written like a number
+note: the number 2138 without its zero is the other repair, and the digits are then a number
+debatable
+⟦intended⟧
+{"name": "Rosa Delgado", "street": "41 Linnaean St", "city": "Cambridge", "state": "MA", "zip": "02138", "country": "US"}
+⟦broken⟧
+{"name": "Rosa Delgado", "street": "41 Linnaean St", "city": "Cambridge", "state": "MA", "zip": 02138, "country": "US"}
+⟦end⟧
+
+⟦case hand-editing-24⟧
+from: a database config while the key host is renamed to hostname: the new key is typed in front, and the old key is not deleted yet
+note: a repair can also keep the old key and drop the new one. Each of the two is a key either way
+⟦intended⟧
+{"hostname": "db-replica-2.internal", "port": 5432, "pool": {"min": 2, "max": 10}}
+⟦broken⟧
+{"hostname""host": "db-replica-2.internal", "port": 5432, "pool": {"min": 2, "max": 10}}
+⟦end⟧
+
+⟦case hand-editing-25⟧
+from: the body field of an API client for an endpoint that takes one string, with the closing quote not typed yet
+⟦intended⟧
+"Thanks for your order!\nYour receipt is attached."
+⟦broken⟧
+"Thanks for your order!\nYour receipt is attached.
+⟦end⟧
+
+⟦case hand-editing-26⟧
+from: a proxy's config where the author switched off the last member of an object with the editor's comment shortcut, so the member above it now ends with a comma that has nothing after it
+⟦intended⟧
+{
+⟦tab⟧"listen": "0.0.0.0:8443",
+⟦tab⟧"log": {
+⟦tab⟧⟦tab⟧"level": "info"
+⟦tab⟧},
+⟦tab⟧"upstreams": ["10.0.4.11:8080", "10.0.4.12:8080"]
+}
+⟦broken⟧
+{
+⟦tab⟧"listen": "0.0.0.0:8443",
+⟦tab⟧"log": {
+⟦tab⟧⟦tab⟧"level": "info",
+⟦tab⟧⟦tab⟧// "file": "/var/log/gatekeeper/access.log"
+⟦tab⟧},
+⟦tab⟧"upstreams": ["10.0.4.11:8080", "10.0.4.12:8080"]
+}
+⟦end⟧
+
+⟦case hand-editing-27⟧
+from: a client's retry settings, edited on Windows by someone used to Python, who explained a number with a comment at the end of its line
+⟦intended⟧
+{⟦cr⟧
+  "retryDelaysMs": [⟦cr⟧
+    250,⟦cr⟧
+    1000,⟦cr⟧
+    4000,⟦cr⟧
+    15000⟦cr⟧
+  ],⟦cr⟧
+  "giveUpAfter": 4⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦broken⟧
+{⟦cr⟧
+  "retryDelaysMs": [⟦cr⟧
+    250,⟦cr⟧
+    1000,⟦cr⟧
+    4000, # the gateway needs about 3 s to restart⟦cr⟧
+    15000⟦cr⟧
+  ],⟦cr⟧
+  "giveUpAfter": 4⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦case hand-editing-28⟧
+from: a config for the staging site written by someone used to JavaScript: a comment at the top of the file, and one string typed with single quotes
+⟦intended⟧
+{
+  "apiBase": "https://staging-api.lumen.example",
+  "cdnBase": "https://staging-cdn.lumen.example",
+  "sentry": {
+    "dsn": "https://4f1c2a9b@o91822.ingest.sentry.io/5521904",
+    "tracesSampleRate": 0.25
+  },
+  "featureFlags": {
+    "newCheckout": true,
+    "betaBanner": false,
+    "giftCards": false
+  },
+  "supportEmail": "support@lumen.example"
+}
+⟦broken⟧
+/* staging only, do not copy to prod */
+{
+  "apiBase": 'https://staging-api.lumen.example',
+  "cdnBase": "https://staging-cdn.lumen.example",
+  "sentry": {
+    "dsn": "https://4f1c2a9b@o91822.ingest.sentry.io/5521904",
+    "tracesSampleRate": 0.25
+  },
+  "featureFlags": {
+    "newCheckout": true,
+    "betaBanner": false,
+    "giftCards": false
+  },
+  "supportEmail": "support@lumen.example"
+}
+⟦end⟧
+
+⟦case hand-editing-29⟧
+from: the payload of a chat webhook with one member pasted from a chat message, where the quotes had been turned into curly quotes, and no comma typed after it
+⟦intended⟧
+{"channel": "#deploys", "username": "release-bot", "icon_emoji": ":rocket:", "text": "Deployed billing 4.12.0 to production"}
+⟦broken⟧
+{"channel": "#deploys", “username”: “release-bot” "icon_emoji": ":rocket:", "text": "Deployed billing 4.12.0 to production"}
+⟦end⟧
+
+⟦case hand-editing-30⟧
+from: a translation file where the author escaped an apostrophe as in JavaScript, and forgot the comma before a member added later
+⟦intended⟧
+{"empty.title": "Nothing here yet", "empty.body": "You haven't added any projects.\nCreate one to get started.", "empty.action": "New project"}
+⟦broken⟧
+{"empty.title": "Nothing here yet", "empty.body": "You haven\'t added any projects.\nCreate one to get started." "empty.action": "New project"}
+⟦end⟧
+
+⟦case hand-editing-31⟧
+from: the config of a backup job after the line that opens a nested object was deleted by accident with the editor's delete line shortcut
+note: the author may also be taking the two members out of their object. The line with the closing brace is then the leftover, and bucket and prefix stand at depth 1
+debatable
+⟦intended⟧
+{
+    "name": "nightly-backup",
+    "schedule": "0 3 * * *",
+    "target": {
+        "bucket": "acme-backups",
+        "prefix": "postgres/"
+    },
+    "keepDays": 30,
+    "enabled": true
+}
+⟦broken⟧
+{
+    "name": "nightly-backup",
+    "schedule": "0 3 * * *",
+        "bucket": "acme-backups",
+        "prefix": "postgres/"
+    },
+    "keepDays": 30,
+    "enabled": true
+}
+⟦end⟧
+
+⟦case hand-editing-32⟧
+from: a search query typed by hand into the console of a search engine, with one closing brace too few deep inside
+⟦intended⟧
+{"query": {"bool": {"must": [{"match": {"title": "espresso machine"}}], "filter": [{"range": {"price": {"lte": 400}}}]}}, "size": 20}
+⟦broken⟧
+{"query": {"bool": {"must": [{"match": {"title": "espresso machine"}], "filter": [{"range": {"price": {"lte": 400}}}]}}, "size": 20}
+⟦end⟧
+
+⟦case hand-editing-33⟧
+from: a product typed into a shop's fixture file by someone who does not program: the editor closed a quote by itself and the author typed the quote too, and wrote yes for true
+⟦intended⟧
+{"sku": "MUG-113", "label": "Enamel mug", "priceCents": 1450, "inStock": true}
+⟦broken⟧
+{"sku": "MUG-113", "label": "Enamel mug"", "priceCents": 1450, "inStock": yes}
+⟦end⟧
+
+⟦case hand-editing-34⟧
+from: the config of a process manager with a line pasted from a .env file into its env object, as the line stands there
+⟦intended⟧
+{
+  "name": "orders-worker",
+  "instances": 2,
+  "env": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "postgres://app:s3cret@db.internal:5432/orders"
+  }
+}
+⟦broken⟧
+{
+  "name": "orders-worker",
+  "instances": 2,
+  "env": {
+    "NODE_ENV": "production",
+    DATABASE_URL=postgres://app:s3cret@db.internal:5432/orders
+  }
+}
+⟦end⟧
+
+⟦case hand-editing-35⟧
+from: a saved report's config where the author split a long string over two lines with a plus sign, as in JavaScript
+⟦intended⟧
+{
+  "name": "open-orders",
+  "query": "SELECT id, total FROM orders WHERE status = 'open' ORDER BY created_at",
+  "refreshSeconds": 300
+}
+⟦broken⟧
+{
+  "name": "open-orders",
+  "query": "SELECT id, total FROM orders " +
+           "WHERE status = 'open' ORDER BY created_at",
+  "refreshSeconds": 300
+}
+⟦end⟧
+
+⟦case hand-editing-36⟧
+from: a list of holidays kept by hand: a new first entry has its date without quotes, and where an entry was deleted the selection took the opening brace of the next entry
+⟦intended⟧
+[{"name": "New Year's Day", "date": "2025-01-01"}, {"name": "Midsummer Eve", "date": "2025-06-20"}, {"name": "Christmas Eve", "date": "2025-12-24"}]
+⟦broken⟧
+[{"name": "New Year's Day", "date": 2025-01-01}, "name": "Midsummer Eve", "date": "2025-06-20"}, {"name": "Christmas Eve", "date": "2025-12-24"}]
+⟦end⟧
+
+⟦case hand-editing-37⟧
+from: an animation config with the four numbers of a CSS cubic-bezier pasted in, which have no zero before the point
+⟦intended⟧
+{"easing": [0.4, 0, 0.2, 1], "durationMs": 300, "delayMs": 0}
+⟦broken⟧
+{"easing": [.4, 0, .2, 1], "durationMs": 300, "delayMs": 0}
+⟦end⟧
+
+⟦case hand-editing-38⟧
+from: the items of an order in a test's fixture while a new entry is being typed between two others, in an editor that closes no braces by itself: the first member and its comma are there
+⟦intended⟧
+[
+  {"sku": "TEA-001", "qty": 4},
+  {"sku": "KTL-207", "qty": 2},
+  {"sku": "FLT-020", "qty": 1}
+]
+⟦broken⟧
+[
+  {"sku": "TEA-001", "qty": 4},
+  {"sku": "KTL-207",
+  {"sku": "FLT-020", "qty": 1}
+]
+⟦end⟧
+
+⟦case hand-editing-39⟧
+from: a build matrix typed by hand into the JSON input of a workflow by someone used to YAML: a brace where a list ends, and a key without quotes
+⟦intended⟧
+{"os": ["ubuntu-latest", "macos-14"], "node": [18, 20, 22], "fail-fast": false}
+⟦broken⟧
+{"os": ["ubuntu-latest", "macos-14"}, node: [18, 20, 22], "fail-fast": false}
+⟦end⟧
+
+⟦case hand-editing-40⟧
+from: a package.json where the author pressed paste by accident while the clipboard still held a shell command copied with its line end
+⟦intended⟧
+{
+  "name": "handbook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.2.3"
+  }
+}
+⟦broken⟧
+{
+  "name": "handbook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+npm add -D vitepress
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.2.3"
+  }
+}
+⟦end⟧
