@@ -55,10 +55,10 @@ The parser as it is does not recover on purpose, so nearly any change to its err
 
 | Reader | Code points with every scored value right | Samples right as a whole | The same two for the group "within reach of the tables" |
 | --- | --- | --- | --- |
-| the parser as it is | 41.1% | 10.3% | 47.5%, 14.6% |
+| the parser as it is | 41.2% | 10.3% | 47.5%, 14.6% |
 | `stay` | 72.4% | 28.3% | 79.7%, 39.1% |
 | `resync` | 82.7% | 69.7% | 93.2%, 85.7% |
-| `words` | 92.0% | 75.1% | 98.0%, 91.5% |
+| `words` | 91.9% | 75.1% | 98.0%, 91.5% |
 | `lines` | 92.3% | 75.3% | 98.0%, 91.5% |
 
 A trained result is a gain only over the best hand rule. Over all samples that is `lines`, and for one kind of damage it is the best of the four, which `stats.ts` prints per kind as what is "left".
@@ -72,7 +72,7 @@ Three more things to keep in mind when a number is read:
 
   | Arm | Code points that can have every scored value right | Samples that can be right as a whole | The same two for the group within reach |
   | --- | --- | --- | --- |
-  | changes only cells of the grammar table | 60.8% | 45.7% | 70.4%, 64.6% |
+  | changes only cells of the grammar table | 60.8% | 45.7% | 70.4%, 64.5% |
   | also changes cells of the tokenizer's table | 97.9% | 92.4% | 100%, 100% |
 
   For the first arm, the depth and the container are sums over the tokenizer's events, and no grammar cell feeds them, so they stay what the parser as it is gives, and a display kind can only change between key and string. That holds for every setting of the grammar table. For the second arm the bound comes from `limits.ts`. It holds for every setting of the cells that valid JSON never reads, with or without more states, as long as the classes, the events and the display table are as they are, see "What the two proofs assume" below, and `conditionProblems(tables)` says whether tables are of that arm. In the group within reach it is 100% by the group's definition. Both are upper bounds and no estimates: a code point counts when some run of the loop has it right, whether or not one table gives that run in every sample. And both are bounds for the loop of `table-parser.ts`, in which the depth changes by the tokenizer's event: a parser that changes the depth by something else, e.g. by an action that a grammar cell holds, is another parser, and neither bound says anything about it.
@@ -251,7 +251,7 @@ A document that is one string, one number or one literal is the exception. Its s
 
 The ten smallest sequences of more than one token are split by hand too, because a hash put all ten into train, and no validation or test document was an empty container. The template `scalar` makes them, and so do small documents of other templates, e.g. of `tree`: about 1% of the samples. `[{}]`, `{s:[]}`, `[s]` and `{s:n}` are in train, `[]`, `{s:{}}` and `[n]` in validation, and `{}`, `[[]]` and `{s:s}` in test. So each of validation and test has one of the two empty containers, one container that holds an empty one, and one container with one entry, and train has no document that is `[]` or `{}` alone. A sequence is still in one split only.
 
-How many shapes of document a split tests differs from template to template, and `stats.ts` prints it: per template and split the samples, the distinct sequences, and the share of the samples that have the most frequent one. In the first 40,000 samples every template but `scalar` has 32 or more distinct sequences in test, and every one that is not held out has 29 or more in validation, e.g. `remoteCall` 29 in validation and 35 in test, `numberGrid` 35 and 49, `sensorReadings` 67 and 81, `messages` 146 and 160. For a text of several documents what is counted is the list of the distinct sequences of its records, and the record types are rarer and have fewer, e.g. `records: event` 8 and 10, `records: row` 10 and 2, `records: pair` none and 1.
+How many shapes of document a split tests differs from template to template, and `stats.ts` prints it: per template and split the samples, the distinct sequences, and the share of the samples that have the most frequent one. In the first 40,000 samples every template but `scalar` has 32 or more distinct sequences in test, and every one that is not held out has 29 or more in validation, e.g. `remoteCall` 29 in validation and 35 in test, `numberGrid` 35 and 50, `sensorReadings` 67 and 81, `messages` 146 and 160. `scalar` has 15 in validation and 11 in test: the three sequences that each got by hand, and lone scalars, which count by their text. For a text of several documents what is counted is the list of the distinct sequences of its records, and the record types are rarer and have fewer, e.g. `records: event` 8 and 10, `records: row` 10 and 2, `records: pair` none and 1.
 
 Training never sees four kinds and one template. A sample that has one of them is only made from an original of the test split, which makes the test split about 20% of the samples. What decides whether a sample is held out is fixed by the first try at it, and the later tries only draw other documents, so a held-out kind is as frequent as its weight says, and it sits on the held-out template as often as that template takes it, e.g. 13% of the `conflictMarkers` samples.
 
@@ -293,7 +293,7 @@ bun lab/recovery-parser/dump.ts <folder> [seed] [samples]  # text files for read
 - `samples.ts`: `sampleAt`, `labelsOf`, `groupOf`, `limitsFor` and `mostRightFor`, what is not scored, and what is held out.
 - `check-samples.ts`: a second derivation of a sample's alignment, labels, first damage and unscored values, with its own JSON parser and no code of the dataset. Run as a script it also checks, with a sequence of tokens of its own, that no document's sequence is in two splits.
 - `stats.ts`, `dump.ts`: the statistics and the text files.
-- `invariants.test.ts`: e.g. every original is valid, every broken text is rejected, the edits give the broken text, every text of a typing replay is what its edits give, the form texts of raw line feeds and of single quotes give the numbers that the edits give, a string without its opening quote has the flag that its row above says, before its first error the parser as it is gives every scored label, the second derivation agrees and notices samples that are spoiled on purpose, the two fields of `limits.ts` are true exactly when no run of the loop has every scored label right, the hand rules read valid documents as before, they and tables that are made to score high stay at or below the bound, and no sequence of more than one token is in two splits, with every record of a text of several documents taken as a document.
+- `invariants.test.ts`: e.g. every original is valid, every broken text is rejected, the edits give the broken text, text before the whole original is added as a whole, every text of a typing replay is what its edits give, the form texts of raw line feeds and of single quotes give the numbers that the edits give, a string without its opening quote has the flag that its row above says, before its first error the parser as it is gives every scored label, the second derivation agrees and notices samples that are spoiled on purpose, the two fields of `limits.ts` are true exactly when no run of the loop has every scored label right, the hand rules read valid documents as before, they and tables that are made to score high stay at or below the bound, and no sequence of more than one token is in two splits, with every record of a text of several documents taken as a document.
 
 ## Known limits
 

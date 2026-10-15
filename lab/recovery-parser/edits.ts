@@ -15,8 +15,9 @@
 // it is no rule for every way of pairing the two texts. E.g. when the line of an inner `}` is removed and the line of
 // the outer `}` follows, the `}` that is left is the outer one.
 //
-// Text that is added before the whole original stays there when it holds more than one code point repeated, e.g. a log
-// prefix that happens to start with the document's first characters: the prefix is added, and the document is kept.
+// Text that is added before the whole original is the exception, unless it is one code point, once or repeated. It
+// stays where it is, e.g. a log prefix that happens to start with the document's first characters: the whole prefix
+// is added, and the whole document is kept. See canonicalEdits.
 
 export type Edit = {
   // An index into the original's code points.
