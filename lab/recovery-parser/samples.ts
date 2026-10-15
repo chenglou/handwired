@@ -8,10 +8,11 @@ import {displayKind, maximumDepth} from '../../src/json-search/highlighter/kinds
 import {type Plan, type PlannedDamage, type Reachable, type Rule, drawPlan, planOneKind} from './damage.ts'
 import {type Style, type Template, codePointLength, drawLayout, drawTemplate, drawValidLayout, makeDocumentOf} from './documents.ts'
 import {type Edit, applyEdits, canonicalEdits, mergeEdits} from './edits.ts'
-import {type Label, type ValidLabel, labelsOfValidText, tokenSequenceOf} from './labels.ts'
+import {type Label, type ValidLabel, labelsOfValidText} from './labels.ts'
 import {type Random, createRandom, hashText} from './random.ts'
 import {scan} from './scan.ts'
 import {limitsOf, mostRightOf, readsAsNumberOrLiteral} from './limits.ts'
+import {type Split, splitOf, splitOfDocuments} from './splits.ts'
 import {type ParserTrace, capacity, runTableParser} from './table-parser.ts'
 import {type TypingReplay, type TypingStep, makeTypingReplay} from './typing.ts'
 
@@ -19,8 +20,6 @@ export const defaultSeed = 20261015
 
 export const sources = ['valid', 'damage', 'typing'] as const
 export type Source = typeof sources[number]
-export const splits = ['train', 'validation', 'test'] as const
-export type Split = typeof splits[number]
 
 // Held out for testing only: training never sees a sample that has one of these kinds or whose document comes from
 // this template.
@@ -100,35 +99,12 @@ export type Sample = {
   needsDisplayFix: boolean
   // Whether another sensible repair would give other scored labels to kept code points.
   debatable: boolean
+  // The split of the sample's documents, see splits.ts. Every document of a text of several documents is in it.
   split: Split
   // What makes the sample one that training never sees, e.g. ['kind: logPrefix', 'template: order'].
   heldOut: string[]
   // For a sample of a typing replay: the editor, what was typed, and the key press.
   typing?: {editor: TypingReplay['editor'], action: TypingReplay['action'], comma: TypingReplay['comma'], target: string, step: number, steps: number}
-}
-
-// What decides an original's split: its tokens as the grammar table reads them, see tokenSequenceOf, e.g. `{s:n}`. A
-// document that is one string, one number or one literal has the sequence `s` or `n`, which is the same for every
-// such document, so there the text decides too, e.g. `n true` and `s "abc"`.
-export function splitKeyOf(original: string): string {
-  const sequence = tokenSequenceOf(original)
-  return sequence.length === 1 ? `${sequence} ${original.trim()}` : sequence
-}
-
-// A document that is one literal has one of three texts, and a hash puts all three into the train split. So they are
-// split by hand, one per split: a half-typed literal alone, e.g. `fals` or `nu`, is then in validation and in test too.
-const splitOfLoneLiteral: Record<string, Split> = {'n true': 'train', 'n false': 'validation', 'n null': 'test'}
-
-// 80% train, 10% validation, 10% test, by a hash of splitKeyOf. So the same original never sits in two splits, and
-// neither do two documents that differ only in what their strings and numbers hold or in their layout: a test
-// document's sequence of tokens is in no train document. The one exception is a document that is a lone scalar: its
-// sequence of one token is in every split, and its text is in one.
-export function splitOf(original: string): Split {
-  const key = splitKeyOf(original)
-  const byHand = splitOfLoneLiteral[key]
-  if (byHand !== undefined) return byHand
-  const bucket = hashText(key) % 100
-  return bucket < 80 ? 'train' : bucket < 90 ? 'validation' : 'test'
 }
 
 const parses = (text: string) => {
@@ -211,8 +187,8 @@ const applyUnscored = (alignment: readonly number[], labels: readonly ValidLabel
 }
 
 // Builds a sample from documents and edits, or returns undefined when the result breaks a constraint: every document
-// valid, the broken text rejected by JSON.parse and by the highlighter's tables, both texts within 512 code points
-// and 16 levels.
+// valid and all of them in one split, the broken text rejected by JSON.parse and by the highlighter's tables, both
+// texts within 512 code points and 16 levels.
 type DraftParts = {
   source: Source, recipe: string, kinds: string[], forms: string[], template: string, style: Style, documents: string[], edits: Edit[],
   unscoredKinds: number[], reachable: Reachable, needsRules: Rule[], needsClass: string[], debatable: boolean,
@@ -220,6 +196,7 @@ type DraftParts = {
 function draftOf(parts: DraftParts): Draft | undefined {
   const original = parts.documents.join('')
   if (codePointLength(original) > capacity) return undefined
+  if (parts.documents.length > 1 && splitOfDocuments(parts.documents) === undefined) return undefined
   const labels: ValidLabel[] = []
   for (const document of parts.documents) {
     if (!parses(document)) return undefined
@@ -276,7 +253,7 @@ const heldOutOf = (kinds: readonly string[], template: string) =>
   [...kinds.filter(kind => heldOutKinds.includes(kind)).map(kind => `kind: ${kind}`), ...(template === heldOutTemplate ? [`template: ${template}`] : [])]
 
 function finish(seed: number, index: number, draft: Draft): Sample {
-  const sample: Sample = {id: `${seed}:${index}`, ...draft, split: splitOf(draft.original), heldOut: heldOutOf(draft.kinds, draft.template)}
+  const sample: Sample = {id: `${seed}:${index}`, ...draft, split: splitOfDocuments(draft.documents)!, heldOut: heldOutOf(draft.kinds, draft.template)}
   const labels = documentLabels.get(draft)
   if (labels !== undefined) documentLabels.set(sample, labels)
   return sample
@@ -454,7 +431,7 @@ export function sampleAt(seed: number, index: number, options: {source?: Source,
     const heldOut = heldOutOf(made.kinds, made.template).join()
     if (decided !== undefined && heldOut !== decided.heldOut) continue
     const needed = neededSplitOf(made.kinds, made.template)
-    if (needed === undefined || splitOf(made.original) === needed) {
+    if (needed === undefined || splitOfDocuments(made.documents) === needed) {
       // A held-out sample cannot be made for another split than the test split.
       if (options.split !== undefined && needed !== options.split) continue
       return finish(seed, index, made)
@@ -536,3 +513,4 @@ export function groupOf(sample: Sample): Group {
 }
 
 export type {Label, ValidLabel}
+export {type Split, splitKeyOf, splitOf, splitOfDocuments, splits} from './splits.ts'

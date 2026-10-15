@@ -5,6 +5,7 @@ import {type Json, type Layout, type RecordType, makeRecords, serialize} from '.
 import {type Edit, insertAt} from '../edits.ts'
 import type {Random} from '../random.ts'
 import type {Scan} from '../scan.ts'
+import {type Split, splitOf} from '../splits.ts'
 import type {Damage, KindDefinition, KindOptions} from './types.ts'
 import {logFieldsIn, logPrefixes} from './wrappers.ts'
 
@@ -12,10 +13,20 @@ const oneLine = (style: 'compact' | 'spaced'): Layout => ({style, indent: '  ', 
 const indented: Layout = {style: 'indented', indent: '  ', shortOnOneLine: false, rowsOnOneLine: false, escapes: 'plain', finalLineFeed: false}
 const lengthOf = (text: string) => Array.from(text).length
 
-// Records of one stream as texts, as many as fit in `limit` code points with `overhead` more per record.
+// Records of one stream as texts, as many as fit in `limit` code points with `overhead` more per record. Every record
+// is in the split of the first one, see splitOf: a record alone is a document like any other, and a text that mixed
+// records of two splits would put a test document's sequence of tokens into a train text. So the first record decides
+// the text's split, and a later record that falls into another split is made again, e.g. with a string where it had
+// a null. No texts when the stream has no second record of that split.
 function recordTexts(random: Random, count: number, limit: number, overhead: number, layout: Layout, types: readonly (readonly [RecordType, number])[]) {
   const type = random.weighted(types)
-  const texts = makeRecords(random, type, count).map((record: Json) => serialize(record, layout))
+  let split: Split | undefined
+  const records = makeRecords(random, type, count, record => {
+    const own = splitOf(serialize(record, layout))
+    split ??= own
+    return own === split
+  })
+  const texts = (records ?? []).map((record: Json) => serialize(record, layout))
   let total = 0
   const fitting: string[] = []
   for (const text of texts) {

@@ -257,6 +257,10 @@ export function report(seed: number, sampleCount: number): string {
   let unscoredNesting = 0
   let splitConflicts = 0
   let damagedSamples = 0
+  // Texts of several documents: all of them, per split, and per split those whose records have more than one sequence.
+  let severalDocuments = 0
+  const severalBySplit = new Map<string, number>()
+  const severalSequences = new Map<string, number>()
   // Labeled code points between the first damage and the first error, which no score counts: every arm gives them what
   // the parser as it is gives, and their labels are that or are not scored.
   let beforeFirstError = 0
@@ -291,10 +295,18 @@ export function report(seed: number, sampleCount: number): string {
         cells.add(cell)
       }
     }
+    // The sequences of tokens of the sample's documents, each alone: one for most samples, and one per record of a
+    // text of several documents. The sample's shape is the list of its distinct sequences.
     let sequences = tokenSequences.get(sample.split)
     if (sequences === undefined) tokenSequences.set(sample.split, sequences = new Set<string>())
-    const splitKey = splitKeyOf(sample.original)
-    sequences.add(splitKey)
+    const documentKeys = [...new Set(sample.documents.map(splitKeyOf))]
+    for (const key of documentKeys) sequences.add(key)
+    const splitKey = documentKeys.sort().join(' | ')
+    if (sample.documents.length > 1) {
+      severalDocuments++
+      if (documentKeys.length > 1) severalSequences.set(sample.split, (severalSequences.get(sample.split) ?? 0) + 1)
+      severalBySplit.set(sample.split, (severalBySplit.get(sample.split) ?? 0) + 1)
+    }
     let perSplit = sequencesByTemplate.get(sample.template)
     if (perSplit === undefined) sequencesByTemplate.set(sample.template, perSplit = new Map<string, Map<string, number>>())
     let perSequence = perSplit.get(sample.split)
@@ -426,18 +438,21 @@ export function report(seed: number, sampleCount: number): string {
   table('Samples per split', bySplit, sampleCount, splits)
   lines.push(`  ${splitConflicts} originals occur in two splits (must be 0).`)
   // A split key is a sequence of tokens, or for a document that is one scalar the token and the text, see splitKeyOf.
+  // The documents are counted one by one, so a record of a text of several documents counts as a document.
   const sequencesOf = (split: string) => tokenSequences.get(split) ?? new Set<string>()
   const isLoneScalar = (key: string) => key.startsWith('s ') || key.startsWith('n ')
   const severalTokens = (split: string) => [...sequencesOf(split)].filter(key => !isLoneScalar(key))
-  lines.push(`  ${severalTokens('train').length} distinct sequences of tokens among the originals of the train split.`)
+  lines.push(`  ${severalTokens('train').length} distinct sequences of tokens among the documents of the train split, where each record of a text of several documents is a document.`)
   for (const split of ['validation', 'test']) {
     const shared = severalTokens(split).filter(sequence => sequencesOf('train').has(sequence)).length
-    lines.push(`  ${severalTokens(split).length} distinct sequences of tokens among the originals of the ${split} split, ${shared} of them also in the train split (must be 0).`)
+    lines.push(`  ${severalTokens(split).length} distinct sequences of tokens among the documents of the ${split} split, ${shared} of them also in the train split (must be 0).`)
   }
+  lines.push(`  ${severalDocuments} texts of several documents: ${splits.map(split => `${severalBySplit.get(split) ?? 0} in ${split}`).join(', ')}. Their records have more than one sequence in ${splits.map(split => `${severalSequences.get(split) ?? 0} texts of ${split}`).join(', ')}.`)
   const sharedScalars = ['validation', 'test'].flatMap(split => [...sequencesOf(split)].filter(key => isLoneScalar(key) && sequencesOf('train').has(key))).length
   lines.push(`  A document that is one string, number or literal has one token, so its text decides its split: ${splits.map(split => `${[...sequencesOf(split)].filter(isLoneScalar).length} such texts in ${split}`).join(', ')}, ${sharedScalars} of them in two splits (must be 0).`)
   lines.push('', 'Sequences of tokens per template and split: samples, distinct sequences, and the share of the samples that have the most frequent')
-  lines.push('sequence. The test column holds the held-out samples too. A split with few sequences tests few shapes of document.')
+  lines.push('sequence. The test column holds the held-out samples too. A split with few sequences tests few shapes of document. For a text of')
+  lines.push('several documents, the rows "records", what counts is the list of the distinct sequences of its records, whatever their number and order.')
   const describeSequences = (perSequence: Map<string, number> | undefined) => {
     if (perSequence === undefined) return `${'0'.padStart(6)} ${'0'.padStart(5)} ${'-'.padStart(4)} `
     const total = [...perSequence.values()].reduce((sum, value) => sum + value, 0)

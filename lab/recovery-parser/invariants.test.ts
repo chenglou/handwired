@@ -12,7 +12,7 @@ import {handRuleTables, handRules} from './hand-rules.ts'
 import {kindLetters, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, typingReplayOf} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, typingReplayOf} from './samples.ts'
 import {type ParserTables, capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
@@ -421,30 +421,43 @@ test('the hand-written settings of the tables read valid documents exactly as th
   expect(Array.from(shown.displayKind.slice(0, shown.length), kind => kindLetters[kind]).join('')).toBe('pkkkkpwnnnnpwkkkkkpwssssssssssp')
 })
 
-test('the split is a function of the original\'s tokens, and held-out kinds and the held-out template only sit in the test split', () => {
+test('the split is a function of a document\'s tokens, also for each record of a text of several documents, and held-out kinds and the held-out template only sit in the test split', () => {
   const kindNames = new Set(kinds.map(kind => kind.name))
   const splitOfSequence = new Map<string, string>()
   const splitsOfLoneScalars = new Set<string>()
+  let severalDocuments = 0
+  let severalSequences = 0
   for (const sample of samples) {
-    expect(sample.split).toBe(splitOf(sample.original))
-    // No sequence of tokens is in two splits, so a test document's tokens are in no train document. A document that
-    // is one scalar has a sequence of one token, and is split by its text.
-    const sequence = tokenSequenceOf(sample.original)
-    const key = splitKeyOf(sample.original)
-    if (sequence.length === 1) {
-      if (!key.startsWith(`${sequence} `) || key.slice(2) !== sample.original.trim()) fail(sample, 'a lone scalar is not split by its text')
-      if (sample.source !== 'valid') splitsOfLoneScalars.add(sample.split)
-    } else if (key !== sequence) fail(sample, 'a document of several tokens is not split by its sequence of tokens')
-    const earlier = splitOfSequence.get(key)
-    if (earlier !== undefined && earlier !== sample.split) fail(sample, 'the same sequence of tokens sits in two splits')
-    splitOfSequence.set(key, sample.split)
+    // No sequence of tokens is in two splits, so a test document's tokens are in no train document. That holds for
+    // every document of a sample alone, so a record of a text of several documents is in the split that the same
+    // record has as a document of its own. A document that is one scalar has a sequence of one token, and is split by
+    // its text.
+    if (sample.documents.length > 1) severalDocuments++
+    if (new Set(sample.documents.map(document => tokenSequenceOf(document))).size > 1) severalSequences++
+    for (const document of sample.documents) {
+      if (splitOf(document) !== sample.split) fail(sample, `the document ${JSON.stringify(document)} is not in the sample's split`)
+      const sequence = tokenSequenceOf(document)
+      const key = splitKeyOf(document)
+      if (sequence.length === 1) {
+        if (!key.startsWith(`${sequence} `) || key.slice(2) !== document.trim()) fail(sample, 'a lone scalar is not split by its text')
+        if (sample.source !== 'valid' && sample.documents.length === 1) splitsOfLoneScalars.add(sample.split)
+      } else if (key !== sequence) fail(sample, 'a document of several tokens is not split by its sequence of tokens')
+      const earlier = splitOfSequence.get(key)
+      if (earlier !== undefined && earlier !== sample.split) fail(sample, 'the same sequence of tokens sits in two splits')
+      splitOfSequence.set(key, sample.split)
+    }
     for (const kind of sample.kinds) if (!kindNames.has(kind)) fail(sample, `the kind ${kind} is not in the list of kinds`)
     const isHeldOut = sample.kinds.some(kind => heldOutKinds.includes(kind)) || sample.template === heldOutTemplate
     expect(sample.heldOut.length > 0).toBe(isHeldOut)
     if (isHeldOut && sample.split !== 'test') fail(sample, 'a held-out sample is outside the test split')
   }
-  // Every split and every held-out kind occurs, so the test above checked something.
+  // Every split and every held-out kind occurs, and so do texts of several documents whose records differ in their
+  // tokens, so the test above checked something.
   expect(new Set(samples.map(sample => sample.split)).size).toBe(3)
+  expect(severalDocuments).toBeGreaterThan(50)
+  expect(severalSequences).toBeGreaterThan(15)
+  expect(splitOfDocuments(['{"id": 1}\n', '{"id": 2}\n'])).toBe(splitOf('{"id": 7}'))
+  expect(splitOfDocuments(['true\n', 'false\n'])).toBe(undefined)
   // Broken texts of a lone scalar, e.g. tru and "abc, are in the train split and in at least one other, and the three
   // literals are in one split each.
   expect(splitsOfLoneScalars.has('train')).toBe(true)

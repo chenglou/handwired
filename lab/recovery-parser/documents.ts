@@ -870,7 +870,10 @@ function piecesOf(random: Random, text: string, count: number): string[] {
   return bounds.slice(0, -1).map((start, index) => characters.slice(start, bounds[index + 1]).join(''))
 }
 
-export function makeRecords(random: Random, type: RecordType, count: number): Json[] {
+// With `fits`, a record that the caller does not take is made again with other values, up to 40 times, and after 10
+// times without what makes it the odd one. A record that fits in no try ends the stream when two records are there,
+// and otherwise no stream is made. damage/several.ts uses that to keep every record of a text in one split.
+export function makeRecords(random: Random, type: RecordType, count: number, fits?: (record: Json) => boolean): Json[] | undefined {
   const start = 1_790_000_000 + random.integer(0, 9_000_000)
   const hour = random.integer(0, 22)
   const minute = random.integer(0, 50)
@@ -882,43 +885,63 @@ export function makeRecords(random: Random, type: RecordType, count: number): Js
   const oddRecord = random.chance(0.4) ? random.integer(0, count - 1) : -1
   const pieces = type === 'chunk' ? piecesOf(random, random.pick(streamedTexts), count) : []
   // The writer of a stream decides which members its records have beside the ones that every stream of the type has,
-  // e.g. one log has a request id on every line and another has none. Each of four such members is in a stream or not.
-  const has = Array.from({length: 4}, () => random.chance(0.3))
+  // e.g. one log has a request id on every line and another has none. Each of six such members is in a stream or not.
+  // They differ in what they hold, a string, a number, an array or an object, and in where they stand, so that the
+  // streams of one type have many sequences of tokens: a record's sequence decides its split, see splits.ts, and a
+  // split that had one or two sequences of a type would test one or two shapes of record.
+  const has = Array.from({length: 6}, () => random.chance(0.45))
   const model = random.pick(['harbor-small', 'harbor-large-2026'])
   const streamId = hexId(random, 6)
-  return Array.from({length: count}, (_, index): Json => {
-    const odd = index === oddRecord
+  const recordAt = (index: number, odd: boolean): Json => {
     switch (type) {
       case 'event': {
         const level = odd ? 'error' : random.pick(levels.slice(0, 3))
         return {
-          ts: `${date}T${pad(hour)}:${pad(minute + index)}:${pad(random.integer(0, 59))}Z`, level, service, ...(has[0]! ? {host: `${service}-${random.integer(1, 12)}`} : {}), msg: logMessage(random),
+          ts: `${date}T${pad(hour)}:${pad(minute + index)}:${pad(random.integer(0, 59))}Z`, ...(has[4]! ? {pid: 4000 + (start % 900)} : {}), level, service,
+          ...(has[0]! ? {host: `${service}-${random.integer(1, 12)}`} : {}), msg: logMessage(random),
           ...(has[1]! ? {requestId: hexId(random, 8)} : {}), ...(has[2]! ? {durationMs: random.integer(1, 2500)} : {}), ...(has[3]! ? {tags: random.pick<Json>([[], [random.pick(tags)]])} : {}),
+          ...(has[5]! ? {user: {id: random.integer(1, 999), plan: random.pick(['free', 'team'])}} : {}),
           ...(odd ? {error: {code: random.pick(['ETIMEDOUT', 'ECONNRESET']), retryable: random.chance(0.5)}} : {}),
         }
       }
       case 'reading':
         return {
-          sensor: sensors[sensor]!, t: start + index * 60, v: sensors[sensor] === 'door-north' ? random.chance(0.5) : Math.round(random.next() * 5000 - 500) / 100,
+          ...(has[4]! ? {id: `${streamId}-${index + 1}`} : {}), sensor: sensors[sensor]!, t: start + index * 60, v: sensors[sensor] === 'door-north' ? random.chance(0.5) : Math.round(random.next() * 5000 - 500) / 100,
           ...(has[0]! ? {unit: units[sensor]!} : {}), ...(has[1]! ? {ok: random.chance(0.9)} : {}), ...(has[2]! ? {battery: random.integer(5, 100)} : {}), ...(has[3]! ? {at: [random.integer(0, 40), random.integer(0, 40)]} : {}),
+          ...(has[5]! ? {device: {model: `HX-${200 + (start % 7) * 10}`, firmware: `1.${start % 9}.0`}} : {}),
           ...(odd ? {gap: null} : {}),
         }
       case 'row':
         return {
           id: index + 1, name: person(random), ...(has[0]! ? {email: random.chance(0.8) ? `user${random.integer(1, 999)}@example.com` : null} : {}), active: random.chance(0.7),
           ...(has[1]! ? {score: random.integer(0, 100)} : {}), ...(has[2]! ? {city: random.pick(cities)} : {}), ...(has[3]! ? {tags: []} : {}),
+          ...(has[4]! ? {team: {id: random.integer(1, 40), name: random.pick(services)}} : {}), ...(has[5]! ? {joined: `2026-${pad(random.integer(1, 12))}-${pad(random.integer(1, 28))}`} : {}),
           ...(odd ? {roles: [random.pick(roles), random.pick(roles)]} : {}),
         }
       case 'chunk':
         return {
-          ...(has[0]! ? {id: `c-${streamId}`} : {}), ...(has[1]! ? {model} : {}), delta: pieces[index] ?? '', index,
+          ...(has[0]! ? {id: `c-${streamId}`} : {}), ...(has[1]! ? {model} : {}), ...(has[4]! ? {created: start} : {}), delta: pieces[index] ?? '', ...(has[5]! ? {role: 'assistant'} : {}), index,
           ...(has[2]! ? {finish_reason: index === count - 1 ? 'stop' : null} : {}), ...(has[3]! ? {usage: {tokens: random.integer(1, 40)}} : {}),
           ...(odd ? {logprobs: null} : {}),
         }
       case 'pair':
-        return [start + index, random.integer(0, 99), ...(has[0]! ? [random.integer(0, 99)] : []), ...(has[1]! ? [random.chance(0.5)] : []), ...(odd ? [null] : [])]
+        return [
+          start + index, random.integer(0, 99), ...(has[0]! ? [random.integer(0, 99)] : []), ...(has[1]! ? [random.chance(0.5)] : []), ...(has[2]! ? [random.pick(tags)] : []),
+          ...(has[3]! ? [[random.integer(0, 40), random.integer(0, 40)]] : []), ...(odd ? [null] : []),
+        ]
       case 'value':
         return random.pick<Json>([index + 1, random.pick(words), random.chance(0.5), null])
     }
-  })
+  }
+  const records: Json[] = []
+  for (let index = 0; index < count; index++) {
+    let record: Json | undefined
+    for (let attempt = 0; attempt < 40 && record === undefined; attempt++) {
+      const made = recordAt(index, index === oddRecord && attempt < 10)
+      if (fits === undefined || fits(made)) record = made
+    }
+    if (record === undefined) return records.length >= 2 ? records : undefined
+    records.push(record)
+  }
+  return records
 }

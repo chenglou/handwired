@@ -326,6 +326,11 @@ export function sampleProblems(sample: Sample): string[] {
   return problems
 }
 
+// The tokens of a valid document, one letter each: the brackets, the colon and the comma as they are, s for a string
+// and n for a number or a literal, e.g. {s:n,s:[n,s]}. A string becomes a lone quote first, so that no letter of a
+// literal is taken for one.
+const ownSequence = (document: string) => document.replace(/"(?:[^"\\]|\\.)*"/gs, '"').replace(/[^\s{}[\]:,"]+/g, 'n').replace(/"/g, 's').replace(/\s+/g, '')
+
 if (import.meta.main) {
   const sampleCount = Number(process.argv[2] ?? 40_000)
   const seed = Number(process.argv[3] ?? defaultSeed)
@@ -333,12 +338,22 @@ if (import.meta.main) {
   let failed = 0
   let labelsCompared = 0
   const splitOfOriginal = new Map<string, string>()
+  const splitOfSequence = new Map<string, string>()
   for (let index = first; index < first + sampleCount; index++) {
     const sample = sampleAt(seed, index)
     const problems = sampleProblems(sample)
     const earlier = splitOfOriginal.get(sample.original)
     if (earlier !== undefined && earlier !== sample.split) problems.push('the same original is in two splits')
     splitOfOriginal.set(sample.original, sample.split)
+    // No sequence of more than one token is in two splits, with each record of a text of several documents taken as
+    // a document.
+    for (const document of sample.documents) {
+      const sequence = ownSequence(document)
+      if (sequence.length === 1) continue
+      const known = splitOfSequence.get(sequence)
+      if (known !== undefined && known !== sample.split) problems.push(`a document with the tokens ${sequence.slice(0, 60)} is in the ${sample.split} split, and one with the same tokens was in the ${known} split`)
+      splitOfSequence.set(sequence, sample.split)
+    }
     if (sample.heldOut.length > 0 && sample.split !== 'test') problems.push('a held-out sample is outside the test split')
     labelsCompared += sample.alignment.filter(counterpart => counterpart !== -1).length
     if (problems.length === 0) continue
