@@ -13,24 +13,32 @@
 // The dataset's two proofs and its bound (needsNestingFix, needsDisplayFix, mostRightFor) are about the plain parser.
 import {conditionProblems} from '../limits.ts'
 import {type ParserTables, defaultTables} from '../table-parser.ts'
-import {type RecoveryTables, actionByToken, actionOfToken, asIsTables, checkTables, today} from './recovery-tables.ts'
+import {type RecoveryTables, actionByToken, actionOfToken, addStates, asIsTables, checkTables, today} from './recovery-tables.ts'
 
 // Tables of the dataset's layout as tables of the experiment, with the stack action `by token` in every grammar cell,
-// e.g. recoveryTablesOf(handRuleTables('words')). The tables have to have today's numbers of states, classes and
-// contexts, and today's display table. Throws when they change a frozen cell.
+// e.g. recoveryTablesOf(handRuleTables('words')). The tables have to have today's classes, contexts, tokens and depth
+// changes, and today's display table for today's grammar states. They may have more tokenizer states and more
+// grammar states than today's, e.g. a hand rule with a state of its own after a string that a line feed ended: the
+// added states come after today's, as addStates puts them, and an added grammar state's column of the display table
+// is the one that the tables hold. Throws when the tables change a frozen cell.
 export function recoveryTablesOf(plain: ParserTables): RecoveryTables {
-  const tables = asIsTables()
-  if (plain.classCount !== tables.classCount || plain.contextCount !== tables.contextCount || plain.grammarStateCount !== tables.grammarStateCount
-    || plain.lexerNext.length !== tables.lexerNext.length || plain.grammarNext.length !== tables.grammarNext.length || plain.display.length !== tables.display.length) {
-    throw new Error('recoveryTablesOf takes tables with today\'s numbers of states, classes and contexts')
+  const addedLexerStates = plain.lexerNext.length / plain.classCount - today.lexerStateCount
+  const addedGrammarStates = plain.grammarStateCount - today.grammarStateCount
+  if (plain.classCount !== today.classCount || plain.contextCount !== today.contextCount || plain.symbolCount !== today.tokenCount * today.contextCount
+    || !Number.isInteger(addedLexerStates) || addedLexerStates < 0 || addedGrammarStates < 0 || plain.lexerEvent.length !== plain.lexerNext.length
+    || plain.grammarNext.length !== plain.grammarStateCount * plain.symbolCount || plain.display.length !== plain.eventCount * plain.grammarStateCount) {
+    throw new Error('recoveryTablesOf takes tables with today\'s classes, contexts and tokens, and with today\'s states or more')
   }
-  if (plain.display.some((kind, entry) => kind !== tables.display[entry]) || plain.grammarToken.some((token, event) => token !== tables.tokenOfEvent[event]) || plain.depthChange.some((change, event) => change !== defaultTables.depthChange[event])) {
-    throw new Error('recoveryTablesOf takes tables with today\'s display table, tokens and depth changes')
+  if (plain.grammarToken.some((token, event) => token !== today.tokenOfEvent[event]) || plain.depthChange.some((change, event) => change !== defaultTables.depthChange[event])) {
+    throw new Error('recoveryTablesOf takes tables with today\'s tokens and depth changes')
   }
+  // The column of an added grammar state is set below, so which column addStates copies does not matter.
+  const tables = addStates(asIsTables(), addedLexerStates, Array.from({length: addedGrammarStates}, () => today.errorState))
   tables.lexerNext.set(plain.lexerNext)
   tables.lexerEvent.set(plain.lexerEvent)
   tables.grammarNext.set(plain.grammarNext)
   tables.grammarAction.fill(actionByToken)
+  tables.display.set(plain.display)
   checkTables(tables)
   return tables
 }

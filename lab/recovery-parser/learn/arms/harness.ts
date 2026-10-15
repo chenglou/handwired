@@ -292,8 +292,9 @@ export async function runArm(options: ArmOptions): Promise<SettingResult[]> {
 
 // The tables that every arm is read against, each with the tables it started from, which are today's:
 // - the parser as it is,
-// - the dataset's three hand rules (../../hand-rules.ts) as tables of the experiment, with the stack action `by
-//   token` in every grammar cell,
+// - the dataset's hand rules (../../hand-rules.ts), three today, as tables of the experiment, with the stack action
+//   `by token` in every grammar cell. The list follows the dataset's `handRules`, so a hand rule that a later commit
+//   of the dataset adds gets a row by itself,
 // - the 35 hand-written rules of ../handwritten/rules.ts as they are.
 export function baselineTables(): {name: string, tables: RecoveryTables, base: RecoveryTables}[] {
   const base = asIsTables()

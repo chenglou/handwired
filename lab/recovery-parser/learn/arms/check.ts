@@ -12,6 +12,8 @@
 //    check counts what differs after it. The three are tables of the plain table parser, and the hand-written 35
 //    rules are not. And the cells that the dataset takes for read by valid JSON are the experiment's frozen cells,
 //    cell by cell, so the dataset's first condition and the experiment's first ground rule are the same rule.
+//    Tables of the dataset's layout with one more tokenizer state convert too, with the same depth at every code
+//    point: a later commit of the dataset has a hand rule with such a state.
 // 2. The record of today's tables: its row "all" is the row of scoreTables, it has a row for each of the six groups
 //    and for the kinds of damage, no cell is changed, the ground rules hold, and the depth of valid JSON that is too
 //    deep is right. Tables with a changed frozen cell get no record.
@@ -25,7 +27,7 @@ import {join} from 'node:path'
 import {handRuleTables, handRules} from '../../hand-rules.ts'
 import {cellsThatValidJsonReads} from '../../limits.ts'
 import {createRandom} from '../../random.ts'
-import {runTableParser} from '../../table-parser.ts'
+import {classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from '../../table-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {groupNames, loadSamples, standardRange, textOf} from '../data.ts'
 import {handwrittenTables} from '../handwritten/rules.ts'
@@ -97,6 +99,44 @@ const throws = (run: () => unknown) => {
     const share = (count: number) => `${count} (${(100 * count / tally.codePoints).toFixed(2)}%)`
     console.log(`   The hand rule ${rule} as tables of the experiment: on ${tally.texts} broken texts, ${tally.codePoints} code points, the exact parser gives the depth of the dataset's plain table parser at every one. In ${tally.textsWithAnotherContext} texts the real stack and the running sum disagree about a container. From the first code point that reads another context on, the container differs at ${share(tally.otherContainer)} code points and the display kind at ${share(tally.otherKind)}. Before it nothing differs.`)
   }
+  // Tables of the dataset's layout with one more tokenizer state, as the hand rule `lines` of a later commit of the
+  // dataset has it: the state after a string that a line feed ended, whose row is the row of the state between,
+  // but for an opening brace, which gets the event of a comma.
+  {
+    const words = handRuleTables('words')
+    const classCount = defaultTables.classCount
+    const between = lexerStateNames.indexOf('between')
+    const addedState = lexerStateNames.length
+    const lexerNext = [...words.lexerNext]
+    const lexerEvent = [...words.lexerEvent]
+    for (let characterClass = 0; characterClass < classCount; characterClass++) {
+      lexerNext.push(lexerNext[between * classCount + characterClass]!)
+      lexerEvent.push(lexerEvent[between * classCount + characterClass]!)
+    }
+    lexerNext[lexerStateNames.indexOf('string') * classCount + classNames.indexOf('lineFeed')] = addedState
+    lexerEvent[addedState * classCount + classNames.indexOf('openBrace')] = eventNames.indexOf('comma')
+    lexerNext[addedState * classCount + classNames.indexOf('openBrace')] = between
+    const plain = {...words, lexerNext, lexerEvent}
+    const tables = recoveryTablesOf(plain)
+    let codePoints = 0
+    let otherDepth = 0
+    let inAddedState = 0
+    for (let place = 0; place < samples.sampleCount; place++) {
+      if (samples.firstDamage[place] === -1) continue
+      const start = samples.start[place]!
+      const length = samples.start[place + 1]! - start
+      const expected = runTableParser(textOf(samples, place), plain)
+      runRecoveryParserInto(trace, samples.codePoints, start, length, false, tables, length)
+      for (let position = 0; position < length; position++) {
+        codePoints++
+        if (trace.depthAfter[position] !== expected.depthAfter[position]) otherDepth++
+        if (trace.lexerStateBefore[position] === addedState) inAddedState++
+      }
+    }
+    check(tables.lexerStateCount === addedState + 1 && otherDepth === 0 && inAddedState > 0 && plainParserProblems(tables).length === 0, `tables with one more tokenizer state: ${otherDepth} of ${codePoints} code points have another depth than in the plain table parser, ${inAddedState} are read in the added state, and plainParserProblems says ${plainParserProblems(tables)[0] ?? 'nothing'}`)
+    check(throws(() => recoveryTablesOf({...words, lexerNext: words.lexerNext.slice(0, -1)})), 'recoveryTablesOf takes tables whose tokenizer table is no whole number of states')
+    console.log(`   Tables of the dataset's layout with one more tokenizer state convert too: ${tables.lexerStateCount} tokenizer states, ${inAddedState} code points are read in the added state, and the depth is the plain table parser's at every code point.`)
+  }
   const handwrittenProblems = plainParserProblems(handwrittenTables().tables)
   check(handwrittenProblems.length === 1 && handwrittenProblems[0]!.includes('stack action'), `the hand-written tables: ${handwrittenProblems.join('; ')}`)
   check(plainParserProblems(asIsTables()).length === 0, 'today\'s tables are no tables of the plain table parser')
@@ -105,7 +145,7 @@ const throws = (run: () => unknown) => {
   const withDisplayChanged = openDisplayEntries(asIsTables())
   withDisplayChanged.display[withDisplayChanged.displayOpen.indexOf(1)] = 8
   check(plainParserProblems(withDisplayChanged).some(problem => problem.includes('display table')), 'plainParserProblems does not name a changed entry of the display table')
-  console.log(`   Tables of the plain table parser: today's and the three hand rules. Not: the hand-written tables (${handwrittenProblems[0]}), tables with the bit, with an added class, or with a changed entry of the display table.`)
+  console.log(`   Tables of the plain table parser: today's and the ${handRules.length} hand rules. Not: the hand-written tables (${handwrittenProblems[0]}), tables with the bit, with an added class, or with a changed entry of the display table.`)
 }
 
 // 2. The record of today's tables.
@@ -185,7 +225,8 @@ const validation = validationOfTheStandardSet()
   const baseline = {name: 'the parser as it is', seeds: [], records: [recordOf(asIsTables(), asIsTables())]}
   check(!throws(() => describeComparison(results[0]!, baseline)) && describeComparison(results[0]!, baseline).includes('no seed'), 'a comparison with a baseline, which has no seed, throws')
   const baselineNames = baselineTables().map(baseline => baseline.name)
-  check(baselineNames.length === 5 && baselineTables().every(({tables}) => tablesToJson(tables).length > 0), `the baselines are ${baselineNames.join(', ')}`)
+  // The parser as it is, one row per hand rule of the dataset, and the hand-written rules.
+  check(baselineNames.length === handRules.length + 2 && baselineTables().every(({tables}) => tablesToJson(tables).length > 0), `the baselines are ${baselineNames.join(', ')}`)
   console.log(`4. runArm with 2 settings and 3 seeds saved 6 tables, each with the record that recordOf gives for the saved tables, and a summary with a row per setting. describeComparison gives both ranges and refuses 2 seeds. The baselines: ${baselineNames.join('; ')}.`)
 }
 

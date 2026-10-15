@@ -216,6 +216,8 @@ The dataset's files are everything in `lab/recovery-parser/` that is not under `
 3. Run `bun lab/recovery-parser/learn/check-all.ts`. The cache of the samples is made again by itself, since its name holds a key of the dataset's source files, and every record of an arm holds that key as `datasetKey`.
 4. Every number in the READMEs is then of another dataset: make the tables again with the commands above. Tables and records that were saved under `RECOVERY_SCRATCH` before are of the old dataset.
 
+The baselines of `arms/harness.ts` follow the dataset's list of hand rules, so a hand rule that a later commit adds gets a row by itself, also one with a tokenizer state of its own.
+
 In code:
 
 ```ts
