@@ -91,6 +91,23 @@ const treeKeys = ['id', 'name', 'type', 'value', 'items', 'children', 'meta', 'd
 
 const sentence = (random: Random, wordCount: number) => Array.from({length: wordCount}, () => random.pick(words)).join(' ')
 
+// The lists above hold four texts with a tab. Each is written anew when it is drawn, with other words and numbers, so
+// that the tabs of the documents sit in many strings and not in four.
+const logMessage = (random: Random) => {
+  const message = random.pick(messages)
+  if (!message.includes('\t')) return message
+  const step = random.integer(1, 8)
+  return `step ${step}\t${random.pick(['ok', 'done', 'skipped'])}\nstep ${step + 1}\t${random.pick(['failed', 'ok', 'timed out'])}`
+}
+const noteFor = (random: Random) => {
+  const note = random.pick(notes)
+  return note.includes('\t') ? `${random.pick(['fragile', 'heavy', 'keep cold', 'gift'])}\t${random.pick(['handle with care', 'this side up', 'ring first', 'no substitutes'])}` : note
+}
+const translationFor = (random: Random, [key, text]: [string, string]): [string, string] =>
+  key === 'tabbed' ? [key, `${random.pick(words)}\t${random.pick(['value', 'count', 'total', random.pick(words)])}`]
+    : key === 'row' ? [key, `${random.pick(['MG', 'AP', 'LM', 'NB', 'OO'])}-${random.integer(100, 999)}\t${random.integer(1, 9)}\t${(random.integer(100, 9999) / 100).toFixed(2)}`]
+    : [key, text]
+
 // Free text as a person types it into a field such as a note, a bio or a message: mostly plain words, and in four
 // texts of ten something that a serializer must escape or that means something in JSON. The damage kinds inside
 // strings take their strings from here, so what follows an inner quote or a line feed is different from text to text:
@@ -98,7 +115,7 @@ const sentence = (random: Random, wordCount: number) => Array.from({length: word
 export function freeText(random: Random, wordCount: number): string {
   const count = Math.max(2, wordCount)
   const texts = Array.from({length: count}, () => random.pick(words))
-  const feature = random.weighted([['plain', 60], ['quoted', 13], ['lines', 10], ['tabs', 3], ['backslashes', 5], ['apostrophe', 5], ['marks', 4]] as const)
+  const feature = random.weighted([['plain', 57], ['tabs', 3], ['quoted', 13], ['lines', 10], ['tabs', 3], ['backslashes', 5], ['apostrophe', 5], ['marks', 4]] as const)
   switch (feature) {
     case 'plain':
       return texts.join(' ')
@@ -128,8 +145,17 @@ export function freeText(random: Random, wordCount: number): string {
       }
       return lines.join(lineEnd)
     }
-    case 'tabs':
-      return [texts.slice(0, Math.ceil(count / 2)).join(' '), texts.slice(Math.ceil(count / 2)).join(' '), ...(random.chance(0.4) ? [String(random.integer(0, 999))] : [])].join('\t')
+    case 'tabs': {
+      // A row pasted from a table, with two to four cells and sometimes a number, a label with its value after a tab, or
+      // two lines of which the second starts with a tab.
+      const form = random.weighted([['cells', 50], ['label', 25], ['indented line', 25]] as const)
+      if (form === 'label') return `${texts[0]!}:\t${texts.slice(1).join(' ')}`
+      if (form === 'indented line') return `${texts.slice(0, Math.ceil(count / 2)).join(' ')}\n\t${texts.slice(Math.ceil(count / 2)).join(' ')}`
+      const cellCount = Math.min(count, random.integer(2, 4))
+      const cells = Array.from({length: cellCount}, (_, cell) => texts.slice(Math.floor(cell * count / cellCount), Math.floor((cell + 1) * count / cellCount)).join(' '))
+      if (random.chance(0.4)) cells.push(String(random.integer(0, 999)))
+      return cells.join('\t')
+    }
     case 'backslashes': {
       const name = random.pick(words)
       const path = random.pick([
@@ -245,7 +271,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       ts: time(random),
       level,
       service: random.pick(services),
-      msg: random.chance(0.5) ? random.pick(messages) : freeText(random, random.integer(2, 7)),
+      msg: random.chance(0.5) ? logMessage(random) : freeText(random, random.integer(2, 7)),
       durationMs: Math.round(random.next() * 250_000) / 100,
       status: random.pick([200, 201, 204, 301, 400, 404, 429, 500, 502]),
       requestId: hexId(random, 16),
@@ -276,7 +302,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       paid: random.chance(0.9),
       customer: {name: person(random), city: random.pick(cities)},
       shippedAt: random.chance(0.6) ? time(random) : null,
-      notes: random.chance(0.5) ? random.pick(notes) : freeText(random, random.integer(2, 8)),
+      notes: random.chance(0.5) ? noteFor(random) : freeText(random, random.integer(2, 8)),
       discount: random.chance(0.3) ? -Math.round(random.next() * 2000) / 100 : 0,
     }, 3, size)
   },
@@ -379,7 +405,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       return {
         data: null,
         error: someKeys(random, {
-          code: random.pick([400, 401, 404, 429, 500]), message: random.chance(0.5) ? random.pick(messages) : freeText(random, random.integer(2, 8)),
+          code: random.pick([400, 401, 404, 429, 500]), message: random.chance(0.5) ? logMessage(random) : freeText(random, random.integer(2, 8)),
           details: random.pick<Json>([[], [issue()], [issue(), issue()], null]), requestId: hexId(random, 8), retryAfter: random.pick<Json>([null, 1, 30]), docs: 'https://example.com/docs/errors',
         }, 2, size),
         ...(random.chance(0.3) ? {meta: {requestId: hexId(random, 8), durationMs: random.integer(1, 900)}} : {}),
@@ -464,7 +490,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
       ])()
       return {jsonrpc: '2.0', id, result}
     }
-    const data = random.pick<Json | undefined>([undefined, null, {retryAfter: random.integer(1, 60)}, freeText(random, random.integer(2, 5)), {details: [random.pick(messages)]}])
+    const data = random.pick<Json | undefined>([undefined, null, {retryAfter: random.integer(1, 60)}, freeText(random, random.integer(2, 5)), {details: [logMessage(random)]}])
     return {jsonrpc: '2.0', id, error: {code: random.pick([-32700, -32600, -32601, -32000]), message: random.pick(['Parse error', 'Invalid Request', 'Method not found', 'Server error']), ...(data === undefined ? {} : {data})}}
   },
   // A document as a database stores it: an id of 24 hexadecimal digits, times, and numbers kept as strings.
@@ -488,9 +514,10 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   // A file is one flat object, or groups of texts under names with some members about the file before them. Most
   // texts are a string, and some have their plural forms, a note for the translator, or two lines as an array.
   messages(random, size) {
-    // Texts of the list above, and one text in three written anew under a key of its own.
-    const entries = random.shuffled(translationEntries).slice(0, 2 + Math.round(size * 9))
-      .map((entry, index): [string, string] => random.chance(0.33) ? [`${random.pick(['title', 'body', 'tooltip', 'help', 'banner', 'footer', 'label', 'error'])}${index + 1}`, freeText(random, random.integer(2, 7))] : entry)
+    // Texts of the list above, and one text in three written anew under a key of its own. The two texts of the list
+    // that hold a tab are in one file of four each, so that the files with a tab are not most of the files.
+    const entries = random.shuffled(translationEntries.filter(([key]) => (key !== 'tabbed' && key !== 'row') || random.chance(0.25))).slice(0, 2 + Math.round(size * 9))
+      .map((entry, index): [string, string] => random.chance(0.33) ? [`${random.pick(['title', 'body', 'tooltip', 'help', 'banner', 'footer', 'label', 'error'])}${index + 1}`, freeText(random, random.integer(2, 7))] : translationFor(random, entry))
     const written = entries.map(([key, text]): [string, Json] => [key, random.weighted<() => Json>([
       [() => text, 80], [() => ({one: text, other: `${text} ({count})`}), 8],
       [() => ({message: text, description: random.pick(['shown in the header', 'a button', 'an error under a field', 'the subject of an email'])}), 6],
@@ -556,7 +583,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
     }
     return Array.from({length: rows}, (_, index): Json => ({
       id: index + 1, name: random.pick(firstNames), done: random.chance(0.5),
-      ...(random.chance(0.3) ? {note: random.chance(0.5) ? random.pick(notes) : freeText(random, random.integer(2, 6))} : {}), ...(random.chance(0.2) ? {parent: null} : {}),
+      ...(random.chance(0.3) ? {note: random.chance(0.5) ? noteFor(random) : freeText(random, random.integer(2, 6))} : {}), ...(random.chance(0.2) ? {parent: null} : {}),
     }))
   },
   // A value of any type inside any type, for token sequences the modeled templates don't have.
@@ -588,7 +615,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
   // A document that is one value, or a container with nothing or little in it.
   scalar(random) {
     return random.weighted<() => Json>([
-      [() => random.pick(messages), 2], [() => freeText(random, random.integer(2, 12)), 2], [() => random.pick(translationEntries)[1], 2],
+      [() => logMessage(random), 2], [() => freeText(random, random.integer(2, 12)), 2], [() => random.pick(translationEntries)[1], 2],
       [() => random.integer(-999, 99_999), 2], [() => raw(random.pick(['0', '-0', '0.5', '-12.75', '1e10', '2.5E-3', '1E+5', '0.0', '-0.0e0'])), 2],
       [() => true, 1], [() => false, 1], [() => null, 1],
       [() => [], 1], [() => ({}), 1], [() => '', 1], [() => [[]], 0.5], [() => [{}], 0.5], [() => ({a: {}}), 0.5], [() => ({list: []}), 0.5],
@@ -865,7 +892,7 @@ export function makeRecords(random: Random, type: RecordType, count: number): Js
       case 'event': {
         const level = odd ? 'error' : random.pick(levels.slice(0, 3))
         return {
-          ts: `${date}T${pad(hour)}:${pad(minute + index)}:${pad(random.integer(0, 59))}Z`, level, service, ...(has[0]! ? {host: `${service}-${random.integer(1, 12)}`} : {}), msg: random.pick(messages),
+          ts: `${date}T${pad(hour)}:${pad(minute + index)}:${pad(random.integer(0, 59))}Z`, level, service, ...(has[0]! ? {host: `${service}-${random.integer(1, 12)}`} : {}), msg: logMessage(random),
           ...(has[1]! ? {requestId: hexId(random, 8)} : {}), ...(has[2]! ? {durationMs: random.integer(1, 2500)} : {}), ...(has[3]! ? {tags: random.pick<Json>([[], [random.pick(tags)]])} : {}),
           ...(odd ? {error: {code: random.pick(['ETIMEDOUT', 'ECONNRESET']), retryable: random.chance(0.5)}} : {}),
         }
