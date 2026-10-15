@@ -101,11 +101,27 @@ export type Sample = {
   typing?: {editor: TypingReplay['editor'], action: TypingReplay['action'], comma: TypingReplay['comma'], target: string, step: number, steps: number}
 }
 
-// 80% train, 10% validation, 10% test, by a hash of the original's tokens as the grammar table reads them, see
-// tokenSequenceOf. So the same original never sits in two splits, and neither do two documents that differ only in
-// what their strings and numbers hold or in their layout: a test document's sequence of tokens is in no train document.
+// What decides an original's split: its tokens as the grammar table reads them, see tokenSequenceOf, e.g. `{s:n}`. A
+// document that is one string, one number or one literal has the sequence `s` or `n`, which is the same for every
+// such document, so there the text decides too, e.g. `n true` and `s "abc"`.
+export function splitKeyOf(original: string): string {
+  const sequence = tokenSequenceOf(original)
+  return sequence.length === 1 ? `${sequence} ${original.trim()}` : sequence
+}
+
+// A document that is one literal has one of three texts, and a hash puts all three into the train split. So they are
+// split by hand, one per split: a half-typed literal alone, e.g. `fals` or `nu`, is then in validation and in test too.
+const splitOfLoneLiteral: Record<string, Split> = {'n true': 'train', 'n false': 'validation', 'n null': 'test'}
+
+// 80% train, 10% validation, 10% test, by a hash of splitKeyOf. So the same original never sits in two splits, and
+// neither do two documents that differ only in what their strings and numbers hold or in their layout: a test
+// document's sequence of tokens is in no train document. The one exception is a document that is a lone scalar: its
+// sequence of one token is in every split, and its text is in one.
 export function splitOf(original: string): Split {
-  const bucket = hashText(tokenSequenceOf(original)) % 100
+  const key = splitKeyOf(original)
+  const byHand = splitOfLoneLiteral[key]
+  if (byHand !== undefined) return byHand
+  const bucket = hashText(key) % 100
   return bucket < 80 ? 'train' : bucket < 90 ? 'validation' : 'test'
 }
 

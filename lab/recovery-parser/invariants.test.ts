@@ -12,7 +12,7 @@ import {handRuleTables, handRules} from './hand-rules.ts'
 import {labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {assumptionProblems, cellsThatValidJsonReads, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitOf, typingReplayOf} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, typingReplayOf} from './samples.ts'
 import {capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
@@ -321,13 +321,20 @@ test('the two hand-written settings of the tables read valid documents exactly a
 test('the split is a function of the original\'s tokens, and held-out kinds and the held-out template only sit in the test split', () => {
   const kindNames = new Set(kinds.map(kind => kind.name))
   const splitOfSequence = new Map<string, string>()
+  const splitsOfLoneScalars = new Set<string>()
   for (const sample of samples) {
     expect(sample.split).toBe(splitOf(sample.original))
-    // No sequence of tokens is in two splits, so a test document's tokens are in no train document.
+    // No sequence of tokens is in two splits, so a test document's tokens are in no train document. A document that
+    // is one scalar has a sequence of one token, and is split by its text.
     const sequence = tokenSequenceOf(sample.original)
-    const earlier = splitOfSequence.get(sequence)
+    const key = splitKeyOf(sample.original)
+    if (sequence.length === 1) {
+      if (!key.startsWith(`${sequence} `) || key.slice(2) !== sample.original.trim()) fail(sample, 'a lone scalar is not split by its text')
+      if (sample.source !== 'valid') splitsOfLoneScalars.add(sample.split)
+    } else if (key !== sequence) fail(sample, 'a document of several tokens is not split by its sequence of tokens')
+    const earlier = splitOfSequence.get(key)
     if (earlier !== undefined && earlier !== sample.split) fail(sample, 'the same sequence of tokens sits in two splits')
-    splitOfSequence.set(sequence, sample.split)
+    splitOfSequence.set(key, sample.split)
     for (const kind of sample.kinds) if (!kindNames.has(kind)) fail(sample, `the kind ${kind} is not in the list of kinds`)
     const isHeldOut = sample.kinds.some(kind => heldOutKinds.includes(kind)) || sample.template === heldOutTemplate
     expect(sample.heldOut.length > 0).toBe(isHeldOut)
@@ -335,6 +342,11 @@ test('the split is a function of the original\'s tokens, and held-out kinds and 
   }
   // Every split and every held-out kind occurs, so the test above checked something.
   expect(new Set(samples.map(sample => sample.split)).size).toBe(3)
+  // Broken texts of a lone scalar, e.g. tru and "abc, are in the train split and in at least one other, and the three
+  // literals are in one split each.
+  expect(splitsOfLoneScalars.has('train')).toBe(true)
+  expect(splitsOfLoneScalars.size).toBeGreaterThan(1)
+  expect([splitOf('true'), splitOf(' false\n'), splitOf('null'), splitOf('"abc"'), splitOf('"abc"\n')]).toEqual(['train', 'validation', 'test', splitOf(' "abc"'), splitOf(' "abc"')])
   expect(samples.some(sample => sample.template === heldOutTemplate)).toBe(true)
   for (const kind of heldOutKinds) expect(samples.some(sample => sample.kinds.includes(kind))).toBe(true)
   // A held-out kind sits on the held-out template about as often as on any template that it can be made from, and

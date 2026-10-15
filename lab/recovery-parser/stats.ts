@@ -7,9 +7,9 @@ import {writeFileSync} from 'node:fs'
 import {displayKind} from '../../src/json-search/highlighter/kinds.ts'
 import {contradictions, families, kinds, recipeNames} from './damage.ts'
 import {type HandRule, handRuleTables, handRules} from './hand-rules.ts'
-import {type Label, tokenSequenceOf} from './labels.ts'
+import type {Label} from './labels.ts'
 import {cellsThatValidJsonReads} from './limits.ts'
-import {type Sample, defaultSeed, groupOf, groups, heldOutKinds, heldOutTemplate, labelsOf, mostRightFor, sampleAt, sources, splits} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, groups, heldOutKinds, heldOutTemplate, labelsOf, mostRightFor, sampleAt, sources, splitKeyOf, splits} from './samples.ts'
 import {
   type ParserTables, type ParserTrace, classNames, containerNames, contextNames, defaultTables, eventNames, grammarCellName, grammarStateNames, isLexerErrorEvent,
   lexerCellName, lexerStateNames, positionCount, runTableParser, tokenNames,
@@ -232,6 +232,9 @@ export function report(seed: number, sampleCount: number): string {
   const brokenTexts = new Map<string, number>()
   const originals = new Map<string, string>()
   const tokenSequences = new Map<string, Set<string>>()
+  // Per template and split, and per held-out kind: how many samples have each sequence of tokens.
+  const sequencesByTemplate = new Map<string, Map<string, Map<string, number>>>()
+  const sequencesByHeldOutKind = new Map<string, Map<string, number>>()
   const situations = new Set<string>()
   const firstErrorSituations = new Set<string>()
   const familyOf = new Map(kinds.map(kind => [kind.name, kind.family]))
@@ -278,7 +281,19 @@ export function report(seed: number, sampleCount: number): string {
     }
     let sequences = tokenSequences.get(sample.split)
     if (sequences === undefined) tokenSequences.set(sample.split, sequences = new Set<string>())
-    sequences.add(tokenSequenceOf(sample.original))
+    const splitKey = splitKeyOf(sample.original)
+    sequences.add(splitKey)
+    let perSplit = sequencesByTemplate.get(sample.template)
+    if (perSplit === undefined) sequencesByTemplate.set(sample.template, perSplit = new Map<string, Map<string, number>>())
+    let perSequence = perSplit.get(sample.split)
+    if (perSequence === undefined) perSplit.set(sample.split, perSequence = new Map<string, number>())
+    tally(perSequence, splitKey)
+    for (const kind of sample.kinds) {
+      if (!heldOutKinds.includes(kind)) continue
+      let ofKind = sequencesByHeldOutKind.get(kind)
+      if (ofKind === undefined) sequencesByHeldOutKind.set(kind, ofKind = new Map<string, number>())
+      tally(ofKind, splitKey)
+    }
     if (sample.source === 'valid') continue
     damagedSamples++
     tally(byReachable, sample.reachable)
@@ -381,12 +396,27 @@ export function report(seed: number, sampleCount: number): string {
   table('Samples per source', bySource, sampleCount, sources)
   table('Samples per split', bySplit, sampleCount, splits)
   lines.push(`  ${splitConflicts} originals occur in two splits (must be 0).`)
+  // A split key is a sequence of tokens, or for a document that is one scalar the token and the text, see splitKeyOf.
   const sequencesOf = (split: string) => tokenSequences.get(split) ?? new Set<string>()
-  lines.push(`  ${sequencesOf('train').size} distinct sequences of tokens among the originals of the train split.`)
+  const isLoneScalar = (key: string) => key.startsWith('s ') || key.startsWith('n ')
+  const severalTokens = (split: string) => [...sequencesOf(split)].filter(key => !isLoneScalar(key))
+  lines.push(`  ${severalTokens('train').length} distinct sequences of tokens among the originals of the train split.`)
   for (const split of ['validation', 'test']) {
-    const shared = [...sequencesOf(split)].filter(sequence => sequencesOf('train').has(sequence)).length
-    lines.push(`  ${sequencesOf(split).size} distinct sequences of tokens among the originals of the ${split} split, ${shared} of them also in the train split (must be 0).`)
+    const shared = severalTokens(split).filter(sequence => sequencesOf('train').has(sequence)).length
+    lines.push(`  ${severalTokens(split).length} distinct sequences of tokens among the originals of the ${split} split, ${shared} of them also in the train split (must be 0).`)
   }
+  const sharedScalars = ['validation', 'test'].flatMap(split => [...sequencesOf(split)].filter(key => isLoneScalar(key) && sequencesOf('train').has(key))).length
+  lines.push(`  A document that is one string, number or literal has one token, so its text decides its split: ${splits.map(split => `${[...sequencesOf(split)].filter(isLoneScalar).length} such texts in ${split}`).join(', ')}, ${sharedScalars} of them in two splits (must be 0).`)
+  lines.push('', 'Sequences of tokens per template and split: samples, distinct sequences, and the share of the samples that have the most frequent')
+  lines.push('sequence. The test column holds the held-out samples too. A split with few sequences tests few shapes of document.')
+  const describeSequences = (perSequence: Map<string, number> | undefined) => {
+    if (perSequence === undefined) return `${'0'.padStart(6)} ${'0'.padStart(5)} ${'-'.padStart(4)} `
+    const total = [...perSequence.values()].reduce((sum, value) => sum + value, 0)
+    return `${String(total).padStart(6)} ${String(perSequence.size).padStart(5)} ${(100 * Math.max(...perSequence.values()) / total).toFixed(0).padStart(4)}%`
+  }
+  lines.push(`  ${splits.map(split => split.padStart(17)).join('  ')}  template`)
+  for (const template of [...sequencesByTemplate.keys()].sort()) lines.push(`  ${splits.map(split => describeSequences(sequencesByTemplate.get(template)!.get(split))).join('  ')}  ${template}`)
+  for (const kind of heldOutKinds) lines.push(`  ${' '.repeat(38)}${describeSequences(sequencesByHeldOutKind.get(kind))}  samples with the held-out kind ${kind}`)
   table(`Broken samples by what is held out (held-out kinds ${heldOutKinds.join(', ')}; held-out template ${heldOutTemplate}). All of them but the first group are in the test split`, byHeldOut, damagedSamples, heldOutGroups)
   for (const kind of heldOutKinds) {
     const [samples, onOrder] = heldOutKindOnOrder.get(kind) ?? [0, 0]
