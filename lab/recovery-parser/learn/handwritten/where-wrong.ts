@@ -1,6 +1,6 @@
-// Where the hand-written recovery is still wrong: for every sample with a wrong labeled code point from the first
-// damage on, the cells that the parser read at the first such code point, and what was wrong there. The samples'
-// wrong code points are added up per pair of cells, so the top of the list is where reading samples pays most.
+// Where the hand-written recovery is still wrong: for every sample with a wrong scored code point, the cells that
+// the parser read at the first such code point, and what was wrong there. The samples' wrong code points are added
+// up per pair of cells, so the top of the list is where reading samples pays most.
 //
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/handwritten/where-wrong.ts [--split train] [--kind missingCloser] [--typing]
@@ -16,10 +16,10 @@
 // grammar after a complete value inside a nested object, the parser's depth there is one more than the label's, and
 // these samples have 23,304 wrong code points in all. "kind k->s" means that the label says key and the parser shows
 // a string. An example shows the text around the code point, which is between 【 and 】.
-import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, optionOf, sourceNames, splitNames} from '../data.ts'
+import {cacheFolderOf, codePointNestingScored, codePointScored, kindsOf, loadStandardSamples, optionOf, sourceNames, splitNames} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {grammarCellName, lexerCellName, loadTables} from '../recovery-tables.ts'
-import {runOnSample} from '../score.ts'
+import {runOnSample, wrongKind, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
 const kindLetters = 'wpsenlE.k'
@@ -65,10 +65,9 @@ if (import.meta.main) {
   const samplesOfCause = causes.map(() => 0)
   let wrongSamples = 0
   let wrongCodePoints = 0
-  let labeledCodePoints = 0
+  let scoredCodePoints = 0
   for (let place = 0; place < samples.sampleCount; place++) {
-    const firstDamage = samples.firstDamage[place]!
-    if (splitNames[samples.split[place]!] !== split || firstDamage === -1) continue
+    if (splitNames[samples.split[place]!] !== split || samples.firstDamage[place] === -1) continue
     if (onlyTyping && sourceNames[samples.source[place]!] !== 'typing') continue
     if (kind !== undefined && !kindsOf(samples, place).includes(kind)) continue
     const start = samples.start[place]!
@@ -77,14 +76,14 @@ if (import.meta.main) {
     let firstWrong = -1
     let wrong = 0
     let what = ''
-    for (let position = firstDamage; position < length; position++) {
+    for (let position = samples.firstErrorPosition[place]!; position < length; position++) {
       const flags = samples.flags[start + position]!
-      if ((flags & codePointLabeled) === 0) continue
-      labeledCodePoints++
-      const kindWrong = (flags & codePointKindScored) !== 0 && trace.displayKind[position] !== samples.labelKind[start + position]
-      const depthDifference = trace.depthAfter[position]! - samples.labelDepth[start + position]!
-      const containerWrong = trace.containerAfter[position] !== samples.labelContainer[start + position]
-      if (!kindWrong && depthDifference === 0 && !containerWrong) continue
+      if ((flags & codePointScored) === 0) continue
+      scoredCodePoints++
+      const wrongLabels = wrongLabelsAt(samples, start + position, trace, position)
+      if (wrongLabels === 0) continue
+      const kindWrong = (wrongLabels & wrongKind) !== 0
+      const depthDifference = (flags & codePointNestingScored) === 0 ? 0 : trace.depthAfter[position]! - samples.labelDepth[start + position]!
       wrong++
       if (firstWrong !== -1) continue
       firstWrong = position
@@ -115,16 +114,16 @@ if (import.meta.main) {
     }
     tally.set(key, entry)
   }
-  console.log(`Split ${split}${kind === undefined ? '' : `, kind ${kind}`}${onlyTyping ? ', typing replays' : ''}: ${wrongCodePoints} of ${labeledCodePoints} labeled code points from the first damage on are wrong, in ${wrongSamples} samples.`)
+  console.log(`Split ${split}${kind === undefined ? '' : `, kind ${kind}`}${onlyTyping ? ', typing replays' : ''}: ${wrongCodePoints} of ${scoredCodePoints} scored code points are wrong, in ${wrongSamples} samples.`)
   for (const [key, entry] of [...tally].sort((left, right) => right[1].wrong - left[1].wrong).slice(0, top)) {
     console.log(`${String(entry.wrong).padStart(7)} wrong in ${String(entry.samples).padStart(5)} samples  ${key}`)
     for (const example of entry.examples) console.log(`            ${example}`)
   }
   if (process.argv.includes('--causes')) {
     console.log('')
-    console.log('Wrong code points per guessed cause, with their share of all wrong code points and of all labeled code points:')
+    console.log('Wrong code points per guessed cause, with their share of all wrong code points and of all scored code points:')
     causes.forEach(([name], index) => {
-      console.log(`${String(wrongOfCause[index]).padStart(7)} wrong in ${String(samplesOfCause[index]).padStart(5)} samples  ${(100 * wrongOfCause[index]! / wrongCodePoints).toFixed(1).padStart(5)}%  ${(100 * wrongOfCause[index]! / labeledCodePoints).toFixed(2).padStart(5)}%  ${name}`)
+      console.log(`${String(wrongOfCause[index]).padStart(7)} wrong in ${String(samplesOfCause[index]).padStart(5)} samples  ${(100 * wrongOfCause[index]! / wrongCodePoints).toFixed(1).padStart(5)}%  ${(100 * wrongOfCause[index]! / scoredCodePoints).toFixed(2).padStart(5)}%  ${name}`)
     })
   }
 }

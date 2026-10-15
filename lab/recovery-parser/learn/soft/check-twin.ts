@@ -26,9 +26,9 @@
 // It also checks the intended stacks of twin-data.ts against the exact parser on the originals of the first 2,000
 // samples that are not in the test split.
 import {createRandom} from '../../random.ts'
-import {defaultSeed, sampleAt} from '../../samples.ts'
+import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {loadStandardSamples, splitNames} from '../data.ts'
+import {allowedSampleAt, loadStandardSamples} from '../data.ts'
 import {type RecoveryTrace, containerObject, createTrace, positionCount, runRecoveryParser, runRecoveryParserInto} from '../recovery-parser.ts'
 import {
   type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, classNames, openDisplayEntries, randomizeOpenCells, tokenNames,
@@ -46,7 +46,7 @@ const fail = (message: string) => {
 
 const samples = loadStandardSamples()
 // Broken samples of the train split, in the dataset's order. The check reads no label, only texts.
-const places = placesForTwin(samples, splitNames.indexOf('train')).subarray(0, sampleCount)
+const places = placesForTwin(samples, 'train').subarray(0, sampleCount)
 if (places.length < sampleCount) throw new Error(`the train split has only ${places.length} broken samples for the twin`)
 const todaysData = packForTwin(samples, places)
 
@@ -307,9 +307,9 @@ function checkBitOnTrack(name: string, tables: RecoveryTables, data: TwinData, t
   let codePoints = 0
   let checked = 0
   for (let index = 0; checked < 2000; index++) {
-    const sample = sampleAt(defaultSeed, index)
-    // The test split is only read by a script that is told to.
-    if (sample.split === 'test') continue
+    // allowedSampleAt gives no sample of the test split.
+    const sample = allowedSampleAt(defaultSeed, index)
+    if (sample === undefined) continue
     checked++
     const stacks = intendedObjectsOf({...sample, alignment: Array.from({length: Array.from(sample.original).length}, (_, position) => position)})
     let offset = 0
@@ -338,8 +338,5 @@ function checkBitOnTrack(name: string, tables: RecoveryTables, data: TwinData, t
 }
 
 console.log(`${((performance.now() - started) / 1000).toFixed(1)} s.`)
-if (failures > 0) {
-  console.log(`${failures} checks FAILED.`)
-  process.exit(1)
-}
-console.log('Every check passed.')
+console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)
+if (failures > 0) process.exitCode = 1

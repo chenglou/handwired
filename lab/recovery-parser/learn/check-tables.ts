@@ -28,9 +28,10 @@
 import {mkdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {createRandom} from '../random.ts'
-import {defaultSeed, sampleAt} from '../samples.ts'
+import {defaultSeed} from '../samples.ts'
 import {type ParserTrace, classNames, contextNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
+import {allowedSampleAt} from './data.ts'
 import {codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {
   type AddedClass, type RecoveryTables, actionCount, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, displayEntryName, displayEntryOf, displayKindNames,
@@ -209,7 +210,9 @@ function checkText(text: string, expectValid: boolean | undefined, made: string)
   })
 }
 for (let index = 0; index < sampleCount; index++) {
-  const sample = sampleAt(defaultSeed, index)
+  // The texts of the train and validation splits: allowedSampleAt gives no sample of the test split.
+  const sample = allowedSampleAt(defaultSeed, index)
+  if (sample === undefined) continue
   for (const document of sample.documents) checkText(document, true, sample.source === 'valid' ? 'the dataset\'s valid samples' : 'the dataset\'s originals')
   if (sample.source !== 'valid') checkText(sample.broken, false, 'the dataset\'s broken texts')
 }

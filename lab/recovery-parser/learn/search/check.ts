@@ -19,7 +19,7 @@ for (const [split, part] of [['train', trainPart(samples)], ['validation', valid
   const prepared = prepareSamples(part)
   let changeable = 0
   for (let sample = 0; sample < prepared.sampleCount; sample++) if (prepared.changeableFrom[sample]! < prepared.start[sample + 1]! - prepared.start[sample]!) changeable++
-  console.log(`${split}: ${prepared.sampleCount} broken samples, ${changeable} of them read an open cell at one of their code points, ${prepared.scoredCodePoints} labeled code points from the first damage on`)
+  console.log(`${split}: ${prepared.sampleCount} broken samples, ${changeable} of them read an open cell at one of their code points, ${prepared.scoredCodePoints} scored code points`)
   for (let setting = 0; setting <= settings; setting++) {
     let tables = asIsTables()
     if (setting > 0) {
@@ -77,5 +77,6 @@ for (const [split, part] of [['train', trainPart(samples)], ['validation', valid
   }
   console.log(`single cells: ${choices} other choices in 12 settings of the tables, ${choicesThatChange} of them change the score`)
 }
-console.log(problems === 0 ? `Every check passed: today's tables and ${settings} random settings on each split, and the other choices of single cells.` : `${problems} checks failed.`)
-if (problems > 0) process.exit(1)
+console.log(`Checked: today's tables and ${settings} random settings on each split, and the other choices of single cells.`)
+console.log(problems === 0 ? 'Every check passed.' : `${problems} checks FAILED.`)
+if (problems > 0) process.exitCode = 1

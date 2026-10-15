@@ -12,15 +12,17 @@
 //   want   the label's display kind, one letter each, see kindLetters in labels.ts. Blank where the damage added the
 //          code point, and ? where the display kind is not scored.
 //   got    the display kind that the tables give.
-//   wantd, gotd  the depth after the code point, 0 to 9 and then a to g, - below 0 and + above 16.
+//   wantd, gotd  the depth after the code point, 0 to 9 and then a to g, - below 0 and + above 16. wantd has a ? where
+//          the depth and the container are not scored.
 //   wantc, gotc  the innermost open container after the code point: o for an object, a for an array, - for none.
-//   miss   from the first damage on: k where the display kind is wrong, d the depth, c the container, * more than one.
+//   miss   from the first error on, where a score counts: k where the display kind is wrong, d the depth, c the
+//          container, * more than one.
 import {kindLetters} from '../../labels.ts'
 import {createRandom} from '../../random.ts'
-import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, optionOf, reachableNames, validationPart} from '../data.ts'
+import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadStandardSamples, optionOf, validationPart} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, checkTables, loadTables} from '../recovery-tables.ts'
-import {runOnSample} from '../score.ts'
+import {runOnSample, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../score.ts'
 
 const scratchFolder = optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']
 const tablesFile = optionOf('--tables')
@@ -44,29 +46,25 @@ let scored = 0
 let wrong = 0
 const wrongPlaces: number[] = []
 for (let place = 0; place < samples.sampleCount; place++) {
-  const firstDamage = samples.firstDamage[place]!
-  if (firstDamage === -1) continue
+  if (samples.firstDamage[place] === -1) continue
   const start = samples.start[place]!
   const length = samples.start[place + 1]! - start
   runOnSample(trace, samples, place, tables)
   let wrongHere = 0
-  for (let position = firstDamage; position < length; position++) {
-    const flags = samples.flags[start + position]!
-    if ((flags & codePointLabeled) === 0) continue
+  for (let position = samples.firstErrorPosition[place]!; position < length; position++) {
+    if ((samples.flags[start + position]! & codePointScored) === 0) continue
     scored++
-    const kindWrong = (flags & codePointKindScored) !== 0 && trace.displayKind[position] !== samples.labelKind[start + position]
-    const depthWrong = trace.depthAfter[position] !== samples.labelDepth[start + position]
-    const containerWrong = trace.containerAfter[position] !== samples.labelContainer[start + position]
-    if (!kindWrong && !depthWrong && !containerWrong) continue
+    const wrongLabelsHere = wrongLabelsAt(samples, start + position, trace, position)
+    if (wrongLabelsHere === 0) continue
     wrong++
     wrongHere++
-    add(wrongLabels, [kindWrong ? 'kind' : '', depthWrong ? 'depth' : '', containerWrong ? 'container' : ''].filter(name => name !== '').join(' and '))
-    if (kindWrong) add(wrongKinds, `${kindLetters[samples.labelKind[start + position]!]} shown as ${kindLetters[trace.displayKind[position]!]}`)
+    add(wrongLabels, [(wrongLabelsHere & wrongKind) !== 0 ? 'kind' : '', (wrongLabelsHere & wrongDepth) !== 0 ? 'depth' : '', (wrongLabelsHere & wrongContainer) !== 0 ? 'container' : ''].filter(name => name !== '').join(' and '))
+    if ((wrongLabelsHere & wrongKind) !== 0) add(wrongKinds, `${kindLetters[samples.labelKind[start + position]!]} shown as ${kindLetters[trace.displayKind[position]!]}`)
   }
   if (wrongHere > 0 && (onlyKind === undefined || kindsOf(samples, place).includes(onlyKind))) wrongPlaces.push(place)
 }
 const sorted = (counts: Map<string, number>) => [...counts].sort((left, right) => right[1] - left[1])
-console.log(`Tables: ${tablesFile ?? 'today\'s'}. Validation split: ${scored} labeled code points at or after the first damage, ${wrong} of them wrong (${(100 * wrong / scored).toFixed(2)}%).`)
+console.log(`Tables: ${tablesFile ?? 'today\'s'}. Validation split: ${scored} scored code points, ${wrong} of them wrong (${(100 * wrong / scored).toFixed(2)}%).`)
 console.log(`Which labels are wrong, in % of the wrong code points: ${sorted(wrongLabels).map(([name, value]) => `${name} ${(100 * value / wrong).toFixed(1)}`).join(', ')}`)
 console.log(`Display kinds (${kindLetters}: whitespace, punctuation, string, escape, number, literal, Error, past the end, key), in % of the wrong code points: ${sorted(wrongKinds).slice(0, 12).map(([name, value]) => `${name} ${(100 * value / wrong).toFixed(1)}`).join(', ')}`)
 console.log(`${wrongPlaces.length} samples${onlyKind === undefined ? '' : ` with the kind ${onlyKind}`} have a wrong code point. ${Math.min(count, wrongPlaces.length)} of them:`)
@@ -75,28 +73,27 @@ const random = createRandom(20261015, pick)
 for (let drawn = 0; drawn < count && wrongPlaces.length > 0; drawn++) {
   const place = wrongPlaces.splice(random.integer(0, wrongPlaces.length - 1), 1)[0]!
   const firstDamage = samples.firstDamage[place]!
+  const firstError = samples.firstErrorPosition[place]!
   const start = samples.start[place]!
   const length = samples.start[place + 1]! - start
   runOnSample(trace, samples, place, tables)
   const line = (letter: (position: number, at: number) => string) => Array.from({length}, (_, position) => letter(position, start + position)).join('')
-  const labeled = (at: number) => (samples.flags[at]! & codePointLabeled) !== 0
+  const kept = (at: number) => (samples.flags[at]! & codePointKept) !== 0
+  const nestingScored = (at: number) => (samples.flags[at]! & codePointNestingScored) !== 0
   const miss = line((position, at) => {
-    if (position < firstDamage || !labeled(at)) return ' '
-    const kindWrong = (samples.flags[at]! & codePointKindScored) !== 0 && trace.displayKind[position] !== samples.labelKind[at]
-    const depthWrong = trace.depthAfter[position] !== samples.labelDepth[at]
-    const containerWrong = trace.containerAfter[position] !== samples.labelContainer[at]
-    const wrongCount = Number(kindWrong) + Number(depthWrong) + Number(containerWrong)
-    return wrongCount > 1 ? '*' : kindWrong ? 'k' : depthWrong ? 'd' : containerWrong ? 'c' : ' '
+    if (position < firstError) return ' '
+    const wrongLabelsHere = wrongLabelsAt(samples, at, trace, position)
+    return wrongLabelsHere === 0 ? ' ' : wrongLabelsHere === wrongKind ? 'k' : wrongLabelsHere === wrongDepth ? 'd' : wrongLabelsHere === wrongContainer ? 'c' : '*'
   })
   const wrongHere = Array.from(miss).filter(letter => letter !== ' ').length
   console.log('')
-  console.log(`--- sample ${samples.index[place]}  kinds: ${kindsOf(samples, place).join(', ')}  reachable: ${reachableNames[samples.reachable[place]!]}${samples.needsClass[place] === 1 ? '  needs a class' : ''}${samples.debatable[place] === 1 ? '  debatable' : ''}  first damage at ${firstDamage}, first error at ${samples.firstErrorPosition[place]}, ${wrongHere} wrong code points`)
+  console.log(`--- sample ${samples.index[place]}  kinds: ${kindsOf(samples, place).join(', ')}  group: ${groupNames[samples.group[place]!]}${samples.debatable[place] === 1 ? '  debatable' : ''}  first damage at ${firstDamage}, first error at ${firstError}, ${wrongHere} wrong code points`)
   console.log(`brok  ${line((_, at) => shown(samples.codePoints[at]!))}`)
-  console.log(`want  ${line((_, at) => !labeled(at) ? ' ' : (samples.flags[at]! & codePointKindScored) === 0 ? '?' : kindLetters[samples.labelKind[at]!]!)}`)
+  console.log(`want  ${line((_, at) => !kept(at) ? ' ' : (samples.flags[at]! & codePointKindScored) === 0 ? '?' : kindLetters[samples.labelKind[at]!]!)}`)
   console.log(`got   ${line(position => kindLetters[trace.displayKind[position]!]!)}`)
-  console.log(`wantd ${line((_, at) => labeled(at) ? depthLetter(samples.labelDepth[at]!) : ' ')}`)
+  console.log(`wantd ${line((_, at) => !kept(at) ? ' ' : nestingScored(at) ? depthLetter(samples.labelDepth[at]!) : '?')}`)
   console.log(`gotd  ${line(position => depthLetter(trace.depthAfter[position]!))}`)
-  console.log(`wantc ${line((_, at) => labeled(at) ? containerLetter(samples.labelContainer[at]!) : ' ')}`)
+  console.log(`wantc ${line((_, at) => !kept(at) ? ' ' : nestingScored(at) ? containerLetter(samples.labelContainer[at]!) : '?')}`)
   console.log(`gotc  ${line(position => containerLetter(trace.containerAfter[position]!))}`)
   console.log(`miss  ${miss}`)
 }

@@ -81,6 +81,29 @@ export function validTextOfDepth(random: Random, depth: number): string {
   }
 }
 
+// A valid JSON text with exactly `depth` levels of containers in which members follow the nested container, e.g.
+// [[[1], 2], {"a": 3}]: after the closing bracket of a nested container the text goes on inside the container around
+// it, with a comma and one more value or member. validTextOfDepth only puts members before the nested container, so
+// after its innermost container closes, nothing but closing brackets and white space follows. At each level a member
+// follows with a probability of 0.7, and the text has such a member at one level at least.
+export function validTextOfDepthWithMembersAfter(random: Random, depth: number): string {
+  for (;;) {
+    let text = randomValue(random, 1)
+    while (!text.startsWith('[') && !text.startsWith('{')) text = randomValue(random, 1)
+    let levelsWithAMemberAfter = 0
+    for (let level = 1; level < depth; level++) {
+      const inArray = random.chance(0.5)
+      let after = ''
+      if (random.chance(0.7)) {
+        levelsWithAMemberAfter++
+        after = `,${gap(random)}${inArray ? '' : `${randomString(random)}${gap(random)}:${gap(random)}`}${randomValue(random, 0)}`
+      }
+      text = inArray ? `[${gap(random)}${text}${gap(random)}${after}${gap(random)}]` : `{${gap(random)}${randomString(random)}:${gap(random)}${text}${gap(random)}${after}${gap(random)}}`
+    }
+    if (levelsWithAMemberAfter > 0 && codePointLength(text) <= capacity) return text
+  }
+}
+
 // A valid JSON text of exactly `length` code points: a shorter one in an array, next to a string that fills the rest,
 // or followed by white space.
 export function validTextOfLength(random: Random, length: number): string {
@@ -134,6 +157,8 @@ export function randomSoup(random: Random): string {
 // as tooLong and the second as tooDeep.
 export const tooLongText = (random: Random) => validTextOfLength(random, capacity + random.integer(1, 90))
 export const tooDeepText = (random: Random) => validTextOfDepth(random, maximumDepth + random.integer(1, 3))
+// A valid JSON text with more than 16 levels in which members follow the nested containers.
+export const tooDeepTextWithMembersAfter = (random: Random) => validTextOfDepthWithMembersAfter(random, maximumDepth + random.integer(1, 3))
 
 export type CheckText = {text: string, made: 'valid' | 'valid, 16 levels' | 'valid, 512 code points' | 'edited' | 'soup' | 'too long' | 'too deep'}
 

@@ -8,16 +8,18 @@
 // - "added": the damage added the code point, e.g. a brace inside a comment. It has no label.
 // - "not punctuation in the original": the code point is kept and its label's display kind is no punctuation, e.g.
 //   the brace of '${file}', which is string content in the original.
-// - "the label's depth is +1, 0, -1, ... from the depth before": the code point is kept punctuation, and the number
-//   says what one step would have to do to the parser's depth before it to get the label's depth after it: +1 is a
-//   push, 0 leaves the stack, -1 is a pop, and -2 are two pops, which one step cannot do.
+// - "the original's depth is +1, 0, -1, ... from the depth before": the code point is kept punctuation, and the
+//   number says what one step would have to do to the parser's depth before it to get the depth after the code
+//   point's counterpart in the original: +1 is a push, 0 leaves the stack, -1 is a pop, and -2 are two pops, which
+//   one step cannot do. The original's depth is there at every kept code point, also where the label's is not scored.
 // - For a string: whether its label is a key or a string.
+// - "the display kind is not scored": the dataset asks no parser for a display kind there.
 //
 // A count says what the labels want at one cell, not what a choice is worth: a choice also changes what the parser
 // reads afterwards, and an added code point has no label but still moves the parser. E.g. a comma inside a comment
 // is added, so it is in no "the label's depth" row, yet a pop at that comma is wrong. Where two readings are close,
 // the train score decides, and README.md says so.
-import {cacheFolderOf, codePointLabeled, loadStandardSamples, optionOf, splitNames} from '../data.ts'
+import {cacheFolderOf, codePointKept, codePointKindScored, loadStandardSamples, optionOf, splitNames} from '../data.ts'
 import {displayKind} from '../../labels.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {grammarCellName} from '../recovery-tables.ts'
@@ -57,12 +59,13 @@ if (import.meta.main) {
       const depthBefore = position === 0 ? 0 : trace.depthAfter[position - 1]!
       const labelKind = samples.labelKind[at]!
       let what: string
-      if ((samples.flags[at]! & codePointLabeled) === 0) what = 'added'
+      if ((samples.flags[at]! & codePointKept) === 0) what = 'added'
+      else if ((samples.flags[at]! & codePointKindScored) === 0) what = 'the display kind is not scored'
       else if (group === 0) what = labelKind === displayKind.key ? 'the label is a key' : labelKind === displayKind.string ? 'the label is a string' : 'the label is something else'
       else if (labelKind !== displayKind.punctuation) what = 'not punctuation in the original'
       else {
-        const change = samples.labelDepth[at]! - depthBefore
-        what = `the label's depth is ${change > 0 ? '+' : ''}${change <= -2 ? '-2 or lower' : change} from the depth before`
+        const change = samples.intendedDepthAfter[at]! - depthBefore
+        what = `the original's depth is ${change > 0 ? '+' : ''}${change <= -2 ? '-2 or lower' : change} from the depth before`
       }
       const name = grammarCellName(tables, cell)
       const ofCell = tallies[group]!.get(name) ?? new Map<string, number>()

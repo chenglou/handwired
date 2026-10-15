@@ -31,7 +31,7 @@
 //           right for a comment and wrong for the first quote of a string that the damage quoted.
 import {mkdirSync} from 'node:fs'
 import {dirname, join} from 'node:path'
-import {type Samples, cacheFolderOf, codePointLabeled, loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
+import {type Samples, cacheFolderOf, codePointKept, loadStandardSamples, optionOf, trainPart, validationPart} from '../data.ts'
 import {containerArray, containerNone, containerObject, maximumDepth} from '../recovery-parser.ts'
 import {
   type RecoveryTables, actionByToken, actionCount, actionNames, actionNone, actionOfToken, actionPop, actionPushArray, actionPushObject, asIsTables, cellCounts, differencesOf,
@@ -85,18 +85,18 @@ export function countVotes(samples: Samples, options: VoteOptions): Votes {
     let lexerState = 0
     let grammarState = 0
     let depth = 0
-    // Puts the walk on the intended state after the code point at `at`. Of the stack, the labels hold the depth and
-    // the kind of the innermost container, which is all that a step reads.
+    // Puts the walk on the intended state after the code point at `at`. Of the stack, the intended states hold the
+    // depth and the kind of the innermost container, which is all that a step reads.
     const force = (at: number) => {
       lexerState = samples.intendedLexerAfter[at]!
       grammarState = samples.intendedGrammarAfter[at]!
-      depth = samples.labelDepth[at]!
-      if (depth >= 1) kindAtLevel[depth] = samples.labelContainer[at]!
+      depth = samples.intendedDepthAfter[at]!
+      if (depth >= 1) kindAtLevel[depth] = samples.intendedContainerAfter[at]!
       known = true
     }
     for (let position = 0; position < length; position++) {
       const at = first + position
-      const kept = (samples.flags[at]! & codePointLabeled) !== 0
+      const kept = (samples.flags[at]! & codePointKept) !== 0
       const counted = position >= firstDamage
       if (!known) {
         if (counted) count(kept ? 'kept, the state before is not known' : 'added, the state before is not known')
@@ -154,8 +154,8 @@ export function countVotes(samples: Samples, options: VoteOptions): Votes {
       const token = tokenOfEvent[event]!
       const grammarCell = (grammarState * tokenCount + token) * contextCount + contextOf()
       const intendedGrammarAfter = samples.intendedGrammarAfter[at]!
-      const intendedDepth = samples.labelDepth[at]!
-      const intendedContainer = samples.labelContainer[at]!
+      const intendedDepth = samples.intendedDepthAfter[at]!
+      const intendedContainer = samples.intendedContainerAfter[at]!
       let grammarAfter = intendedGrammarAfter
       let reached = true
       if (grammarOpen[grammarCell] === 1) {
@@ -306,7 +306,7 @@ if (import.meta.main) {
   }
   if (outFile !== undefined) {
     mkdirSync(dirname(outFile), {recursive: true})
-    saveTables(outFile, tables, `votes of the train split, ${walk}: ${differencesOf(asIsTables(), tables).length} cells differ from today's`)
+    saveTables(outFile, tables, `votes of the train split, ${walk}: ${differencesOf(asIsTables(), tables).length} cells changed against today's tables, which the votes start from`)
     console.log(`Tables: ${outFile}`)
   }
 }

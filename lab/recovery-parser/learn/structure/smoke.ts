@@ -16,7 +16,7 @@
 import {appendFileSync, mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {displayKind} from '../../labels.ts'
-import {codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, splitNames, validationPart} from '../data.ts'
+import {codePointKindScored, kindsOf, loadStandardSamples, validationPart} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {
   type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, classNames, describeDifferences, differencesOf, grammarCellName, grammarChoiceName, openDisplayEntries, saveTables,
@@ -42,7 +42,7 @@ for (const name of names) if (bases[name] === undefined) throw new Error(`smoke.
 
 const samples = loadStandardSamples()
 const validation = validationPart(samples)
-const trainPlaces = placesForTwin(samples, splitNames.indexOf('train'))
+const trainPlaces = placesForTwin(samples, 'train')
 
 // The first letters of the keys without quotes that start with t, f or n, in the validation samples of the kind
 // unquotedKey: how many there are, and how many of them `tables` show as a key. Today's tokenizer starts a literal
@@ -55,7 +55,7 @@ function firstLettersOfKeys(tables: RecoveryTables) {
     const start = validation.start[place]!
     const length = validation.start[place + 1]! - start
     runOnSample(trace, validation, place, tables)
-    const isKey = (position: number) => position >= 0 && (validation.flags[start + position]! & (codePointLabeled | codePointKindScored)) === (codePointLabeled | codePointKindScored) && validation.labelKind[start + position] === displayKind.key
+    const isKey = (position: number) => position >= 0 && (validation.flags[start + position]! & codePointKindScored) !== 0 && validation.labelKind[start + position] === displayKind.key
     for (let position = validation.firstDamage[place]!; position < length; position++) {
       if (!isKey(position) || isKey(position - 1) || !'tfn'.includes(String.fromCodePoint(validation.codePoints[start + position]!))) continue
       tally.letters++
@@ -71,11 +71,11 @@ function lineOf(name: string, tables: RecoveryTables, changed: string) {
   const score = scoreTables(tables, validation)
   const row = (group: string) => sharesOf(rowOf(score, group)!)
   const letters = firstLettersOfKeys(tables)
-  return `| ${name} | ${changed} | ${percent(row('all').allThree)} | ${percent(row('needs a class').allThree)} | ${percent(row('kind: singleQuotedString').allThree)} | ${percent(row('kind: unquotedKey').kind)} | ${letters.shownAsKey} of ${letters.letters} | ${percent(row('kind: colonWithoutValue').allThree)} |`
+  return `| ${name} | ${changed} | ${percent(row('all').allThree)} | ${percent(row('group: needs a character class').allThree)} | ${percent(row('group: needs a display fix').allThree)} | ${percent(row('group: needs a line rule').allThree)} | ${percent(row('kind: singleQuotedString').allThree)} | ${percent(row('kind: unquotedKey').kind)} | ${letters.shownAsKey} of ${letters.letters} | ${percent(row('kind: colonWithoutValue').allThree)} |`
 }
 const lines = [
-  '| tables | cells that differ from the run\'s base | all three, all samples | all three, needs a class | all three, singleQuotedString | display kind, unquotedKey | first letters t, f, n of keys without quotes shown as a key | all three, colonWithoutValue |',
-  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  '| tables | cells changed against the run\'s base | all three, all samples | all three, group "needs a character class" | all three, group "needs a display fix" | all three, group "needs a line rule" | all three, singleQuotedString | display kind, unquotedKey | first letters t, f, n of keys without quotes shown as a key | all three, colonWithoutValue |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   lineOf('the parser as it is', asIsTables(), '0'),
 ]
 
@@ -86,7 +86,7 @@ for (const name of names) {
   const logFile = join(folder, `${name}.log`)
   writeFileSync(logFile, '')
   const started = performance.now()
-  const result = await train(model, data, Int32Array.from({length: data.sampleCount}, (_, place) => place), {
+  const result = await train(model, data, {
     epochs: 1, validation, trainedOn: {samples, places: trainPlaces}, logEverySamples: 8000, log: line => appendFileSync(logFile, `${line}\n`),
   })
   const tables = result.last
@@ -94,7 +94,7 @@ for (const name of names) {
   const differences = differencesOf(base, tables)
   const read = cellsReadAt(tables, samples, trainPlaces)
   const lastPoints = result.points.slice(-3).map(point => percent(point.allThree))
-  console.log(`Run ${name}: ${data.sampleCount} train samples in ${((performance.now() - started) / 1000).toFixed(0)} s, ${result.samplesPerSecond.toFixed(0)} samples per second of training. ${differences.length} cells differ from the run's base, and a code point of a trained text reads ${differences.filter(difference => isRead(read, difference)).length} of them. All three on the validation split at the last 3 log points: ${lastPoints.join(', ')}.`)
+  console.log(`Run ${name}: ${data.sampleCount} train samples in ${((performance.now() - started) / 1000).toFixed(0)} s, ${result.samplesPerSecond.toFixed(0)} samples per second of training. ${differences.length} cells changed against the run's base (${differencesOf(asIsTables(), tables).length} cells differ from today's parser), and a code point of a trained text reads ${differences.filter(difference => isRead(read, difference)).length} of them. All three on the validation split at the last 3 log points: ${lastPoints.join(', ')}.`)
   lines.push(lineOf(`one pass, ${name}`, tables, String(differences.length)))
 
   // What the cells of the structure hold after training. Only cells that a code point of a trained text reads are

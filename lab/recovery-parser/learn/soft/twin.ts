@@ -14,8 +14,8 @@
 //
 // The twin starts at a text's first error with the exact parser's state, since every cell that a text reads before its
 // first error is frozen. The loss is the cross-entropy of the display kind, the depth and the container against the
-// labels, at the labeled code points from the first damage on. The backward pass is written by hand, see stepBackward,
-// and check-gradient.ts compares it with finite differences.
+// labels, at the code points that a score counts: from the first error on, each value of a label that is scored. The
+// backward pass is written by hand, see stepBackward, and check-gradient.ts compares it with finite differences.
 //
 // README.md of this folder says where treating the parts of the state as independent loses information.
 import {createRandom} from '../../random.ts'
@@ -25,9 +25,9 @@ import {
 } from '../recovery-tables.ts'
 
 // The bits of TwinData.flags, as in data.ts.
-const codePointLabeled = 1
 const codePointKindScored = 2
 const codePointCanFollow = 8
+const codePointNestingScored = 16
 
 const classLineFeed = classNames.indexOf('lineFeed')
 const tokenNone = tokenNames.indexOf('none')
@@ -122,9 +122,15 @@ export type TwinModel = {
   weights: CellArrays
 }
 
+// Which cells of one table are trainable: a mask with 1 per trainable cell, 'open' for every open cell, or 'none'.
+export type TrainableCells = Uint8Array | 'open' | 'none'
+
 export type ModelOptions = {
-  // The trainable cells and entries of the display table, e.g. a tenth of the open cells. Without it, every open one.
-  trainable?: {lexer: Uint8Array, grammar: Uint8Array, display: Uint8Array}
+  // The trainable cells of the tokenizer's table, of the grammar's table, and the trainable entries of the display
+  // table, e.g. {lexer: 'none', grammar: 'open', display: 'none'} for a run that trains grammar cells only. Without
+  // `trainable`, every open cell and every open entry is trainable. With it, all three have to be named: createModel
+  // throws when one is missing, so that no table is trained without a word.
+  trainable?: {lexer: TrainableCells, grammar: TrainableCells, display: TrainableCells}
   // Where the weights start. 'base': every trainable mix gives `startShare` to the choice of the base tables and
   // splits the rest evenly over the other choices. 'uniform': every choice of a trainable mix has the same share.
   start?: 'base' | 'uniform'
@@ -154,9 +160,20 @@ export const trainableOf = (model: TwinModel, group: GroupName) => group === 'di
 
 export function createModel(base: RecoveryTables, options: ModelOptions = {}): TwinModel {
   const shape = shapeOf(base)
-  const trainableLexer = (options.trainable?.lexer ?? base.lexerOpen).slice()
-  const trainableGrammar = (options.trainable?.grammar ?? base.grammarOpen).slice()
-  const trainableDisplay = (options.trainable?.display ?? base.displayOpen).slice()
+  // The mask of one table. With `trainable` given, a table that it does not name is an error: a missing mask used to
+  // mean "every open one", which trained e.g. every open entry of the display table without a word.
+  const maskOf = (table: 'lexer' | 'grammar' | 'display', open: Uint8Array) => {
+    if (options.trainable === undefined) return open.slice()
+    const chosen = (options.trainable as Partial<Record<typeof table, TrainableCells>>)[table]
+    if (chosen === undefined) throw new Error(`createModel got \`trainable\` without \`${table}\`: name all three of lexer, grammar and display, each as a mask, 'open' or 'none'`)
+    if (chosen === 'open') return open.slice()
+    if (chosen === 'none') return new Uint8Array(open.length)
+    if (!(chosen instanceof Uint8Array)) throw new Error(`createModel got \`trainable.${table}\` that is no mask, 'open' or 'none'`)
+    return chosen.slice()
+  }
+  const trainableLexer = maskOf('lexer', base.lexerOpen)
+  const trainableGrammar = maskOf('grammar', base.grammarOpen)
+  const trainableDisplay = maskOf('display', base.displayOpen)
   if (trainableLexer.length !== shape.lexerCells || trainableGrammar.length !== shape.grammarCells || trainableDisplay.length !== shape.displayEntries) throw new Error('the masks of trainable cells do not have one entry per cell')
   for (let cell = 0; cell < shape.lexerCells; cell++) if (trainableLexer[cell] === 1 && base.lexerOpen[cell] === 0) throw new Error(`the tokenizer cell ${cell} is frozen, and cannot be trainable`)
   for (let cell = 0; cell < shape.grammarCells; cell++) if (trainableGrammar[cell] === 1 && base.grammarOpen[cell] === 0) throw new Error(`the grammar cell ${cell} is frozen, and cannot be trainable`)
@@ -329,7 +346,6 @@ export type TwinData = {
   index: Int32Array
   // The code points of sample s are the entries start[s] to start[s + 1] - 1 of the arrays per code point.
   start: Int32Array
-  firstDamage: Int32Array
   // The position of the first error, where the twin starts, and the exact parser's state before that position: the
   // tokenizer state, the grammar state, the depth, and bit l - 1 of startObjects is 1 when level l is an object.
   // startFirstOnLine is the bit "first on its line" there, 0 for tables without the bit.
@@ -339,7 +355,8 @@ export type TwinData = {
   startDepth: Int8Array
   startObjects: Uint16Array
   startFirstOnLine: Uint8Array
-  // Per code point: its class, and the flags, labels and intended states of data.ts.
+  // Per code point: its class, and the flags, labels and intended states of data.ts. A label's value is -1 where it
+  // is not scored. The intended depth is there at every kept code point.
   classes: Uint8Array
   flags: Uint8Array
   labelKind: Int8Array
@@ -348,6 +365,7 @@ export type TwinData = {
   intendedLexerAfter: Int8Array
   intendedEvent: Int8Array
   intendedGrammarAfter: Int8Array
+  intendedDepthAfter: Int8Array
   // Per code point with a counterpart in the original: the stack after the counterpart, bit l - 1 is 1 when level l is
   // an object. Only filled when hasIntendedObjects is true. Keeping the run on track needs it.
   intendedObjects: Uint16Array
@@ -381,12 +399,12 @@ export type LossOptions = {
   onTrackSeed?: number
 }
 
-// What a batch adds up: the loss, how many labeled code points it counts, and its parts.
+// What a batch adds up: the loss, how many scored code points it counts, and its parts.
 export type LossTally = {
   // Samples that the twin ran, i.e. that have a code point at or after their first error.
   samples: number
-  // Labeled code points at or after both the first damage and the first error: the ones whose loss the open cells can
-  // change. The loss per code point is `loss / codePoints`.
+  // Scored code points: at or after the first error, with a label that has a scored value. They are the code points
+  // that a score counts, see ../score.ts. The loss per code point is `loss / codePoints`.
   codePoints: number
   // Steps that the twin took.
   positions: number
@@ -930,7 +948,6 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     const first = data.firstError[place]!
     const stop = end ?? length
     if (first < 0 || first >= stop) return
-    const firstDamage = data.firstDamage[place]!
     const kindWeight = options.kindWeight ?? 1
     const depthWeight = options.depthWeight ?? 1
     const containerWeight = options.containerWeight ?? 1
@@ -965,35 +982,43 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       const canFollow = (flags & codePointCanFollow) !== 0
       const targetHere = kept && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : canFollow)
       const replaceHere = kept && (intendedEverywhere || canFollow)
-      if (position >= firstDamage && (flags & codePointLabeled) !== 0) {
+      // The loss of the label's values that are scored: the depth and the container together, and the display kind.
+      const scoresNesting = (flags & codePointNestingScored) !== 0
+      const scoresKind = (flags & codePointKindScored) !== 0
+      if (scoresNesting || scoresKind) {
         tally.codePoints++
-        const depthIndex = data.labelDepth[at]! - depthLow
-        const depthShare = depthAfter[position * depthCount + depthIndex]!
-        const containerShare = containers[position * 3 + data.labelContainer[at]!]!
-        const depthLoss = -depthWeight * Math.log(depthShare + lossFloor)
-        const containerLoss = -containerWeight * Math.log(containerShare + lossFloor)
+        let depthShare = 1
+        let containerShare = 1
         let kindShare = 1
-        let kindLoss = 0
-        tally.depthLoss += depthLoss
-        tally.containerLoss += containerLoss
-        tally.loss += depthLoss + containerLoss
-        if ((flags & codePointKindScored) !== 0) {
-          kindShare = kinds[position * displayKindCount + data.labelKind[at]!]!
-          kindLoss = -kindWeight * Math.log(kindShare + lossFloor)
-          tally.kindLoss += kindLoss
-          tally.loss += kindLoss
+        let labelLoss = 0
+        if (scoresNesting) {
+          depthShare = depthAfter[position * depthCount + data.labelDepth[at]! - depthLow]!
+          containerShare = containers[position * 3 + data.labelContainer[at]!]!
+          const depthLoss = -depthWeight * Math.log(depthShare + lossFloor)
+          const containerLoss = -containerWeight * Math.log(containerShare + lossFloor)
+          tally.depthLoss += depthLoss
+          tally.containerLoss += containerLoss
+          labelLoss += depthLoss + containerLoss
         }
+        if (scoresKind) {
+          kindShare = kinds[position * displayKindCount + data.labelKind[at]!]!
+          const kindLoss = -kindWeight * Math.log(kindShare + lossFloor)
+          tally.kindLoss += kindLoss
+          labelLoss += kindLoss
+        }
+        tally.loss += labelLoss
         if (depthShare === 0 || containerShare === 0 || kindShare === 0) {
           tally.ruledOut++
-          tally.ruledOutLoss += depthLoss + containerLoss + kindLoss
+          tally.ruledOutLoss += labelLoss
         }
-        if (intendedTargets && targetHere) {
-          const intendedLoss = -intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
-            - intendedEventWeight * Math.log(events[position * eventCount + data.intendedEvent[at]!]! + lossFloor)
-            - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor)
-          tally.intendedLoss += intendedLoss
-          tally.loss += intendedLoss
-        }
+      }
+      // The extra targets, at every kept code point whose intended state may be used, scored or not.
+      if (intendedTargets && targetHere) {
+        const intendedLoss = -intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
+          - intendedEventWeight * Math.log(events[position * eventCount + data.intendedEvent[at]!]! + lossFloor)
+          - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor)
+        tally.intendedLoss += intendedLoss
+        tally.loss += intendedLoss
       }
       // Keeping the run on track: one draw per code point whose intended state may be used.
       const replace = random !== undefined && replaceHere && random.next() < onTrackProbability
@@ -1003,7 +1028,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       }
       if (position + 1 < stop) {
         if (replace) {
-          setStateBefore(position + 1, data.intendedLexerAfter[at]!, data.intendedGrammarAfter[at]!, data.labelDepth[at]!, data.intendedObjects[at]!)
+          setStateBefore(position + 1, data.intendedLexerAfter[at]!, data.intendedGrammarAfter[at]!, data.intendedDepthAfter[at]!, data.intendedObjects[at]!)
           firstOnLineBefore[position + 1] = firstOnLineAfter[position]!
         } else {
           carry(position)
@@ -1020,23 +1045,23 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       const at = start + position
       if (position < length) {
         const flags = data.flags[at]!
-        if (position >= firstDamage && (flags & codePointLabeled) !== 0) {
+        if ((flags & codePointNestingScored) !== 0) {
           const depthIndex = data.labelDepth[at]! - depthLow
           depthGradient[depthIndex]! -= depthWeight / (depthAfter[position * depthCount + depthIndex]! + lossFloor)
           const container = data.labelContainer[at]!
           containerGradient[container] = -containerWeight / (containers[position * 3 + container]! + lossFloor)
-          if ((flags & codePointKindScored) !== 0) {
-            const kind = data.labelKind[at]!
-            kindGradient[kind] = -kindWeight / (kinds[position * displayKindCount + kind]! + lossFloor)
-          }
-          if (intendedTargets && data.intendedLexerAfter[at]! >= 0 && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : (flags & codePointCanFollow) !== 0)) {
-            const lexerState = data.intendedLexerAfter[at]!
-            const event = data.intendedEvent[at]!
-            const grammarState = data.intendedGrammarAfter[at]!
-            lexerGradient[lexerState]! -= intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
-            eventGradient[event] = -intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
-            grammarGradient[grammarState]! -= intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
-          }
+        }
+        if ((flags & codePointKindScored) !== 0) {
+          const kind = data.labelKind[at]!
+          kindGradient[kind] = -kindWeight / (kinds[position * displayKindCount + kind]! + lossFloor)
+        }
+        if (intendedTargets && data.intendedLexerAfter[at]! >= 0 && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : (flags & codePointCanFollow) !== 0)) {
+          const lexerState = data.intendedLexerAfter[at]!
+          const event = data.intendedEvent[at]!
+          const grammarState = data.intendedGrammarAfter[at]!
+          lexerGradient[lexerState]! -= intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
+          eventGradient[event] = -intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
+          grammarGradient[grammarState]! -= intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
         }
       }
       stepBackward(position, position < length ? data.classes[at]! : 0, gradients)
@@ -1072,7 +1097,7 @@ export type ObjectiveOptions = LossOptions & {
   sharpnessCost?: number
 }
 
-// What training lowers: the loss per labeled code point of the samples at `places`, plus the sharpness cost. With
+// What training lowers: the loss per scored code point of the samples at `places`, plus the sharpness cost. With
 // `weightGradients`, writes the gradients by the weights into it. This is the one-thread form. train.ts splits the
 // samples over worker threads and puts the parts together in the same way.
 export function objective(model: TwinModel, runner: TwinRunner, data: TwinData, places: ArrayLike<number>, options: ObjectiveOptions, mixes: CellArrays, mixGradients?: CellArrays, weightGradients?: CellArrays) {

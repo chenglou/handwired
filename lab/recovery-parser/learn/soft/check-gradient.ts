@@ -24,7 +24,7 @@
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {loadStandardSamples, splitNames} from '../data.ts'
+import {loadStandardSamples} from '../data.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective, trainableOf} from './twin.ts'
@@ -45,7 +45,7 @@ const fail = (message: string) => {
 
 const samples = loadStandardSamples()
 // Train samples with at most 120 code points, so that many weights matter to the objective, and two long ones.
-const trainPlaces = placesForTwin(samples, splitNames.indexOf('train'))
+const trainPlaces = placesForTwin(samples, 'train')
 const lengthOf = (place: number) => samples.start[place + 1]! - samples.start[place]!
 const short = Array.from(trainPlaces).filter(place => lengthOf(place) <= 120)
 const long = Array.from(trainPlaces).filter(place => lengthOf(place) >= 400).slice(0, 2)
@@ -192,8 +192,12 @@ for (const [name, worst] of [['today\'s tables', worstOfTodays], ['added structu
   }
 }
 console.log(`${((performance.now() - started) / 1000).toFixed(1)} s.`)
+// The last line says whether the check passed, as in every check of learn/.
 if (failures > 0) {
-  console.log(`${failures} comparisons FAILED: a direction with a relative difference above ${relativeTolerance}, or a single weight with a difference above ${absoluteTolerance} + ${relativeTolerance} of the gradient.`)
-  process.exit(1)
+  console.log(`A failure is a direction with a relative difference above ${relativeTolerance}, or a single weight with a difference above ${absoluteTolerance} + ${relativeTolerance} of the gradient.`)
+  console.log(`${failures} checks FAILED.`)
+  process.exitCode = 1
+} else {
+  console.log(`Every direction has a relative difference of at most ${relativeTolerance}, and every single weight a difference of at most ${absoluteTolerance} + ${relativeTolerance} of the gradient.`)
+  console.log('Every check passed.')
 }
-console.log(`Every direction has a relative difference of at most ${relativeTolerance}, and every single weight a difference of at most ${absoluteTolerance} + ${relativeTolerance} of the gradient.`)

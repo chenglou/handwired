@@ -20,9 +20,10 @@
 // e. With so many classes and states that a cell's number does not fit 16 bits, the trace names the cells that were
 //    read, and the ground rules hold.
 import {createRandom} from '../random.ts'
-import {defaultSeed, sampleAt} from '../samples.ts'
+import {defaultSeed} from '../samples.ts'
 import {type ParserTrace, classNames, grammarStateNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
+import {allowedSampleAt} from './data.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, grammarCellOf, lexerCellOf, openDisplayEntries, randomizeOpenCells, today} from './recovery-tables.ts'
 
@@ -91,7 +92,9 @@ function verdictDifference(trace: RecoveryTrace, expected: ParserTrace): string 
     if (otherContainer > 0) tally.brokenWithOtherContainer++
   }
   for (let index = 0; index < sampleCount; index++) {
-    const sample = sampleAt(defaultSeed, index)
+    // The texts of the train and validation splits: allowedSampleAt gives no sample of the test split.
+    const sample = allowedSampleAt(defaultSeed, index)
+    if (sample === undefined) continue
     check(sample.broken)
     if (sample.source !== 'valid') for (const document of sample.documents) check(document)
   }
@@ -106,7 +109,8 @@ function verdictDifference(trace: RecoveryTrace, expected: ParserTrace): string 
 const texts: {text: string, codePoints: number[], truncated: boolean, expected: ParserTrace}[] = []
 const add = (text: string) => texts.push({text, ...codePointsOf(text), expected: runTableParser(text)})
 for (let index = 0; index < 2000; index++) {
-  const sample = sampleAt(defaultSeed, 100_000 + index)
+  const sample = allowedSampleAt(defaultSeed, 100_000 + index)
+  if (sample === undefined) continue
   add(sample.broken)
   if (sample.source !== 'valid') add(sample.original)
 }

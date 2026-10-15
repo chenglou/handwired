@@ -1,5 +1,5 @@
-// Where the hand-written recovery is worse than the parser as it is: the labeled code points from the first damage
-// on that today's tables get right and the hand-written tables get wrong, per sample.
+// Where the hand-written recovery is worse than the parser as it is: the scored code points that today's tables get
+// right and the hand-written tables get wrong, per sample.
 //
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/handwritten/worse.ts [--split train] [--top 12] [--tables <file.json>] [--scratch <folder>]
@@ -10,10 +10,10 @@
 // gained in all. Then the lost code points by the two cells that the hand-written parser read at a sample's first
 // lost code point, with one example each, where the code point is between 【 and 】. A cell at the top of that list
 // is a rule that is too greedy for some texts.
-import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadStandardSamples, optionOf, splitNames} from '../data.ts'
-import {type RecoveryTrace, createTrace} from '../recovery-parser.ts'
+import {cacheFolderOf, codePointScored, kindsOf, loadStandardSamples, optionOf, splitNames} from '../data.ts'
+import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, grammarCellName, lexerCellName, loadTables} from '../recovery-tables.ts'
-import {runOnSample} from '../score.ts'
+import {runOnSample, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
 const visible = (codePoint: number) => codePoint === 0x0a ? '⏎' : codePoint === 0x09 ? '→' : codePoint < 0x20 ? '␦' : String.fromCodePoint(codePoint)
@@ -31,8 +31,7 @@ if (import.meta.main) {
   const byCells = new Map<string, {samples: number, lost: number, example: string}>()
   const tally = {samples: 0, samplesThatLose: 0, samplesThatLoseMore: 0, lost: 0, gained: 0}
   for (let place = 0; place < samples.sampleCount; place++) {
-    const firstDamage = samples.firstDamage[place]!
-    if (splitNames[samples.split[place]!] !== split || firstDamage === -1) continue
+    if (splitNames[samples.split[place]!] !== split || samples.firstDamage[place] === -1) continue
     tally.samples++
     const start = samples.start[place]!
     const length = samples.start[place + 1]! - start
@@ -41,13 +40,10 @@ if (import.meta.main) {
     let firstLost = -1
     let lost = 0
     let gained = 0
-    for (let position = firstDamage; position < length; position++) {
-      const flags = samples.flags[start + position]!
-      if ((flags & codePointLabeled) === 0) continue
-      const isRight = (shown: RecoveryTrace) => ((flags & codePointKindScored) === 0 || shown.displayKind[position] === samples.labelKind[start + position])
-        && shown.depthAfter[position] === samples.labelDepth[start + position] && shown.containerAfter[position] === samples.labelContainer[start + position]
-      const before = isRight(traceAsIs)
-      const after = isRight(trace)
+    for (let position = samples.firstErrorPosition[place]!; position < length; position++) {
+      if ((samples.flags[start + position]! & codePointScored) === 0) continue
+      const before = wrongLabelsAt(samples, start + position, traceAsIs, position) === 0
+      const after = wrongLabelsAt(samples, start + position, trace, position) === 0
       if (before && !after) {
         lost++
         if (firstLost === -1) firstLost = position

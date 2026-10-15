@@ -5,24 +5,26 @@
 //   bun lab/recovery-parser/learn/handwritten/show.ts [--kind missingComma] [--index 1234] [--split train] [--limit 20]
 //       [--skip 0] [--wrong] [--cells] [--tables <file.json>] [--to 60000] [--scratch <folder>]
 // --kind shows the samples that have the kind, --index the sample with that index in the dataset, --wrong only the
-// samples in which a labeled code point from the first damage on is wrong, and --cells adds, per wrong sample, the
-// cells that the parser read at the first wrong code point, and the entry of the display table when the tables have
-// open ones. --split is train or validation: this script never shows the test split. --tables shows saved tables in
+// samples in which a scored code point is wrong, and --cells adds, per wrong sample, the cells that the parser read
+// at the first wrong code point, and the entry of the display table when the tables have open ones. --split is train
+// or validation: this script never shows the test split, whose samples are not loaded. --tables shows saved tables in
 // place of the hand-written ones.
 //
 // The lines of a sample, one column per code point (⏎ is a line feed, → a tab):
 //   text   the broken text
 //   want   the label's display kind: w whitespace, p punctuation, s string, e escape, n number, l literal, E error,
-//          k key. Blank without a label, ? where the kind is not scored.
+//          k key. Blank where the damage added the code point, ? where the kind is not scored.
 //   got    the display kind that the parser gives
-//   wantd, gotd   the depth after the code point, 0 to 9, then a to g. - is below 0, + is above 16.
+//   wantd, gotd   the depth after the code point, 0 to 9, then a to g. - is below 0, + is above 16. wantd and wantc
+//          have a ? where the depth and the container are not scored.
 //   wantc, gotc   the innermost open container after it: o object, a array, - none
-//   miss   k, d or c where the kind, the depth or the container is wrong, * for more than one. Only code points from
-//          the first damage on are compared, and | marks the first damage.
-import {cacheFolderOf, codePointKindScored, codePointLabeled, kindsOf, loadSamples, optionOf, reachableNames, splitNames, standardRange} from '../data.ts'
+//   miss   k, d or c where the kind, the depth or the container is wrong, * for more than one. Only the code points
+//          that a score counts are compared: the ones from the first error on whose label has a scored value. | marks
+//          the first damage and ! the first error, where nothing is wrong there.
+import {cacheFolderOf, codePointKept, codePointKindScored, codePointNestingScored, codePointScored, groupNames, kindsOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {displayChoiceName, displayEntryName, displayEntryOf, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName, loadTables} from '../recovery-tables.ts'
-import {runOnSample} from '../score.ts'
+import {runOnSample, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../score.ts'
 import {handwrittenTables} from './rules.ts'
 
 const kindLetters = 'wpsenlE.k'
@@ -51,6 +53,7 @@ if (import.meta.main) {
   const tablesFile = optionOf('--tables')
   const tables = tablesFile === undefined ? handwrittenTables().tables : loadTables(tablesFile).tables
   const samples = loadSamples(standardRange.seed, standardRange.from, Number(optionOf('--to') ?? standardRange.to), cacheFolderOf(optionOf('--scratch') ?? process.env['RECOVERY_SCRATCH']))
+  if (index !== undefined && !samples.index.includes(Number(index))) throw new Error(`sample ${index} is not among the loaded samples: it is in the test split, which is never loaded, or outside the range of --to`)
   const trace = createTrace()
   let shown = 0
   let matched = 0
@@ -70,29 +73,28 @@ if (import.meta.main) {
     const lines = {text: '', want: '', got: '', wantd: '', gotd: '', wantc: '', gotc: '', miss: ''}
     let firstWrong = -1
     let wrong = 0
-    let labeled = 0
+    let scored = 0
+    const firstError = samples.firstErrorPosition[place]!
     for (let position = 0; position < length; position++) {
       const flags = samples.flags[start + position]!
-      const isLabeled = (flags & codePointLabeled) !== 0
+      const isKept = (flags & codePointKept) !== 0
       const kindScored = (flags & codePointKindScored) !== 0
+      const nestingScored = (flags & codePointNestingScored) !== 0
       lines.text += visible(samples.codePoints[start + position]!)
-      lines.want += !isLabeled ? ' ' : kindScored ? kindLetters[samples.labelKind[start + position]!]! : '?'
+      lines.want += !isKept ? ' ' : kindScored ? kindLetters[samples.labelKind[start + position]!]! : '?'
       lines.got += kindLetters[trace.displayKind[position]!]!
-      lines.wantd += isLabeled ? depthLetter(samples.labelDepth[start + position]!) : ' '
+      lines.wantd += !isKept ? ' ' : nestingScored ? depthLetter(samples.labelDepth[start + position]!) : '?'
       lines.gotd += depthLetter(trace.depthAfter[position]!)
-      lines.wantc += isLabeled ? containerLetter(samples.labelContainer[start + position]!) : ' '
+      lines.wantc += !isKept ? ' ' : nestingScored ? containerLetter(samples.labelContainer[start + position]!) : '?'
       lines.gotc += containerLetter(trace.containerAfter[position]!)
-      let miss = position === firstDamage ? '|' : ' '
-      if (isLabeled && firstDamage !== -1 && position >= firstDamage) {
-        labeled++
-        const kindWrong = kindScored && trace.displayKind[position] !== samples.labelKind[start + position]
-        const depthWrong = trace.depthAfter[position] !== samples.labelDepth[start + position]
-        const containerWrong = trace.containerAfter[position] !== samples.labelContainer[start + position]
-        const count = Number(kindWrong) + Number(depthWrong) + Number(containerWrong)
-        if (count > 0) {
+      let miss = position === firstDamage ? '|' : position === firstError ? '!' : ' '
+      if (firstError !== -1 && position >= firstError && (flags & codePointScored) !== 0) {
+        scored++
+        const wrongLabels = wrongLabelsAt(samples, start + position, trace, position)
+        if (wrongLabels !== 0) {
           wrong++
           if (firstWrong === -1) firstWrong = position
-          miss = count > 1 ? '*' : kindWrong ? 'k' : depthWrong ? 'd' : 'c'
+          miss = wrongLabels === wrongKind ? 'k' : wrongLabels === wrongDepth ? 'd' : wrongLabels === wrongContainer ? 'c' : '*'
         }
       }
       lines.miss += miss
@@ -101,7 +103,7 @@ if (import.meta.main) {
     matched++
     if (matched <= skip) continue
     shown++
-    console.log(`--- ${samples.seed}:${samples.index[place]}  kinds: ${kinds.length === 0 ? 'none' : kinds.join(', ')}  reachable: ${reachableNames[samples.reachable[place]!]}${samples.needsClass[place] === 1 ? '  needs a class' : ''}${samples.debatable[place] === 1 ? '  debatable' : ''}  ${wrong} of ${labeled} labeled code points from the damage on are wrong`)
+    console.log(`--- ${samples.seed}:${samples.index[place]}  kinds: ${kinds.length === 0 ? 'none' : kinds.join(', ')}${firstDamage === -1 ? '' : `  group: ${groupNames[samples.group[place]!]}`}${samples.debatable[place] === 1 ? '  debatable' : ''}  ${wrong} of ${scored} scored code points are wrong`)
     for (const [name, line] of Object.entries(lines)) console.log(`${name.padEnd(6)}${line}`)
     if (withCells && firstWrong !== -1) {
       // The steps around the first wrong code point: the cells that were read and what they hold.

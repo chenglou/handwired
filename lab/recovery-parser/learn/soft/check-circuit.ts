@@ -176,8 +176,12 @@ const structureName = `of tables with ${classesOfTheChecks.length} added classes
 checkStep(structureName, withStructure, true, 3, 400, classNames.indexOf('lineFeed'))
 checkStep(structureName, withStructure, false, 1, 500)
 summary('The step with added structure')
+// The last line says whether the check passed, as in every check of learn/.
 if (failures > 0) {
-  console.log(`${failures} comparisons FAILED: a difference above ${tolerance}.`)
-  process.exit(1)
+  console.log(`A difference above ${tolerance} counts as a failure.`)
+  console.log(`${failures} checks FAILED.`)
+  process.exitCode = 1
+} else {
+  console.log(`Every value and every gradient of the circuit is the twin's within ${tolerance}.`)
+  console.log('Every check passed.')
 }
-console.log(`Every value and every gradient of the circuit is the twin's within ${tolerance}.`)

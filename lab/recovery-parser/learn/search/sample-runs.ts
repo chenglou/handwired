@@ -2,12 +2,12 @@
 //
 // The search runs a sample again for every choice it tries, many million times, so the loop here skips what no choice
 // of the open cells can change: the part of a sample before the first position that reads an open cell. That position
-// is the sample's first error, see recovery-tables.ts. prepareSamples finds it with today's tables and the parser of
-// recovery-parser.ts, and keeps the parser's state there and the score of the code points before it.
+// is the sample's first error, see recovery-tables.ts, and a score counts no code point before it. prepareSamples
+// finds it with today's tables and the parser of recovery-parser.ts, and keeps the parser's state there.
 //
 // The loop has to count exactly what score.ts counts. check.ts compares the two on today's tables and on random
 // settings of every open cell, and search.ts compares them after every pass.
-import {type Samples, codePointKindScored, codePointLabeled} from '../data.ts'
+import {type Samples, codePointKindScored, codePointNestingScored, codePointScored} from '../data.ts'
 import {containerArray, containerNone, containerObject, createTrace, maximumDepth, runRecoveryParserInto} from '../recovery-parser.ts'
 import {type RecoveryTables, actionByToken, actionOfToken, actionPop, actionPushArray, actionPushObject, asIsTables, today} from '../recovery-tables.ts'
 
@@ -33,15 +33,16 @@ export type RunSamples = {
   grammarStateThere: Uint8Array
   depthThere: Int8Array
   objectLevelsThere: Uint16Array
-  // The score of the labeled code points from the first damage up to that position, as scoreOfSample packs a score.
+  // The score of the scored code points before that position, as scoreOfSample packs a score. It is 0: a score
+  // counts the code points from the first error on, and the first error is the first read of an open cell.
   fixedScore: Int32Array
-  // Labeled code points at or after the first damage, over all samples.
+  // Scored code points over all samples: the ones from the first error on whose label has a scored value.
   scoredCodePoints: number
 }
 
-// A sample's score in one number: the code points with all three labels right × scorePack, plus the labels that are
-// right one by one (the display kind where it is scored, the depth, the container). A sample has at most 512 code
-// points, so the second count is at most 1536.
+// A sample's score in one number: the scored code points with every scored label right × scorePack, plus the labels
+// that are right one by one (the display kind, the depth and the container, each where it is scored). A sample has
+// at most 512 code points, so the second count is at most 1536.
 export const scorePack = 4096
 
 const arrayFields = ['place', 'start', 'classes', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'changeableFrom', 'lexerStateThere', 'grammarStateThere', 'depthThere', 'objectLevelsThere', 'fixedScore'] as const
@@ -101,21 +102,11 @@ export function prepareSamples(samples: Samples): RunSamples {
     prepared.grammarStateThere[sample] = changeableFrom < length ? trace.grammarBefore[changeableFrom]! : 0
     prepared.depthThere[sample] = depth
     prepared.objectLevelsThere[sample] = objectLevels
-    let fixedScore = 0
-    const firstDamage = samples.firstDamage[place]!
-    for (let position = firstDamage; position < length; position++) {
-      const flags = samples.flags[first + position]!
-      if ((flags & codePointLabeled) === 0) continue
-      prepared.scoredCodePoints++
-      if (position >= changeableFrom) continue
-      const depthIsRight = trace.depthAfter[position] === samples.labelDepth[first + position]
-      const containerIsRight = trace.containerAfter[position] === samples.labelContainer[first + position]
-      const kindIsScored = (flags & codePointKindScored) !== 0
-      const kindIsRight = !kindIsScored || trace.displayKind[position] === samples.labelKind[first + position]
-      fixedScore += Number(depthIsRight) + Number(containerIsRight) + Number(kindIsScored && kindIsRight) + (depthIsRight && containerIsRight && kindIsRight ? scorePack : 0)
-    }
-    if (firstDamage > changeableFrom) throw new Error(`sample at place ${place}: it reads an open cell at ${changeableFrom}, before its first damage at ${firstDamage}`)
-    prepared.fixedScore[sample] = fixedScore
+    // The first read of an open cell is the first error, or there is none among the code points.
+    const firstError = samples.firstErrorPosition[place]!
+    if (changeableFrom !== Math.min(firstError, length)) throw new Error(`sample at place ${place}: it first reads an open cell at ${changeableFrom}, and its first error is at ${firstError}`)
+    for (let position = firstError; position < length; position++) if ((samples.flags[first + position]! & codePointScored) !== 0) prepared.scoredCodePoints++
+    prepared.fixedScore[sample] = 0
     at += length
   }
   prepared.start[sampleCount] = at
@@ -172,12 +163,17 @@ function scoreOfRun(samples: RunSamples, tables: RecoveryTables, at: number, end
       const bit = lexerCellCount + grammarCell
       cellsRead[cellsOffset + (bit >> 3)]! |= 1 << (bit & 7)
     }
+    // Every code point of a run is at or after the first error, so it counts when a value of its label is scored.
     const flag = flags[at]!
-    if ((flag & codePointLabeled) !== 0) {
-      const depthIsRight = depth === labelDepth[at]
-      const containerIsRight = (depth <= 0 ? containerNone : kindAtLevel[depth > maximumDepth ? maximumDepth : depth]!) === labelContainer[at]
-      let right = (depthIsRight ? 1 : 0) + (containerIsRight ? 1 : 0)
-      let allRight = depthIsRight && containerIsRight
+    if ((flag & codePointScored) !== 0) {
+      let right = 0
+      let allRight = true
+      if ((flag & codePointNestingScored) !== 0) {
+        if (depth === labelDepth[at]) right++
+        else allRight = false
+        if ((depth <= 0 ? containerNone : kindAtLevel[depth > maximumDepth ? maximumDepth : depth]!) === labelContainer[at]) right++
+        else allRight = false
+      }
       if ((flag & codePointKindScored) !== 0) {
         if (display[event * grammarStateCount + grammarAfter] === labelKind[at]) right++
         else allRight = false
@@ -291,8 +287,8 @@ export function changesOfChoices(samples: RunSamples, among: ArrayLike<number>, 
   return {allRight, labelsRight, readers: readers.length}
 }
 
-// The packed score of every sample together, as two counts: the code points with all three labels right, and the
-// labels that are right one by one.
+// The packed score of every sample together, as two counts: the scored code points with every scored label right,
+// and the labels that are right one by one.
 export function totalScore(samples: RunSamples, tables: RecoveryTables) {
   let allRight = 0
   let labelsRight = 0

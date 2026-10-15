@@ -7,12 +7,13 @@
 // - Per rule, how many samples read one of its cells from the first error on. A rule that no sample reads is there
 //   for completeness only.
 // - On valid JSON texts of 17 to 19 levels, which today's parser reports as too deep and whose depth it still has
-//   right at every code point: the hand-written tables must not have more wrong depths. The dataset has no such
-//   text, so no score sees them, see ../check-deep.ts.
+//   right at every code point: the hand-written tables must not have more wrong depths, on texts with nothing after
+//   their nested containers and on texts with members after them. The dataset has no such text, so no score sees
+//   them, see ../check-deep.ts.
 //
 // Run from the repo root: bun lab/recovery-parser/learn/handwritten/check.ts [--scratch <folder>] [--to 60000]
-import {deepTexts, depthsOnDeepTexts} from '../check-deep.ts'
-import {cacheFolderOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
+import {deepTexts, deepTextsWithMembersAfter, depthsOnDeepTexts} from '../check-deep.ts'
+import {cacheFolderOf, loadSamples, optionOf, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName} from '../recovery-tables.ts'
 import {runOnSample} from '../score.ts'
@@ -34,8 +35,8 @@ if (import.meta.main) {
   let samplesInError = 0
   let differencesBeforeError = 0
   let codePointsFromError = 0
+  // The loaded samples are the ones of the train and validation splits: the test split is never loaded.
   for (let place = 0; place < samples.sampleCount; place++) {
-    if (splitNames[samples.split[place]!] === 'test') continue
     texts++
     const length = samples.start[place + 1]! - samples.start[place]!
     runOnSample(trace, samples, place, tables, true)
@@ -85,6 +86,12 @@ if (import.meta.main) {
   const tooDeep = deepTexts(300)
   const deepAsIs = depthsOnDeepTexts(asIs, tooDeep)
   const deep = depthsOnDeepTexts(tables, tooDeep)
-  console.log(`${deep.texts} valid JSON texts of 17 to 19 levels, ${deep.fromFirstError} code points at or after the first error: the depth is wrong at ${deep.depthWrong} of them (the parser as it is: ${deepAsIs.depthWrong}, and it must not be more), the container at ${deep.containerWrong} (the parser as it is: ${deepAsIs.containerWrong}).`)
-  if (differencesBeforeError > 0 || deep.depthWrong > deepAsIs.depthWrong) process.exit(1)
+  console.log(`${deep.texts} valid JSON texts of 17 to 19 levels with nothing after their nested containers, ${deep.fromFirstError} code points at or after the first error: the depth is wrong at ${deep.depthWrong} of them (the parser as it is: ${deepAsIs.depthWrong}, and it must not be more), the container at ${deep.containerWrong} (the parser as it is: ${deepAsIs.containerWrong}).`)
+  const tooDeepWithMembersAfter = deepTextsWithMembersAfter(300)
+  const deepAfterAsIs = depthsOnDeepTexts(asIs, tooDeepWithMembersAfter)
+  const deepAfter = depthsOnDeepTexts(tables, tooDeepWithMembersAfter)
+  console.log(`${deepAfter.texts} such texts with members after their nested containers, ${deepAfter.fromFirstError} code points at or after the first error: the depth is wrong at ${deepAfter.depthWrong} of them (the parser as it is: ${deepAfterAsIs.depthWrong}, and it must not be more), the container at ${deepAfter.containerWrong} (the parser as it is: ${deepAfterAsIs.containerWrong}).`)
+  const failed = differencesBeforeError > 0 || deep.depthWrong > deepAsIs.depthWrong || deepAfter.depthWrong > deepAfterAsIs.depthWrong
+  console.log(failed ? 'The check FAILED.' : 'Every check passed.')
+  if (failed) process.exitCode = 1
 }

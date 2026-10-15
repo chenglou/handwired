@@ -1,14 +1,18 @@
 // Fills the open cells by search, without gradients: for one open cell at a time, try its choices in the exact
 // parser and keep the one with the best score on the train split, and go over the cells again until a pass changes
-// nothing or the budget ends.
+// nothing or a limit ends the search.
 //
 // Run from the repo root:
-//   bun lab/recovery-parser/learn/search/search.ts [--from <tables.json>] [--out <tables.json>] [--pairs known]
-//       [--passes 50] [--runs 1400] [--minutes 9.5] [--workers 4] [--order 0] [--without-kinds hashComment,foreignLiteral]
+//   bun lab/recovery-parser/learn/search/search.ts [--from <tables.json> --out <tables.json>] [--pairs known]
+//       [--passes 50] [--runs 1400] [--minutes <minutes>] [--workers 4] [--order 0] [--without-kinds hashComment,foreignLiteral]
 //       [--end-events] [--scratch <folder>]
-// --from   the tables to start from, e.g. the ones votes.ts saved. Without it, today's tables.
-// --out    where the tables go after every pass. Without it, <scratch>/search/search-from-<today or the name of --from>.json.
-//          A log goes next to it, with the same name and .log.
+// --from   the tables to start from, e.g. the ones votes.ts saved. Without it, today's tables. With it, --out has to
+//          name the output: the search does not make up a name from the name of the file it started from.
+// --out    where the tables go after every pass. A log goes next to it, with the same name and .log. Without --from
+//          and --out, the tables go to <scratch>/search/search-from-today.json, with the order and the kinds that are
+//          left out in the name.
+// --passes the most passes over the open cells. A search that this limit ends can be repeated: it ends at the same
+//          step on every machine.
 // --pairs  which choices of a tokenizer cell a step tries:
 //          parts  one part at a time: every other next state with the event the cell holds, and every other event
 //                 with the next state it holds
@@ -22,16 +26,16 @@
 //          this folder tried them, and used the event `end` to give the grammar its token.
 // --runs   the budget, in millions of runs of a sample. The search stops inside a pass when it is used up. It is a
 //          count and not a time, so a rerun stops at the same step.
-// --minutes  a second stop, by the clock, for a machine that is slower than expected. When it is the one that stops
-//          the search, the log says so, since a rerun may then stop at another step.
+// --minutes  a stop by the clock. It is off unless the option is given, because a search that the clock stops cannot
+//          be repeated: a rerun may stop at another step. When it is the one that stops the search, the log says so.
 // --order  0 goes over the cells of a pass from the most read one to the least read one. Any other number is the seed
 //          of a random order, a new one in every pass. The search ends in other tables for another order, so a few
 //          orders say how much of a score is the order's doing.
 // --without-kinds  leaves out every train sample with one of these kinds of damage. The validation rows of those
 //          kinds then say how the search does on damage it has not seen, without a look at the test split.
 //
-// The score of a choice is two counts over the train split's labeled code points at or after the first damage: the
-// code points with all three labels right, and the labels that are right one by one (display kind, depth, container).
+// The score of a choice is two counts over the train split's scored code points, see ../score.ts: the code points
+// with every scored label right, and the labels that are right one by one (display kind, depth, container).
 // A choice is better when the first count is higher, or the first is the same and the second is higher. The second
 // count lets the search keep a step that e.g. gets the depth right before another cell gets the display kind right.
 //
@@ -54,7 +58,7 @@ const pairs = optionOf('--pairs') ?? 'known'
 if (!['parts', 'known', 'all'].includes(pairs)) throw new Error(`--pairs takes parts, known or all, and got ${pairs}`)
 const maximumPasses = Number(optionOf('--passes') ?? 50)
 const maximumRuns = Number(optionOf('--runs') ?? 1400) * 1e6
-const maximumMinutes = Number(optionOf('--minutes') ?? 9.5)
+const maximumMinutes = Number(optionOf('--minutes') ?? Infinity)
 const orderSeed = Number(optionOf('--order') ?? 0)
 const withoutKinds = (optionOf('--without-kinds') ?? '').split(',').filter(name => name !== '')
 const withEndEvents = process.argv.includes('--end-events')
@@ -62,8 +66,8 @@ const withEndEvents = process.argv.includes('--end-events')
 // no such cell, since it runs the code points of a text and not the position after them.
 const endEvents = new Set((['end', 'endInsideToken', 'truncatedEnd'] as const).map(name => eventNames.indexOf(name)))
 const workerCount = Math.min(4, Math.max(1, Number(optionOf('--workers') ?? 4)))
-const startName = fromFile === undefined ? 'today' : basename(fromFile).replace(/\.json$/, '')
-const outFile = optionOf('--out') ?? (scratchFolder === undefined ? undefined : join(scratchFolder, 'search', `search-from-${startName}${orderSeed === 0 ? '' : `-order-${orderSeed}`}${withoutKinds.length === 0 ? '' : `-without-${withoutKinds.join('-')}`}.json`))
+if (fromFile !== undefined && optionOf('--out') === undefined) throw new Error('search.ts with --from needs --out <tables.json>: name the output yourself, e.g. --out $RECOVERY_SCRATCH/search/search-from-votes.json')
+const outFile = optionOf('--out') ?? (scratchFolder === undefined ? undefined : join(scratchFolder, 'search', `search-from-today${orderSeed === 0 ? '' : `-order-${orderSeed}`}${withoutKinds.length === 0 ? '' : `-without-${withoutKinds.join('-')}`}.json`))
 if (outFile === undefined) throw new Error('search.ts needs --out <tables.json>, or a scratch folder from --scratch or the environment variable RECOVERY_SCRATCH')
 mkdirSync(dirname(outFile), {recursive: true})
 const logFile = outFile.replace(/\.json$/, '') + '.log'
@@ -105,8 +109,8 @@ const checkedTotal = () => {
   return total
 }
 let total = checkedTotal()
-log(`Search from ${fromFile ?? 'today\'s tables'}, choices of a tokenizer cell: ${pairs}${withEndEvents ? ', with the events of a text\'s end' : ', without the events of a text\'s end'}, ${orderSeed === 0 ? 'most read cells first' : `random order ${orderSeed}`}, ${workerCount} worker threads, at most ${maximumPasses} passes, ${maximumRuns / 1e6} million runs and ${maximumMinutes} minutes.`)
-log(`Train split${withoutKinds.length === 0 ? '' : ` without the kinds ${withoutKinds.join(', ')}`}: ${prepared.sampleCount} broken samples, ${prepared.scoredCodePoints} labeled code points from the first damage on.`)
+log(`Search from ${fromFile ?? 'today\'s tables'}, choices of a tokenizer cell: ${pairs}${withEndEvents ? ', with the events of a text\'s end' : ', without the events of a text\'s end'}, ${orderSeed === 0 ? 'most read cells first' : `random order ${orderSeed}`}, ${workerCount} worker threads, at most ${maximumPasses} passes and ${maximumRuns / 1e6} million runs${Number.isFinite(maximumMinutes) ? `, and a stop by the clock after ${maximumMinutes} minutes` : ', no stop by the clock'}.`)
+log(`Dataset ${samples.datasetKey}. Train split${withoutKinds.length === 0 ? '' : ` without the kinds ${withoutKinds.join(', ')}`}: ${prepared.sampleCount} broken samples, ${prepared.scoredCodePoints} scored code points.`)
 log(`Start: train all three ${percent(total.allRight, prepared.scoredCodePoints)}% (${total.allRight} code points, ${total.labelsRight} right labels). ${validationLine()}`)
 
 // The pairs of next state and event that today's tokenizer table holds somewhere.
@@ -238,10 +242,12 @@ for (; pass < maximumPasses && stoppedBy === '';) {
   }
   const checked = checkedTotal()
   if (checked.allRight !== total.allRight || checked.labelsRight !== total.labelsRight) throw new Error(`after pass ${pass} the steps add up to ${total.allRight} code points and ${total.labelsRight} labels, and a run of every sample gives ${checked.allRight} and ${checked.labelsRight}`)
-  const differences = differencesOf(asIsTables(), tables)
-  const note = `search from ${fromFile === undefined ? 'today\'s tables' : basename(fromFile)}, --pairs ${pairs}${withEndEvents ? ', --end-events' : ''}${orderSeed === 0 ? '' : `, --order ${orderSeed}`}${withoutKinds.length === 0 ? '' : `, without the kinds ${withoutKinds.join(', ')}`}, after pass ${pass}${stoppedBy === '' ? '' : `, which stopped by ${stoppedBy}`}: ${differences.length} cells differ from today's, train all three ${percent(total.allRight, prepared.scoredCodePoints)}%`
+  // Two counts: what the search changed, against the tables it started from, and what differs from today's parser.
+  const changedAgainstStart = differencesOf(startTables, tables).length
+  const differFromToday = differencesOf(asIsTables(), tables).length
+  const note = `search from ${fromFile === undefined ? 'today\'s tables' : basename(fromFile)}, --pairs ${pairs}${withEndEvents ? ', --end-events' : ''}${orderSeed === 0 ? '' : `, --order ${orderSeed}`}${withoutKinds.length === 0 ? '' : `, without the kinds ${withoutKinds.join(', ')}`}, after pass ${pass}${stoppedBy === '' ? '' : `, which stopped by ${stoppedBy}`}: ${changedAgainstStart} cells changed against the tables it started from, ${differFromToday} cells differ from today's parser, train all three ${percent(total.allRight, prepared.scoredCodePoints)}%`
   saveTables(outFile, tables, note)
-  log(`Pass ${pass} ${stoppedBy === '' ? 'done' : `stopped by ${stoppedBy}`} at ${seconds()} s: ${tried} of ${order.length} open cells tried (${readAtStart} were read at the start of the pass), ${changes} changed, ${((runs - passRuns) / 1e6).toFixed(1)} million runs. ${differences.length} cells differ from today's and ${differencesOf(startTables, tables).length} from the start.`)
+  log(`Pass ${pass} ${stoppedBy === '' ? 'done' : `stopped by ${stoppedBy}`} at ${seconds()} s: ${tried} of ${order.length} open cells tried (${readAtStart} were read at the start of the pass), ${changes} changed, ${((runs - passRuns) / 1e6).toFixed(1)} million runs. ${changedAgainstStart} cells changed against the tables the search started from, and ${differFromToday} cells differ from today's parser.`)
   log(`  train: all three ${percent(total.allRight, prepared.scoredCodePoints)}% (${total.allRight} code points, ${total.labelsRight} right labels). ${validationLine()}`)
   if (changes === 0 && stoppedBy === '') {
     stoppedBy = 'a pass that changed nothing'
