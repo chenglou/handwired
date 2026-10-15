@@ -24,11 +24,12 @@
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {loadStandardSamples} from '../data.ts'
+import {loadStandardSamples, refuseUnknownOptions} from '../data.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective, trainableOf} from './twin.ts'
 
+refuseUnknownOptions('soft/check-gradient.ts', [])
 const sampleCount = Number(process.argv[2] ?? 24)
 const weightsPerGroup = Number(process.argv[3] ?? 60)
 const directionsPerGroup = 6

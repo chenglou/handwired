@@ -31,13 +31,14 @@ import {createRandom} from '../random.ts'
 import {defaultSeed} from '../samples.ts'
 import {type ParserTrace, classNames, contextNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
-import {allowedSampleAt} from './data.ts'
+import {allowedSampleAt, refuseUnknownOptions} from './data.ts'
 import {codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {
   type AddedClass, type RecoveryTables, actionCount, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, className, copyTables, describeDifferences, differencesOf, displayEntryName, displayEntryOf, displayKindNames,
   eventNames, frozenSearchOf, grammarCellName, grammarStateNames, lexerCellName, loadTables, openDisplayEntries, problemsOf, randomizeOpenCells, saveTables, tablesFromJson, tablesToJson, today,
 } from './recovery-tables.ts'
 
+refuseUnknownOptions('check-tables.ts', [])
 const sampleCount = Number(process.argv[2] ?? 30_000)
 let failures = 0
 const fail = (message: string) => {

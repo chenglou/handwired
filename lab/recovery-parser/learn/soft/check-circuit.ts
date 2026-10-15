@@ -17,10 +17,12 @@ import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {capacity, maximumDepth} from '../recovery-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
+import {refuseUnknownOptions} from '../data.ts'
 import {type RecoveryTables, actionCount, actionNone, addClasses, addFirstOnLineBit, addStates, asIsTables, className, classNames, grammarStateNames, openDisplayEntries} from '../recovery-tables.ts'
 import {buildStepCircuit} from './step-circuit.ts'
 import {createCellArrays, createTwinRunner, defaultDepthHigh, defaultDepthLow, groupNames, groupWidths, shapeOf} from './twin.ts'
 
+refuseUnknownOptions('soft/check-circuit.ts', [])
 const trials = Number(process.argv[2] ?? 6)
 const tolerance = 1e-4
 let failures = 0

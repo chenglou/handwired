@@ -20,7 +20,7 @@
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
 import {createRandom} from '../random.ts'
-import {datasetKey, loadSamples, standardRange} from './data.ts'
+import {datasetKey, loadSamples, refuseUnknownOptions, standardRange} from './data.ts'
 import {handwrittenTables} from './handwritten/rules.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, copyTables, differencesOf, grammarStateNames, openDisplayEntries, randomizeOpenCells, saveTables} from './recovery-tables.ts'
 import {cellCountsOf, scoreTables, sharesOf} from './score.ts'
@@ -32,6 +32,7 @@ const check = (holds: boolean, message: string) => {
   console.log(`FAILED: ${message}`)
 }
 
+refuseUnknownOptions('check-commands.ts', [])
 const scratch = process.env['RECOVERY_SCRATCH']
 if (scratch === undefined || scratch === '') throw new Error('set RECOVERY_SCRATCH to a folder outside the repo: the check saves tables there, and the commands read the cache of the samples there')
 const folder = join(scratch, 'check-commands')

@@ -16,7 +16,7 @@
 import {appendFileSync, mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {displayKind} from '../../labels.ts'
-import {codePointKindScored, kindsOf, loadStandardSamples, validationPart} from '../data.ts'
+import {codePointKindScored, kindsOf, loadStandardSamples, refuseUnknownOptions, validationPart} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {
   type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, classNames, describeDifferences, differencesOf, grammarCellName, grammarChoiceName, openDisplayEntries, saveTables,
@@ -37,6 +37,7 @@ const bases: Record<string, () => RecoveryTables> = {
   display: () => openDisplayEntries(asIsTables()),
   bit: () => addFirstOnLineBit(asIsTables()),
 }
+refuseUnknownOptions('structure/smoke.ts', [])
 const names = process.argv.slice(2).length === 0 ? Object.keys(bases) : process.argv.slice(2)
 for (const name of names) if (bases[name] === undefined) throw new Error(`smoke.ts takes ${Object.keys(bases).join(', ')}, and got ${name}`)
 

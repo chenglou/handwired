@@ -23,10 +23,11 @@ import {createRandom} from '../random.ts'
 import {defaultSeed} from '../samples.ts'
 import {type ParserTrace, classNames, grammarStateNames, positionCount, runTableParser, tokenNames} from '../table-parser.ts'
 import {checkTexts, classesOfTheChecks, textWithAddedClasses} from './check-texts.ts'
-import {allowedSampleAt} from './data.ts'
+import {allowedSampleAt, refuseUnknownOptions} from './data.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from './recovery-parser.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, grammarCellOf, lexerCellOf, openDisplayEntries, randomizeOpenCells, today} from './recovery-tables.ts'
 
+refuseUnknownOptions('check-parser.ts', [])
 const sampleCount = Number(process.argv[2] ?? 30_000)
 const settingCount = Number(process.argv[3] ?? 200)
 let failures = 0

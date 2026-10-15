@@ -28,7 +28,7 @@
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {allowedSampleAt, loadStandardSamples} from '../data.ts'
+import {allowedSampleAt, loadStandardSamples, refuseUnknownOptions} from '../data.ts'
 import {type RecoveryTrace, containerObject, createTrace, positionCount, runRecoveryParser, runRecoveryParserInto} from '../recovery-parser.ts'
 import {
   type RecoveryTables, actionCount, actionPop, actionPushArray, actionPushObject, addClasses, addFirstOnLineBit, addStates, asIsTables, checkTables, classNames, openDisplayEntries, randomizeOpenCells, tokenNames,
@@ -36,6 +36,7 @@ import {
 import {intendedObjectsOf, loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type TwinData, type TwinRunner, createCellArrays, createTally, createTwinRunner, defaultDepthHigh, defaultDepthLow, exactMixesInto, shapeOf} from './twin.ts'
 
+refuseUnknownOptions('soft/check-twin.ts', [])
 const sampleCount = Number(process.argv[2] ?? 2500)
 const settingCount = Number(process.argv[3] ?? 20)
 let failures = 0

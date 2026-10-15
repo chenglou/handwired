@@ -44,7 +44,7 @@ import {cellsThatValidJsonReads} from '../../limits.ts'
 import {createRandom} from '../../random.ts'
 import {classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from '../../table-parser.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {type Samples, datasetKey, groupNames, heldOutByKind, heldOutByTemplate, loadSamples, standardRange, textOf} from '../data.ts'
+import {type Samples, datasetKey, groupNames, heldOutByKind, heldOutByTemplate, loadSamples, refuseUnknownOptions, standardRange, textOf} from '../data.ts'
 import {handwrittenTables} from '../handwritten/rules.ts'
 import {plainParserProblems, recoveryTablesOf} from '../plain-tables.ts'
 import {createTrace, runRecoveryParserInto} from '../recovery-parser.ts'
@@ -60,6 +60,7 @@ import {
   trainDataFor, trainPartOfTheStandardSet, validationOfTheStandardSet,
 } from './harness.ts'
 
+refuseUnknownOptions('arms/check.ts', [])
 let failures = 0
 const check = (holds: boolean, message: string) => {
   if (holds) return

@@ -52,6 +52,7 @@ const refusesTheTestSplit = (run: () => unknown) => {
   return false
 }
 
+refuseUnknownOptions('check-guard.ts', [])
 if (process.env['RECOVERY_FINAL'] !== undefined) {
   console.log('FAILED: check-guard.ts has to run without the environment variable RECOVERY_FINAL.')
   console.log('1 checks FAILED.')

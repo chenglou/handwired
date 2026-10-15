@@ -30,7 +30,7 @@ import {mkdirSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
 import {createRandom} from '../../random.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
-import {loadStandardSamples} from '../data.ts'
+import {loadStandardSamples, refuseUnknownOptions} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {
   type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, cellCounts, checkTables, differencesOf, displayKindNames, grammarStateNames, loadTables, openDisplayEntries, problemsOf, saveTables, tablesToJson,
@@ -47,6 +47,7 @@ const check = (holds: boolean, message: string) => {
   console.log(`FAILED: ${message}`)
 }
 
+refuseUnknownOptions('soft/check-train.ts', [])
 const samples = loadStandardSamples()
 const trainPlaces = placesForTwin(samples, 'train').subarray(0, 96)
 const intendedObjects = loadIntendedObjects(samples, softCacheFolderOf())
