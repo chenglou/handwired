@@ -500,7 +500,7 @@ export const notationKinds: KindDefinition[] = [
   {
     name: 'unquotedKey', family: 'other notation', origin: 'either', weight: 1.5,
     example: '{⏎  "host": "localhost",⏎  port: 8080⏎}',
-    reachable: 'yes: where a key may come, a word up to the colon is the key. A key that starts with t, f or n, e.g. name, needs a display cell: after white space, a bracket or a comma the tokenizer reads that letter as the start of true, false or null, by a cell that valid JSON reads, and the display table shows it as a literal',
+    reachable: 'yes: where a key may come, a word up to the colon is the key. A key that starts with t, f or n, e.g. name, needs a display fix as long as the tokenizer has read no cell before it that valid JSON never reads: it then reads that letter from the state between as the start of true, false or null, by a cell that valid JSON reads, and the display table shows it as a literal. After such a cell, e.g. after the key port, tables can be in a state of their own, in which a word after a comma is a key',
     apply: unquotedKey,
   },
   {

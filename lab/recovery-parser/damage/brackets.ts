@@ -176,14 +176,14 @@ export const bracketKinds: KindDefinition[] = [
   {
     name: 'strayCloser', family: 'bracket', origin: 'either', weight: 1.5,
     example: '{⏎  "name": "Ada",⏎  },⏎  "active": true⏎}',
-    reachable: 'yes after the document\'s end, when no open container has the bracket\'s kind, and when it closes the top-level container and a comma follows. Otherwise no: it reads as a real closer. A closer right before the same closer is the kept one, and the second is the added one. The loop of the highlighter lowers the depth at every closing bracket, so it can only label what comes after the document\'s end',
+    reachable: 'yes after the document\'s end, when no open container has the bracket\'s kind, and when it closes the top-level container and a comma follows. Otherwise no: it reads as a real closer. A closer right before the same closer is the kept one, and the second is the added one. The loop of the highlighter lowers the depth at every closing bracket that the tokenizer reads by a cell of valid JSON, so there it can only label what comes after the document\'s end',
     margin: 20,
     apply: strayCloser,
   },
   {
     name: 'wrongCloser', family: 'bracket', origin: 'either', weight: 0.8,
     example: '{"point": [59.91, 10.75}}',
-    reachable: 'yes, with the rule that a closer of the other kind closes one container, which contradicts the rule for a missing closer. The loop of the highlighter then has the wrong kind for a container around it',
+    reachable: 'yes, with the rule that a closer of the other kind closes one container, which contradicts the rule for a missing closer. The loop of the highlighter then has the wrong kind for a container around it, when the tokenizer reads the closer by a cell of valid JSON',
     apply: wrongCloser,
   },
 ]

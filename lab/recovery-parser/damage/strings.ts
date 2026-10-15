@@ -226,13 +226,13 @@ export const stringKinds: KindDefinition[] = [
   {
     name: 'missingOpeningQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": Lisbon",⏎  "country": "PT"⏎}',
-    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display cell, as a key without quotes does',
+    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
     apply: missingOpeningQuote,
   },
   {
     name: 'doubledQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": "Lisbon"",⏎  "country": "PT"⏎}',
-    reachable: 'yes for a parser that knows that it stands right after a closing quote: a second quote there is skipped, and content there opens the string again. The highlighter\'s tokenizer is in the same state after a closing quote as between any two tokens, so its tables read the second quote as the start of a string',
+    reachable: 'yes for a parser that knows that it stands right after a closing quote: a second quote there is skipped, and content there opens the string again. The highlighter\'s tokenizer is in the same state after a closing quote as between any two tokens, so its tables read the second quote as the start of a string, unless a cell that valid JSON never reads has led them into states of their own before',
     margin: 2,
     apply: doubledQuote,
   },
