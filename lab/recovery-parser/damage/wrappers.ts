@@ -3,7 +3,7 @@
 import {type Edit, insertAt} from '../edits.ts'
 import type {Random} from '../random.ts'
 import type {Scan} from '../scan.ts'
-import type {Damage, KindDefinition, KindOptions, Reachable} from './types.ts'
+import type {Damage, KindDefinition, KindOptions} from './types.ts'
 
 // Text before the document and after it. The rank orders several of them, see edits.ts: the byte order mark is
 // outermost, then a sentence, a code fence, a log prefix, and innermost a statement, quotes or a color code.
@@ -45,9 +45,9 @@ const hazardsBefore = [
   'The 24" monitor is entry 3:', 'The response starts with { as expected:', 'Rows start with [ in this format:',
 ] as const
 
-// Whether the quotes and brackets of a sentence pair up, so that a parser that reads them as JSON is between tokens
-// at depth 0 after the sentence.
-function pairsUp(sentence: string) {
+// What a sentence leaves open for a parser that reads its quotes and brackets as JSON: nothing when they pair up, so
+// that the parser is between tokens at depth 0 after the sentence, or a string, or a container.
+function leftOpenBy(sentence: string): 'nothing' | 'a string' | 'a container' {
   const open: string[] = []
   let inString = false
   for (const character of sentence) {
@@ -55,10 +55,10 @@ function pairsUp(sentence: string) {
     else if (inString) continue
     else if (character === '{' || character === '[') open.push(character)
     else if (character === '}' || character === ']') {
-      if (open.pop() !== (character === '}' ? '{' : '[')) return false
+      if (open.pop() !== (character === '}' ? '{' : '[')) return 'a container'
     }
   }
-  return !inString && open.length === 0
+  return inString ? 'a string' : open.length > 0 ? 'a container' : 'nothing'
 }
 
 // A sentence before the document, after it, or both, as a language model or a program's status output writes it.
@@ -67,7 +67,7 @@ function proseAround(random: Random, scanned: Scan, options: KindOptions = {}): 
   const edits: Edit[] = []
   let hazard = false
   let sameLine = false
-  let reachable: Reachable = 'yes'
+  let flags: Pick<Damage, 'reachable' | 'needsRules'> = {reachable: 'yes'}
   // A label such as "Result:" comes from a program as often as from a model, and a sentence only from a model.
   const onlyModel = options.writer === 'model'
   let fromProgram = !onlyModel && where === 'after' && random.chance(0.3)
@@ -81,21 +81,29 @@ function proseAround(random: Random, scanned: Scan, options: KindOptions = {}): 
       : label ? random.pick(sentenceLabels)
       : `${opening}${opening.endsWith(', ') && !body.startsWith('I') ? body[0]!.toLowerCase() + body.slice(1) : body}${canEndWithPeriod && random.chance(0.3) ? '.' : ':'}`
     // Mostly on lines of its own, and sometimes on the document's first line, e.g. Result: {
-    sameLine = random.chance(0.15)
+    // A model's sentence before a code fence is always on lines of its own.
+    sameLine = !onlyModel && random.chance(0.15)
     edits.push(before(`${sentence}${sameLine ? ' ' : random.chance(0.6) ? '\n\n' : '\n'}`, -5))
-    // Quotes and brackets that pair up leave the parser between tokens at depth 0, as after a document. A quote or a
-    // bracket without its partner opens a string or a container that the document doesn't have: on a line of its own
-    // it ends with the line, and on the document's first line nothing ends it.
-    if (!pairsUp(sentence)) reachable = sameLine ? 'no' : 'line rule'
+    // Quotes and brackets that pair up leave the parser between tokens at depth 0, as after a document. A quote
+    // without its partner opens a string that the document doesn't have: on a line of its own it ends with the line,
+    // and on the document's first line nothing ends it. A bracket without its partner opens a container that nothing
+    // closes, and no parser can know that the document's first bracket does not belong inside it.
+    const leftOpen = leftOpenBy(sentence)
+    if (leftOpen === 'a container' || (leftOpen === 'a string' && sameLine)) flags = {reachable: 'no'}
+    else if (leftOpen === 'a string') flags = {reachable: 'line rule', needsRules: ['a string that is open at a line feed ends there']}
   }
   if (where !== 'before') edits.push(after(scanned, `${random.chance(0.6) ? '\n\n' : '\n'}${fromProgram ? statusLinesAfter(random) : random.pick(sentencesAfter)}`, 5))
   return {
     edits, form: `a sentence ${where === 'both' ? 'before and after' : where}${sameLine ? ', on the document\'s first line' : ''}${hazard ? ', with JSON\'s own characters in it' : ''}`,
-    reachable,
+    ...flags,
   }
 }
 
-const callbackNames = ['callback', 'cb', 'handleResponse', 'jsonp_1697270000000', 'jQuery112408_1697270000000', 'angular.callbacks._0', 'onData', '__jp3'] as const
+// The names of JSONP callbacks. Libraries make names of a time stamp and a counter, e.g. jQuery's.
+const callbackName = (random: Random) => random.pick([
+  'callback', 'cb', 'handleResponse', `jsonp_${1_690_000_000_000 + random.integer(0, 99_999_999_999)}`, `jQuery${random.integer(11_000_000, 36_999_999)}_${1_690_000_000_000 + random.integer(0, 99_999_999_999)}`,
+  `angular.callbacks._${random.integer(0, 9)}`, 'onData', `__jp${random.integer(0, 9)}`,
+])
 // The names say nothing about what the document holds, so that they fit every template.
 const assignments = ['var data = ', 'const data = ', 'let result = ', 'window.__INITIAL_STATE__ = ', 'module.exports = ', 'export default ', 'data = ', 'const payload = ', 'export const data = ', 'const json = '] as const
 
@@ -105,7 +113,7 @@ function statementWrapper(random: Random, scanned: Scan, options: KindOptions = 
   const form = options.scope ?? random.weighted([['call', 40], ['assignment', 40], ['guard', 20]] as const)
   if (form === 'call') {
     const express = random.chance(0.2)
-    const name = random.pick(callbackNames)
+    const name = callbackName(random)
     const suffix = random.chance(0.6) ? ');' : ')'
     return {edits: [before(express ? '/**/ typeof cb === \'function\' && cb(' : `${name}(`), after(scanned, suffix)], form: `a call, ${express ? 'as Express writes JSONP' : `${name}(…${suffix}`}`, reachable: 'yes'}
   }
@@ -142,15 +150,19 @@ function secondBefore(time: LogTime): LogTime {
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
+// The formats of a log prefix, by number as in logPrefixes below. The kind logPrefix, which training never sees, has
+// formats that no line of the kind logLines has, so that what it adds is new text too: Python's two formats, the
+// output of grep, and a label before a printed document. `python` is what a Python program writes.
+const prefixFormats = {line: [1, 2, 7, 8], python: [1, 2, 2, 8], lines: [0, 3, 4, 5, 9, 10]} as const
+
 // A prefix as a logging library writes it before a document on the same line. The lines of one log share the format,
 // the logger and the process. `step` moves the time on from one line to the next, `fields` are the time and the level
 // that the line's document states itself, and with a `message` the result is a whole line that holds no document.
-// `python` keeps to what a Python program writes.
-export function logPrefixes(random: Random, python = false) {
+export function logPrefixes(random: Random, use: keyof typeof prefixFormats) {
   const start = {month: random.integer(1, 12), day: random.integer(1, 28), hour: random.integer(0, 23), minute: random.integer(0, 49), second: random.integer(0, 59)}
   const logger = random.pick(['checkout', 'app.orders', 'auth', 'worker-3', 'http'])
   const process = random.integer(100, 9999)
-  const format = python ? random.pick([1, 1, 2, 2, 8, 9, 10]) : random.integer(0, 10)
+  const format: number = random.pick(prefixFormats[use])
   const label = random.pick(['DEBUG - Response body: ', 'payload=', 'body: ', 'Received: '])
   let line = 12 + random.integer(0, 400)
   const prefixOf = (step: number, fields: LogFields = {}, message?: string): {prefix: string, suffix: string} => {
@@ -173,7 +185,6 @@ export function logPrefixes(random: Random, python = false) {
         case 3: return `[${date} ${time}] app.${level}: `
         case 4: return `${monthNames[month - 1]!} ${String(day).padStart(2, ' ')} ${time} web-1 app[${process}]: `
         case 5: return `${date}T${time}.${milliseconds}${pad(random.integer(0, 999999), 6)}Z stdout F `
-        case 6: return 'data: '
         case 7: return `app.log:${line}:`
         // A label that a print statement puts before a document, and not before a message.
         case 8: return message === undefined ? label : ''
@@ -184,12 +195,12 @@ export function logPrefixes(random: Random, python = false) {
     if (message !== undefined) return {prefix: `${prefix}${message}${format === 3 ? ' [] []' : ''}`, suffix: ''}
     return format === 3 ? {prefix: `${prefix}${random.pick(['order placed', 'request handled', 'cache refreshed'])} `, suffix: ' []'} : {prefix, suffix: ''}
   }
-  // The system log, a container's log and an event stream put their prefix on every line, so that no line is bare.
-  return {prefixOf, onEveryLine: format >= 4 && format <= 6}
+  // The system log and a container's log put their prefix on every line, so that no line is bare.
+  return {prefixOf, onEveryLine: format === 4 || format === 5}
 }
 
 function logPrefix(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
-  const {prefix, suffix} = logPrefixes(random, options.scope === 'Python').prefixOf(0, logFieldsIn(scanned.text))
+  const {prefix, suffix} = logPrefixes(random, options.scope === 'Python' ? 'python' : 'line').prefixOf(0, logFieldsIn(scanned.text))
   return {edits: [before(prefix, -3), ...(suffix === '' ? [] : [after(scanned, suffix, 3)])], form: `a log prefix, e.g. ${prefix.trim()}`, reachable: 'yes'}
 }
 
@@ -237,7 +248,8 @@ function ansiColorCodes(random: Random, scanned: Scan): Damage | undefined {
   for (const part of scanned.strings) color(part, part.role === 'key' ? '34;1' : '0;32')
   for (const value of [...scanned.numbers, ...scanned.literals]) color(value, '0;39')
   if (edits.length === 0) return undefined
-  return {edits, form: 'a color code around every key and every value', reachable: 'yes'}
+  // In ␛[34;1m the code ends at the m, and ; and m are both in the class of most letters.
+  return {edits, form: 'a color code around every key and every value', reachable: 'yes', needsClass: 'the ; inside a color code'}
 }
 
 // The document was stored as a string inside another text and taken out without decoding.
@@ -262,12 +274,14 @@ function htmlEntities(random: Random, scanned: Scan): Damage | undefined {
     if (entity !== undefined) edits.push({at: index, remove: 1, insert: entity})
   })
   if (edits.length === 0) return undefined
-  return {edits, form: `${quote} for every quote`, reachable: 'yes', needsClass: 'the characters of an entity, e.g. & and ;'}
+  // A string between two entities reads as one word, as with single quotes, unless it holds a character that ends a word.
+  const needsClass = scanned.strings.some(part => /[\s,:{}[\]"\\]/.test(part.content))
+  return {edits, form: `${quote} for every quote`, reachable: 'yes', ...(needsClass ? {needsClass: 'the characters of an entity, e.g. & and ;'} : {})}
 }
 
 export const wrapperKinds: KindDefinition[] = [
   {
-    name: 'codeFence', family: 'wrapper', weight: 2.6,
+    name: 'codeFence', family: 'wrapper', origin: 'output', weight: 2.6,
     example: '```json⏎{⏎  "id": 42⏎}⏎```',
     reachable: 'yes: a fence line holds no bracket and no quote and ends at its line feed, and the document starts at depth 0 after it',
     styles: [['indented', 88], ['spaced', 7], ['compact', 5]],
@@ -276,33 +290,33 @@ export const wrapperKinds: KindDefinition[] = [
     apply: codeFence,
   },
   {
-    name: 'proseAround', family: 'wrapper', weight: 1.3,
+    name: 'proseAround', family: 'wrapper', origin: 'output', weight: 1.3,
     example: 'Here is the JSON you asked for:⏎⏎{"id": 42}',
-    reachable: 'yes when the quotes and brackets of the sentence before the document pair up, or it has none. When one has no partner: line rule for a sentence on lines of its own, no for one on the document\'s first line. A sentence only after the document leaves nothing to recover',
+    reachable: 'yes when the quotes and brackets of the sentence before the document pair up, or it has none. A quote without its partner: line rule for a sentence on lines of its own, no for one on the document\'s first line. A bracket without its partner: no. A sentence only after the document leaves nothing to recover',
     styles: [['indented', 70], ['spaced', 20], ['compact', 10]],
     layout: {finalLineFeed: false, leading: ''},
     margin: 130,
     apply: proseAround,
   },
   {
-    name: 'statementWrapper', family: 'wrapper', weight: 2.5,
+    name: 'statementWrapper', family: 'wrapper', origin: 'output', weight: 2.5,
     example: 'callback({"id": 42, "name": "Ada"});',
-    reachable: 'yes: no prefix holds an opening bracket or a double quote, so the document starts at the first opening bracket, at depth 0',
+    reachable: 'yes: no prefix holds an opening bracket or a double quote, so the document starts at the first opening bracket, at depth 0. The closing brackets of the guard )]}\', come before the document, where they can only be skipped, which the highlighter\'s loop does only as long as it reads them as part of an error',
     layout: {finalLineFeed: false, leading: ''},
     margin: 50,
     apply: statementWrapper,
   },
   {
-    name: 'logPrefix', family: 'wrapper', weight: 1,
+    name: 'logPrefix', family: 'wrapper', origin: 'output', weight: 1,
     example: 'INFO:root:{"event": "login", "user": 42}',
-    reachable: 'yes: the prefixes hold no double quote, and their square brackets come in closed pairs, e.g. [2231]',
+    reachable: 'yes: the prefixes hold no double quote and no bracket',
     styles: [['compact', 55], ['spaced', 45]],
     templates: ['logEvent', 'apiResponse', 'chatChunk', 'remoteCall', 'order', 'userRecord', 'sensorReadings', 'databaseRecord', 'table', 'numberGrid', 'scalar'],
     margin: 60,
     apply: logPrefix,
   },
   {
-    name: 'quotedDocument', family: 'wrapper', weight: 0.6,
+    name: 'quotedDocument', family: 'wrapper', origin: 'output', weight: 0.6,
     example: 'b\'{"ok": true, "items": [1, 2]}\'',
     reachable: 'yes for \'…\' and b\'…\'. no for "…", where the first quote opens a string that ends at the document\'s first quote',
     styles: [['spaced', 45], ['compact', 35], ['indented', 20]],
@@ -311,28 +325,28 @@ export const wrapperKinds: KindDefinition[] = [
     apply: quotedDocument,
   },
   {
-    name: 'byteOrderMark', family: 'wrapper', weight: 0.3,
+    name: 'byteOrderMark', family: 'wrapper', origin: 'either', weight: 0.3,
     example: '\ufeff{"id": 42}',
     reachable: 'yes: one character that starts no token, at the very start, is skipped',
     margin: 1,
     apply: byteOrderMark,
   },
   {
-    name: 'textAfterEnd', family: 'wrapper', weight: 0.6,
+    name: 'textAfterEnd', family: 'wrapper', origin: 'either', weight: 0.6,
     example: '{⏎  "ok": true⏎};',
     reachable: 'yes, and nothing is left to recover: every kept character comes before the damage',
     margin: 10,
     apply: textAfterEnd,
   },
   {
-    name: 'ansiColorCodes', family: 'wrapper', weight: 0.2,
+    name: 'ansiColorCodes', family: 'wrapper', origin: 'output', weight: 0.2,
     example: '␛[32m{"ok": true}␛[0m',
-    reachable: 'yes: after the escape character, the [, the digits and the semicolons up to the letter m are skipped, and that [ opens nothing',
+    reachable: 'yes: after the escape character, the [, the digits and the semicolons up to the letter m are skipped, and that [ opens nothing. With a semicolon in the code, the tables need a class to find the m',
     maximumLength: 150,
     apply: ansiColorCodes,
   },
   {
-    name: 'backslashEscapedDocument', family: 'wrapper', weight: 0.6,
+    name: 'backslashEscapedDocument', family: 'wrapper', origin: 'output', weight: 0.6,
     example: '{\\"id\\": 42, \\"name\\": \\"Ada\\"}',
     reachable: 'yes: a backslash where a token may start shows that the text is escaped once, and from then on \\" is a quote',
     styles: [['spaced', 40], ['compact', 35], ['indented', 25]],
@@ -341,9 +355,9 @@ export const wrapperKinds: KindDefinition[] = [
     apply: backslashEscapedDocument,
   },
   {
-    name: 'htmlEntities', family: 'wrapper', weight: 0.3,
+    name: 'htmlEntities', family: 'wrapper', origin: 'output', weight: 0.3,
     example: '{&quot;id&quot;: 42, &quot;name&quot;: &quot;Ada&quot;}',
-    reachable: 'yes for a parser with states that follow the characters of &quot;, which the highlighter\'s classes cannot tell apart',
+    reachable: 'yes for a parser with states that follow the characters of &quot;. The tables read a string between two entities as one word, and need more when it holds a character that ends a word',
     maximumLength: 160,
     apply: htmlEntities,
   },

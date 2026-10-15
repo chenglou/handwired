@@ -71,20 +71,20 @@ function middleCutOut(random: Random, scanned: Scan): Damage | undefined {
 
 export const cutKinds: KindDefinition[] = [
   {
-    name: 'cutOff', family: 'cut off', weight: 7,
+    name: 'cutOff', family: 'cut off', origin: 'either', weight: 7,
     example: '{"id": 42, "name": "Ada Lovel',
     reachable: 'yes, and nothing is left to recover: no kept character comes after the cut',
     margin: 30,
     apply: cutOff,
   },
   {
-    name: 'headMissing', family: 'cut off', weight: 0.6,
+    name: 'headMissing', family: 'cut off', origin: 'output', weight: 0.6,
     example: '"id": 42, "name": "Ada"}',
     reachable: 'no: the depth at the start is unknown, and a text that starts inside a string has every later quote in the opposite role',
     apply: headMissing,
   },
   {
-    name: 'middleCutOut', family: 'cut off', weight: 0.6,
+    name: 'middleCutOut', family: 'cut off', origin: 'output', weight: 0.6,
     example: '{"id": 7, "tags": ["urgent", "dr...lling": true}',
     reachable: 'no: the removed span can hold any number of brackets and quotes',
     margin: 34,

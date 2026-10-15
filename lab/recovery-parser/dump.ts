@@ -2,8 +2,9 @@
 // its label and above what the parser as it is shows for it.
 //
 // Run from the repo root: bun lab/recovery-parser/dump.ts <folder> [seed] [samples to scan, default 60000]
-// It writes one file per kind of damage with 60 samples from short to long, all.txt with the first 300 samples in the
-// dataset's own order, valid.txt, and typing-replays.txt with whole replays, one text per key press.
+// It writes, per kind of damage, kind-<name>.txt with 60 whole samples from short to long and near-<name>.txt with the
+// same samples cut down to the columns around their damage, all.txt with the first 300 samples in the dataset's own
+// order, valid.txt, and typing-replays.txt with whole replays, one text per key press.
 //
 // The lines of a sample:
 //   orig   the original, i.e. the valid text its author meant. A line feed is ⏎, a tab is →, see `visible` below.
@@ -11,20 +12,22 @@
 //   depth  the nesting depth after the code point, 0 to 9 and then a to g for 10 to 16.
 //   cont   the innermost open container after the code point: o for an object, a for an array, - for none.
 //   brok   the broken text.
-//   align  . under a kept code point, ~ under one that was replaced one for one, + under one that the damage added.
+//   align  . under a kept code point, ~ under one that stands in the place of another, + under one that the damage added.
 //   want   the label's display kind for every code point of the broken text. Blank where it has no label, and ? where
 //          the display kind is not scored.
-//   wantd  the label's depth.   wantc  the label's container.
+//   wantd  the label's depth.   wantc  the label's container. ? where the two are not scored.
 //   now, nowd, nowc  what the parser as it is gives.
 //   miss   where the parser as it is differs from the label: k for the display kind, d for the depth, c for the
-//          container, * for more than one. Only from the first damage on can it differ.
+//          container, * for more than one. It differs only from its first error on, which ^ marks in the line `first`.
+//          In that line, d marks the first damaged code point when it comes before the first error.
 import {mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {errorKinds} from '../../src/json-search/highlighter/kinds.ts'
 import {kinds} from './damage.ts'
+import {applyEdits} from './edits.ts'
 import {kindLetters, labelsOfValidText} from './labels.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, labeledAfterDamage, labelsOf, sampleAt, typingReplayOf} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, labelsOf, sampleAt, scoredCodePoints, typingReplayOf} from './samples.ts'
 import {containerNames, runTableParser} from './table-parser.ts'
 
 // One column per code point: characters that would break the columns are shown as another character.
@@ -46,77 +49,111 @@ export function visible(text: string) {
   return shown
 }
 
-const depthLetter = (depth: number) => depth < 0 ? '-' : depth > 16 ? '+' : '0123456789abcdefg'[depth]!
-const containerLetter = (container: number) => containerNames[container]![0] === 'n' ? '-' : containerNames[container]![0]!
+const depthLetter = (depth: number | undefined) => depth === undefined ? '?' : depth < 0 ? '-' : depth > 16 ? '+' : '0123456789abcdefg'[depth]!
+const containerLetter = (container: number | undefined) => container === undefined ? '?' : containerNames[container]![0] === 'n' ? '-' : containerNames[container]![0]!
 
-export function describeSample(sample: Sample): string {
+// The lines of a broken sample, one string per line of the description, each as long as the broken text.
+function rowsOf(sample: Sample) {
   const labels = labelsOf(sample)
-  const originalLabels = sample.documents.flatMap(labelsOfValidText)
   const trace = runTableParser(sample.broken)
   const length = sample.alignment.length
-  const perCodePoint = (letter: (index: number) => string) => Array.from({length}, (_, index) => letter(index)).join('')
+  const perCodePoint = (letter: (index: number) => string) => Array.from({length}, (_, index) => letter(index))
   const miss = perCodePoint(index => {
     const label = labels[index]
     if (label === undefined) return ' '
     const kind = label.kind !== undefined && label.kind !== trace.displayKind[index]
-    const depth = label.depth !== trace.depthAfter[index]
-    const container = label.container !== trace.containerAfter[index]
+    const depth = label.depth !== undefined && label.depth !== trace.depthAfter[index]
+    const container = label.container !== undefined && label.container !== trace.containerAfter[index]
     return Number(kind) + Number(depth) + Number(container) > 1 ? '*' : kind ? 'k' : depth ? 'd' : container ? 'c' : ' '
   })
+  return [
+    ['brok ', Array.from(visible(sample.broken))],
+    ['align', perCodePoint(index => sample.alignment[index] === -1 ? '+' : sample.replaced[index] === true ? '~' : '.')],
+    ['want ', perCodePoint(index => labels[index] === undefined ? ' ' : labels[index].kind === undefined ? '?' : kindLetters[labels[index].kind]!)],
+    ['wantd', perCodePoint(index => labels[index] === undefined ? ' ' : depthLetter(labels[index].depth))],
+    ['wantc', perCodePoint(index => labels[index] === undefined ? ' ' : containerLetter(labels[index].container))],
+    ['now  ', perCodePoint(index => kindLetters[trace.displayKind[index]!]!)],
+    ['nowd ', perCodePoint(index => depthLetter(trace.depthAfter[index]))],
+    ['nowc ', perCodePoint(index => containerLetter(trace.containerAfter[index]))],
+    ['miss ', miss],
+    ['first', perCodePoint(index => index === sample.firstErrorPosition ? '^' : index === sample.firstDamage ? 'd' : ' ')],
+  ] as [string, string[]][]
+}
+
+function headerOf(sample: Sample) {
   const header = [
     `--- ${sample.id}  ${sample.source}${sample.source === 'damage' ? ` / ${sample.recipe}` : ''}  kinds: ${sample.kinds.length === 0 ? 'none' : sample.kinds.join(', ')}  reachable: ${sample.reachable}  split: ${sample.split}${sample.heldOut.length > 0 ? ` (held out, ${sample.heldOut.join(', ')})` : ''}  ${sample.template}, ${sample.style}`,
     ...sample.forms.map(form => `    ${form}`),
   ]
+  if (sample.source === 'valid') return header
+  if (sample.needsRules.length > 0) header.push(`    needs the rule: ${sample.needsRules.join('; ')}`)
   if (sample.needsClass.length > 0) header.push(`    needs a character class the highlighter lacks: ${sample.needsClass.join(', ')}`)
-  if (sample.source === 'valid') return [...header, `orig  ${visible(sample.original)}`, `label ${originalLabels.map(label => kindLetters[label.kind!]).join('')}`, `depth ${originalLabels.map(label => depthLetter(label.depth)).join('')}`, `cont  ${originalLabels.map(label => containerLetter(label.container)).join('')}`].join('\n')
-  header.push(`    first damage at ${sample.firstDamage}, first error now at ${sample.firstErrorPosition} (${errorKinds[sample.firstErrorKind]}), ${labeledAfterDamage(sample)} labeled code points from the damage on${sample.documents.length > 1 ? `, ${sample.documents.length} documents` : ''}${sample.debatable ? ', another repair is sensible' : ''}`)
-  return [
-    ...header,
-    `orig  ${visible(sample.original)}`,
-    `label ${originalLabels.map(label => kindLetters[label.kind!]).join('')}`,
-    `depth ${originalLabels.map(label => depthLetter(label.depth)).join('')}`,
-    `cont  ${originalLabels.map(label => containerLetter(label.container)).join('')}`,
-    `brok  ${visible(sample.broken)}`,
-    `align ${perCodePoint(index => sample.alignment[index] === -1 ? '+' : sample.replaced[index] === true ? '~' : '.')}`,
-    `want  ${perCodePoint(index => labels[index] === undefined ? ' ' : labels[index].kind === undefined ? '?' : kindLetters[labels[index].kind]!)}`,
-    `wantd ${perCodePoint(index => labels[index] === undefined ? ' ' : depthLetter(labels[index].depth))}`,
-    `wantc ${perCodePoint(index => labels[index] === undefined ? ' ' : containerLetter(labels[index].container))}`,
-    `now   ${perCodePoint(index => kindLetters[trace.displayKind[index]!]!)}`,
-    `nowd  ${perCodePoint(index => depthLetter(trace.depthAfter[index]!))}`,
-    `nowc  ${perCodePoint(index => containerLetter(trace.containerAfter[index]!))}`,
-    `miss  ${miss}`,
-  ].join('\n')
+  const group = groupOf(sample)
+  const also = [...(sample.needsNestingFix && group !== 'needs a nesting fix' ? ['needs a nesting fix'] : []), ...(sample.needsDisplayFix && group !== 'needs a display cell' ? ['needs a display cell'] : [])]
+  header.push(`    group: ${group}${also.length > 0 ? ` (also: ${also.join(', ')})` : ''}${sample.debatable ? ', another repair is sensible' : ''}`)
+  header.push(`    first damage at ${sample.firstDamage}, first error now at ${sample.firstErrorPosition} (${errorKinds[sample.firstErrorKind]}), ${scoredCodePoints(sample)} scored code points from the first error on${sample.documents.length > 1 ? `, ${sample.documents.length} documents` : ''}`)
+  return header
+}
+
+export function describeSample(sample: Sample): string {
+  const originalLabels = sample.documents.flatMap(labelsOfValidText)
+  const original = [
+    `orig  ${visible(sample.original)}`, `label ${originalLabels.map(label => kindLetters[label.kind]).join('')}`,
+    `depth ${originalLabels.map(label => depthLetter(label.depth)).join('')}`, `cont  ${originalLabels.map(label => containerLetter(label.container)).join('')}`,
+  ]
+  if (sample.source === 'valid') return [...headerOf(sample), ...original].join('\n')
+  return [...headerOf(sample), ...original, ...rowsOf(sample).map(([name, row]) => `${name} ${row.join('')}`)].join('\n')
+}
+
+// A broken sample cut down to the columns around its damage: `margin` columns on each side of every added or replaced
+// code point, of every place where code points were removed, of the first damage and of the first error. Columns
+// that are left out show as " … ".
+export function describeNear(sample: Sample, margin = 44): string {
+  const length = sample.alignment.length
+  const marks: number[] = [Math.min(sample.firstDamage, length - 1), Math.min(sample.firstErrorPosition, length - 1)]
+  let expected = 0
+  sample.alignment.forEach((index, position) => {
+    if (index === -1 || sample.replaced[position] === true || index !== expected) marks.push(position)
+    if (index !== -1) expected = index + 1
+  })
+  const shown = new Uint8Array(length)
+  for (const mark of marks) for (let position = Math.max(0, mark - margin); position <= Math.min(length - 1, mark + margin); position++) shown[position] = 1
+  const rows = rowsOf(sample).map(([name, row]) => {
+    let text = ''
+    for (let position = 0; position < length; position++) {
+      if (shown[position] === 1) text += row[position]
+      else if (position === 0 || shown[position - 1] === 1) text += ' … '
+    }
+    return `${name} ${text}`
+  })
+  return [...headerOf(sample), ...rows].join('\n')
 }
 
 // A whole replay: the finished document, then the text after every key press with what the parser as it is shows.
 function describeReplay(seed: number, index: number): string | undefined {
   const made = typingReplayOf(createRandom(seed, index))
-  if (made === undefined) return undefined
+  if (made === undefined || 'otherSplit' in made) return undefined
   const {replay, template, style} = made
   const labels = labelsOfValidText(replay.finished)
+  const finished = Array.from(replay.finished)
   const lines = [
     `=== replay ${seed}:${index}  ${replay.editor} editor, ${replay.action}: ${replay.target}${replay.comma === 'none' ? '' : `, its comma ${replay.comma}`}  ${template}, ${style}`,
     `fin   ${visible(replay.finished)}`,
-    `label ${labels.map(label => kindLetters[label.kind!]).join('')}`,
+    `label ${labels.map(label => kindLetters[label.kind]).join('')}`,
     `depth ${labels.map(label => depthLetter(label.depth)).join('')}`,
   ]
   replay.steps.forEach((step, stepIndex) => {
-    lines.push(`  step ${stepIndex}  key: ${visible(step.key)}  ${step.valid ? 'valid' : `kinds: ${step.kinds.join(', ')}  reachable: ${step.reachable}`}`)
+    lines.push(`  step ${stepIndex}  key: ${visible(step.key)}  ${step.valid ? 'valid' : `kinds: ${step.kinds.join(', ')}  reachable: ${step.reachable}${step.needsRules.length > 0 ? `  needs the rule: ${step.needsRules.join('; ')}` : ''}`}`)
     lines.push(`  text  ${visible(step.text)}`)
     if (step.valid) return
     const trace = runTableParser(step.text)
-    // The label of every kept code point, through the step's removals.
-    const kept: number[] = []
-    let position = 0
-    for (const edit of step.edits) {
-      for (; position < edit.at; position++) kept.push(position)
-      position = edit.at + edit.remove
-    }
-    for (; position < labels.length; position++) kept.push(position)
+    // The label of every code point of the step's text, through the step's edits. A wrong key press adds one.
+    const {alignment} = applyEdits(finished, step.edits)
     const unscored = new Set(step.unscoredKinds)
-    lines.push(`  want  ${kept.map(original => unscored.has(original) ? '?' : kindLetters[labels[original]!.kind!]).join('')}`)
-    lines.push(`  now   ${kept.map((_, brokenIndex) => kindLetters[trace.displayKind[brokenIndex]!]).join('')}`)
-    lines.push(`  miss  ${kept.map((original, brokenIndex) => {
+    lines.push(`  want  ${alignment.map(original => original === -1 ? ' ' : unscored.has(original) ? '?' : kindLetters[labels[original]!.kind]).join('')}`)
+    lines.push(`  now   ${alignment.map((_, brokenIndex) => kindLetters[trace.displayKind[brokenIndex]!]).join('')}`)
+    lines.push(`  miss  ${alignment.map((original, brokenIndex) => {
+      if (original === -1) return ' '
       const label = labels[original]!
       const kind = !unscored.has(original) && label.kind !== trace.displayKind[brokenIndex]
       const depth = label.depth !== trace.depthAfter[brokenIndex]
@@ -164,18 +201,19 @@ if (import.meta.main) {
     }
     const aloneCount = Math.min(alone.length, Math.max(perKind - withOthers.length, Math.round(perKind * 0.75)))
     const chosen = [...spread(alone, aloneCount), ...spread(withOthers, perKind - aloneCount)]
-    const text = `${legend}${chosen.length} samples with ${kind}, of seed ${seed}: ${Math.min(aloneCount, alone.length)} where it is the only kind, from short to long, then ${chosen.length - Math.min(aloneCount, alone.length)} where it comes with other kinds.\n\n${chosen.map(describeSample).join('\n\n')}\n`
-    writeFileSync(join(folder, `kind-${kind}.txt`), text)
+    const title = `${chosen.length} samples with ${kind}, of seed ${seed}: ${Math.min(aloneCount, alone.length)} where it is the only kind, from short to long, then ${chosen.length - Math.min(aloneCount, alone.length)} where it comes with other kinds.`
+    writeFileSync(join(folder, `kind-${kind}.txt`), `${legend}${title}\n\n${chosen.map(describeSample).join('\n\n')}\n`)
+    writeFileSync(join(folder, `near-${kind}.txt`), `${legend}${title} Only the columns around the damage are shown.\n\n${chosen.map(sample => describeNear(sample)).join('\n\n')}\n`)
   }
   const replays: string[] = []
   for (let index = 0; replays.length < 40 && index < 400; index++) {
     const made = typingReplayOf(createRandom(seed, index))
     // Replays of short documents, so that a whole replay can be read, and every eighth one of any length.
-    if (made === undefined || (made.replay.finished.length > 220 && index % 8 !== 0) || made.replay.steps.length > 80) continue
+    if (made === undefined || 'otherSplit' in made || (made.replay.finished.length > 220 && index % 8 !== 0) || made.replay.steps.length > 80) continue
     const described = describeReplay(seed, index)
     if (described !== undefined) replays.push(described)
   }
   writeFileSync(join(folder, 'typing-replays.txt'), `${legend}${replays.length} typing replays of seed ${seed}. Each step is the text after one key press, with the labels of its code points (want), what the parser as it is shows (now), and where the two differ (miss).\n\n${replays.join('\n\n')}\n`)
   const counts = [...byKind].map(([kind, samples]) => `${kind} ${samples.length}`).join(', ')
-  console.log(`wrote ${byKind.size + 3} files to ${folder} from ${scanned} samples of seed ${seed}. Samples found per kind, up to ${perKind * 3}: ${counts}`)
+  console.log(`wrote ${byKind.size * 2 + 3} files to ${folder} from ${scanned} samples of seed ${seed}. Samples found per kind, up to ${perKind * 3}: ${counts}`)
 }

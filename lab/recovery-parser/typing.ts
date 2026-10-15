@@ -5,14 +5,16 @@
 // and after each key press the text is the finished document without the part of that range that isn't typed yet. An
 // editor that closes quotes and brackets by itself keeps, of that part, the closers of what is open at the cursor, e.g.
 // the closing quote of a key that is half typed. So every text only lacks code points of the original, and every code
-// point in it has a label.
+// point in it has a label, apart from the one wrong character of the replays below.
 //
 // Deleting with Backspace passes through the same texts in the opposite order, so a replay of a deletion is a replay
 // of typing with its steps reversed.
-import {highlightReference} from '../../tests/json-search/highlighter/reference.ts'
-import type {Reachable} from './damage/types.ts'
-import {leastReachable} from './damage/types.ts'
-import {type Edit, removeRange} from './edits.ts'
+//
+// One replay in three has a wrong key press: the key next to the right one, e.g. ; for :, and then Backspace. The text
+// with the wrong character is the text before it plus that one character at the cursor, which is added and has no label.
+import type {Reachable, Rule} from './damage/types.ts'
+import {settleReachable} from './damage/types.ts'
+import {type Edit, applyEdits, insertAt, mergeEdits, removeRange} from './edits.ts'
 import type {Random} from './random.ts'
 import {type Container, type Entry, type Scan, isWhitespace} from './scan.ts'
 
@@ -26,8 +28,12 @@ export type TypingStep = {
   // The kinds of damage in the text, in text order, with the names of damage.ts, e.g. missingComma, openStringAtLineEnd.
   kinds: string[]
   reachable: Reachable
+  // The rules of damage/types.ts's `contradictions` that a parser needs for this text.
+  needsRules: Rule[]
   // Indexes into the finished document of kept code points whose display kind is not scored, e.g. a comma inside an open string.
   unscoredKinds: number[]
+  // Whether another sensible repair would give other labels, e.g. for a container whose closer is not typed yet.
+  debatable: boolean
 }
 export type TypingReplay = {
   finished: string
@@ -44,6 +50,28 @@ export type TypingReplay = {
 }
 
 const isValidNumber = (text: string) => /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(text)
+// A text of a replay is the finished document without some of its code points, and at most one added character, so it
+// is within the highlighter's capacity and depth, and the highlighter accepts it exactly when JSON.parse does.
+const parses = (text: string) => {
+  try {
+    JSON.parse(text)
+  } catch {
+    return false
+  }
+  return true
+}
+
+// The key next to a key, for a slip of the finger: a neighbor on the same row of the keyboard, ; for a colon typed
+// without Shift, and . or m for a comma.
+const keyRows = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm']
+function wrongKeysFor(key: string): string[] {
+  if (key === ':') return [';']
+  if (key === ',') return ['.', 'm']
+  const row = key.length === 1 ? keyRows.find(letters => letters.includes(key)) : undefined
+  if (row === undefined) return []
+  const place = row.indexOf(key)
+  return [row[place - 1], row[place + 1]].filter(letter => letter !== undefined)
+}
 
 // How many code points of an escape are typed when the cursor is inside one, e.g. 1 right after a backslash and 4
 // after \u00, or 0 when the cursor is not inside an escape. `stringStart` is the string's opening quote.
@@ -179,8 +207,8 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
       position = edit.at + edit.remove
     }
     text += codePoints.slice(position).join('')
-    const valid = highlightReference(text, 0).valid === 1
-    const step: TypingStep = {key, text, edits, valid, kinds: [], reachable: 'yes', unscoredKinds: []}
+    const valid = parses(text)
+    const step: TypingStep = {key, text, edits, valid, kinds: [], reachable: 'yes', needsRules: [], unscoredKinds: [], debatable: false}
     if (valid) return step
 
     // The text after the cursor: what the editor kept, and the document after the typed range.
@@ -195,9 +223,10 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
       return {character: tail[index], lineFeed}
     }
     const reachable: Reachable[] = []
-    const add = (kind: string, flag: Reachable) => {
+    const add = (kind: string, flag: Reachable, rule?: Rule) => {
       step.kinds.push(kind)
       reachable.push(flag)
+      if (rule !== undefined && !step.needsRules.includes(rule)) step.needsRules.push(rule)
     }
     if (target.action === 'type the document' && editor === 'plain') {
       // The text is the start of the document and stops at the cursor.
@@ -207,12 +236,21 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
     const commaPending = !commaTyped && target.comma !== -1
     // The entry before this one has no comma yet, and a part of this entry is there.
     if (commaPending && target.entry !== null && target.comma < target.entry.start && cursor > target.entry.start) add('missingComma', 'yes')
-    // After a key or after a colon, what follows decides: a closer or a comma can be read as they are, the next key on
-    // a new line needs the line feed to be told from a value, and on the same line nothing tells them apart.
-    const afterKeyOrColon = (skip: number): Reachable => {
-      const {character, lineFeed} = nextToken(skip)
-      if (character === '}' || character === ',') return 'yes'
-      return character === '"' && lineFeed ? 'line rule' : 'no'
+    // After a key or after a colon, what follows decides. A closer or a comma is read as it is. The next key after a
+    // colon is read as the value, as in valid JSON, so its display kind is not scored (see unscoredOf in samples.ts),
+    // and the colon after it shows what happened. The next key after a key needs the rule "a string after a key is
+    // the next key".
+    const addAfterKeyOrColon = (kind: 'keyWithoutColon' | 'colonWithoutValue', skip: number) => {
+      const {character} = nextToken(skip)
+      if (character === '}' || character === ',') add(kind, 'yes')
+      else if (character === '"') add(kind, 'yes', kind === 'keyWithoutColon' ? 'a string after a key is the next key' : undefined)
+      else add(kind, 'no')
+    }
+    // A string that is open at the end of its line: it ends at the line feed. When it is a key and the next key
+    // follows on the next line, that key is a string after a key.
+    const addOpenStringAtLineEnd = (part: {role: 'key' | 'value'}, lineEndIndex: number) => {
+      add('openStringAtLineEnd', 'line rule', 'a string that is open at a line feed ends there')
+      if (part.role === 'key' && nextToken(lineEndIndex).character === '"') step.needsRules.push('a string after a key is the next key')
     }
     const openString = strings.find(part => part.start < cursor && cursor <= part.end - 1)
     const typedKey = strings.find(part => part.role === 'key' && part.end === cursor)
@@ -226,7 +264,8 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
       if (tail[0] === ',') index = 1
       while (tail[index] === ' ' || tail[index] === '\t' || tail[index] === '\r') index++
       const atLineEnd = index >= tail.length || tail[index] === '\n'
-      add(atLineEnd ? 'openStringAtLineEnd' : 'openStringMidLine', atLineEnd ? 'line rule' : 'no')
+      if (atLineEnd) addOpenStringAtLineEnd(openString, index)
+      else add('openStringMidLine', 'no')
       // A comma right after the cursor is inside the open string.
       if (atLineEnd && tail[0] === ',') step.unscoredKinds.push(to)
     } else if (openString !== undefined) {
@@ -239,19 +278,20 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
         if (commaInside) index = 2
         while (tail[index] === ' ' || tail[index] === '\t' || tail[index] === '\r') index++
         const atLineEnd = index >= tail.length || tail[index] === '\n'
-        add(atLineEnd ? 'openStringAtLineEnd' : 'openStringMidLine', atLineEnd ? 'line rule' : 'no')
+        if (atLineEnd) addOpenStringAtLineEnd(openString, index)
+        else add('openStringMidLine', 'no')
         // The quote reads as part of an escape, and a comma after it as the string's content.
         if (atLineEnd) step.unscoredKinds.push(openString.end - 1, ...(commaInside ? [to] : []))
       } else {
         // The start of a \u escape that has not all of its digits yet, before the closing quote.
         if (escapeTyped > 1) add('unescapedBackslash', 'yes')
         // In a key, the colon and the value are not typed.
-        if (openString.role === 'key') add('keyWithoutColon', afterKeyOrColon(1))
+        if (openString.role === 'key') addAfterKeyOrColon('keyWithoutColon', 1)
       }
     } else if (typedKey !== undefined) {
-      add('keyWithoutColon', afterKeyOrColon(0))
+      addAfterKeyOrColon('keyWithoutColon', 0)
     } else if (afterColon !== undefined) {
-      add('colonWithoutValue', afterKeyOrColon(0))
+      addAfterKeyOrColon('colonWithoutValue', 0)
     } else if (literal !== undefined) {
       add('partialLiteral', 'yes')
     } else if (number !== undefined && !isValidNumber(codePoints.slice(number.start, cursor).join(''))) {
@@ -264,7 +304,10 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
       const innermost: Container = open.at(-1)!
       const {character} = nextToken(0)
       const closesBoth = open.length === 1 && innermost.parent !== null && innermost.parent.type !== innermost.type && character === (innermost.parent.type === 'object' ? '}' : ']')
-      add('missingCloser', closesBoth ? 'yes' : 'no')
+      if (closesBoth) add('missingCloser', 'yes', 'a closer of the other kind closes two containers')
+      else add('missingCloser', 'no')
+      // Without that closer, the text also reads as a container that goes on, with its closer missing further down.
+      step.debatable = !closesBoth
     }
     // The last thing typed, apart from white space.
     let lastTyped = cursor - 1
@@ -293,8 +336,15 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
       if (character === ',') add('extraComma', 'yes')
       else if (character === ']' && previous === ',') add('trailingComma', 'yes')
     }
-    step.reachable = leastReachable(reachable)
+    step.reachable = settleReachable(reachable, step.needsRules)
     return step
+  }
+  // The text after a wrong key press at `cursor`: the text of the step before it and the wrong character.
+  const wrongKeyStep = (before: TypingStep, cursor: number, wrong: string, right: string): TypingStep => {
+    const edits = mergeEdits([before.edits, [insertAt(cursor, wrong)]], codePoints.length)!
+    const text = applyEdits(codePoints, edits).broken
+    const valid = parses(text)
+    return {...before, key: `${wrong} in place of ${right}`, text, edits, valid, kinds: valid ? [] : [...before.kinds, 'typingSlip'], needsRules: [...before.needsRules], unscoredKinds: [...before.unscoredKinds]}
   }
 
   const stops = cursorStops(codePoints, from, to)
@@ -302,7 +352,18 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
   // The text before the first key press: the document without the typed range. A document typed from the top starts
   // from an empty text, which is not a step.
   if (target.action !== 'type the document') steps.push(stepAt(from, false, target.action === 'change a value' ? 'the old value is selected and deleted' : 'before the first key press'))
-  for (const stop of stops) steps.push(stepAt(stop.cursor, false, stop.key))
+  // The key press that goes wrong, in one replay in three: one of the keys that have a neighbor to slip to. A deletion
+  // has no wrong key, since every key press of it is Backspace.
+  const slippable = stops.map((_, index) => index).filter(index => (index > 0 || steps.length > 0) && wrongKeysFor(stops[index]!.key).length > 0)
+  const slipAt = target.action !== 'delete an entry' && slippable.length > 0 && random.chance(0.33) ? random.pick(slippable) : -1
+  stops.forEach((stop, index) => {
+    if (index === slipAt) {
+      const before = steps.at(-1)!
+      const cursor = index === 0 ? from : stops[index - 1]!.cursor
+      steps.push(wrongKeyStep(before, cursor, random.pick(wrongKeysFor(stop.key)), stop.key), {...before, key: 'Backspace'})
+    }
+    steps.push(stepAt(stop.cursor, false, stop.key))
+  })
   if (target.commaMode === 'last') steps.push(stepAt(to, true, ','))
   // A key press that moves the cursor over a closer that the editor had typed changes no text.
   const distinct = steps.filter((step, index) => index === 0 || step.text !== steps[index - 1]!.text)

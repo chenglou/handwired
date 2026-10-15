@@ -78,14 +78,15 @@ function commaSeparatedRecords(random: Random, _scanned: Scan): Damage | undefin
   return {
     documents, edits, template: `records: ${type}`, style,
     form: `${texts.length} records with a comma${space === '\n' ? ' and a line feed' : space === ' ' ? ' and a space' : ''} between them${afterLast ? ' and after the last' : ''}`,
-    reachable: 'yes', debatable: true,
+    reachable: 'yes', needsRules: ['a comma after the top-level value is skipped'], debatable: true,
   }
 }
 
 // Lines of a log that hold no document: messages, which a logger writes after the same prefix as a document, and
-// lines of a stack trace or of another program, which have no prefix.
+// lines that another program wrote into the same output, which have no prefix. None is a line of one language's stack
+// trace, which would not stand alone between the lines of a logger of another language.
 const messageLines = ['Server listening on port 3000', 'Connected to db.internal:5432', 'Retrying in 5s...', 'worker 3 exited with code 1', 'cache warmed in 412 ms'] as const
-const bareLines = ['Traceback (most recent call last):', '    at handler (/app/src/index.js:42:13)', 'npm warn deprecated glob@7.2.3', '--- request 4471 ---', '  File "app.py", line 88, in handle'] as const
+const bareLines = ['npm warn deprecated glob@7.2.3', '--- request 4471 ---', '> harbor-api@2.4.0 start', 'Killed', '[nodemon] restarting due to changes...', 'Waiting for the debugger to disconnect...'] as const
 
 // Several lines of a log or of a stream: a prefix and a document on each, and lines of plain text between them.
 function logLines(random: Random, _scanned: Scan): Damage | undefined {
@@ -115,7 +116,7 @@ function logLines(random: Random, _scanned: Scan): Damage | undefined {
     if (offset + added > 512) return undefined
     return {documents, edits, template: `records: ${type}`, style, form: `${texts.length} server-sent events${done ? ' and data: [DONE]' : ''}`, reachable: 'yes'}
   }
-  const {prefixOf, onEveryLine} = logPrefixes(random)
+  const {prefixOf, onEveryLine} = logPrefixes(random, 'lines')
   let plain = 0
   texts.forEach((text, index) => {
     const fields = logFieldsIn(text)
@@ -137,25 +138,25 @@ function logLines(random: Random, _scanned: Scan): Damage | undefined {
 
 export const severalKinds: KindDefinition[] = [
   {
-    name: 'newlineDelimited', family: 'several documents', weight: 2.4,
+    name: 'newlineDelimited', family: 'several documents', origin: 'output', weight: 2.4,
     example: '{"t": 1, "v": 20.5}⏎{"t": 2, "v": 20.7}⏎',
     reachable: 'yes: after a complete top-level value, the start of a value begins a new document at depth 0',
     apply: newlineDelimited,
   },
   {
-    name: 'concatenated', family: 'several documents', weight: 0.7,
+    name: 'concatenated', family: 'several documents', origin: 'output', weight: 0.7,
     example: '{"id":1}{"id":2}',
     reachable: 'yes, as newlineDelimited',
     apply: concatenated,
   },
   {
-    name: 'commaSeparatedRecords', family: 'several documents', weight: 0.4,
+    name: 'commaSeparatedRecords', family: 'several documents', origin: 'output', weight: 0.4,
     example: '{"id": 1},⏎{"id": 2},⏎{"id": 3}',
-    reachable: 'yes: a comma at depth 0 after a complete value is skipped. The rule contradicts the one for a stray closer of the top-level container',
+    reachable: 'yes with the rule that a comma after the top-level value is skipped, which contradicts the rule for a closer too many of the top-level container',
     apply: commaSeparatedRecords,
   },
   {
-    name: 'logLines', family: 'several documents', weight: 1,
+    name: 'logLines', family: 'several documents', origin: 'output', weight: 1,
     example: '09:31:07 INFO {"event": "start"}⏎09:31:08 WARN {"event": "retry", "n": 2}',
     reachable: 'yes: every document ends at depth 0, and the quotes and the brackets of the prefixes and of the plain lines come in closed pairs, [DONE] included',
     apply: logLines,

@@ -6,6 +6,14 @@ import {type Container, type Entry, type Scan, type StringPart, type Value, hasO
 import type {Damage, KindDefinition, KindOptions} from './types.ts'
 
 const textOf = (scanned: Scan, value: {start: number, end: number}) => scanned.codePoints.slice(value.start, value.end).join('')
+// A string in other quotes reads as one word when its content holds nothing that ends a word: the quotes are in the
+// class of most letters. With such a character in it, only a class for the quote keeps the string together.
+const endsAWord = (part: StringPart) => /[\s,:{}[\]"\\]/.test(part.content)
+// The key that a number stands under: its own, or the key of the member that holds its array, e.g. coordinates.
+function nameOf(value: Value): string {
+  for (let entry = value.entry; entry !== null; entry = entry.container.value.entry) if (entry.key !== null) return entry.key.content
+  return ''
+}
 const stringOfValue = (scanned: Scan, value: Value) => scanned.strings.find(part => part.start === value.start)!
 // The positions, in the text, of the backslashes that escape a double quote inside a string.
 function escapedQuotes(scanned: Scan, part: StringPart) {
@@ -52,7 +60,7 @@ function singleQuotedString(random: Random, scanned: Scan, options: KindOptions 
       for (let index = part.start + 1; index < part.end - 1; index++) if (scanned.codePoints[index] === '\'') edits.push(insertAt(index, '\\'))
     }
   }
-  const needsClass = 'the apostrophe as a quote'
+  const classFor = (parts: readonly StringPart[]) => parts.some(endsAWord) ? {needsClass: 'the apostrophe as a quote'} : {}
   const members = scanned.entries.filter(entry => entry.key !== null && entry.value.type === 'string' && plain(entry.key) && plain(stringOfValue(scanned, entry.value)))
   const values = scanned.strings.filter(part => part.role === 'value' && plain(part))
   const form = options.scope ?? random.weighted([['every', 45], ['one member', members.length > 0 ? 25 : 0], ['one value', values.length > 0 ? 10 : 0], ['every value', values.length > 1 ? 20 : 0]] as const)
@@ -64,21 +72,22 @@ function singleQuotedString(random: Random, scanned: Scan, options: KindOptions 
     const changed = considered.filter(part => !part.content.includes('\'') || hasBoth(part))
     if (changed.length === 0) return undefined
     for (const part of changed) requote(part, hasBoth(part) && form === 'every but word keys' ? '`' : '\'')
-    return {edits, unscoredKinds, form: `every string${form === 'every' ? '' : ' that keeps its quotes'}${changed.length < considered.length ? ' without an apostrophe' : ''}, ${changed.length} of them`, reachable: 'yes', needsClass}
+    return {edits, unscoredKinds, form: `every string${form === 'every' ? '' : ' that keeps its quotes'}${changed.length < considered.length ? ' without an apostrophe' : ''}, ${changed.length} of them`, reachable: 'yes', ...classFor(changed)}
   }
   if (form === 'one member' && members.length > 0) {
     const entry = random.pick(members)
     requote(entry.key!)
     requote(stringOfValue(scanned, entry.value))
-    return {edits, form: 'the key and the value of one member', reachable: 'yes', needsClass}
+    return {edits, form: 'the key and the value of one member', reachable: 'yes', ...classFor([entry.key!, stringOfValue(scanned, entry.value)])}
   }
   if (values.length === 0) return undefined
   if (form === 'every value') {
     for (const part of values) requote(part)
-    return {edits, form: `every string value, ${values.length} of them, while the keys keep their quotes`, reachable: 'yes', needsClass}
+    return {edits, form: `every string value, ${values.length} of them, while the keys keep their quotes`, reachable: 'yes', ...classFor(values)}
   }
-  requote(random.pick(values))
-  return {edits, form: 'one string value', reachable: 'yes', needsClass}
+  const value = random.pick(values)
+  requote(value)
+  return {edits, form: 'one string value', reachable: 'yes', ...classFor([value])}
 }
 
 // The quotes that a word processor or a web page makes of straight quotes: an opening one at the start of the text and
@@ -90,17 +99,17 @@ function curlyQuotes(random: Random, scanned: Scan, options: KindOptions = {}): 
     const before = codePoints[position - 1]
     return replaceOneForOne(position, before === undefined || ' \t\n([{'.includes(before) ? '“' : '”')
   }
-  const needsClass = 'the typographic quotes'
+  const classFor = (parts: readonly StringPart[]) => parts.some(endsAWord) ? {needsClass: 'the typographic quotes'} : {}
   const every = options.scope === 'every' || random.chance(0.75)
-  if (every) return {edits: scanned.strings.flatMap(part => [curl(part.start), curl(part.end - 1)]), form: `every quote of the text, ${scanned.strings.length} strings`, reachable: 'yes', needsClass}
+  if (every) return {edits: scanned.strings.flatMap(part => [curl(part.start), curl(part.end - 1)]), form: `every quote of the text, ${scanned.strings.length} strings`, reachable: 'yes', ...classFor(scanned.strings)}
   const members = scanned.entries.filter(entry => entry.key !== null && entry.value.type === 'string')
   if (members.length > 0 && random.chance(0.5)) {
     const entry = random.pick(members)
     const value = stringOfValue(scanned, entry.value)
-    return {edits: [curl(entry.key!.start), curl(entry.key!.end - 1), curl(value.start), curl(value.end - 1)], form: 'the key and the value of one member', reachable: 'yes', needsClass}
+    return {edits: [curl(entry.key!.start), curl(entry.key!.end - 1), curl(value.start), curl(value.end - 1)], form: 'the key and the value of one member', reachable: 'yes', ...classFor([entry.key!, value])}
   }
   const part = random.pick(scanned.strings)
-  return {edits: [curl(part.start), curl(part.end - 1)], form: `one ${part.role}`, reachable: 'yes', needsClass}
+  return {edits: [curl(part.start), curl(part.end - 1)], form: `one ${part.role}`, reachable: 'yes', ...classFor([part])}
 }
 
 // U+00A0 in place of a space between tokens, as text copied from a web page or an email has it.
@@ -154,14 +163,16 @@ function foreignLiteral(random: Random, scanned: Scan, options: KindOptions = {}
     case 'Python':
     case 'upper case': {
       if (literals.length === 0) return undefined
-      // One program wrote them all, so every literal of the text changes. Each letter stands for a letter of the JSON word.
+      // One program wrote them all, so every literal of the text changes. The word is added in the literal's place and
+      // has no label, as nil and undefined: the highlighter has no display kind for a word that is not JSON's, and
+      // "literal" on a word would contradict "string" on a value without quotes.
       const words = form === 'Python' ? pythonWords : upperCaseWords
-      return {edits: literals.map(literal => replaceOneForOne(literal.start, words[literal.word]!)), form: `${form === 'Python' ? 'True, False and None' : 'TRUE, FALSE and NULL'} for every literal, ${literals.length} of them`, reachable: 'yes'}
+      return {edits: literals.map(literal => ({at: literal.start, remove: literal.word.length, insert: words[literal.word]!})), form: `${form === 'Python' ? 'True, False and None' : 'TRUE, FALSE and NULL'} for every literal, ${literals.length} of them`, reachable: 'yes'}
     }
     case 'undefined': {
       if (nulls.length === 0) return undefined
       const literal = random.pick(nulls)
-      return {edits: [{at: literal.start, remove: 4, insert: 'undefined'}], form: 'undefined for one null', reachable: 'yes', debatable: true}
+      return {edits: [{at: literal.start, remove: 4, insert: 'undefined'}], form: 'undefined for one null', reachable: 'yes'}
     }
     case 'nil': {
       if (nulls.length === 0) return undefined
@@ -207,24 +218,15 @@ function nonFiniteNumber(random: Random, scanned: Scan, options: KindOptions = {
   const others = siblings.length > 0 && random.chance(0.4) ? random.shuffled(siblings).slice(0, random.integer(1, 3)) : []
   return {
     edits: [number, ...others].map(value => ({at: value.start, remove: value.end - value.start, insert: word})),
-    form: `${word} for ${others.length === 0 ? 'one number' : `the same key in ${others.length + 1} records`}`, reachable: 'yes', debatable: true,
+    form: `${word} for ${others.length === 0 ? 'one number' : `the same key in ${others.length + 1} records`}`, reachable: 'yes',
   }
 }
 
-// How many leading code points of a value without quotes read as the start of a JSON number or of true, false or null.
-// A parser must label them before it can know that the value is a word, so their display kind is not scored.
-export function misleadingPrefix(content: string) {
-  const number = /^-?(0|[1-9][0-9]*)?(\.[0-9]*)?([eE][+-]?[0-9]*)?/.exec(content)![0]
-  if (number.length > 0 && number !== '-') return number.length
-  for (const word of ['true', 'false', 'null']) {
-    let shared = 0
-    while (shared < word.length && content[shared] === word[shared]) shared++
-    if (shared > 0) return shared
-  }
-  return 0
-}
 const readsAsJson = (content: string) => /^(true|false|null|-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?)$/.test(content)
 
+// A string value without its quotes. Leading code points that read as the start of a JSON number or literal, e.g. the
+// 1.4 of 1.4.2, are shown as a number by every parser before it can know better, so their display kind is not scored:
+// samples.ts finds them with the parser as it is, see unscoredOf there.
 function unquotedValue(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const {codePoints} = scanned
   const usable = (part: StringPart) => part.role === 'value' && part.entry !== null && part.content !== '' && !part.hasEscape && !/[",{}[\]\n\t]/.test(part.content)
@@ -233,108 +235,110 @@ function unquotedValue(random: Random, scanned: Scan, options: KindOptions = {})
   // Several words only as the last value on a line, where the line feed or the comma before it ends the value.
   const phrases = scanned.strings.filter(part => usable(part) && part.content.includes(' ') && !part.content.includes(':') && part.entry!.key !== null && hasOwnLine(codePoints, part.entry!))
   const unquote = (part: StringPart) => [removeRange(part.start, part.start + 1), removeRange(part.end - 1, part.end)]
-  const unscored = (part: StringPart) => Array.from({length: misleadingPrefix(part.content)}, (_, offset) => part.start + 1 + offset)
+  const flags = (parts: readonly StringPart[]): Pick<Damage, 'reachable' | 'needsClass'> => ({
+    // Several words without a comma after them run to the line feed.
+    reachable: parts.some(part => part.content.includes(' ') && part.entry!.commaAfter === -1) ? 'line rule' : 'yes',
+    // A tokenizer that does not see the grammar reads a colon after a word as the colon after a key without quotes.
+    ...(parts.some(part => part.content.includes(':')) ? {needsClass: 'a colon inside a value without quotes, which is not the colon after a key'} : {}),
+  })
   if (options.scope === 'every') {
     const changed = [...words, ...phrases]
     if (changed.length === 0) return undefined
-    return {edits: changed.flatMap(unquote), unscoredKinds: changed.flatMap(unscored), form: `every string value that can stand without quotes, ${changed.length} of them`, reachable: 'yes'}
+    return {edits: changed.flatMap(unquote), form: `every string value that can stand without quotes, ${changed.length} of them`, ...flags(changed)}
   }
   const severalWords = phrases.length > 0 && (words.length === 0 || random.chance(0.3))
   if (!severalWords && words.length === 0) return undefined
   const part = random.pick(severalWords ? phrases : words)
-  const prefix = misleadingPrefix(part.content)
-  return {
-    edits: unquote(part), unscoredKinds: unscored(part),
-    form: `${severalWords ? 'several words' : 'one word'}${prefix > 0 ? `, of which the first ${prefix} read as a number or a literal` : ''}`, reachable: 'yes',
-  }
+  return {edits: unquote(part), form: severalWords ? 'several words' : 'one word', ...flags([part])}
 }
 
+// A number in a form that JSON lacks, on a number where people write that form: a leading zero on a month or a file
+// mode, a plus sign on an offset, hexadecimal digits on a color, separators in a large count, a unit on a size.
 function numberFormat(random: Random, scanned: Scan): Damage | undefined {
-  const numbers = scanned.numbers.map(number => ({...number, text: textOf(scanned, number), isMemberValue: number.entry !== null && number.entry.key !== null}))
+  const numbers = scanned.numbers.map(number => ({...number, text: textOf(scanned, number), name: nameOf(number), isMemberValue: number.entry !== null && number.entry.key !== null}))
   if (numbers.length === 0) return undefined
-  const wholeNumbers = numbers.filter(number => /^[1-9][0-9]*$/.test(number.text))
-  const notNegative = numbers.filter(number => !number.text.startsWith('-') && !/[eE]/.test(number.text))
+  const named = (pattern: RegExp) => numbers.filter(number => pattern.test(number.name))
+  const isWhole = (text: string) => /^[1-9][0-9]*$/.test(text)
+  const padded = named(/^(month|day|hour|minute|mode|mask|code|zip|week)$/i).filter(number => isWhole(number.text) && number.text.length <= 4)
+  const signed = named(/offset|delta|change|zoom|balance|discount|elevation|coordinates|^(lat|lon|x|y|v)$/i).filter(number => !number.text.startsWith('-') && !/[eE]/.test(number.text) && number.text !== '0')
   const zeroPoint = numbers.filter(number => /^-?0\.[0-9]/.test(number.text))
   const pointZero = numbers.filter(number => /\.0$/.test(number.text))
-  // Numbers that people write with separators, e.g. 30,000 or 1_400_000, and not a timestamp of ten digits.
-  const large = wholeNumbers.filter(number => number.text.length >= 4 && number.text.length <= 8)
-  const withFraction = numbers.filter(number => /^-?[0-9]+\.[0-9]+$/.test(number.text))
-  const form = random.weighted([
-    ['leading zero', wholeNumbers.length > 0 ? 30 : 0], ['plus sign', notNegative.length > 0 ? 12 : 0], ['no digit before the point', zeroPoint.length > 0 ? 15 : 0],
-    ['no digit after the point', wholeNumbers.length + pointZero.length > 0 ? 8 : 0], ['hexadecimal', wholeNumbers.length > 0 ? 8 : 0], ['digit groups', large.length > 0 ? 7 : 0],
-    ['thousands commas', large.some(number => number.isMemberValue) ? 10 : 0], ['decimal comma', withFraction.some(number => number.isMemberValue) ? 5 : 0], ['suffix', 5],
-  ] as const)
+  const measures = named(/price|total|score|rate|ratio|opacity|elevation|balance|height|width|duration|area|^(v|w|h)$/i).filter(number => isWhole(number.text))
+  const hexadecimal = named(/color|mask|flags/i).filter(number => isWhole(number.text) && number.text.length <= 9)
+  // Counts that people write with separators, e.g. 30,000 or 1_400_000, and not an id, a port or a time stamp.
+  const large = numbers.filter(number => isWhole(number.text) && number.text.length >= 5 && number.text.length <= 9 && !/id$|port|zip|code|line|status|created|manager|^(t|ts)$/i.test(number.name))
+  const withFraction = numbers.filter(number => /^-?[0-9]+\.[0-9]+$/.test(number.text) && number.isMemberValue)
+  const plain = (number: {text: string}) => /^[0-9]+(\.[0-9]+)?$/.test(number.text)
+  // A number with the unit that its key suggests, or with the letter that marks a number's type in another language.
+  const suffixed: [typeof numbers[number], string][] = [
+    ...named(/fontSize|width|height$/i).filter(plain).map(number => [number, 'px'] as [typeof number, string]),
+    ...named(/timeout|duration|period|delay|interval/i).filter(plain).map(number => [number, random.pick(['ms', 's'])] as [typeof number, string]),
+    ...named(/opacity|rate|ratio|score|discount|percent/i).filter(plain).map(number => [number, '%'] as [typeof number, string]),
+    ...named(/views|population|count|total|stock|qty|limit|^max/i).filter(number => isWhole(number.text)).map(number => [number, random.pick(['L', 'n'])] as [typeof number, string]),
+    ...withFraction.filter(plain).slice(0, 2).map(number => [number, 'f'] as [typeof number, string]),
+  ]
+  const forms = [
+    ['leading zero', padded.length > 0 ? 30 : 0], ['plus sign', signed.length > 0 ? 12 : 0], ['no digit before the point', zeroPoint.length > 0 ? 15 : 0],
+    ['no digit after the point', measures.length + pointZero.length > 0 ? 8 : 0], ['hexadecimal', hexadecimal.length > 0 ? 8 : 0], ['digit groups', large.length > 0 ? 7 : 0],
+    ['thousands commas', large.some(number => number.isMemberValue) ? 10 : 0], ['decimal comma', withFraction.length > 0 ? 5 : 0], ['suffix', suffixed.length > 0 ? 5 : 0],
+  ] as const
+  if (forms.every(([, weight]) => weight === 0)) return undefined
+  const form = random.weighted(forms)
   // Where the groups of three digits start, counted from the right, e.g. [1, 4] for 1400000, and the number written with them.
   const groupStarts = (text: string) => Array.from({length: text.length}, (_, offset) => offset).filter(offset => offset > 0 && (text.length - offset) % 3 === 0)
   const grouped = (text: string, separator: string) => Array.from(text, (digit, offset) => groupStarts(text).includes(offset) ? separator + digit : digit).join('')
   switch (form) {
     case 'leading zero': {
-      if (wholeNumbers.length === 0) return undefined
-      // Short numbers get the zeros that a fixed width gives, e.g. 03 for a month or 007 for an id.
-      const short = wholeNumbers.filter(number => number.text.length <= 3)
-      const number = random.pick(short.length > 0 && random.chance(0.8) ? short : wholeNumbers)
-      const zeros = '0'.repeat(number.text.length === 1 ? random.integer(1, 2) : 1)
+      // The zeros that a fixed width gives, e.g. 03 for a month, or the zero of an octal file mode, e.g. 0755.
+      const number = random.pick(padded)
+      const zeros = '0'.repeat(number.text.length === 1 && random.chance(0.3) ? 2 : 1)
       return {
-        edits: [insertAt(number.start, zeros)], form: `${zeros}${number.text} for ${number.text}`, reachable: 'yes', debatable: true,
-        // The other repair is the string "007", so the digits' display kind is not scored.
+        edits: [insertAt(number.start, zeros)], form: `${zeros}${number.text} for ${number.text} under "${number.name}"`, reachable: 'yes',
+        // The other repair is the string "03", so the digits' display kind is not scored.
         unscoredKinds: Array.from({length: number.text.length}, (_, offset) => number.start + offset),
       }
     }
     case 'plus sign': {
-      if (notNegative.length === 0) return undefined
-      const number = random.pick(notNegative)
-      return {edits: [insertAt(number.start, '+')], form: `+${number.text}`, reachable: 'yes'}
+      const number = random.pick(signed)
+      return {edits: [insertAt(number.start, '+')], form: `+${number.text} under "${number.name}"`, reachable: 'yes'}
     }
     case 'no digit before the point': {
-      if (zeroPoint.length === 0) return undefined
       const number = random.pick(zeroPoint)
       const zero = number.start + Number(number.text.startsWith('-'))
       return {edits: [removeRange(zero, zero + 1)], form: `${number.text.replace('0.', '.')} for ${number.text}`, reachable: 'yes'}
     }
     case 'no digit after the point': {
-      if (pointZero.length > 0 && (wholeNumbers.length === 0 || random.chance(0.4))) {
+      if (pointZero.length > 0 && (measures.length === 0 || random.chance(0.4))) {
         const number = random.pick(pointZero)
         return {edits: [removeRange(number.end - 1, number.end)], form: `${number.text.slice(0, -1)} for ${number.text}`, reachable: 'yes'}
       }
-      if (wholeNumbers.length === 0) return undefined
-      const number = random.pick(wholeNumbers)
-      return {edits: [insertAt(number.end, '.')], form: `${number.text}. for ${number.text}`, reachable: 'yes'}
+      const number = random.pick(measures)
+      return {edits: [insertAt(number.end, '.')], form: `${number.text}. for ${number.text} under "${number.name}"`, reachable: 'yes'}
     }
     case 'hexadecimal': {
-      const small = wholeNumbers.filter(number => number.text.length <= 9)
-      if (small.length === 0) return undefined
-      const number = random.pick(small)
+      const number = random.pick(hexadecimal)
       const digits = Number(number.text).toString(16)
       const written = `0x${random.chance(0.5) ? digits.toUpperCase() : digits}`
-      return {edits: [{at: number.start, remove: number.text.length, insert: written}], form: `${written} for ${number.text}`, reachable: 'yes'}
+      return {edits: [{at: number.start, remove: number.text.length, insert: written}], form: `${written} for ${number.text} under "${number.name}"`, reachable: 'yes'}
     }
     case 'digit groups': {
-      if (large.length === 0) return undefined
       const number = random.pick(large)
       return {edits: groupStarts(number.text).map(offset => insertAt(number.start + offset, '_')), form: `${grouped(number.text, '_')} for ${number.text}`, reachable: 'yes'}
     }
     case 'thousands commas': {
       // Only as a member's value: inside an array [1,234] would be valid with another meaning.
-      const values = large.filter(number => number.isMemberValue)
-      if (values.length === 0) return undefined
-      const number = random.pick(values)
+      const number = random.pick(large.filter(candidate => candidate.isMemberValue))
       return {edits: groupStarts(number.text).map(offset => insertAt(number.start + offset, ',')), form: `${grouped(number.text, ',')} for ${number.text}`, reachable: 'yes'}
     }
     case 'decimal comma': {
-      const values = withFraction.filter(number => number.isMemberValue)
-      if (values.length === 0) return undefined
-      const number = random.pick(values)
+      const number = random.pick(withFraction)
       const point = number.start + number.text.indexOf('.')
       // The comma stands for the point, and must be labeled before the digit after it is read.
       return {edits: [replaceOneForOne(point, ',')], unscoredKinds: [point], form: `${number.text.replace('.', ',')} for ${number.text}`, reachable: 'yes'}
     }
     case 'suffix': {
-      const plain = numbers.filter(candidate => /^-?[0-9]+(\.[0-9]+)?$/.test(candidate.text))
-      if (plain.length === 0) return undefined
-      const number = random.pick(plain)
-      const isWhole = /^-?[0-9]+$/.test(number.text)
-      const suffix = isWhole ? random.pick(['L', 'n', 'px', 'ms', '%']) : random.pick(['f', '%', 'px'])
-      return {edits: [insertAt(number.end, suffix)], form: `${number.text}${suffix}`, reachable: 'yes'}
+      const [number, suffix] = random.pick(suffixed)
+      return {edits: [insertAt(number.end, suffix)], form: `${number.text}${suffix} under "${number.name}"`, reachable: 'yes'}
     }
   }
 }
@@ -342,23 +346,28 @@ function numberFormat(random: Random, scanned: Scan): Damage | undefined {
 // A value written as a call, as the MongoDB shell and Python print values that JSON has no type for.
 function callWrapper(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const wrap = (value: {start: number, end: number}, name: string): Edit[] => [insertAt(value.start, `${name}(`), insertAt(value.end, ')')]
+  // Around a string, the name and the brackets read as words next to the string. Around a number, they and the number
+  // read as one word, since the round brackets are in the class of most letters: only a class for them ends the name
+  // before the number.
+  const classFor = (values: readonly {type: string}[]) => values.some(value => value.type === 'number') ? {needsClass: 'the round brackets around a number'} : {}
   const members = scanned.entries.filter(entry => entry.key !== null)
   const objectIds = members.filter(entry => entry.value.type === 'string' && /^"[0-9a-f]{24}"$/.test(textOf(scanned, entry.value)))
   const dates = members.filter(entry => entry.value.type === 'string' && /^"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z"$/.test(textOf(scanned, entry.value)))
   const wholeNumbers = members.filter(entry => entry.value.type === 'number' && /^-?[0-9]+$/.test(textOf(scanned, entry.value)))
   const decimalStrings = members.filter(entry => entry.value.type === 'string' && /^"[0-9]+\.[0-9]+"$/.test(textOf(scanned, entry.value)))
   const fractions = scanned.numbers.filter(number => /^-?[0-9]+\.[0-9]+$/.test(textOf(scanned, number)))
-  const needsClass = 'the round brackets'
   if (objectIds.length > 0 && options.scope !== 'Python print') {
-    // A document copied from the MongoDB shell: the id always, and some of the dates and numbers.
+    // A document copied from the MongoDB shell: the id always, and some of the dates and numbers. The old shell writes
+    // NumberLong(15) and NumberDecimal("10.90"), and the new one Int32(15) and Decimal128('10.90').
+    const newShell = options.scope === 'new shell'
     const edits = objectIds.flatMap(entry => wrap(entry.value, 'ObjectId'))
-    let count = objectIds.length
-    const dateName = random.chance(0.85) ? 'ISODate' : 'new Date'
-    for (const entry of dates) if (random.chance(0.8)) { edits.push(...wrap(entry.value, dateName)); count++ }
-    const longName = random.pick(['NumberLong', 'NumberInt'])
-    for (const entry of wholeNumbers) if (random.chance(0.35)) { edits.push(...wrap(entry.value, longName)); count++ }
-    for (const entry of decimalStrings) if (random.chance(0.7)) { edits.push(...wrap(entry.value, random.pick(['NumberDecimal', 'Decimal128']))); count++ }
-    return {edits, form: `${count} values as the MongoDB shell prints them`, reachable: 'yes', needsClass, debatable: true}
+    const wrapped = objectIds.map(entry => entry.value)
+    const dateName = newShell || random.chance(0.85) ? 'ISODate' : 'new Date'
+    for (const entry of dates) if (random.chance(0.8)) { edits.push(...wrap(entry.value, dateName)); wrapped.push(entry.value) }
+    const wholeName = newShell ? 'Int32' : random.pick(['NumberLong', 'NumberInt'])
+    for (const entry of wholeNumbers) if (random.chance(0.35)) { edits.push(...wrap(entry.value, wholeName)); wrapped.push(entry.value) }
+    for (const entry of decimalStrings) if (random.chance(0.7)) { edits.push(...wrap(entry.value, newShell ? 'Decimal128' : 'NumberDecimal')); wrapped.push(entry.value) }
+    return {edits, form: `${wrapped.length} values as the ${newShell ? 'new ' : ''}MongoDB shell prints them`, reachable: 'yes', ...classFor(wrapped)}
   }
   // Numbers as NumPy prints them, each as a call. Only a Python print has them.
   if (options.scope !== 'Python print') return undefined
@@ -367,7 +376,7 @@ function callWrapper(random: Random, scanned: Scan, options: KindOptions = {}): 
   const kind = random.pick(numbers)[1]
   const changed = numbers.filter(([, name]) => name === kind)
   const picked = changed.length <= 4 || random.chance(0.5) ? changed : random.shuffled(changed).slice(0, random.integer(1, 4))
-  return {edits: picked.flatMap(([number, name]) => wrap(number, name)), form: `${picked.length} numbers as NumPy prints them, ${kind}(…)`, reachable: 'yes', needsClass, debatable: true}
+  return {edits: picked.flatMap(([number, name]) => wrap(number, name)), form: `${picked.length} numbers as NumPy prints them, ${kind}(…)`, reachable: 'yes', ...classFor(picked.map(([number]) => number))}
 }
 
 // A Python tuple: round brackets around a short array of scalars, e.g. a coordinate.
@@ -375,12 +384,18 @@ function tuple(random: Random, scanned: Scan): Damage | undefined {
   const short = scanned.containers.filter(container => container.type === 'array' && container.entries.length >= 1 && container.entries.length <= 4 && !container.severalLines
     && container.entries.every(entry => entry.value.type === 'number'))
   if (short.length === 0) return undefined
-  const changed = random.chance(0.6) ? short : [random.pick(short)]
+  // The items of one list are all tuples or all lists, e.g. a list of coordinates. So the arrays that change are all
+  // short arrays of the text, or one of them with its siblings, when every sibling is such an array.
+  const siblingsOf = (container: Container) => container.parent?.type === 'array' ? container.parent.entries.map(entry => entry.value.container) : [container]
+  const groups = short.map(siblingsOf).filter((group): group is Container[] => group.every(sibling => sibling !== null && short.includes(sibling)))
+  if (groups.length === 0) return undefined
+  const changed = random.chance(0.6) ? [...new Set(groups.flat())] : random.pick(groups)
   const edits: Edit[] = []
   for (const container of changed) {
     edits.push(replaceOneForOne(container.open, '('), replaceOneForOne(container.close, ')'))
-    // Python writes a tuple of one item with a comma after it.
-    if (container.entries.length === 1) edits.push(insertAt(container.entries[0]!.end, ','))
+    // Python writes a tuple of one item with a comma after it, which comes after the closing bracket of a call around
+    // the item, e.g. (np.int64(80),).
+    if (container.entries.length === 1) edits.push({...insertAt(container.entries[0]!.end, ','), rank: 1})
   }
   return {edits, form: `${changed.length} short array${changed.length > 1 ? 's' : ''} of numbers`, reachable: 'yes', needsClass: 'the round brackets as brackets'}
 }
@@ -395,12 +410,21 @@ function templatePlaceholder(random: Random, scanned: Scan): Damage | undefined 
   const placeholder = random.weighted([
     [`{{${snake}}}`, 30], [`{{ ${snake} }}`, 15], [`\${${snake.toUpperCase()}}`, 20], [`<${snake}>`, 15], [entry.value.type === 'number' ? '%d' : '%s', 10], [`$${key}`, 10],
   ])
-  return {edits: [{at: entry.value.start, remove: entry.value.end - entry.value.start, insert: placeholder}], form: `${placeholder} for a ${entry.value.type}`, reachable: 'yes', debatable: true}
+  return {edits: [{at: entry.value.start, remove: entry.value.end - entry.value.start, insert: placeholder}], form: `${placeholder} for a ${entry.value.type}`, reachable: 'yes'}
 }
 
 // Dots or a note where entries were left out, as documentation and printing functions write them.
 function ellipsis(random: Random, scanned: Scan, options: KindOptions = {}): Damage | undefined {
   const {codePoints} = scanned
+  if (options.scope === 'Node depth') {
+    // Node prints a container below the third level as [Object] or [Array], unless it is empty.
+    const deep = scanned.containers.filter(container => container.depth === 4 && container.entries.length > 0)
+    if (deep.length === 0) return undefined
+    return {
+      edits: deep.map(container => ({at: container.open, remove: container.close + 1 - container.open, insert: container.type === 'object' ? '[Object]' : '[Array]'})),
+      form: `[Object] or [Array] for ${deep.length} container${deep.length > 1 ? 's' : ''} below the third level, as Node prints them`, reachable: 'yes',
+    }
+  }
   const filled = scanned.containers.filter(container => container.entries.length >= 1)
   if (filled.length === 0) return undefined
   const long = filled.filter(container => container.entries.length >= 3)
@@ -409,9 +433,12 @@ function ellipsis(random: Random, scanned: Scan, options: KindOptions = {}): Dam
   const entries = container.entries
   // A marker that is a comment must end its line, so it only stands where the closer is on the next line.
   const endsLine = (lastEntry: Entry) => container.severalLines && lastOnLine(codePoints, lastEntry.end)
+  // A count of items only for an array, as the functions that print one write it.
+  const isArray = container.type === 'array'
   const marker = (count: number, mayComment: boolean) => random.weighted([
-    ['...', 50], ['…', 10], ['// ...', mayComment ? 10 : 0], [random.pick([`// ... ${count} more item${count === 1 ? '' : 's'}`, '// more items here', '// rest unchanged', '// etc.']), mayComment ? 15 : 0],
-    [`... ${count} more item${count === 1 ? '' : 's'}`, 5], ['/* ... */', 5], ['# ...', mayComment ? 5 : 0],
+    ['...', 50], ['…', 10], ['// ...', mayComment ? 10 : 0],
+    [random.pick(isArray ? [`// ... ${count} more item${count === 1 ? '' : 's'}`, '// more items here', '// etc.'] : ['// rest unchanged', '// etc.', '// more settings here']), mayComment ? 15 : 0],
+    [`... ${count} more item${count === 1 ? '' : 's'}`, isArray ? 5 : 0], ['/* ... */', 5], ['# ...', mayComment ? 5 : 0],
   ])
   switch (form) {
     case 'last entries': {
@@ -427,8 +454,6 @@ function ellipsis(random: Random, scanned: Scan, options: KindOptions = {}): Dam
       const text = marker(last - first + 1, false)
       return {
         edits: [{at: entries[first]!.start, remove: entries[last]!.end - entries[first]!.start, insert: text}], form: `${text} for ${last - first + 1} entries in the middle of an ${container.type}`, reachable: 'yes',
-        // More entries follow a block comment on its line, so its end must be found exactly.
-        ...(text.startsWith('/*') ? {needsClass: 'the * that ends a block comment'} : {}),
       }
     }
     case 'all entries': {
@@ -439,7 +464,8 @@ function ellipsis(random: Random, scanned: Scan, options: KindOptions = {}): Dam
       const lastEntry = entries.at(-1)!
       const dots = random.chance(0.85) ? '...' : '…'
       const text = container.severalLines ? `,\n${indentationAt(codePoints, lastEntry.start)}${dots}` : `, ${dots}`
-      return {edits: [insertAt(lastEntry.end, text)], form: `${dots} after the last entry of an ${container.type}`, reachable: 'yes'}
+      // The comma comes before a comment that another kind adds at the same place.
+      return {edits: [{...insertAt(lastEntry.end, text), rank: -1}], form: `${dots} after the last entry of an ${container.type}`, reachable: 'yes'}
     }
     default:
       return undefined
@@ -472,87 +498,87 @@ function stringConcatenation(random: Random, scanned: Scan): Damage | undefined 
 
 export const notationKinds: KindDefinition[] = [
   {
-    name: 'unquotedKey', family: 'other notation', weight: 1.5,
+    name: 'unquotedKey', family: 'other notation', origin: 'either', weight: 1.5,
     example: '{⏎  "host": "localhost",⏎  port: 8080⏎}',
-    reachable: 'yes: where a key may come, a word up to the colon is the key',
+    reachable: 'yes: where a key may come, a word up to the colon is the key. A key that starts with t, f or n, e.g. name, needs a display cell when no error came before it: the tokenizer reads that letter as the start of true, false or null, and the display table shows it as a literal',
     apply: unquotedKey,
   },
   {
-    name: 'singleQuotedString', family: 'other notation', weight: 1,
+    name: 'singleQuotedString', family: 'other notation', origin: 'either', weight: 1,
     example: '{"roles": [\'admin\', \'billing\'], "active": true}',
-    reachable: 'yes for a parser that reads the apostrophe as a quote, which the highlighter\'s classes cannot: the apostrophe is in the class of most letters',
+    reachable: 'yes for a parser that reads the apostrophe as a quote. The highlighter\'s classes lump the apostrophe with letters, so its tables read \'admin\' as one word, which is enough unless the string holds a space, a comma, a colon, a bracket, a quote or a backslash',
     apply: singleQuotedString,
   },
   {
-    name: 'curlyQuotes', family: 'other notation', weight: 1.2,
+    name: 'curlyQuotes', family: 'other notation', origin: 'either', weight: 1.2,
     example: '{“name”: “Ada”, “age”: 36}',
-    reachable: 'yes for a parser that reads “ and ” as quotes, which the highlighter\'s classes cannot',
+    reachable: 'yes for a parser that reads “ and ” as quotes. As with single quotes, the tables read “Ada” as one word, and need a class when the string holds a character that ends a word',
     apply: curlyQuotes,
   },
   {
-    name: 'nonBreakingSpace', family: 'other notation', weight: 0.5,
+    name: 'nonBreakingSpace', family: 'other notation', origin: 'either', weight: 0.5,
     example: '{"name":\u00a0"Ada", "age": 36}',
     reachable: 'yes for a parser that reads U+00A0 as white space, which the highlighter\'s classes cannot',
     styles: [['indented', 60], ['spaced', 40]],
     apply: nonBreakingSpace,
   },
   {
-    name: 'foreignLiteral', family: 'other notation', weight: 2.8,
+    name: 'foreignLiteral', family: 'other notation', origin: 'either', weight: 2.8,
     example: '{"active": True, "manager": None}',
-    reachable: 'yes: a word where a value may come, up to a comma, a closer or white space, is one value',
+    reachable: 'yes: a word where a value may come, up to a comma, a closer or white space, is one value. The word has no label: it is not a JSON literal, and the highlighter has no display kind for it',
     margin: 16,
     apply: foreignLiteral,
   },
   {
-    name: 'nonFiniteNumber', family: 'other notation', weight: 1.5,
+    name: 'nonFiniteNumber', family: 'other notation', origin: 'output', weight: 1.5,
     example: '{"mean": NaN, "count": 0}',
-    reachable: 'yes, as foreignLiteral. The word itself has no label, since it stands for a number, for null or for a string',
+    reachable: 'yes, as foreignLiteral',
     margin: 30,
     apply: nonFiniteNumber,
   },
   {
-    name: 'unquotedValue', family: 'other notation', weight: 0.9,
+    name: 'unquotedValue', family: 'other notation', origin: 'file', weight: 0.9,
     example: '{⏎  "env": production,⏎  "port": 8080⏎}',
-    reachable: 'yes: the value runs to the next comma, closer or line feed. Leading characters that read as a number or a literal, e.g. the 1.4 of 1.4.2, are not scored',
+    reachable: 'yes: the value runs to the next comma or closer. line rule for several words that run to a line feed. Leading characters that read as a number or a literal, e.g. the 1.4 of 1.4.2, are shown as one by every parser, so their display kind is not scored. A colon inside the value, e.g. in a time, needs a tokenizer that knows that it is not reading a key',
     apply: unquotedValue,
   },
   {
-    name: 'numberFormat', family: 'other notation', weight: 1.5,
+    name: 'numberFormat', family: 'other notation', origin: 'file', weight: 1.5,
     example: '{"month": 03, "opacity": .5}',
-    reachable: 'yes: digits, letters, +, . and _ up to the next comma, closer or white space are one value. In 1,400,000 the digits after a comma come where a key must come, so they continue the number',
+    reachable: 'yes: digits, letters, +, . and _ up to the next comma, closer or white space are one value. In 1,400,000 the digits after a comma come where a key must come, so they continue the number. After a leading zero the digits\' display kind is not scored, since "03" as a string is as sensible',
     margin: 8,
     apply: numberFormat,
   },
   {
-    name: 'callWrapper', family: 'other notation', weight: 1,
+    name: 'callWrapper', family: 'other notation', origin: 'output', weight: 1,
     example: '{"_id": ObjectId("507f191e810c19729de860ea"), "qty": NumberLong(15)}',
-    reachable: 'yes for a parser that skips a name and ( before a value and ) after it. The round brackets are in the class of most letters. Alone it is a document of the MongoDB shell, and in a Python print it is a number as NumPy prints it',
+    reachable: 'yes for a parser that skips a name and ( before a value and ) after it. Around a string the tables read them as words. Around a number they need a class for the round brackets, which are in the class of most letters. Alone it is a document of the MongoDB shell, and in a Python print it is a number as NumPy prints it',
     templates: ['databaseRecord'],
     margin: 110,
     apply: callWrapper,
   },
   {
-    name: 'tuple', family: 'other notation', weight: 0,
+    name: 'tuple', family: 'other notation', origin: 'output', weight: 0,
     example: '{\'point\': (12.5, 41.9)}',
     reachable: 'yes for a parser that reads ( and ) as brackets, which the highlighter\'s classes cannot. Only in a Python print',
     apply: tuple,
   },
   {
-    name: 'templatePlaceholder', family: 'other notation', weight: 0.2,
+    name: 'templatePlaceholder', family: 'other notation', origin: 'either', weight: 0.2,
     example: '{"userId": {{user_id}}, "active": true}',
     reachable: 'yes: {{user_id}} opens two braces and closes two, and the other forms end at a comma, a closer or white space',
     margin: 30,
     apply: templatePlaceholder,
   },
   {
-    name: 'ellipsis', family: 'other notation', weight: 1.3,
+    name: 'ellipsis', family: 'other notation', origin: 'either', weight: 1.3,
     example: '{"items": [{"id": 1}, ...], "total": 40}',
-    reachable: 'yes: the marker holds no bracket and no quote, and is skipped up to the next comma, closer or line feed',
+    reachable: 'yes: the marker holds no quote and is skipped up to the next comma, closer or line feed. The [Object] and [Array] of Node open a bracket and close it',
     margin: 30,
     apply: ellipsis,
   },
   {
-    name: 'stringConcatenation', family: 'other notation', weight: 0.15,
+    name: 'stringConcatenation', family: 'other notation', origin: 'file', weight: 0.15,
     example: '{"msg": "request " + "completed"}',
     reachable: 'yes with a plus, and inside an array. no for two strings next to each other inside an object, where the second reads as the next key',
     margin: 30,
