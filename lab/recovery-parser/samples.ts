@@ -91,10 +91,12 @@ export type Sample = {
   needsClass: string[]
   // True when the scored depths and containers cannot all come out of the highlighter's loop, whatever the cells hold
   // that valid JSON never reads, e.g. the } of {"tags": ["ops", "beta"}, which must close two containers, and a } too
-  // many, which the loop cannot skip. See limits.ts for the conditions and for what the field does not prove.
+  // many that the tokenizer reads by a cell of valid JSON, so that the loop cannot skip it. See limits.ts for the two
+  // conditions and for what the field does not prove.
   needsNestingFix: boolean
-  // True when the scored display kinds cannot all come out of the loop as long as the display table is as it is, e.g.
-  // the n of the key in {name: "Ada"}, which the tokenizer reads as the start of null. See limits.ts.
+  // True when the scored display kinds cannot all come out of the loop as long as the display table is as it is: a
+  // cell that valid JSON reads shows a code point as another kind than its label, e.g. the n of the key in
+  // {name: "Ada"}, which the tokenizer reads as the start of null. See limits.ts.
   needsDisplayFix: boolean
   // Whether another sensible repair would give other scored labels to kept code points.
   debatable: boolean
@@ -254,7 +256,7 @@ function draftOf(parts: DraftParts): Draft | undefined {
     const brokenCodePoints = Array.from(applied.broken)
     const unscored = unscoredOf(originalCodePoints, brokenCodePoints, labels, applied.alignment, firstDamage, trace, parts.unscoredKinds)
     const scored = applyUnscored(applied.alignment, labels, unscored.unscoredKinds, unscored.unscoredNesting)
-    const limits = limitsOf(brokenCodePoints, scored, originalCodePoints, applied.alignment, applied.replaced, trace.firstErrorPosition)
+    const limits = limitsOf(brokenCodePoints, scored, trace.firstErrorPosition)
     draft = {
       ...common, ...unscored, firstErrorPosition: trace.firstErrorPosition, firstErrorKind: trace.firstErrorKind,
       needsNestingFix: limits.needsNestingFix, needsDisplayFix: limits.needsDisplayFix,
@@ -494,14 +496,14 @@ export function scoredCodePoints(sample: Sample, labels: readonly (Label | undef
 // Where the limits of the highlighter's loop show in a sample, see Limits in limits.ts: the two fields again, and the
 // position of the first code point at which the scored labels can no longer all be right.
 export function limitsFor(sample: Sample, labels: readonly (Label | undefined)[] = labelsOf(sample)) {
-  return limitsOf(Array.from(sample.broken), labels, Array.from(sample.original), sample.alignment, sample.replaced, sample.firstErrorPosition)
+  return limitsOf(Array.from(sample.broken), labels, sample.firstErrorPosition)
 }
 
 // The most code points of a sample, of those that a score counts, that one run of the highlighter's loop can have
-// right when the cells that valid JSON never reads may hold anything, see limits.ts. An upper bound for tables that
-// keep the conditions there, and no estimate of what tables reach.
+// right when the cells that valid JSON never reads may hold anything, see limits.ts: `right` of `counted`. An upper
+// bound for every setting of those cells, with or without more states, and no estimate of what tables reach.
 export function mostRightFor(sample: Sample, labels: readonly (Label | undefined)[] = labelsOf(sample)) {
-  return mostRightOf(Array.from(sample.broken), labels, Array.from(sample.original), sample.alignment, sample.replaced, sample.firstErrorPosition)
+  return mostRightOf(Array.from(sample.broken), labels, sample.firstErrorPosition)
 }
 
 // One group per broken sample, by what it takes to label it, so that every report splits the samples the same way.
@@ -511,7 +513,7 @@ export const groups = [
   // The flag is 'no': a judgment about every parser that reads from left to right.
   'out of reach',
   // The scored depths and containers cannot all come out of the highlighter's loop, see needsNestingFix: a proof
-  // under the conditions of limits.ts.
+  // under the two conditions of limits.ts.
   'needs a nesting fix',
   // The tokenizer must tell characters apart that its classes lump together, see needsClass: a judgment per form.
   'needs a character class',

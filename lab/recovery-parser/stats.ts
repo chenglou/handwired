@@ -1,4 +1,4 @@
-// Statistics of the dataset: what it holds, what the parser as it is and two hand-written settings of its tables
+// Statistics of the dataset: what it holds, what the parser as it is and the hand-written settings of its tables
 // already get right, and which cells of the tables the samples reach.
 //
 // Run from the repo root: bun lab/recovery-parser/stats.ts <file> [samples, default 40000] [seed]
@@ -64,10 +64,18 @@ for (let cell = 0; cell < tables.grammarNext.length; cell++) {
 const lexerErrorCells: number[] = []
 for (let cell = 0; cell < tables.lexerEvent.length; cell++) if (isLexerErrorEvent(tables.lexerEvent[cell]!)) lexerErrorCells.push(cell)
 
-// The readers that a score is given for: the parser as it is, and the two hand-written settings of hand-rules.ts.
+// The readers that a score is given for: the parser as it is, and the hand-written settings of hand-rules.ts.
 const readers = ['now', ...handRules] as const
 type Reader = typeof readers[number]
-const readerTables: Record<Reader, ParserTables> = {now: defaultTables, stay: handRuleTables('stay'), resync: handRuleTables('resync')}
+const perReader = <Value>(make: (reader: Reader) => Value) => Object.fromEntries(readers.map(reader => [reader, make(reader)])) as Record<Reader, Value>
+const readerTables = perReader((reader): ParserTables => reader === 'now' ? defaultTables : handRuleTables(reader))
+const readerNotes: Record<Reader, string> = {
+  now: 'the parser as it is, which shows everything after its first error as an error',
+  stay: 'hand-rules.ts: a tokenizer error starts no error line, and a token that the grammar does not accept is ignored',
+  resync: 'hand-rules.ts: as stay, and such a token moves the grammar to the state that follows it in valid JSON',
+}
+// The hand rule that the mean of the samples' own shares is printed for: the last one, which scores highest.
+const lastRule: HandRule = handRules[handRules.length - 1]!
 
 // What one reader gets right, over the code points that a score counts: those from the first error of the parser as
 // it is on that have a label with a scored value.
@@ -86,10 +94,10 @@ const emptyScore = (): Score => ({scored: 0, right: 0, kindScored: 0, kindRight:
 // What two arms of the experiment can have right at most in a sample: the code points, and whether the whole sample.
 // `grammar` is for an arm that changes only cells of the grammar table, `tokenizer` for an arm that also changes cells
 // of the tokenizer's table, see `boundsOf`.
-type Bounds = {grammarRight: number, grammarWhole: number, tokenizerRight: number, tokenizerWhole: number, notExact: number}
-const emptyBounds = (): Bounds => ({grammarRight: 0, grammarWhole: 0, tokenizerRight: 0, tokenizerWhole: 0, notExact: 0})
+type Bounds = {grammarRight: number, grammarWhole: number, tokenizerRight: number, tokenizerWhole: number}
+const emptyBounds = (): Bounds => ({grammarRight: 0, grammarWhole: 0, tokenizerRight: 0, tokenizerWhole: 0})
 type Row = {samples: number, nothingToRecover: number, scores: Record<Reader, Score>, bounds: Bounds}
-const emptyRow = (): Row => ({samples: 0, nothingToRecover: 0, scores: {now: emptyScore(), stay: emptyScore(), resync: emptyScore()}, bounds: emptyBounds()})
+const emptyRow = (): Row => ({samples: 0, nothingToRecover: 0, scores: perReader(emptyScore), bounds: emptyBounds()})
 
 // One sample's numbers for one reader, to be added to every row that the sample belongs to.
 function scoreOf(sample: Sample, labels: readonly (Label | undefined)[], trace: ParserTrace): Score {
@@ -135,8 +143,8 @@ function addScores(row: Row, sampleScores: Record<Reader, Score>, sampleBounds: 
 const scoreHeader = `${'samples'.padStart(7)} ${'nothing'.padStart(7)}   ${readers.map(reader => `${reader.padStart(6)} ${'whole'.padStart(5)}`).join('   ')}   ${'mean'.padStart(5)}`
 const scoreLine = (row: Row) => {
   const withSomething = row.samples - row.nothingToRecover
-  const perReader = readers.map(reader => `${percent(row.scores[reader].right, row.scores[reader].scored).padStart(6)} ${percent(row.scores[reader].wholeRight, withSomething)}`)
-  return `${count(row.samples)} ${count(row.nothingToRecover)}   ${perReader.join('   ')}   ${percent(row.scores.resync.shareSum, withSomething)}`
+  const columns = readers.map(reader => `${percent(row.scores[reader].right, row.scores[reader].scored).padStart(6)} ${percent(row.scores[reader].wholeRight, withSomething)}`)
+  return `${count(row.samples)} ${count(row.nothingToRecover)}   ${columns.join('   ')}   ${percent(row.scores[lastRule].shareSum, withSomething)}`
 }
 const valueLine = (row: Row, reader: Reader) => {
   const score = row.scores[reader]
@@ -154,7 +162,7 @@ function grammarOnlyCanBeRight(label: Label, trace: ParserTrace, position: numbe
 }
 
 // The two bounds of one sample. For the first arm every counted code point is looked at alone. For the second arm
-// limits.ts looks for the one run of the loop that has the most counted code points right, under its conditions.
+// limits.ts looks for the one run of the loop that has the most counted code points right, under its two conditions.
 function boundsOf(sample: Sample, labels: readonly (Label | undefined)[], trace: ParserTrace): Bounds {
   let counted = 0
   let grammarRight = 0
@@ -167,10 +175,7 @@ function boundsOf(sample: Sample, labels: readonly (Label | undefined)[], trace:
   const most = mostRightFor(sample, labels)
   if (most.counted !== counted) throw new Error(`stats.ts and limits.ts count other code points in the sample ${sample.id}`)
   if (most.right < grammarRight) throw new Error(`the bound of the second arm is below the bound of the first in the sample ${sample.id}`)
-  return {
-    grammarRight, grammarWhole: Number(counted > 0 && grammarRight === counted), tokenizerRight: most.right, tokenizerWhole: Number(counted > 0 && most.right === counted),
-    notExact: Number(!most.exact),
-  }
+  return {grammarRight, grammarWhole: Number(counted > 0 && grammarRight === counted), tokenizerRight: most.right, tokenizerWhole: Number(counted > 0 && most.right === counted)}
 }
 const boundHeader = `${'points'.padStart(6)} ${'whole'.padStart(5)}   ${'points'.padStart(6)} ${'whole'.padStart(5)}`
 const boundLine = (row: Row) => {
@@ -229,7 +234,7 @@ export function report(seed: number, sampleCount: number): string {
   const grammarFirstError = new Map<number, number>()
   const lexerFirstError = new Map<number, number>()
   // Per hand rule and table: how many samples make the rule read each error cell somewhere in the text.
-  const visited = {stay: {grammar: new Map<number, number>(), lexer: new Map<number, number>()}, resync: {grammar: new Map<number, number>(), lexer: new Map<number, number>()}}
+  const visited = Object.fromEntries(handRules.map(rule => [rule, {grammar: new Map<number, number>(), lexer: new Map<number, number>()}])) as Record<HandRule, {grammar: Map<number, number>, lexer: Map<number, number>}>
   const isGrammarErrorCell = new Set(grammarErrorCells)
   const isLexerErrorCell = new Set(lexerErrorCells)
   const validCells = new Map<number, number>()
@@ -334,9 +339,9 @@ export function report(seed: number, sampleCount: number): string {
     tally(brokenTexts, sample.broken)
 
     const labels = labelsOf(sample)
-    const traces = {now: runTableParser(sample.broken), stay: runTableParser(sample.broken, readerTables.stay), resync: runTableParser(sample.broken, readerTables.resync)}
+    const traces = perReader(reader => runTableParser(sample.broken, readerTables[reader]))
     const trace = traces.now
-    const sampleScores = {now: scoreOf(sample, labels, traces.now), stay: scoreOf(sample, labels, traces.stay), resync: scoreOf(sample, labels, traces.resync)}
+    const sampleScores = perReader(reader => scoreOf(sample, labels, traces[reader]))
     const sampleBounds = boundsOf(sample, labels, trace)
     for (const rule of handRules) {
       if (sampleScores[rule].right > sampleBounds.tokenizerRight) throw new Error(`the hand rule ${rule} has more code points right than the bound of the second arm in the sample ${sample.id}`)
@@ -474,15 +479,13 @@ export function report(seed: number, sampleCount: number): string {
   lines.push(`  ${histogram(relativeDamage, 0.1, 11).join(' ')}`)
 
   const everySample = rowsByGroup.get('every broken sample') ?? emptyRow()
-  lines.push('', 'Scores without training: what three readers already get right.')
-  lines.push('  now     the parser as it is, which shows everything after its first error as an error')
-  lines.push('  stay    hand-rules.ts: a tokenizer error starts no error line, and a token that the grammar does not accept is ignored')
-  lines.push('  resync  hand-rules.ts: as stay, and such a token moves the grammar to the state that follows it in valid JSON')
+  lines.push('', `Scores without training: what ${readers.length} readers already get right.`)
+  for (const reader of readers) lines.push(`  ${reader.padEnd(7)} ${readerNotes[reader]}`)
   lines.push('A score counts the code points from the first error of the parser as it is on that have a label with a scored value.')
   lines.push(`Before that error every arm gives what the parser as it is gives: ${beforeFirstError} labeled code points lie between the first damage and the first error, ${beforeFirstErrorUnscored} of them with a value that is not scored.`)
   lines.push('Columns: samples, samples with nothing to recover (no scored code point), then per reader the percentage of code points with every scored')
   lines.push('value right and the percentage of samples with something to recover in which every code point is right, and last the mean over')
-  lines.push('those samples of each sample\'s own percentage of right code points, for resync. A trained result is a gain only over the better hand rule.')
+  lines.push(`those samples of each sample's own percentage of right code points, for ${lastRule}. A trained result is a gain only over the best hand rule.`)
   const groupOrder = (key: string) => {
     const prefixes = ['every broken sample', 'group: ', 'reachable: ', 'layout: ', 'line ends: ', 'source: ', 'split: ', 'kinds in the sample', 'another repair', 'rule: ', 'recipe: ']
     return prefixes.findIndex(prefix => key.startsWith(prefix))
@@ -510,9 +513,10 @@ export function report(seed: number, sampleCount: number): string {
   lines.push('             events, which no grammar cell feeds, so they stay what the parser as it is gives, and a display kind can only change between')
   lines.push('             key and string on a code point of a string. The bound holds for every such table, with or without more grammar states.')
   lines.push('  tokenizer  An arm that also changes the other cells of the tokenizer\'s table, with or without more states. The classes, the events')
-  lines.push('             and the display table are as they are. The bound holds for tables that keep the two conditions of limits.ts: an event of')
-  lines.push('             a bracket, a colon or a comma is only given to its own character, and after a code point that is shown as white space or')
-  lines.push('             punctuation the tokenizer is in the state between. Both hand rules keep them. Without them nothing can be ruled out.')
+  lines.push('             and the display table are as they are. The bound holds for every such table: up to the first cell that valid JSON never')
+  lines.push('             reads the tokenizer gives the events that it gives now, and after that cell the depth still moves by one level per code')
+  lines.push('             point at most, at a code point that is shown as punctuation. conditionProblems(tables) of limits.ts says whether tables are')
+  lines.push('             of this arm.')
   lines.push('Both are upper bounds and no estimates: a code point counts when some run of the loop has it right, whether or not one table gives')
   lines.push('that run in every sample, and whether or not the grammar can tell a key from a string there. For the second arm the bound is 100% in')
   lines.push('the group within reach by the group\'s definition, since needsNestingFix and needsDisplayFix are true exactly when it is below 100%.')
@@ -523,15 +527,14 @@ export function report(seed: number, sampleCount: number): string {
     const row = rowsByGroup.get(key)
     if (row !== undefined) lines.push(`  ${boundLine(row)}  ${key}`)
   }
-  lines.push(`  The parser as it is has ${percent(nowScore.right, nowScore.scored).trim()}% of the code points right and shows ${percent(shownAsErrorByTokenizer, nowScore.scored).trim()}% as an error. In ${everySample.bounds.notExact} samples the search for the second arm's best run`)
-  lines.push('  was cut short, and their bound is then higher than the best run.')
+  lines.push(`  The parser as it is has ${percent(nowScore.right, nowScore.scored).trim()}% of the code points right and shows ${percent(shownAsErrorByTokenizer, nowScore.scored).trim()}% as an error.`)
 
   const leftAbove = (row: Row) => {
     const best = Math.max(...handRules.map((rule: HandRule) => row.scores[rule].scored === 0 ? 0 : row.scores[rule].right / row.scores[rule].scored))
     return row.scores.now.scored === 0 ? '    -' : (100 * (1 - best)).toFixed(1).padStart(5)
   }
   for (const [title, rows] of [['kind (every sample that has it)', rowsByKind], ['kind (samples where it is the only kind)', rowsByKindAlone]] as const) {
-    lines.push('', `  ${scoreHeader}  ${'left'.padStart(5)}  ${title}. "left" is what the better hand rule leaves, in percent of the code points`)
+    lines.push('', `  ${scoreHeader}  ${'left'.padStart(5)}  ${title}. "left" is what the best hand rule leaves, in percent of the code points`)
     for (const kind of kinds) {
       const row = rows.get(kind.name)
       if (row !== undefined) lines.push(`  ${scoreLine(row)}  ${leftAbove(row)}  ${kind.name}`)

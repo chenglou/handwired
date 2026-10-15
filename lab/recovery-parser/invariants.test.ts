@@ -10,10 +10,10 @@ import {contradictions, kinds} from './damage.ts'
 import {type Edit, applyEdits, canonicalEdits, insertAt, removeRange, replaceOneForOne} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
 import {labelsOfValidText, tokenSequenceOf} from './labels.ts'
-import {assumptionProblems, cellsThatValidJsonReads, limitsOf} from './limits.ts'
+import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
 import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, typingReplayOf} from './samples.ts'
-import {capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
+import {type ParserTables, capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
 const samples: Sample[] = Array.from({length: sampleCount}, (_, index) => sampleAt(defaultSeed, index))
@@ -190,30 +190,43 @@ function limitsOfText(original: string, edits: Edit[], unscoredNesting: number[]
     const scored = !unscoredNesting.includes(index)
     return {kind: valid[index]!.kind, depth: scored ? valid[index]!.depth : undefined, container: scored ? valid[index]!.container : undefined}
   })
-  const limits = limitsOf(Array.from(applied.broken), labels, originalCodePoints, applied.alignment, applied.replaced, runTableParser(applied.broken).firstErrorPosition)
+  const limits = limitsOf(Array.from(applied.broken), labels, runTableParser(applied.broken).firstErrorPosition)
   return {...limits, broken: applied.broken}
 }
 
 test('the fields about what the loop can give say what limits.ts proves, on texts made by hand', () => {
-  // A key without quotes that starts with n, after an error: the n is read as the start of null.
-  const keys = limitsOfText('{"port": 1, "name": 2}', [removeRange(1, 2), removeRange(6, 7), removeRange(12, 13), removeRange(17, 18)])
-  expect(keys.broken).toBe('{port: 1, name: 2}')
-  expect([keys.needsDisplayFix, keys.displayStopsAt, keys.needsNestingFix]).toEqual([true, 10, false])
-  // The same with keys that start with other letters.
-  expect(limitsOfText('{"port": 1, "host": 2}', [removeRange(1, 2), removeRange(6, 7), removeRange(12, 13), removeRange(17, 18)])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
-  // A closer that must close two containers after a comment. The line feed before it has no scored depth, and it
-  // cannot take the second step: only a bracket moves the depth.
-  const twoContainers = limitsOfText('{"a": ["x"]\n}', [insertAt(10, ' // note'), removeRange(10, 11)], [11])
-  expect(twoContainers.broken).toBe('{"a": ["x" // note\n}')
-  expect([twoContainers.needsNestingFix, twoContainers.nestingStopsAt]).toEqual([true, 19])
-  // A closer too many after an error: the loop reads it from the state between and lowers the depth.
-  const stray = limitsOfText('{"a": 1,\n"b": 2}', [insertAt(0, '\ufeff'), insertAt(9, '},\n')])
-  expect(stray.broken).toBe('\ufeff{"a": 1,\n},\n"b": 2}')
-  expect(stray.needsNestingFix).toBe(true)
-  // A closer of the other kind after an error: the depth is right, and the kind of the container around it is not.
-  const otherKind = limitsOfText('[{"a": [1]}, 2]', [insertAt(0, '\ufeff'), replaceOneForOne(9, '}')])
-  expect(otherKind.broken).toBe('\ufeff[{"a": [1}}, 2]')
-  expect(otherKind.needsNestingFix).toBe(true)
+  const withoutQuotes = [removeRange(1, 2), removeRange(6, 7), removeRange(12, 13), removeRange(17, 18)]
+  // A key without quotes that starts with n, right after the brace: the n is read as the start of null by a cell that
+  // valid JSON reads, and that cell shows a literal.
+  const keys = limitsOfText('{"name": 1, "port": 2}', withoutQuotes)
+  expect(keys.broken).toBe('{name: 1, port: 2}')
+  expect([keys.needsDisplayFix, keys.displayStopsAt, keys.needsNestingFix]).toEqual([true, 1, false])
+  // The same key after a key that starts with p: the cell for p between two tokens is one that valid JSON never
+  // reads, so the tables can be in a state of their own from there on, in which a word after a comma is a key.
+  const later = limitsOfText('{"port": 1, "name": 2}', withoutQuotes)
+  expect(later.broken).toBe('{port: 1, name: 2}')
+  expect(later).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // A closer that must close two containers. Every code point is read by a cell that valid JSON reads, and the line
+  // feed before the closer, whose depth is not scored, moves no depth.
+  const twoContainers = limitsOfText('{"a": ["x"]\n}', [removeRange(10, 11)], [11])
+  expect(twoContainers.broken).toBe('{"a": ["x"\n}')
+  expect([twoContainers.needsNestingFix, twoContainers.nestingStopsAt]).toEqual([true, 11])
+  // The same after a comment: nothing is proven. The slash is read by a cell that valid JSON never reads, and the
+  // tables may give a character of the comment the event of a closing bracket.
+  const afterAComment = limitsOfText('{"a": ["x"]\n}', [insertAt(10, ' // note'), removeRange(10, 11)], [11])
+  expect(afterAComment.broken).toBe('{"a": ["x" // note\n}')
+  expect(afterAComment).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // A closer too many: the loop reads it from the state between and lowers the depth, which shows at the next code
+  // point that has a label, the quote of "b".
+  const stray = limitsOfText('{"a": 1,\n"b": 2}', [insertAt(9, '},\n')])
+  expect(stray.broken).toBe('{"a": 1,\n},\n"b": 2}')
+  expect([stray.needsNestingFix, stray.nestingStopsAt]).toEqual([true, 12])
+  // The same after a byte order mark, which no cell of valid JSON reads: the tables can skip the closer.
+  expect(limitsOfText('{"a": 1,\n"b": 2}', [insertAt(0, '\ufeff'), insertAt(9, '},\n')])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // A closer of the other kind: the depth is right, and the kind of the container around it is not.
+  const otherKind = limitsOfText('[{"a": [1]}, 2]', [replaceOneForOne(9, '}')])
+  expect(otherKind.broken).toBe('[{"a": [1}}, 2]')
+  expect([otherKind.needsNestingFix, otherKind.nestingStopsAt]).toEqual([true, 9])
   // A color code: its [ comes after a character that valid JSON never has, so the tables can skip it.
   expect(limitsOfText('{"ok": true}', [insertAt(0, '\u001b[32m'), insertAt(12, '\u001b[0m')])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
   // {{id}} opens two braces and closes two.
@@ -224,13 +237,87 @@ test('the fields about what the loop can give say what limits.ts proves, on text
   expect([doubled.needsDisplayFix, doubled.displayStopsAt]).toEqual([true, 10])
   // A missing comma and a comment: nothing is out of reach.
   expect(limitsOfText('{"a": 1,\n"b": 2}', [removeRange(7, 8), insertAt(8, '// b\n')])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // After a cell that valid JSON never reads, the depth still moves by one level per code point at most: a closer
+  // that must close two containers right after a string cannot.
+  const afterAWord = limitsOfText('{"a": ["x"]}', [insertAt(0, '\ufeff'), removeRange(10, 11)])
+  expect(afterAWord.broken).toBe('\ufeff{"a": ["x"}')
+  expect([afterAWord.needsNestingFix, afterAWord.nestingStopsAt]).toEqual([true, 11])
 })
+
+// Tables of the arm that also changes tokenizer cells, made to score high: the hand rule resync, with four rows of
+// the tokenizer's table that valid JSON hardly reads used as a second tokenizer, which remembers across white space
+// and punctuation whether a key or a value comes next. errorLine is "between two tokens where a key may come", nul is
+// "between two tokens after a colon", exponentSign is "inside a word", tru is "inside a number". So after the first
+// word without quotes, a word after a comma is a key, also when it starts with t, f or n. An earlier bound, which
+// took the tokenizer to be in the state between after white space and punctuation, was below what these tables have right.
+function secondTokenizerTables(): ParserTables {
+  const base = handRuleTables('resync')
+  const read = cellsThatValidJsonReads()
+  const role: Record<string, string> = {key: 'errorLine', value: 'nul', word: 'exponentSign', number: 'tru'}
+  const stateNamed = (name: string) => lexerStateNames.indexOf((role[name] ?? name) as typeof lexerStateNames[number])
+  const lexerEvent = [...base.lexerEvent]
+  const lexerNext = [...base.lexerNext]
+  const set = (from: string, characterClass: string, event: string, to: string) => {
+    const cell = stateNamed(from) * defaultTables.classCount + classNames.indexOf(characterClass as typeof classNames[number])
+    if (read.tokenizer[cell] === 1) return
+    lexerEvent[cell] = eventNames.indexOf(event as typeof eventNames[number])
+    lexerNext[cell] = stateNamed(to)
+  }
+  const letters = ['a', 'b', 'e', 'capitalE', 'f', 'l', 'n', 'r', 's', 't', 'u', 'otherHexLetter', 'other']
+  const numberStarts = ['minus', 'zero', 'digit', 'plus', 'dot']
+  const row = (name: string, fill: [string, string], cells: Record<string, [string, string]>) => {
+    for (const characterClass of classNames) set(name, characterClass, ...(cells[characterClass] ?? fill))
+  }
+  const all = (classes: readonly string[], cell: [string, string]) => Object.fromEntries(classes.map(characterClass => [characterClass, cell]))
+  const space = (to: string) => all(['space', 'tabOrCarriageReturn', 'lineFeed'], ['whitespace', to])
+  const common: Record<string, [string, string]> = {
+    openBrace: ['openObject', 'key'], openBracket: ['openArray', 'value'], closeBrace: ['closeObject', 'key'], closeBracket: ['closeArray', 'key'], colon: ['colon', 'value'], comma: ['comma', 'key'],
+    end: ['end', 'key'], truncatedEnd: ['truncatedEnd', 'key'], quote: ['stringStart', 'string'],
+  }
+  for (const letter of letters) set('between', letter, 'stringStart', 'word')
+  for (const state of ['t', 'tr', 'f', 'fa', 'fal', 'fals', 'n', 'nu']) for (const characterClass of [...letters, 'zero', 'digit', 'minus', 'dot']) set(state, characterClass, 'stringContent', 'word')
+  for (const state of ['zero', 'integer', 'fraction', 'exponentDigits', 'dot', 'minus', 'exponent']) for (const characterClass of [...letters, 'dot', 'minus']) set(state, characterClass, 'stringContent', 'word')
+  row('key', ['unexpectedCharacter', 'key'], {...all(letters, ['stringStart', 'word']), ...space('key'), ...common, ...all(numberStarts, ['numberStart', 'number'])})
+  row('value', ['unexpectedCharacter', 'value'], {...all(letters, ['stringStart', 'word']), t: ['literalStart', 't'], f: ['literalStart', 'f'], n: ['literalStart', 'n'], ...space('value'), ...common, ...all(numberStarts, ['numberStart', 'number'])})
+  row('word', ['stringContent', 'word'], {...space('key'), ...common})
+  row('number', ['numberContent', 'number'], {...all(letters, ['stringContent', 'word']), ...space('key'), ...common})
+  return {...base, lexerEvent, lexerNext}
+}
+
+// Tables with something drawn at random in every cell that valid JSON never reads, with `addedStates` more tokenizer
+// states and as many more grammar states, whose rows are drawn too.
+function randomTables(seed: number, addedStates: number): ParserTables {
+  const random = createRandom(seed, 0)
+  const read = cellsThatValidJsonReads()
+  const lexerStateCount = lexerStateNames.length + addedStates
+  const grammarStateCount = defaultTables.grammarStateCount + addedStates
+  const lexerEvent = Array.from({length: lexerStateCount * defaultTables.classCount}, (_, cell) => read.tokenizer[cell] === 1 ? defaultTables.lexerEvent[cell]! : random.integer(0, defaultTables.eventCount - 1))
+  const lexerNext = Array.from({length: lexerStateCount * defaultTables.classCount}, (_, cell) => read.tokenizer[cell] === 1 ? defaultTables.lexerNext[cell]! : random.integer(0, lexerStateCount - 1))
+  const grammarNext = Array.from({length: grammarStateCount * defaultTables.symbolCount}, (_, cell) => read.grammar[cell] === 1 ? defaultTables.grammarNext[cell]! : random.integer(0, grammarStateCount - 1))
+  const grammarError = Array.from({length: grammarNext.length}, (_, cell) => defaultTables.grammarError[cell] ?? 0)
+  const stringEvents = ['stringStart', 'stringContent', 'stringEnd'].map(name => eventNames.indexOf(name as typeof eventNames[number]))
+  const display: number[] = []
+  for (let event = 0; event < defaultTables.eventCount; event++) {
+    for (let state = 0; state < grammarStateCount; state++) {
+      const now = defaultTables.display[event * defaultTables.grammarStateCount + Math.min(state, defaultTables.grammarStateCount - 1)]!
+      display.push(state >= defaultTables.grammarStateCount && stringEvents.includes(event) ? random.pick([displayKind.key, displayKind.string]) : now)
+    }
+  }
+  return {...defaultTables, grammarStateCount, lexerEvent, lexerNext, grammarNext, grammarError, display}
+}
 
 test('the fields about what the loop can give agree with the most that a run can have right, and no hand rule passes that', () => {
   const read = cellsThatValidJsonReads()
   expect(read.tokenizer.reduce((total, flag) => total + flag, 0)).toBe(148)
   expect(read.grammar.reduce((total, flag) => total + flag, 0)).toBe(88)
-  const ruleTables = handRules.map(rule => handRuleTables(rule))
+  // The readers that must stay at or below the bound of limits.ts: the hand rules, tables that use spare rows as a
+  // second tokenizer, and tables with every free cell drawn at random, without and with added states.
+  const armTables: [name: string, tables: ParserTables][] = [
+    ...handRules.map((rule): [string, ParserTables] => [`the hand rule ${rule}`, handRuleTables(rule)]),
+    ['the second tokenizer', secondTokenizerTables()], ['random tables', randomTables(1, 0)], ['random tables with 6 added states', randomTables(2, 6)],
+  ]
+  for (const [name, armTable] of armTables) expect([name, conditionProblems(armTable)]).toEqual([name, []])
+  const wholeByArm = armTables.map(() => 0)
   let flagged = 0
   let lost = 0
   for (const sample of samples) {
@@ -257,19 +344,20 @@ test('the fields about what the loop can give agree with the most that a run can
     const most = mostRightFor(sample, labels)
     const counted = scoredCodePoints(sample, labels)
     expect(most.counted).toBe(counted)
-    if (most.exact && (most.right < counted) !== (sample.needsNestingFix || sample.needsDisplayFix)) fail(sample, `the fields say ${sample.needsNestingFix || sample.needsDisplayFix ? 'out of reach' : 'nothing'}, and the most that a run has right is ${most.right} of ${counted}`)
+    if ((most.right < counted) !== (sample.needsNestingFix || sample.needsDisplayFix)) fail(sample, `the fields say ${sample.needsNestingFix || sample.needsDisplayFix ? 'out of reach' : 'nothing'}, and the most that a run has right is ${most.right} of ${counted}`)
     if (sample.needsNestingFix || sample.needsDisplayFix) flagged++
     lost += counted - most.right
-    // The two hand rules keep the conditions, so neither has more code points right than the most.
-    for (const [index, ruleTable] of ruleTables.entries()) {
-      const ruleTrace = runTableParser(sample.broken, ruleTable)
+    // Every one of the tables keeps the two conditions, so none has more code points right than the most.
+    for (const [index, [name, armTable]] of armTables.entries()) {
+      const armTrace = runTableParser(sample.broken, armTable)
       let right = 0
       for (let position = sample.firstErrorPosition; position < labels.length; position++) {
         const label = labels[position]
         if (label === undefined || (label.kind === undefined && label.depth === undefined)) continue
-        if ((label.kind === undefined || label.kind === ruleTrace.displayKind[position]) && (label.depth === undefined || (label.depth === ruleTrace.depthAfter[position] && label.container === ruleTrace.containerAfter[position]))) right++
+        if ((label.kind === undefined || label.kind === armTrace.displayKind[position]) && (label.depth === undefined || (label.depth === armTrace.depthAfter[position] && label.container === armTrace.containerAfter[position]))) right++
       }
-      if (right > most.right) fail(sample, `the hand rule ${handRules[index]} has ${right} code points right, more than the most that limits.ts allows, ${most.right}`)
+      if (right > most.right) fail(sample, `${name} has ${right} code points right, more than the most that limits.ts allows, ${most.right}`)
+      if (counted > 0 && right === counted) wholeByArm[index]!++
     }
     if (groupOf(sample) === 'within reach of the tables' && (sample.reachable !== 'yes' || sample.needsNestingFix || sample.needsDisplayFix || sample.needsClass.length > 0)) fail(sample, 'the group does not fit the flags')
     // A sample whose kinds need both rules of a pair that exclude each other has the flag 'no'.
@@ -277,11 +365,14 @@ test('the fields about what the loop can give agree with the most that a run can
   }
   expect(flagged).toBeGreaterThan(50)
   expect(lost).toBeGreaterThan(1000)
+  // The second tokenizer has whole samples right that resync has not, so it is a reader worth holding against the bound.
+  const wholeOf = (name: string) => wholeByArm[armTables.findIndex(([arm]) => arm === name)]!
+  expect(wholeOf('the second tokenizer')).toBeGreaterThan(wholeOf('the hand rule resync'))
 })
 
-test('the tables as they are and the two hand rules keep the conditions under which the limits hold, and changed tables are noticed', () => {
-  expect(assumptionProblems(defaultTables)).toEqual([])
-  for (const rule of handRules) expect(assumptionProblems(handRuleTables(rule))).toEqual([])
+test('the tables as they are and the hand rules keep the two conditions under which the limits hold, and tables outside them are noticed', () => {
+  expect(conditionProblems(defaultTables)).toEqual([])
+  for (const rule of handRules) expect(conditionProblems(handRuleTables(rule))).toEqual([])
   const cellOf = (state: string, characterClass: string) => lexerStateNames.indexOf(state as typeof lexerStateNames[number]) * defaultTables.classCount + classNames.indexOf(characterClass as typeof classNames[number])
   const eventNamed = (name: typeof eventNames[number]) => eventNames.indexOf(name)
   const withCell = (cell: number, event: number, next: string) => {
@@ -292,16 +383,25 @@ test('the tables as they are and the two hand rules keep the conditions under wh
     return {...defaultTables, lexerEvent, lexerNext}
   }
   // A cell that valid JSON reads is changed: the n between two tokens no longer starts a literal.
-  expect(assumptionProblems(withCell(cellOf('between', 'n'), eventNamed('stringStart'), 'string')).length).toBe(1)
-  // A closing event on a letter.
-  expect(assumptionProblems(withCell(cellOf('between', 'other'), eventNamed('closeObject'), 'between')).length).toBe(1)
-  // White space that leaves the tokenizer in another state than between.
-  expect(assumptionProblems(withCell(cellOf('tru', 'space'), eventNamed('whitespace'), 'errorLine')).length).toBe(1)
-  // A cell that valid JSON never reads may hold an event that is shown as a string, with any next state.
-  expect(assumptionProblems(withCell(cellOf('between', 'other'), eventNamed('stringContent'), 'errorLine'))).toEqual([])
+  expect(conditionProblems(withCell(cellOf('between', 'n'), eventNamed('stringStart'), 'string')).length).toBe(1)
+  // A cell that valid JSON never reads may hold any event with any next state: a closing event on a letter, white
+  // space that leaves the tokenizer in another state than between, the event of a string.
+  expect(conditionProblems(withCell(cellOf('between', 'other'), eventNamed('closeObject'), 'between'))).toEqual([])
+  expect(conditionProblems(withCell(cellOf('tru', 'space'), eventNamed('whitespace'), 'errorLine'))).toEqual([])
+  expect(conditionProblems(withCell(cellOf('between', 'other'), eventNamed('stringContent'), 'errorLine'))).toEqual([])
+  // A changed display cell, a changed character class and a changed depth change are outside the conditions.
+  const display = [...defaultTables.display]
+  display[eventNamed('literalStart') * defaultTables.grammarStateCount] = displayKind.key
+  expect(conditionProblems({...defaultTables, display}).length).toBe(1)
+  const classOfCodePoint = [...defaultTables.classOfCodePoint]
+  classOfCodePoint["'".codePointAt(0)! + 1] = classNames.indexOf('quote')
+  expect(conditionProblems({...defaultTables, classOfCodePoint}).length).toBe(1)
+  const depthChange = [...defaultTables.depthChange]
+  depthChange[eventNamed('comma')] = -1
+  expect(conditionProblems({...defaultTables, depthChange}).length).toBe(1)
 })
 
-test('the two hand-written settings of the tables read valid documents exactly as the tables as they are', () => {
+test('the hand-written settings of the tables read valid documents exactly as the tables as they are', () => {
   for (const rule of handRules) {
     const tables = handRuleTables(rule)
     for (const sample of samples.slice(0, 1200)) {
