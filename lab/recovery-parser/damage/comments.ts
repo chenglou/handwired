@@ -286,12 +286,16 @@ function conflictMarkers(random: Random, scanned: Scan): Damage | undefined {
   const edits: Edit[] = []
   const used: [number, number][] = []
   const withBase = random.chance(0.18)
+  // One merge names the common ancestor the same way in every conflict of a file.
+  const baseLabel = random.pick(baseLabels)
   const keptSide = random.chance(0.5) ? 'ours' : 'theirs'
   let unequal = false
   for (let conflict = 0; conflict < conflictCount; conflict++) {
     const run = memberRun(random, scanned, 4)
     if (run === undefined) return conflict === 0 ? undefined : {edits, form: `one conflict, the original is the side of ${keptSide}`, reachable: 'yes', debatable: true}
-    if (used.some(([from, to]) => run.from < to && from < run.to)) continue
+    // Git writes two conflicts only where a line that both sides share stands between them: changes that touch are one
+    // conflict. So a second run that overlaps the first or starts where it ends is left out.
+    if (used.some(([from, to]) => run.from <= to && from <= run.to)) continue
     used.push([run.from, run.to])
     const lines = codePoints.slice(run.from, run.to).join('').split('\n').slice(0, -1)
     const otherLines = lines.map(line => otherVersionOf(random, line))
@@ -303,7 +307,7 @@ function conflictMarkers(random: Random, scanned: Scan): Damage | undefined {
       unequal = true
     }
     const other = otherLines.map(line => `${line}\n`).join('')
-    const base = withBase ? `||||||| ${random.pick(baseLabels)}\n${lines.map(line => `${otherVersionOf(random, line)}\n`).join('')}` : ''
+    const base = withBase ? `||||||| ${baseLabel}\n${lines.map(line => `${otherVersionOf(random, line)}\n`).join('')}` : ''
     if (keptSide === 'ours') {
       edits.push(insertAt(run.from, `<<<<<<< ${ours}\n`), insertAt(run.to, `${base}=======\n${other}>>>>>>> ${theirs}\n`))
     } else {
