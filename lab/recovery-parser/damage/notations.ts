@@ -75,14 +75,15 @@ function singleQuotedString(random: Random, scanned: Scan, options: KindOptions 
     const inBackticks = form === 'every but word keys' ? withBoth : []
     for (const part of changed) requote(part, inBackticks.includes(part) ? '`' : '\'')
     // The form text says how many of the requoted strings hold no apostrophe and how many hold both kinds of quote,
-    // e.g. "every string that keeps its quotes without an apostrophe, 5 of them, and 1 with both kinds of quote, in
-    // backticks". "That keeps its quotes" leaves out the keys that are words, which stand without quotes in such a text.
-    const which = `string${form === 'every' ? '' : ' that keeps its quotes'}`
+    // e.g. "every string without an apostrophe, but not the keys that are words, 5 of them, and 1 with both kinds of
+    // quote, in backticks". The keys that are words are left as they are: another kind of the same combination takes
+    // their quotes away in most samples, and in the others they stand in double quotes.
+    const butNot = form === 'every' ? '' : ', but not the keys that are words'
     const without = changed.length - withBoth.length
     const how = form === 'every' ? 'in single quotes with \\\' for each apostrophe' : 'in backticks'
-    const text = withBoth.length === 0 ? `every ${which}${changed.length < considered.length ? ' without an apostrophe' : ''}, ${changed.length} of them`
+    const text = withBoth.length === 0 ? `every string${changed.length < considered.length ? ' without an apostrophe' : ''}${butNot}, ${changed.length} of them`
       : without === 0 ? `only the ${withBoth.length === 1 ? 'string' : `${withBoth.length} strings`} with both kinds of quote, ${how}`
-      : `every ${which} without an apostrophe, ${without} of them, and ${withBoth.length} with both kinds of quote, ${how}`
+      : `every string without an apostrophe${butNot}, ${without} of them, and ${withBoth.length} with both kinds of quote, ${how}`
     // A string in backticks holds a double quote, which ends a word, so the tables need the backtick as a quote for
     // it. That is another class than the apostrophe as a quote, which the strings in single quotes need when one of
     // them holds a character that ends a word.

@@ -13,6 +13,7 @@ import {handRuleTables, handRules} from './hand-rules.ts'
 import {kindLetters, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {cellsThatValidJsonReads, conditionProblems, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
+import {isWordKey, scan} from './scan.ts'
 import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitKeyOf, splitOf, splitOfDocuments, splits, typingReplayOf} from './samples.ts'
 import {type ParserTables, capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
@@ -630,6 +631,8 @@ test('the form texts of raw line feeds and of single quotes give the numbers tha
   // A requoted string that holds an apostrophe holds both kinds of quote, and the form text says how many there are.
   let inBackticks = 0
   let withEscapedApostrophe = 0
+  let leavingOutWordKeys = 0
+  let wordKeysInDoubleQuotes = 0
   const requotedSamples = [...samples, ...Array.from({length: 400}, (_, index) => sampleAt(defaultSeed, index, {kind: 'singleQuotedString'}))]
   for (const sample of requotedSamples) {
     const form = sample.forms.find(text => text.startsWith('singleQuotedString: '))
@@ -655,9 +658,26 @@ test('the form texts of raw line feeds and of single quotes give the numbers tha
     if (scoredCodePoints(sample) === 0) continue
     if (backticks !== sample.needsClass.includes('the backtick as a quote')) fail(sample, 'a string in backticks and the class "the backtick as a quote" do not come together')
     if (sample.needsClass.includes('the apostrophe as a quote') && !requoted.some(part => part.quote === '\'')) fail(sample, 'the class "the apostrophe as a quote" without a string in single quotes')
+    // "Every string": a string that still stands in double quotes holds an apostrophe, or is a key that is a word
+    // when the form text leaves those out.
+    if (!form.startsWith('singleQuotedString: every string') || form.startsWith('singleQuotedString: every string value') || sample.documents.length !== 1) continue
+    const leavesOutWordKeys = form.includes('but not the keys that are words')
+    if (leavesOutWordKeys) leavingOutWordKeys++
+    for (const part of scan(sample.original).strings) {
+      const opening = sample.alignment.indexOf(part.start)
+      if (opening === -1 || broken[opening] !== '"') continue
+      const isWordKeyPart = part.role === 'key' && !part.hasEscape && isWordKey(part.content)
+      if (isWordKeyPart && leavesOutWordKeys) {
+        wordKeysInDoubleQuotes++
+        continue
+      }
+      if (!part.content.includes('\'')) fail(sample, `the form text "${form}" says every string, and "${part.content}" still stands in double quotes`)
+    }
   }
   expect(inBackticks).toBeGreaterThan(0)
   expect(withEscapedApostrophe).toBeGreaterThan(0)
+  expect(leavingOutWordKeys).toBeGreaterThan(0)
+  expect(wordKeysInDoubleQuotes).toBeGreaterThan(0)
 })
 
 test('a string without its opening quote is flagged yes exactly when the closing quote ends what is left, as the README says', () => {
