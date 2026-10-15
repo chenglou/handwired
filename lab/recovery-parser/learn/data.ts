@@ -474,12 +474,13 @@ export function optionOf(name: string, argv: readonly string[] = process.argv): 
 }
 
 // The splits that a command's --split names, e.g. ['train', 'validation'] for `--split train,validation`. Without
-// the option, the validation split. The test split is refused unless RECOVERY_FINAL is `yes`.
+// the option, the validation split. The test split is refused, with or without RECOVERY_FINAL: the commands load no
+// test sample, and arms/final.ts is the one script that scores the test split.
 export function splitsOfOption(command: string, argv: readonly string[] = process.argv): Split[] {
   const named = (optionOf('--split', argv) ?? 'validation').split(',') as Split[]
   for (const split of named) {
-    if (!splitNames.includes(split)) throw new Error(`--split takes ${splitNames.join(', ')}, or several of them with commas, and got ${split}`)
-    if (split === 'test') requireFinal(`${command} --split test`)
+    if (split === 'test') throw new Error(`${command} --split test: this command does not read the test split, which is for final numbers only. arms/final.ts is the one script that scores it, see arms/README.md.`)
+    if (!splitNames.includes(split)) throw new Error(`--split takes train or validation, or both with a comma, and got ${split}`)
   }
   return named
 }

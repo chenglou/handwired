@@ -207,6 +207,15 @@ bun lab/recovery-parser/learn/compare.ts hand-written=$RECOVERY_SCRATCH/handwrit
 
 The cache file is made again by itself when a source file of the dataset, `data.ts` or `intended.ts` changes: its name holds a key of those files, so a file of another version of the dataset is never read.
 
+## Taking a new commit of the dataset
+
+The dataset's files are everything in `lab/recovery-parser/` that is not under `learn/`. They are the dataset branch's files, whole, with one change: `highlightReference` takes one argument on this branch, so seven calls lose their `, 0` (one in `labels.ts`, two each in `check-table-parser.ts`, `check-samples.ts` and `invariants.test.ts`). After a merge of a later commit of the dataset:
+
+1. Take the dataset branch's version of every dataset file, and make those calls take one argument again. `bunx tsc -p lab/recovery-parser` names every such call.
+2. Run `bun test lab/recovery-parser`, `bun lab/recovery-parser/check-samples.ts` and `bun lab/recovery-parser/check-table-parser.ts`.
+3. Run `bun lab/recovery-parser/learn/check-all.ts`. The cache of the samples is made again by itself, since its name holds a key of the dataset's source files, and every record of an arm holds that key as `datasetKey`.
+4. Every number in the READMEs is then of another dataset: make the tables again with the commands above. Tables and records that were saved under `RECOVERY_SCRATCH` before are of the old dataset.
+
 In code:
 
 ```ts

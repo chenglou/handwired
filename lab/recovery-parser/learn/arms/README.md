@@ -156,7 +156,7 @@ The test split is for final numbers only, after every choice is made. It holds f
 
 - `loadSamples` leaves every sample of the test split out when it makes the samples, so a script that reads the arrays cannot score, print or train on one. A sample's place in the arrays is therefore not its index in the dataset: `samples.index[place]` is.
 - `allowedSampleAt(seed, index)` of `../data.ts` gives one sample of the dataset, and `undefined` for a sample of the test split. No file of `learn/` but `data.ts` may call the dataset's `sampleAt`: `../check-guard.ts` fails when one does.
-- `scoreTables` with the split `test`, `loadSamples` with `withTest`, `placesOfSplit(samples, 'test')` and `--split test` on any command throw unless the environment variable `RECOVERY_FINAL` is `yes`.
+- `scoreTables` with the split `test`, `loadSamples` with `withTest` and `placesOfSplit(samples, 'test')` throw unless the environment variable `RECOVERY_FINAL` is `yes`. `--split test` throws on every command, with or without it.
 - `final.ts` is the one script that is meant to run with it: `RECOVERY_FINAL=yes bun lab/recovery-parser/learn/arms/final.ts <name>=<tables.json> ...`. It prints, per tables and for the baselines, a row for each of the four ways a test sample can be held out: nothing held out, a held-out kind on a template that training has, kinds that training has on the held-out template, and both. About a half of the test split is held out, so one number for the whole split is not to be reported alone. **It was never run.**
 - Do not read the files that `lab/recovery-parser/dump.ts` writes: they hold test samples.
 
