@@ -402,6 +402,26 @@ test('every text of a typing replay is what its edits give from the finished doc
   expect(commaApartBefore).toBeGreaterThan(50)
 })
 
+test('a damaged document with carriage return line ends has them at every line end, in the original and in the broken text', () => {
+  let found = 0
+  let withOpenString = 0
+  for (const sample of samples) {
+    if (sample.lineEnd !== (sample.original.includes('\r\n') ? '\r\n' : '\n')) fail(sample, 'the field lineEnd does not say what ends the lines of the original')
+    if (sample.source !== 'damage' || sample.lineEnd !== '\r\n' || sample.documents.length !== 1) continue
+    found++
+    for (const text of [sample.original, sample.broken]) {
+      if (/[^\r]\n|^\n|\r(?!\n)/.test(text)) fail(sample, 'a line feed without a carriage return before it, or a carriage return without a line feed after it')
+    }
+    // A string that is open at its line end meets the carriage return first, which is in one class with the tab.
+    if (sample.needsRules.includes('a string that is open at a line feed ends there')) {
+      withOpenString++
+      if (!sample.needsClass.some(need => need.includes('carriage return'))) fail(sample, 'a string is open at a line end with a carriage return, and the sample does not say that it needs a class')
+    }
+  }
+  expect(found).toBeGreaterThan(20)
+  expect(withOpenString).toBeGreaterThan(0)
+})
+
 test('the same seed and index give the same sample twice, another index gives another sample, and two seeds are unrelated', () => {
   for (let index = 0; index < 400; index++) {
     expect(sampleAt(defaultSeed, index)).toEqual(samples[index]!)

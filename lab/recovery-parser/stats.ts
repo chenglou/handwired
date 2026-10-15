@@ -203,6 +203,7 @@ export function report(seed: number, sampleCount: number): string {
   const lines: string[] = []
   const tally = (map: Map<string, number>, key: string, by = 1) => map.set(key, (map.get(key) ?? 0) + by)
   const bySource = new Map<string, number>()
+  const byCarriageReturn = new Map<string, number>()
   const bySplit = new Map<string, number>()
   const byReachable = new Map<string, number>()
   const byGroup = new Map<string, number>()
@@ -263,6 +264,7 @@ export function report(seed: number, sampleCount: number): string {
   for (let index = 0; index < sampleCount; index++) {
     const sample = sampleAt(seed, index)
     tally(bySource, sample.source)
+    if (sample.lineEnd === '\r\n') tally(byCarriageReturn, sample.source)
     tally(bySplit, sample.split)
     tally(byRecipe, sample.recipe)
     tally(byTemplate, sample.template.startsWith('records') ? 'records (several documents)' : sample.template)
@@ -357,6 +359,7 @@ export function report(seed: number, sampleCount: number): string {
     addTo(rowsByGroup, `split: ${sample.heldOut.length > 0 ? 'test, ' : `${sample.split}, `}${heldOutGroupOf(sample)}`)
     addTo(rowsByGroup, `kinds in the sample: ${Math.min(sample.kinds.length, 4)}${sample.kinds.length >= 4 ? ' or more' : ''}`)
     if (sample.debatable) addTo(rowsByGroup, 'another repair is sensible')
+    if (sample.lineEnd === '\r\n') addTo(rowsByGroup, `line ends: a carriage return and a line feed, ${sample.documents.length > 1 ? 'several documents' : 'one document'}`)
     for (const rule of sample.needsRules) addTo(rowsByGroup, `rule: ${rule}`)
     if (sample.source === 'damage') addTo(rowsByGroup, `recipe: ${sample.recipe}`)
 
@@ -413,6 +416,7 @@ export function report(seed: number, sampleCount: number): string {
   lines.push(`Recovery dataset, seed ${seed}, samples 0 to ${sampleCount - 1}.`)
   lines.push(`${damagedSamples} broken samples and ${sampleCount - damagedSamples} valid ones. Shares are of all samples for sources, splits, templates and styles, and of the broken samples elsewhere.`)
   table('Samples per source', bySource, sampleCount, sources)
+  lines.push(`  Lines that end with a carriage return and a line feed: ${sources.map(source => `${byCarriageReturn.get(source) ?? 0} ${source} samples`).join(', ')}.`)
   table('Samples per split', bySplit, sampleCount, splits)
   lines.push(`  ${splitConflicts} originals occur in two splits (must be 0).`)
   // A split key is a sequence of tokens, or for a document that is one scalar the token and the text, see splitKeyOf.
@@ -480,7 +484,7 @@ export function report(seed: number, sampleCount: number): string {
   lines.push('value right and the percentage of samples with something to recover in which every code point is right, and last the mean over')
   lines.push('those samples of each sample\'s own percentage of right code points, for resync. A trained result is a gain only over the better hand rule.')
   const groupOrder = (key: string) => {
-    const prefixes = ['every broken sample', 'group: ', 'reachable: ', 'layout: ', 'source: ', 'split: ', 'kinds in the sample', 'another repair', 'rule: ', 'recipe: ']
+    const prefixes = ['every broken sample', 'group: ', 'reachable: ', 'layout: ', 'line ends: ', 'source: ', 'split: ', 'kinds in the sample', 'another repair', 'rule: ', 'recipe: ']
     return prefixes.findIndex(prefix => key.startsWith(prefix))
   }
   lines.push('', `  ${scoreHeader}  group`)

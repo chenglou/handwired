@@ -57,6 +57,10 @@ export type Sample = {
   // The documents joined. It is a valid JSON text when there is one document.
   original: string
   broken: string
+  // What ends the lines of the original, and of the broken text where the damage did not touch a line end: a line
+  // feed, or a carriage return and a line feed. The second is what a few valid samples, one form of newlineDelimited
+  // and one damaged document in 20 with several lines have.
+  lineEnd: '\n' | '\r\n'
   // What turns the original into the broken text, in text order, with positions in code points of the original. They
   // are in the canonical form of edits.ts: of two equal code points, the later one is the removed or the added one.
   edits: Edit[]
@@ -207,10 +211,11 @@ const applyUnscored = (alignment: readonly number[], labels: readonly ValidLabel
 // Builds a sample from documents and edits, or returns undefined when the result breaks a constraint: every document
 // valid, the broken text rejected by JSON.parse and by the highlighter's tables, both texts within 512 code points
 // and 16 levels.
-function draftOf(parts: {
+type DraftParts = {
   source: Source, recipe: string, kinds: string[], forms: string[], template: string, style: Style, documents: string[], edits: Edit[],
   unscoredKinds: number[], reachable: Reachable, needsRules: Rule[], needsClass: string[], debatable: boolean,
-}): Draft | undefined {
+}
+function draftOf(parts: DraftParts): Draft | undefined {
   const original = parts.documents.join('')
   if (codePointLength(original) > capacity) return undefined
   const labels: ValidLabel[] = []
@@ -236,7 +241,8 @@ function draftOf(parts: {
     if (second !== -1 && (firstDamage === -1 || second < firstDamage)) firstDamage = second
   }
   const {unscoredKinds: _declared, ...rest} = parts
-  const common = {...rest, original, broken: applied.broken, edits, alignment: applied.alignment, replaced: applied.replaced, firstDamage}
+  const lineEnd: Sample['lineEnd'] = original.includes('\r\n') ? '\r\n' : '\n'
+  const common = {...rest, original, broken: applied.broken, lineEnd, edits, alignment: applied.alignment, replaced: applied.replaced, firstDamage}
   let draft: Draft
   if (parts.source === 'valid') {
     draft = {...common, unscoredKinds: [], unscoredNesting: [], firstErrorPosition: -1, firstErrorKind: 0, needsNestingFix: false, needsDisplayFix: false}
@@ -280,6 +286,39 @@ function finish(seed: number, index: number, draft: Draft): Sample {
 type OtherSplit = {otherSplit: Template}
 type Attempt = Draft | undefined | OtherSplit
 
+// One damaged document in 20 with several lines is a file whose lines end with a carriage return and a line feed, as
+// files from Windows do. Which ones is a hash of the document, so that all broken texts of one document agree.
+const carriageReturnShare = 20
+const carriageReturnClass = 'the carriage return apart from the tab, inside a string'
+
+// The same damage to the same document in a file whose lines end with \r\n: every line feed of the document and of
+// the added text has a carriage return before it, and the edits are moved to the places they have in that text. The
+// labels then come from the document with \r\n as from any original. Returns undefined when the damage does not
+// carry over as it is:
+// - quotedDocument and backslashEscapedDocument write a line feed as the two characters \n, where such a file would
+//   have \r\n, and an edit that already adds a carriage return has its own line ends.
+// - Texts of several documents have line ends of their own, see newlineDelimited.
+function withCarriageReturns(parts: DraftParts): DraftParts | undefined {
+  if (parts.documents.length !== 1 || parts.kinds.includes('quotedDocument') || parts.kinds.includes('backslashEscapedDocument')) return undefined
+  const text = parts.documents[0]!
+  if (!text.includes('\n') || text.includes('\r') || hashText(`line ends ${text}`) % carriageReturnShare !== 0) return undefined
+  if (parts.edits.some(edit => edit.insert.includes('\r') || edit.oneForOne === true && edit.insert.includes('\n'))) return undefined
+  const codePoints = Array.from(text)
+  // The line feeds before each code point: a code point's place moves to the right by that many.
+  const lineFeedsBefore = new Int32Array(codePoints.length + 1)
+  codePoints.forEach((character, index) => { lineFeedsBefore[index + 1] = lineFeedsBefore[index]! + Number(character === '\n') })
+  const edits = parts.edits.map((edit): Edit => {
+    if (edit.oneForOne === true && lineFeedsBefore[edit.at + edit.remove] !== lineFeedsBefore[edit.at]) throw new Error('an edit replaces a line feed one for one')
+    return {...edit, at: edit.at + lineFeedsBefore[edit.at]!, remove: edit.remove + lineFeedsBefore[edit.at + edit.remove]! - lineFeedsBefore[edit.at]!, insert: edit.insert.replaceAll('\n', '\r\n')}
+  })
+  // A line feed that is not scored becomes a carriage return and a line feed that are not scored.
+  const unscoredKinds = parts.unscoredKinds.flatMap(index => codePoints[index] === '\n' ? [index + lineFeedsBefore[index]!, index + lineFeedsBefore[index]! + 1] : [index + lineFeedsBefore[index]!])
+  // A string that is open at its line end now meets the carriage return first. Tables must end the string there and
+  // must go on with the string at a tab, e.g. in "fragile<tab>handle with care", and the two are one character class.
+  const endsAtLineFeed = parts.needsRules.includes('a string that is open at a line feed ends there')
+  return {...parts, documents: [text.replaceAll('\n', '\r\n')], edits, unscoredKinds, needsClass: endsAtLineFeed ? [...parts.needsClass, carriageReturnClass] : parts.needsClass}
+}
+
 function damageDraft(random: Random, plan: Plan, forcedTemplate: Template | undefined): Draft | undefined {
   const template = forcedTemplate ?? drawTemplate(random, plan.request.templates)
   const layout = drawLayout(random, plan.request.styles, plan.request.layout)
@@ -287,11 +326,17 @@ function damageDraft(random: Random, plan: Plan, forcedTemplate: Template | unde
   if (document === undefined) return undefined
   const planned: PlannedDamage | undefined = plan.apply(random, scan(document.text))
   if (planned === undefined) return undefined
-  return draftOf({
+  const parts: DraftParts = {
     source: 'damage', recipe: plan.recipe, kinds: planned.kinds, forms: planned.forms, template: planned.template ?? template, style: planned.style ?? document.layout.style,
     documents: planned.documents ?? [document.text], edits: planned.edits, unscoredKinds: planned.unscoredKinds, reachable: planned.reachable,
     needsRules: planned.needsRules, needsClass: planned.needsClass, debatable: planned.debatable,
-  })
+  }
+  const draft = draftOf(parts)
+  if (draft === undefined) return undefined
+  // The file with \r\n is made after the sample with line feeds and takes its place only when it holds every
+  // constraint too, e.g. the 512 code points. So the choice costs no try and changes no other sample.
+  const converted = withCarriageReturns(parts)
+  return (converted === undefined ? undefined : draftOf(converted)) ?? draft
 }
 
 // A whole typing replay with the document it was made of, for dumps that show replays in order.
