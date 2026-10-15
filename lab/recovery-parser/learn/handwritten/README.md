@@ -156,7 +156,7 @@ The validation split, the main number. A sample with several kinds is in the row
 | quotedDocument | 17 | 0.0 | 86.3 | 13.7 | "…" around the document: the first quote opens a string that ends at the document's first quote. '…' is a word and works. |
 | byteOrderMark | 29 | 3.3 | 97.6 | 2.4 | Nothing of its own. |
 | textAfterEnd | 21 | 59.1 | 96.1 | 3.9 | 17 of the 21 samples have nothing to recover. |
-| ansiColorCodes | 10 | 1.2 | 0.0 | 100.0 | Out of reach. The [ of every color code opens an array. A fix needs a state after the escape character, and a class for the letter that ends the code. |
+| ansiColorCodes | 10 | 1.2 | 0.0 | 100.0 | Out of reach, and the one kind that is worse than as it is. The [ of every color code opens an array, where today everything after the first code is an error at the same depth. A fix needs a state after the escape character, and a class for the letter that ends the code. |
 | backslashEscapedDocument | 20 | 0.0 | 94.2 | 5.8 | Read as words: \"id\" is a key without quotes. Left: the \n and the indentation after it are part of the word, and a colon inside a string ends the word. |
 | htmlEntities | 10 | 2.0 | 99.2 | 0.8 | Nothing of its own: &quot;id&quot; is a word. |
 | newlineDelimited | 123 | 49.0 | 70.7 | 29.3 | One document per line works. What is left is the cut line of cutOff in the same samples. |
