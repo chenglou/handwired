@@ -11,7 +11,8 @@
 // of typing with its steps reversed.
 //
 // One replay in three has a wrong key press: the key next to the right one, e.g. ; for :, and then Backspace. The text
-// with the wrong character is the text before it plus that one character at the cursor, which is added and has no label.
+// with the wrong character is the text before it plus that one character at the cursor, which is added and has no
+// label. Its kinds are those of the text before it and typingSlip, see `wrongKeyStep` for the two exceptions.
 import type {Reachable, Rule} from './damage/types.ts'
 import {settleReachable} from './damage/types.ts'
 import {type Edit, applyEdits, insertAt, mergeEdits, removeRange} from './edits.ts'
@@ -342,12 +343,38 @@ export function makeTypingReplay(random: Random, scanned: Scan): TypingReplay | 
     step.reachable = settleReachable(reachable, step.needsRules)
     return step
   }
-  // The text after a wrong key press at `cursor`: the text of the step before it and the wrong character.
+  // The text after a wrong key press at `cursor`: the text of the step before it and the wrong character. Its kinds
+  // are those of the step before it and typingSlip, with two exceptions, where the wrong character changes what the
+  // text before it was.
   const wrongKeyStep = (before: TypingStep, cursor: number, wrong: string, right: string): TypingStep => {
     const edits = mergeEdits([before.edits, [insertAt(cursor, wrong)]], codePoints.length)!
     const text = applyEdits(codePoints, edits).broken
     const valid = parses(text)
-    return {...before, key: `${wrong} in place of ${right}`, text, edits, valid, kinds: valid ? [] : [...before.kinds, 'typingSlip'], needsRules: [...before.needsRules], unscoredKinds: [...before.unscoredKinds]}
+    const step: TypingStep = {...before, key: `${wrong} in place of ${right}`, text, edits, valid, kinds: valid ? [] : [...before.kinds, 'typingSlip'], needsRules: [...before.needsRules], unscoredKinds: [...before.unscoredKinds]}
+    if (valid) return step
+    // A wrong digit after the start of a number makes the number whole, e.g. the 6 of -24.6 typed for a 5. The number
+    // is then no half-typed one, and what is left is what a whole value leaves: the comma after the entry is not typed.
+    const number = scanned.numbers.find(value => value.start < cursor && cursor < value.end && inRange(value.start))
+    if (before.kinds.includes('partialNumber') && number !== undefined && isValidNumber(`${codePoints.slice(number.start, cursor).join('')}${wrong}`)) {
+      const commaNotTyped = target.entry !== null && target.entry.commaAfter !== -1 && target.entry.commaAfter >= cursor && target.action !== 'change a value'
+      step.kinds = [...before.kinds.filter(kind => kind !== 'partialNumber'), ...(commaNotTyped && !before.kinds.includes('missingComma') ? ['missingComma'] : []), 'typingSlip']
+    }
+    // A ; in the place of the colon, with the next key after it, e.g. `"id";` and `"name": "Ada"` on the next line.
+    // The step before it is a key without its colon, which needs the rule that a string after a key is the next key.
+    // With the ; the text has a second reading: in the damage kind typingSlip a ; stands for the colon, and after a
+    // colon every parser reads the next string as the value, as in a text with a colon and no value. Both readings
+    // agree on every label but the display kind of the next key, so that kind is not scored and no rule is needed.
+    const nextKeyRule: Rule = 'a string after a key is the next key'
+    if (right === ':' && before.kinds.includes('keyWithoutColon') && before.needsRules.includes(nextKeyRule)) {
+      let start = to
+      while (start < codePoints.length && isWhitespace(codePoints[start])) start++
+      const nextKey = scanned.strings.find(part => part.start === start && part.role === 'key')
+      if (nextKey !== undefined) {
+        step.needsRules = before.needsRules.filter(rule => rule !== nextKeyRule)
+        step.unscoredKinds = [...before.unscoredKinds, ...Array.from({length: nextKey.end - nextKey.start}, (_, offset) => nextKey.start + offset)]
+      }
+    }
+    return step
   }
 
   const stops = cursorStops(codePoints, from, target.typedUpTo)

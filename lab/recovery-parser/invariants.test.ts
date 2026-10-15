@@ -478,6 +478,9 @@ test('every text of a typing replay is what its edits give from the finished doc
   // before a new last entry is typed last or never: the two ways in which a comma is typed apart from its entry.
   let commaNeverAfter = 0
   let commaApartBefore = 0
+  // Wrong keys of two forms: a digit right after the start of a number, and a ; before the next key.
+  let wholeNumbers = 0
+  let semicolonsBeforeAKey = 0
   for (const [seed, count] of [[defaultSeed, 1200], [271828, 600]] as const) {
     for (let index = 0; index < count; index++) {
       const made = typingReplayOf(createRandom(seed, index))
@@ -507,6 +510,24 @@ test('every text of a typing replay is what its edits give from the finished doc
         for (const unscored of step.unscoredKinds) {
           if (!applied.alignment.includes(unscored)) throw new Error(`${what}: the step ${JSON.stringify(step.key)} lists the code point ${unscored} as not scored, and its text does not hold it`)
         }
+        if (!step.kinds.includes('typingSlip')) continue
+        // The kinds of a text with a wrong key are those of the text before it, apart from two forms. A wrong digit
+        // that makes a number whole leaves no half-typed number. And a ; for the colon before the next key reads as a
+        // colon without a value too, so that key is not scored and no rule about a string after a key is asked for.
+        const typed = Array.from(step.text)
+        const wrongAt = applied.alignment.indexOf(-1)
+        let numberStart = wrongAt
+        while (numberStart > 0 && /[-+0-9.eE]/.test(typed[numberStart - 1]!)) numberStart--
+        if (step.kinds.includes('partialNumber') && /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(typed.slice(numberStart, wrongAt + 1).join(''))) {
+          throw new Error(`${what}: the step ${JSON.stringify(step.key)} has the kind partialNumber, and the number ${typed.slice(numberStart, wrongAt + 1).join('')} is whole`)
+        }
+        if (/^[0-9]$/.test(typed[wrongAt]!) && /[-.eE+]/.test(typed[wrongAt - 1] ?? '')) wholeNumbers++
+        let next = wrongAt + 1
+        while (/\s/.test(typed[next] ?? '')) next++
+        if (typed[wrongAt] === ';' && typed[next] === '"' && step.kinds.includes('keyWithoutColon')) {
+          semicolonsBeforeAKey++
+          if (step.needsRules.includes('a string after a key is the next key') || !step.unscoredKinds.includes(applied.alignment[next]!)) throw new Error(`${what}: the step ${JSON.stringify(step.key)} scores the key after the ; as a key, or asks for the rule that a string after a key is the next key`)
+        }
       }
       // A replay whose comma is never typed ends with the entry and without that comma.
       if (replay.comma === 'never' && !replay.steps.at(-1)!.kinds.includes('missingComma')) throw new Error(`${what}: the last step is not an entry without its comma`)
@@ -516,6 +537,8 @@ test('every text of a typing replay is what its edits give from the finished doc
   expect(wrongKeys).toBeGreaterThan(100)
   expect(commaNeverAfter).toBeGreaterThan(10)
   expect(commaApartBefore).toBeGreaterThan(50)
+  expect(wholeNumbers).toBeGreaterThan(0)
+  expect(semicolonsBeforeAKey).toBeGreaterThan(0)
 })
 
 test('a damaged document with carriage return line ends has them at every line end, in the original and in the broken text', () => {
