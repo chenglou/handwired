@@ -15,7 +15,7 @@
 // - 'words': as 'resync', and a word where no token of JSON starts is read as a string, see `wordEvents`. E.g. in
 //   {port: 8080, 'env': production} the tokenizer gives `port`, `'env'` and `production` the events of a string, and
 //   the grammar shows the first two as keys and the third as a string, as it does with strings between quotes. It is
-//   one more row of the tokenizer's table, and it scores about 8 points of code points above 'resync'.
+//   one more row of the tokenizer's table, and it scores about 9 points of code points above 'resync'.
 import {type ParserTables, classNames, defaultTables, eventNames, grammarStateNames, lexerStateNames, tokenNames} from './table-parser.ts'
 
 type LexerState = typeof lexerStateNames[number]
@@ -70,13 +70,16 @@ function wordEvents(): [LexerState, CharacterClass, typeof eventNames[number], L
   // nil, the a of name, the second dot of 1.4.2 and the second minus of 2026-04-08.
   for (const state of literalStates) for (const characterClass of [...letters, 'zero', 'digit', 'minus', 'dot'] as const) cells.push([state, characterClass, 'stringContent', 'errorLine'])
   for (const state of numberStates) for (const characterClass of [...letters, 'dot', 'minus'] as const) cells.push([state, characterClass, 'stringContent', 'errorLine'])
-  // Inside a word: white space, a bracket, a colon and a comma end it and are read as between two tokens, a quote
-  // opens a string, as after ObjectId(, and every other character goes on with the word.
+  // Inside a word: white space, a bracket, a colon and a comma end it and are read as between two tokens, and every
+  // other character goes on with the word. A quote ends the word as the closing quote of a string does, e.g. in
+  // `"city": Lisbon",` where the opening quote is missing, and after a string that was left open in the middle of a
+  // line, where every quote is read in the opposite role, e.g. the quote after `main` in `"or, "main": 1`. The other
+  // choice, a quote that opens a string, as after `ObjectId(`, scores 1.7 points of code points lower on the samples.
   const between = lexerStateNames.indexOf('between') * defaultTables.classCount
   for (const characterClass of classNames) {
     if (characterClass === 'end' || characterClass === 'truncatedEnd') continue
     if (afterAValue.includes(characterClass) || characterClass === 'openBrace' || characterClass === 'openBracket') cells.push(['errorLine', characterClass, eventNames[defaultTables.lexerEvent[between + classNames.indexOf(characterClass)]!]!, 'between'])
-    else if (characterClass === 'quote') cells.push(['errorLine', characterClass, 'stringStart', 'string'])
+    else if (characterClass === 'quote') cells.push(['errorLine', characterClass, 'stringEnd', 'between'])
     else cells.push(['errorLine', characterClass, 'stringContent', 'errorLine'])
   }
   return cells
