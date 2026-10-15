@@ -130,6 +130,46 @@ To see that the checks can fail, the new code was broken on purpose, one place a
 | the parser's bit not cleared by a string | `check-parser.ts`, `check-twin.ts` |
 | the cells (any state, string) with the bit not frozen | `check-tables.ts` |
 
+## Smoke runs
+
+These runs only show that training can use each kind of structure, and that the snapped tables can be scored. **They are no result of the experiment**: nothing was tuned, each run has one seed, the score of snapped tables moves by up to a point between two log points of one run, and the dataset is a snapshot under review.
+
+```sh
+export RECOVERY_SCRATCH=<a folder outside the repo>
+bun lab/recovery-parser/learn/structure/smoke.ts                  # four runs, about 2 minutes
+bun lab/recovery-parser/learn/structure/smoke.ts display          # one of plain, classes, display, bit
+```
+
+Each run is one pass of the trainer over the 38,119 train samples that give the twin a step, with every default: the start at the base's choices, every open cell and every open entry trainable, seed 1. `plain` trains today's tables, for comparison. `classes` adds a class for the apostrophe and two tokenizer states. `display` opens the display table's entries. `bit` adds the bit. The numbers are of the last snapped tables in the exact parser on the validation split, in percent:
+
+| run | cells that differ from the run's base | all three, all samples | all three, "needs a class" | all three, singleQuotedString | display kind, unquotedKey | first letters t, f, n of keys without quotes that are shown as a key | all three, colonWithoutValue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| the parser as it is | 0 | 40.8 | 7.9 | 4.4 | 21.9 | 0 of 599 | 62.8 |
+| `plain` | 967 | 94.5 | 88.5 | 87.6 | 93.6 | 0 of 599 | 97.8 |
+| `classes` | 1,084 | 95.5 | 92.4 | 93.1 | 94.0 | 0 of 599 | 97.8 |
+| `display` | 990 | 96.8 | 96.8 | 97.8 | 98.1 | 587 of 599 | 98.4 |
+| `bit` | 1,258 | 94.8 | 88.7 | 87.5 | 92.9 | 0 of 599 | 97.9 |
+
+All three at the last 3 log points of each run: 95.0, 95.2, 94.5 for `plain`, 95.3, 95.4, 95.5 for `classes`, 96.4, 96.6, 96.8 for `display`, 94.9, 95.4, 94.8 for `bit`. So `bit` and `plain` are not told apart by these runs.
+
+What the trained cells of each structure hold, from `differencesOf` of the run's base and its last tables, for the cells that a code point of a trained text reads:
+
+- **`classes`.** 21 cells of the class apostrophe changed. (between, apostrophe) holds the event `stringStart` and the next state `zero`, where it held `unexpectedCharacter` and `errorLine`. In the 20 other states, e.g. the states of a number, of a literal and of an escape, the apostrophe's cell holds the event `stringContent` where it held an error event. Two cells lead into the added state 26, (hex3, comma) and (exponentSign, comma), and 5 cells of state 26 changed. No changed cell that a trained text reads leads into state 27.
+- **`display`.** 79 entries changed, and a trained text reads 71 of them. A literal's first letter is shown as a key when the grammar's next state is `keyOrClose`, `key`, `colon` or `error`, and a literal's later letters when it is `keyOrClose` or `key`. Of the 56 entries of the 7 error events, 54 changed, and none of the 54 holds `error`: 34 hold `string`, 11 `key`, 7 `whitespace`, and one each `literal` and `punctuation`.
+- **`bit`.** 83 grammar cells that a trained text reads both with and without the bit hold another choice with the bit, e.g. (keyOrClose, comma, depth 1, object) holds the next state `key` without the bit and `colon` with it, and (commaOrClose, string, depth 1, array) holds `value` without the bit and `commaOrClose` with it.
+
+What the main number does not show, from `../compare.ts` and `../check-deep.ts`:
+
+| run | added code points shown as an error | code points shown as past the end | wrong depths on valid JSON of 17 to 19 levels |
+| --- | --- | --- | --- |
+| the parser as it is | 89.5% | 0 | 0.0% |
+| `plain` | 0.9% | 131 | 0.0% |
+| `classes` | 4.9% | 183 | 7.1% |
+| `display` | 0.0% | 37 | 9.6% |
+| `bit` | 1.0% | 0 | 3.1% |
+
+The run with the bit trains 951 samples per second where the others train 1,724 to 1,877, with 4 worker threads: the grammar's part of a step has twice the cells. On the 49,028 texts of the train and validation splits, each run's tables give today's display kind, depth, container, event and grammar state at every position before the first error, and today's verdict, by a script that is not in the repo.
+
 ## Not done
 
 - **The whole run as one circuit** is not built, as before. The step is, with all three: a column per class, the mixes of open display entries as source cells, and the bit as one more source cell and one more output.
