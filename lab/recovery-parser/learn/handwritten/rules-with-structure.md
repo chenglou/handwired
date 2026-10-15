@@ -1,6 +1,6 @@
 # What a programmer would add next
 
-`rules.ts` uses only the open cells of the tables as they are. This note lists the structures that a programmer would add to the parser next, in the order of what they gain for what they cost. Nothing here is built. The later arms can use the list to judge whether training finds the same structures, e.g. when an arm adds tokenizer states and one of them turns out to be "inside a string in apostrophes".
+`rules.ts` uses only the open cells of the tables as they are. This note lists the structures that a programmer would add to the parser next, in the order of what they gain for what they cost. No rule here is written. The core can add three of the structures since: the classes of 3 and 6, the bit of 4 and the open entries of 5, see `../structure/README.md`. The later arms can use the list to judge whether training finds the same structures, e.g. when an arm adds tokenizer states and one of them turns out to be "inside a string in apostrophes".
 
 The gains are estimates from the validation split, not measurements. They come from `where-wrong.ts --split validation --causes`, which guesses the cause of each wrong sample from its first wrong code point and its kinds of damage, and counts every wrong code point of the sample for that cause. A gain is given in points of the main number, i.e. the share of the 681,596 labeled code points at or after the first damage. The hand-written rules have 95.5 points, so 4.5 are left. Every number is preliminary, as the dataset is a snapshot.
 

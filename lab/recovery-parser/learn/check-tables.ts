@@ -359,6 +359,7 @@ variants.forEach(({name, tables}, variant) => {
     ['a class that would be left without a code point', [{name: 'feed', codePoints: [0x0a]}]],
     ['a code point in two added classes', [{name: 'first', codePoints: [0x27]}, {name: 'second', codePoints: [0x27, 0x60]}]],
     ['the name of a class of today', [{name: 'quote', codePoints: [0x27]}]],
+    ['a code point twice in one added class', [{name: 'twice', codePoints: [0x27, 0x27]}]],
   ]
   for (const [what, classes] of refusals) {
     let refused = false

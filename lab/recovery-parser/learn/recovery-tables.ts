@@ -7,6 +7,10 @@
 // after a first error, e.g. (between, other), which the x of [x] reads. Only open cells may change. Then every text
 // gets the same trace as today up to its first error, and valid JSON is parsed exactly as today.
 //
+// Tables can have more than today's: more states (addStates), more classes (addClasses), entries of the display
+// table that are open like cells (openDisplayEntries), and a bit that tells the grammar whether a token is the first
+// on its line (addFirstOnLineBit). structure/README.md describes the last three.
+//
 // The code keeps the names of table-parser.ts, where the tokenizer is the "lexer".
 import {readFileSync, writeFileSync} from 'node:fs'
 import {displayKind} from '../../../src/json-search/highlighter/kinds.ts'
@@ -60,10 +64,9 @@ export type RecoveryTables = {
   lexerNext: Uint8Array
   lexerEvent: Uint8Array
   lexerOpen: Uint8Array
-  // The grammar's cells, [(grammar state × tokenCount + token) × contextCount + context]. A context is depth class × 2
-  // + [the innermost open container is an object], and with 16 contexts, + 8 when the token is the first on its line.
-  // Per cell: the next grammar state, the
-  // stack action, and 1 where the cell is open.
+  // The grammar's cells, [(grammar state × tokenCount + token) × contextCount + context]: the next grammar state, the
+  // stack action, and 1 where the cell is open. A context is depth class × 2 + [the innermost open container is an
+  // object], and with 16 contexts, 8 more when the token is the first on its line.
   grammarNext: Uint8Array
   grammarAction: Uint8Array
   grammarOpen: Uint8Array
@@ -133,7 +136,7 @@ function classesWith(addedClasses: readonly AddedClass[]) {
   for (const {name, codePoints} of addedClasses) {
     if (name === '' || names.has(name)) throw new Error(`the added class ${JSON.stringify(name)} has no name, or the name of another class`)
     names.add(name)
-    if (codePoints.length === 0) throw new Error(`the added class ${name} has no code point`)
+    if (codePoints.length === 0 || new Set(codePoints).size !== codePoints.length) throw new Error(`the added class ${name} has no code point, or one twice`)
     for (const codePoint of codePoints) {
       if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) throw new Error(`the added class ${name} holds ${codePoint}, which is no code point`)
       highest = Math.max(highest, codePoint)
@@ -148,7 +151,7 @@ function classesWith(addedClasses: readonly AddedClass[]) {
   addedClasses.forEach(({name, codePoints}, index) => {
     const from = classOfCodePoint[codePoints[0]! + 1]!
     for (const codePoint of codePoints) {
-      if (classOfCodePoint[codePoint + 1] !== from) throw new Error(`the code points of the added class ${name} do not all have one class before, or the list names one twice: U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`)
+      if (classOfCodePoint[codePoint + 1] !== from) throw new Error(`the code points of the added class ${name} do not all have one class before it is added: U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`)
     }
     for (const codePoint of codePoints) classOfCodePoint[codePoint + 1] = classCount + index
     // A class without a code point would have cells that no text reads, frozen or not.
@@ -577,7 +580,7 @@ export function lexerCellName(tables: RecoveryTables, cell: number) {
   return `(${lexerStateName(Math.floor(cell / tables.classCount))}, ${className(tables, cell % tables.classCount)})`
 }
 // The name of a context, e.g. "depth 1, object", or "depth 1, object, first on its line" for a context with the bit.
-export const contextName = (context: number) => `${contextNames[context % contextCount]}${context >= contextCount ? ', first on its line' : ''}`
+const contextName = (context: number) => `${contextNames[context % contextCount]}${context >= contextCount ? ', first on its line' : ''}`
 // The name of a grammar cell, e.g. "(commaOrClose, string, depth 1, object)".
 export function grammarCellName(tables: RecoveryTables, cell: number) {
   const state = Math.floor(cell / (tables.tokenCount * tables.contextCount))

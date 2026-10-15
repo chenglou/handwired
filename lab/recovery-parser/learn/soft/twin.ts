@@ -234,7 +234,8 @@ export function weightGradientsInto(model: TwinModel, temperature: number, mixes
 
 // The cost on a mix being far from one choice: the mix's entropy, -Σ share × ln(share), which is 0 for one choice and
 // ln(choices) for a uniform mix, e.g. 2.08 for the 8 next states of a grammar cell. Returns the mean entropy over the
-// trainable mixes, two per trainable cell, and with `weightGradients`, adds `weight` times its gradient to it.
+// trainable mixes, two per trainable cell and one per trainable entry of the display table, and with
+// `weightGradients`, adds `weight` times its gradient to it.
 export function addSharpnessCost(model: TwinModel, temperature: number, mixes: CellArrays, weight: number, weightGradients?: CellArrays): number {
   const groups = groupsOf(model)
   let mixCount = 0

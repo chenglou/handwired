@@ -37,6 +37,7 @@ How the rules are checked:
 
 - `check-tables.ts`: for each of the 236 frozen cells, a text reads the cell before any error, so no cell is frozen without need. And no text reads an open cell before its first error: 81,051 texts, among them the originals and the broken texts of 30,000 samples, and valid texts with 16 levels and with 512 code points. The same holds for every text of up to 6 code points, which the check goes through class by class, 17,303,316 texts. A table file with a changed frozen cell is refused, and so is one with a number that a byte does not hold.
 - `check-parser.ts`: with today's tables the parser gives the trace of `table-parser.ts` on 71,051 texts. And for 200 random settings of every open cell, 50 of them with added states, rules 1 and 2 hold on 5,906 texts each, with every valid text's whole trace identical.
+- Both checks then run the same parts for tables with added structure, which is most of their time. `structure/README.md` says what those parts cover.
 - A review ran its own exact search over 4,063,196 parser states, with the kind of every open container, and found the same 148 and 88 frozen cells. It also ran 276 settings of the open cells and the saved tables of the arms on 80,381 texts of its own, with no difference from today's parser before a first error or in a verdict. Those scripts are not in the repo.
 
 **What rule 1 does not cover: valid JSON that is too deep or too long.** A valid JSON text of 17 levels or more has a first error at its 17th opening bracket, and reads open cells from there on, so tables may show the rest of it otherwise than today. The dataset has no text deeper than 16 levels, so no score sees that. Today's parser keeps the depth of such a text right at every code point. `check-deep.ts` counts the code points of 300 such texts at which saved tables do not: none for the hand-written tables and the votes, a third to five sixths of the code points after the 17th bracket for the search's tables, see the table of scores. A valid text of more than 512 code points is safe: its first error is at position 512, after everything that is shown.
@@ -140,8 +141,8 @@ bun lab/recovery-parser/learn/score.ts                             # today's tab
 bun lab/recovery-parser/learn/score.ts --tables <file.json> --split validation --cells
 bun lab/recovery-parser/learn/score.ts --to 20000 --split train,validation,test
 bun lab/recovery-parser/learn/compare.ts <name>=<file.json> ...    # one row per saved tables, as the table of scores
-bun lab/recovery-parser/learn/check-tables.ts                      # about 12 s
-bun lab/recovery-parser/learn/check-parser.ts                      # about 25 s
+bun lab/recovery-parser/learn/check-tables.ts                      # about 40 s
+bun lab/recovery-parser/learn/check-parser.ts                      # about 40 s
 bun lab/recovery-parser/learn/check-data.ts 20000 --stats <a file written by lab/recovery-parser/stats.ts over 20000 samples>
 bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth on valid JSON of 17 to 19 levels
 bunx tsc -p lab/recovery-parser/learn                              # type-checks this folder and the folders in it
