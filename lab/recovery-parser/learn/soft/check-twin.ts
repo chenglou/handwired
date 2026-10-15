@@ -13,7 +13,8 @@
 // twice: with a range that holds every depth the exact parser reaches in that run, where every position has to be
 // equal, and with the range that training uses, -8 to 24, where the check counts the runs that leave the range.
 //
-// It also checks the intended stacks of twin-data.ts against the exact parser on the originals.
+// It also checks the intended stacks of twin-data.ts against the exact parser on the originals of the first 2,000
+// samples that are not in the test split.
 import {createRandom} from '../../random.ts'
 import {defaultSeed, sampleAt} from '../../samples.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
@@ -177,8 +178,12 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
   const tables = asIsTables()
   let texts = 0
   let codePoints = 0
-  for (let index = 0; index < 2000; index++) {
+  let checked = 0
+  for (let index = 0; checked < 2000; index++) {
     const sample = sampleAt(defaultSeed, index)
+    // The test split is only read by a script that is told to.
+    if (sample.split === 'test') continue
+    checked++
     const stacks = intendedObjectsOf({...sample, alignment: Array.from({length: Array.from(sample.original).length}, (_, position) => position)})
     let offset = 0
     for (const document of sample.documents) {
@@ -202,7 +207,7 @@ const describe = (comparison: Comparison) => `${comparison.runs} runs, ${compari
       offset += trace.length
     }
   }
-  console.log(`Intended stacks: on ${texts} original documents, ${codePoints} code points, the stack after every code point is the exact parser's.`)
+  console.log(`Intended stacks: on ${texts} original documents of ${checked} samples of the train and validation splits, ${codePoints} code points, the stack after every code point is the exact parser's.`)
 }
 
 console.log(`${((performance.now() - started) / 1000).toFixed(1)} s.`)

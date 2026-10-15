@@ -9,10 +9,14 @@
 //    keep the ground rules, and are the same tables after saving and loading.
 // 4. With a tenth of the open cells trainable, only their weights move, and the snapped tables differ from the base
 //    tables in those cells only.
+// 5. With onlyReadCells, the tables that train returns hold the base tables' choice in every cell that the exact
+//    parser reads at no code point of a trained text, and give the trained texts the trace of the snapped tables.
 import {mkdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {loadStandardSamples, splitNames} from '../data.ts'
+import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, checkTables, differencesOf, loadTables, saveTables} from '../recovery-tables.ts'
+import {cellsReadAt, runOnSample} from '../score.ts'
 import {createBatchRunner, randomTrainableCells, train} from './train.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type LossOptions, createModel, mixesInto, snappedTables} from './twin.ts'
@@ -122,6 +126,35 @@ const trained = createModel(base)
   check(movedOutside === 0 && movedInside > 0, `${movedOutside} weights of cells that are not trainable moved, and ${movedInside} of trainable cells`)
   check(outside === 0, `${outside} cells that are not trainable changed`)
   console.log(`4. With ${trainableCells} of the 1326 open cells trainable: ${movedInside} weights of trainable cells moved and ${movedOutside} of other cells. The snapped tables differ from the base tables in ${differences.length} cells, ${outside} of them not trainable.`)
+}
+
+// 5. The cells that no trained text reads.
+{
+  const model = createModel(base, {start: 'uniform'})
+  const result = await train(model, data, everyPlace, {...trainOptions, seed: 3, trainedOn: {samples, places: trainPlaces}, onlyReadCells: true})
+  const snapped = snappedTables(model)
+  const read = cellsReadAt(result.last, samples, trainPlaces)
+  const changed = differencesOf(base, snapped)
+  const kept = differencesOf(base, result.last)
+  const unread = kept.filter(difference => (difference.table === 'tokenizer' ? read.lexer : read.grammar)[difference.cell] === 0).length
+  check(kept.length > 0 && kept.length < changed.length, `the snapped tables differ from the base in ${changed.length} cells, and the returned ones in ${kept.length}`)
+  check(unread === 0, `${unread} cells of the returned tables differ from the base and are read by no trained text`)
+  const traceOfSnapped = createTrace()
+  const traceOfReturned = createTrace()
+  let codePoints = 0
+  let different = 0
+  for (const place of trainPlaces) {
+    runOnSample(traceOfSnapped, samples, place, snapped)
+    runOnSample(traceOfReturned, samples, place, result.last)
+    const length = samples.start[place + 1]! - samples.start[place]!
+    for (let position = 0; position < length; position++) {
+      codePoints++
+      if (traceOfSnapped.lexerCell[position] !== traceOfReturned.lexerCell[position] || traceOfSnapped.grammarCell[position] !== traceOfReturned.grammarCell[position] || traceOfSnapped.displayKind[position] !== traceOfReturned.displayKind[position]
+        || traceOfSnapped.depthAfter[position] !== traceOfReturned.depthAfter[position] || traceOfSnapped.containerAfter[position] !== traceOfReturned.containerAfter[position]) different++
+    }
+  }
+  check(different === 0, `${different} code points of the trained texts have another trace with the returned tables than with the snapped ones`)
+  console.log(`5. Every open cell trainable from a uniform start: the snapped tables differ from the base tables in ${changed.length} cells, and the exact parser reads ${kept.length} of them at a code point of the ${trainPlaces.length} trained texts. The returned tables hold the base's choice in the others, and give the ${codePoints} code points of the trained texts the same cells and the same trace as the snapped ones.`)
 }
 
 if (failures > 0) {

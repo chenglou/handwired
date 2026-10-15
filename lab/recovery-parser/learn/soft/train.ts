@@ -5,25 +5,48 @@
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-parser/learn/soft/train.ts [--name smoke] [--train-samples 400] [--epochs 10] [--batch 32]
-//       [--learning-rate 0.05] [--seed 1] [--workers 4] [--start base|uniform] [--start-share 0.9] [--open-share 1]
-//       [--intended 0] [--on-track 0] [--temperature 1] [--temperature-end 1] [--sharpness-cost 0] [--log-every 2000]
-// It writes log.txt, best.json and last.json to <scratch>/soft/runs/<name>. best.json holds the snapped tables with
-// the best score on the validation split, and last.json the ones after the last sample. score.ts reads both:
+//       [--learning-rate 0.05] [--seed 1] [--workers 4] [--base <tables.json>] [--start base|uniform] [--start-share 0.9]
+//       [--open-share 1] [--intended 0] [--on-track 0] [--every-intended] [--temperature 1] [--temperature-end 1]
+//       [--sharpness-cost 0] [--depth-low -8] [--depth-high 24] [--only-read-cells] [--log-every 2000]
+// It writes log.txt, best.json and last.json to <scratch>/soft/runs/<name>. last.json holds the snapped tables after
+// the last sample. best.json holds the snapped tables of the log point with the best score on one half of the
+// validation split, and the log gives their score on the other half. score.ts reads both files:
 //   bun lab/recovery-parser/learn/score.ts --tables <scratch>/soft/runs/<name>/best.json --cells
 //
-// --open-share 0.1 trains a random tenth of the open cells. --intended is one weight for the three extra targets.
+// --base starts from saved tables in place of today's, e.g. the hand-written ones. --open-share 0.1 trains a random
+// tenth of the open cells. --intended is one weight for the three extra targets. --every-intended uses the intended
+// states at every kept code point, as the first version did, see LossOptions.intendedEverywhere. --depth-low and
+// --depth-high set the depths that the twin holds a share for, e.g. --depth-high 48 for a uniform start, whose first
+// steps push more than they pop.
+//
+// What a log line holds, besides the loss since the line before:
+// - "free run": the loss of the three labels on a fixed set of the trained samples, run without the extra targets
+//   and without keeping the run on track. Only this loss compares between runs with other options, since a run that
+//   is kept on track has a low loss whatever it would do by itself. Next to it, the same loss without the code
+//   points at which cells that are not trainable rule a label out: those cost 13.8 per label whatever is trained.
+// - "reads as the snapped tables": at how many labeled code points of the fixed set the twin's largest shares are
+//   the display kind, the depth and the container that the exact parser gives with the snapped tables. A mix that
+//   starts with 0.9 on a choice is not that choice: 20 steps after a first error the twin's reading has drifted.
+// - The score of the snapped tables on the validation split, on the whole split and on its two halves.
+// - How many cells of the snapped tables differ from the base tables, and how many of those the exact parser reads
+//   at a code point of a trained text. The others moved only because the twin's mixes read them. The line also has
+//   the score of the snapped tables with the base tables' choice back in those other cells. With --only-read-cells
+//   these are the tables that are scored, picked and saved. Without it the snapped tables are, as they come: the
+//   cells that no trained text reads are not noise, e.g. after training on 400 samples they hold 1.6 to 5.8 points
+//   of the validation score, see README.md.
 import {appendFileSync, mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {Worker} from 'node:worker_threads'
 import {createRandom} from '../../random.ts'
-import {type Samples, loadStandardSamples, optionOf, splitNames, validationPart} from '../data.ts'
-import {type RecoveryTables, asIsTables, differencesOf, saveTables} from '../recovery-tables.ts'
-import {scoreTables, sharesOf} from '../score.ts'
+import {type Samples, codePointLabeled, loadStandardSamples, optionOf, selectSamples, splitNames, validationPart} from '../data.ts'
+import {positionCount} from '../recovery-parser.ts'
+import {type RecoveryTables, asIsTables, differencesOf, loadTables, saveTables} from '../recovery-tables.ts'
+import {cellsReadAt, scoreTables, sharesOf, withUnreadCellsOf} from '../score.ts'
 import type {WorkerAnswer, WorkerSetup, WorkerTask} from './train-worker.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {
   type LossOptions, type LossTally, type TwinData, type TwinModel, addSharpnessCost, addTally, cellArraysLength, createCellArrays, createModel, createTally, createTwinRunner,
-  defaultDepthHigh, defaultDepthLow, groupNames, groupWidths, mixesInto, runBatch, sharpnessOf, snappedTables, weightGradientsInto,
+  defaultDepthHigh, defaultDepthLow, exactMixesInto, groupNames, groupWidths, mixesInto, runBatch, sharpnessOf, snappedTables, weightGradientsInto,
 } from './twin.ts'
 
 // Runs batches of samples on worker threads, or in this thread with 0 workers. The mixes are read from `mixes`, which
@@ -97,6 +120,14 @@ export type TrainOptions = {
   logEverySamples?: number
   // The samples whose validation split scores the snapped tables. Without them, no score is made.
   validation?: Samples
+  // The samples that `data` was packed from, and the places in them of the samples of `data`. With them, a log point
+  // also counts the changed cells that the exact parser reads at a code point of these texts, and scores the snapped
+  // tables with the base tables' choice back in every other cell, see withUnreadCellsOf in score.ts: training moved
+  // such a cell only because the twin's mixes read it.
+  trainedOn?: {samples: Samples, places: ArrayLike<number>}
+  // True returns those tables, with the base tables' choice in the cells that no trained text reads, and scores and
+  // picks by them. It needs trainedOn. The default is false: the snapped tables as they come.
+  onlyReadCells?: boolean
   log?: (line: string) => void
 }
 
@@ -104,18 +135,38 @@ export type TrainPoint = {
   samples: number
   // The loss per labeled code point over the samples since the point before. NaN at the first point, before any sample.
   loss: number
-  // Shares from 0 to 1 of the snapped tables in the exact parser on the validation split, see score.ts.
+  // Shares from 0 to 1 of the returned tables in the exact parser on the validation split, see score.ts. The
+  // returned tables are the snapped ones, or with TrainOptions.onlyReadCells the ones in readCellsOnly below.
   allThree: number
   kind: number
   depth: number
   container: number
   whole: number
-  // Cells in which the snapped tables differ from the base tables.
+  // The share of all three on the two halves of the validation split: the samples at even places, which pick the
+  // best tables, and the samples at odd places, which say how good the picked tables are.
+  pickingHalf: number
+  otherHalf: number
+  // Cells in which the snapped tables differ from the base tables, and how many of those the exact parser reads at
+  // a code point of a trained text. Without TrainOptions.trainedOn the two are the same.
   changedCells: number
+  changedAndRead: number
+  // The share of all three on the validation split of the snapped tables with the base tables' choice back in the
+  // cells that no trained text reads. NaN without TrainOptions.trainedOn.
+  readCellsOnly: number
+  // On a fixed set of the trained samples, without the extra targets and without keeping the run on track: the loss
+  // of the three labels per code point, the same without the code points at which a label has a share of exactly 0,
+  // the share of those code points, and the share of the code points at which the twin's largest shares are what
+  // the exact parser gives with the snapped tables.
+  freeLoss: number
+  freeLossWithoutRuledOut: number
+  ruledOut: number
+  readsAsSnapped: number
 }
 
 export type TrainResult = {
-  // The snapped tables with the best share of all three labels on the validation split, and the ones after the last sample.
+  // The snapped tables of the log point with the best share of all three labels on the picking half of the
+  // validation split, and the ones after the last sample. With TrainOptions.onlyReadCells both hold the base tables'
+  // choice in the cells that no trained text reads.
   best: RecoveryTables
   bestPoint: TrainPoint | undefined
   last: RecoveryTables
@@ -123,6 +174,9 @@ export type TrainResult = {
   // Samples per second of training alone, without the scoring.
   samplesPerSecond: number
 }
+
+// How many samples the free run of a log point uses: the first so many of the trained ones.
+const fixedSampleCount = 100
 
 // Trains the model's weights in place on the samples at `places` of `data`.
 export async function train(model: TwinModel, data: TwinData, places: Int32Array, options: TrainOptions = {}): Promise<TrainResult> {
@@ -136,6 +190,8 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
   const temperatureEnd = options.temperatureEnd ?? temperatureStart
   const sharpnessCost = options.sharpnessCost ?? 0
   const logEverySamples = options.logEverySamples ?? 2000
+  const onlyReadCells = options.onlyReadCells === true
+  if (onlyReadCells && options.trainedOn === undefined) throw new Error('onlyReadCells needs trainedOn, the texts that say which cells are read')
   const log = options.log ?? (line => console.log(line))
   const batches = createBatchRunner(model, data, workerCount, options.depthLow, options.depthHigh)
   const weightGradients = createCellArrays(model.shape)
@@ -159,6 +215,7 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
   const totalSamples = epochs * places.length
   const points: TrainPoint[] = []
   let best = snappedTables(model)
+  let last = best
   let bestPoint: TrainPoint | undefined
   let samplesSeen = 0
   let step = 0
@@ -168,26 +225,92 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
   let temperature = temperatureStart
   let meanEntropy = 0
 
+  // The two halves of the validation split.
+  const validationHalves = options.validation === undefined ? undefined : [0, 1].map(half =>
+    selectSamples(options.validation!, Int32Array.from({length: options.validation!.sampleCount}, (_, place) => place).filter(place => place % 2 === half)))
+
+  // The fixed set of a log point: a free run of the twin and a run of the exact tables, both in this thread.
+  const fixedPlaces = places.subarray(0, Math.min(places.length, fixedSampleCount))
+  const reader = createTwinRunner(model.shape, options.depthLow, options.depthHigh)
+  const exactMixes = createCellArrays(model.shape)
+  const labelWeights: LossOptions = {kindWeight: options.loss?.kindWeight ?? 1, depthWeight: options.loss?.depthWeight ?? 1, containerWeight: options.loss?.containerWeight ?? 1}
+  const largestOf = (shares: Float64Array, base: number, count: number) => {
+    let largest = 0
+    for (let entry = 1; entry < count; entry++) if (shares[base + entry]! > shares[base + largest]!) largest = entry
+    return largest
+  }
+  const readings = new Int16Array(3 * positionCount)
+  const readFixedSet = (tables: RecoveryTables) => {
+    exactMixesInto(tables, exactMixes)
+    const tally = createTally()
+    const unused = createTally()
+    const kindCount = model.shape.displayKindCount
+    let compared = 0
+    let same = 0
+    for (const place of fixedPlaces) {
+      const start = data.start[place]!
+      const length = data.start[place + 1]! - start
+      const from = Math.max(data.firstDamage[place]!, data.firstError[place]!)
+      reader.setMixes(batches.mixes)
+      reader.runSample(data, place, labelWeights, tally)
+      for (let position = from; position < length; position++) {
+        readings[3 * position] = largestOf(reader.kinds, position * kindCount, kindCount)
+        readings[3 * position + 1] = largestOf(reader.depthAfter, position * reader.depthCount, reader.depthCount)
+        readings[3 * position + 2] = largestOf(reader.containers, position * 3, 3)
+      }
+      reader.setMixes(exactMixes)
+      reader.runSample(data, place, labelWeights, unused)
+      for (let position = from; position < length; position++) {
+        if ((data.flags[start + position]! & codePointLabeled) === 0) continue
+        compared++
+        if (readings[3 * position] === largestOf(reader.kinds, position * kindCount, kindCount) && readings[3 * position + 1] === largestOf(reader.depthAfter, position * reader.depthCount, reader.depthCount)
+          && readings[3 * position + 2] === largestOf(reader.containers, position * 3, 3)) same++
+      }
+    }
+    const labelLoss = tally.kindLoss + tally.depthLoss + tally.containerLoss
+    return {
+      freeLoss: tally.codePoints === 0 ? NaN : labelLoss / tally.codePoints,
+      freeLossWithoutRuledOut: tally.codePoints === tally.ruledOut ? NaN : (labelLoss - tally.ruledOutLoss) / (tally.codePoints - tally.ruledOut),
+      ruledOut: tally.codePoints === 0 ? NaN : tally.ruledOut / tally.codePoints,
+      readsAsSnapped: compared === 0 ? NaN : same / compared,
+    }
+  }
+
   const logPoint = () => {
-    const tables = snappedTables(model)
+    const snapped = snappedTables(model)
+    const changedCells = differencesOf(model.base, snapped).length
+    // The snapped tables with the base tables' choice back in the cells that no trained text reads. That changes no
+    // trace of a trained text.
+    const readCellsOnly = options.trainedOn === undefined ? undefined : withUnreadCellsOf(model.base, snapped, cellsReadAt(snapped, options.trainedOn.samples, options.trainedOn.places)).tables
+    const changedAndRead = readCellsOnly === undefined ? changedCells : differencesOf(model.base, readCellsOnly).length
+    const tables = onlyReadCells && readCellsOnly !== undefined ? readCellsOnly : snapped
     const loss = sinceLog.codePoints === 0 ? NaN : sinceLog.loss / sinceLog.codePoints
-    const point: TrainPoint = {samples: samplesSeen, loss, allThree: NaN, kind: NaN, depth: NaN, container: NaN, whole: NaN, changedCells: differencesOf(model.base, tables).length}
-    if (options.validation !== undefined) {
+    const point: TrainPoint = {samples: samplesSeen, loss, allThree: NaN, kind: NaN, depth: NaN, container: NaN, whole: NaN, pickingHalf: NaN, otherHalf: NaN, changedCells, changedAndRead, readCellsOnly: NaN, ...readFixedSet(tables)}
+    if (options.validation !== undefined && validationHalves !== undefined) {
+      if (readCellsOnly !== undefined) point.readCellsOnly = sharesOf(scoreTables(readCellsOnly, options.validation, {breakdowns: false}).rows[0]!).allThree
       const shares = sharesOf(scoreTables(tables, options.validation, {breakdowns: false}).rows[0]!)
-      Object.assign(point, shares)
-      if (bestPoint === undefined || point.allThree > bestPoint.allThree) {
+      point.allThree = shares.allThree
+      point.kind = shares.kind
+      point.depth = shares.depth
+      point.container = shares.container
+      point.whole = shares.whole
+      point.pickingHalf = sharesOf(scoreTables(tables, validationHalves[0]!, {breakdowns: false}).rows[0]!).allThree
+      point.otherHalf = sharesOf(scoreTables(tables, validationHalves[1]!, {breakdowns: false}).rows[0]!).allThree
+      if (bestPoint === undefined || point.pickingHalf > bestPoint.pickingHalf) {
         best = tables
         bestPoint = point
       }
     }
+    last = tables
     points.push(point)
     const percent = (share: number) => (100 * share).toFixed(1).padStart(5)
     const perCodePoint = (total: number) => sinceLog.codePoints === 0 ? '-' : (total / sinceLog.codePoints).toFixed(3)
     const sharpness = sharpnessOf(model, batches.mixes)
     log(`${String(samplesSeen).padStart(7)} samples  loss ${Number.isNaN(loss) ? '-' : loss.toFixed(4)} (kind ${perCodePoint(sinceLog.kindLoss)} depth ${perCodePoint(sinceLog.depthLoss)} container ${perCodePoint(sinceLog.containerLoss)} intended ${perCodePoint(sinceLog.intendedLoss)})`
+      + `  free run: loss ${point.freeLoss.toFixed(4)}, ${point.freeLossWithoutRuledOut.toFixed(4)} without the ${(100 * point.ruledOut).toFixed(1)}% of code points with a label ruled out, reads as the snapped tables at ${percent(point.readsAsSnapped).trim()}%`
       + `  temperature ${temperature.toFixed(2)}  entropy ${meanEntropy.toFixed(3)}  largest share ${sharpness.meanLargestShare.toFixed(3)}`
-      + `  snapped on validation: all three ${percent(point.allThree)} kind ${percent(point.kind)} depth ${percent(point.depth)} container ${percent(point.container)} whole ${percent(point.whole)}`
-      + `  ${point.changedCells} cells changed  ${trainingMilliseconds === 0 ? '-' : (samplesSeen / (trainingMilliseconds / 1000)).toFixed(0)} samples/s`)
+      + `  snapped on validation: all three ${percent(point.allThree)} (halves ${percent(point.pickingHalf).trim()} and ${percent(point.otherHalf).trim()}) kind ${percent(point.kind)} depth ${percent(point.depth)} container ${percent(point.container)} whole ${percent(point.whole)}`
+      + `  ${point.changedCells} cells changed, ${point.changedAndRead} of them read by a trained text, with the others as in the base: all three ${percent(point.readCellsOnly).trim()}  ${trainingMilliseconds === 0 ? '-' : (samplesSeen / (trainingMilliseconds / 1000)).toFixed(0)} samples/s`)
     sinceLog = createTally()
     samplesAtLastLog = samplesSeen
   }
@@ -224,7 +347,7 @@ export async function train(model: TwinModel, data: TwinData, places: Int32Array
     }
   }
   await batches.close()
-  return {best, bestPoint, last: snappedTables(model), points, samplesPerSecond: samplesSeen / (trainingMilliseconds / 1000)}
+  return {best, bestPoint, last, points, samplesPerSecond: samplesSeen / (trainingMilliseconds / 1000)}
 }
 
 // A random share of the open cells of `tables`, as masks of trainable cells, e.g. a tenth with share 0.1.
@@ -259,20 +382,26 @@ if (import.meta.main) {
   const everyTrainPlace = placesForTwin(samples, splitNames.indexOf('train'))
   const trainPlaces = everyTrainPlace.subarray(0, Math.min(everyTrainPlace.length, trainSamples))
   const data = packForTwin(samples, trainPlaces, onTrack > 0 ? loadIntendedObjects(samples, softCacheFolderOf(scratch)) : undefined)
-  const base = asIsTables()
+  const baseFile = optionOf('--base')
+  const base = baseFile === undefined ? asIsTables() : loadTables(baseFile).tables
   const model = createModel(base, {start, startShare: number('--start-share', 0.9), ...(openShare < 1 ? {trainable: randomTrainableCells(base, openShare, seed)} : {})})
   const trainableCells = model.trainableLexer.reduce((total, bit) => total + bit, 0) + model.trainableGrammar.reduce((total, bit) => total + bit, 0)
   log(`bun ${process.argv.slice(1).join(' ')}`)
-  log(`${trainPlaces.length} of the ${everyTrainPlace.length} train samples that give the twin a step, ${data.start[data.sampleCount]} code points. ${trainableCells} trainable cells. Tables and log in ${folder}`)
+  log(`${trainPlaces.length} of the ${everyTrainPlace.length} train samples that give the twin a step, ${data.start[data.sampleCount]} code points. ${trainableCells} trainable cells. Base tables: ${baseFile ?? 'today\'s'}. Tables and log in ${folder}`)
   const result = await train(model, data, Int32Array.from({length: data.sampleCount}, (_, place) => place), {
     seed, epochs: number('--epochs', 1), batchSize: number('--batch', 32), learningRate: number('--learning-rate', 0.05), workers: number('--workers', 4),
-    loss: {intendedLexerWeight: intended, intendedEventWeight: intended, intendedGrammarWeight: intended, onTrackProbability: onTrack},
+    loss: {intendedLexerWeight: intended, intendedEventWeight: intended, intendedGrammarWeight: intended, onTrackProbability: onTrack, intendedEverywhere: process.argv.includes('--every-intended')},
     temperatureStart, temperatureEnd: number('--temperature-end', temperatureStart), sharpnessCost: number('--sharpness-cost', 0),
-    logEverySamples: number('--log-every', 2000), validation: validationPart(samples), log,
+    depthLow: number('--depth-low', defaultDepthLow), depthHigh: number('--depth-high', defaultDepthHigh),
+    logEverySamples: number('--log-every', 2000), validation: validationPart(samples), trainedOn: {samples, places: trainPlaces}, onlyReadCells: process.argv.includes('--only-read-cells'), log,
   })
-  const describe = (point: TrainPoint | undefined) => point === undefined ? 'no score' : `all three ${(100 * point.allThree).toFixed(1)}% after ${point.samples} samples, ${point.changedCells} cells changed`
-  saveTables(join(folder, 'best.json'), result.best, `soft twin, run ${name}, best on validation: ${describe(result.bestPoint)}`)
+  const percent = (share: number) => `${(100 * share).toFixed(1)}%`
+  const describe = (point: TrainPoint | undefined) => point === undefined ? 'no score' : `all three ${percent(point.allThree)} on the validation split after ${point.samples} samples, ${point.changedCells} cells changed, ${point.changedAndRead} of them read by a trained text (with the others as in the base: ${percent(point.readCellsOnly)})`
+  saveTables(join(folder, 'best.json'), result.best, `soft twin, run ${name}, picked on one half of the validation split: ${describe(result.bestPoint)}${result.bestPoint === undefined ? '' : `, ${percent(result.bestPoint.otherHalf)} on the other half`}`)
   saveTables(join(folder, 'last.json'), result.last, `soft twin, run ${name}, after the last sample: ${describe(result.points.at(-1))}`)
-  log(`The base tables on validation: all three ${(100 * result.points[0]!.allThree).toFixed(1)}%. Best snapped tables: ${describe(result.bestPoint)}. Last: ${describe(result.points.at(-1))}.`)
+  const lastPoints = result.points.slice(-5).map(point => point.allThree)
+  log(`The base tables on validation: all three ${percent(result.points[0]!.allThree)}.`)
+  if (result.bestPoint !== undefined) log(`Best snapped tables, picked by the half of the validation split at even places (${percent(result.bestPoint.pickingHalf)} there): all three ${percent(result.bestPoint.otherHalf)} on the other half, ${percent(result.bestPoint.allThree)} on the whole split, after ${result.bestPoint.samples} samples, ${result.bestPoint.changedCells} cells changed.`)
+  log(`Last snapped tables: ${describe(result.points.at(-1))}. The last ${lastPoints.length} log points have all three from ${percent(Math.min(...lastPoints))} to ${percent(Math.max(...lastPoints))} on the whole split.`)
   log(`${result.samplesPerSecond.toFixed(0)} samples per second of training.`)
 }

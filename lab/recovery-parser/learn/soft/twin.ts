@@ -23,6 +23,7 @@ import {type RecoveryTables, actionByToken, actionCount, actionNone, actionOfTok
 // The bits of TwinData.flags, as in data.ts.
 const codePointLabeled = 1
 const codePointKindScored = 2
+const codePointCanFollow = 8
 
 // The sizes and the fixed tables of a set of tables, which is all a step needs besides the cells' mixes.
 export type TwinShape = {
@@ -306,15 +307,22 @@ export type LossOptions = {
   kindWeight?: number
   depthWeight?: number
   containerWeight?: number
-  // Extra targets from intended.ts, at kept code points whose display kind is scored: the cross-entropy of the
-  // tokenizer state after the code point, of the event, and of the grammar state after it. The default is 0 each.
+  // Extra targets from intended.ts: the cross-entropy of the tokenizer state after a code point, of the event, and of
+  // the grammar state after it. The default is 0 each. They are only used at the code points that data.ts marks with
+  // codePointCanFollow, where a parser of the broken text can be in the intended state. Elsewhere no choice of the
+  // open cells leads to the intended state, e.g. at the space after a removed comma, where frozen cells keep the
+  // grammar state.
   intendedLexerWeight?: number
   intendedEventWeight?: number
   intendedGrammarWeight?: number
-  // Keeping the run on track: after a kept code point, with this probability, the twin's state is replaced by the
-  // intended state, i.e. the state of today's parser after the code point's counterpart in the original. Gradients do
-  // not cross a replaced state. The default is 0. It needs TwinData.intendedObjects.
+  // Keeping the run on track: after a code point with the mark codePointCanFollow, with this probability, the twin's
+  // state is replaced by the intended state, i.e. the state of today's parser after the code point's counterpart in
+  // the original. Gradients do not cross a replaced state. The default is 0. It needs TwinData.intendedObjects.
   onTrackProbability?: number
+  // True uses the intended states at every kept code point, with or without the mark, as the first version of the
+  // twin did. It is only here to measure what the mark changes: a run that is put on a state that the parser cannot
+  // be in never reads the open cell that the parser reads next. The default is false.
+  intendedEverywhere?: boolean
   // The seed of the draws for onTrackProbability. A sample's draws depend on this seed and on the sample's index.
   onTrackSeed?: number
 }
@@ -335,9 +343,16 @@ export type LossTally = {
   intendedLoss: number
   // How many states were replaced by the intended state.
   replaced: number
+  // Code points, among `codePoints`, at which a label has a share of exactly 0, and the loss of their three labels.
+  // A share is exactly 0 only when cells that hold exact 0 and 1 rule the label out, i.e. cells that are not
+  // trainable. No weight changes such a loss, and each label costs -ln(lossFloor) = 13.8 there. With few trainable
+  // cells these are most of the loss, so the loss without them says more: (kindLoss + depthLoss + containerLoss -
+  // ruledOutLoss) / (codePoints - ruledOut).
+  ruledOut: number
+  ruledOutLoss: number
 }
 
-export const createTally = (): LossTally => ({samples: 0, codePoints: 0, positions: 0, loss: 0, kindLoss: 0, depthLoss: 0, containerLoss: 0, intendedLoss: 0, replaced: 0})
+export const createTally = (): LossTally => ({samples: 0, codePoints: 0, positions: 0, loss: 0, kindLoss: 0, depthLoss: 0, containerLoss: 0, intendedLoss: 0, replaced: 0, ruledOut: 0, ruledOutLoss: 0})
 export function addTally(total: LossTally, part: LossTally) {
   for (const field of Object.keys(total) as (keyof LossTally)[]) total[field] += part[field]
 }
@@ -798,6 +813,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     const intendedGrammarWeight = options.intendedGrammarWeight ?? 0
     const intendedTargets = intendedLexerWeight !== 0 || intendedEventWeight !== 0 || intendedGrammarWeight !== 0
     const onTrackProbability = options.onTrackProbability ?? 0
+    const intendedEverywhere = options.intendedEverywhere === true
     if (onTrackProbability > 0 && !data.hasIntendedObjects) throw new Error('keeping the run on track needs the intended stacks, see twin-data.ts')
     const random = onTrackProbability > 0 ? createRandom(options.onTrackSeed ?? 0, data.index[place]!) : undefined
 
@@ -814,29 +830,46 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
         continue
       }
       const flags = data.flags[at]!
+      // Whether the intended state after this code point may be used, as a target and as a state to put the run on:
+      // the code point is kept, and a parser of the broken text can be in that state. With intendedEverywhere, as in
+      // the first version: a target at every kept code point whose display kind is scored, and a state to put the
+      // run on at every kept code point.
+      const kept = data.intendedLexerAfter[at]! >= 0
+      const canFollow = (flags & codePointCanFollow) !== 0
+      const targetHere = kept && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : canFollow)
+      const replaceHere = kept && (intendedEverywhere || canFollow)
       if (position >= firstDamage && (flags & codePointLabeled) !== 0) {
         tally.codePoints++
         const depthIndex = data.labelDepth[at]! - depthLow
-        const depthLoss = -depthWeight * Math.log(depthAfter[position * depthCount + depthIndex]! + lossFloor)
-        const containerLoss = -containerWeight * Math.log(containers[position * 3 + data.labelContainer[at]!]! + lossFloor)
+        const depthShare = depthAfter[position * depthCount + depthIndex]!
+        const containerShare = containers[position * 3 + data.labelContainer[at]!]!
+        const depthLoss = -depthWeight * Math.log(depthShare + lossFloor)
+        const containerLoss = -containerWeight * Math.log(containerShare + lossFloor)
+        let kindShare = 1
+        let kindLoss = 0
         tally.depthLoss += depthLoss
         tally.containerLoss += containerLoss
         tally.loss += depthLoss + containerLoss
         if ((flags & codePointKindScored) !== 0) {
-          const kindLoss = -kindWeight * Math.log(kinds[position * displayKindCount + data.labelKind[at]!]! + lossFloor)
+          kindShare = kinds[position * displayKindCount + data.labelKind[at]!]!
+          kindLoss = -kindWeight * Math.log(kindShare + lossFloor)
           tally.kindLoss += kindLoss
           tally.loss += kindLoss
-          if (intendedTargets && data.intendedLexerAfter[at]! >= 0) {
-            const intendedLoss = -intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
-              - intendedEventWeight * Math.log(events[position * eventCount + data.intendedEvent[at]!]! + lossFloor)
-              - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor)
-            tally.intendedLoss += intendedLoss
-            tally.loss += intendedLoss
-          }
+        }
+        if (depthShare === 0 || containerShare === 0 || kindShare === 0) {
+          tally.ruledOut++
+          tally.ruledOutLoss += depthLoss + containerLoss + kindLoss
+        }
+        if (intendedTargets && targetHere) {
+          const intendedLoss = -intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
+            - intendedEventWeight * Math.log(events[position * eventCount + data.intendedEvent[at]!]! + lossFloor)
+            - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor)
+          tally.intendedLoss += intendedLoss
+          tally.loss += intendedLoss
         }
       }
-      // Keeping the run on track: one draw per kept code point.
-      const replace = random !== undefined && data.intendedLexerAfter[at]! >= 0 && random.next() < onTrackProbability
+      // Keeping the run on track: one draw per code point whose intended state may be used.
+      const replace = random !== undefined && replaceHere && random.next() < onTrackProbability
       if (replace) {
         replaced[position] = 1
         tally.replaced++
@@ -864,14 +897,14 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
           if ((flags & codePointKindScored) !== 0) {
             const kind = data.labelKind[at]!
             kindGradient[kind] = -kindWeight / (kinds[position * displayKindCount + kind]! + lossFloor)
-            if (intendedTargets && data.intendedLexerAfter[at]! >= 0) {
-              const lexerState = data.intendedLexerAfter[at]!
-              const event = data.intendedEvent[at]!
-              const grammarState = data.intendedGrammarAfter[at]!
-              lexerGradient[lexerState]! -= intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
-              eventGradient[event] = -intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
-              grammarGradient[grammarState]! -= intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
-            }
+          }
+          if (intendedTargets && data.intendedLexerAfter[at]! >= 0 && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : (flags & codePointCanFollow) !== 0)) {
+            const lexerState = data.intendedLexerAfter[at]!
+            const event = data.intendedEvent[at]!
+            const grammarState = data.intendedGrammarAfter[at]!
+            lexerGradient[lexerState]! -= intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
+            eventGradient[event] = -intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
+            grammarGradient[grammarState]! -= intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
           }
         }
       }

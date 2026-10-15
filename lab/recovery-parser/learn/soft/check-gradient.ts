@@ -63,6 +63,8 @@ const settings: Setting[] = [
     options: {kindWeight: 0.5, depthWeight: 2, containerWeight: 1.5, temperature: 2}},
   {name: 'sharp mixes (weights 4 times as large), on track with probability 0.5, sharpness cost 0.2, an intended target', depthLow: -8, depthHigh: 24, weightScale: 6,
     options: {onTrackProbability: 0.5, onTrackSeed: 11, sharpnessCost: 0.2, intendedGrammarWeight: 0.5}},
+  {name: 'the intended states at every kept code point, not only where a parser can follow them: intended targets, on track with probability 0.4', depthLow: -8, depthHigh: 24, weightScale: 1.5,
+    options: {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.4, onTrackSeed: 13, intendedEverywhere: true}},
 ]
 
 // A normal random number from two uniform ones.
