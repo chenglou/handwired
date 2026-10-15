@@ -3,7 +3,7 @@
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL:
 //   bun lab/recovery-parser/learn/check-all.ts [--only <part of a name>]
-// It took 60 and 71 s in two runs on an 18 core machine with the cache of the standard set in place, and takes
+// It took 57 to 73 s in five runs on an 18 core machine with the cache of the standard set in place, and takes
 // about half a minute more the first time, for that cache and for the intended stacks. Up to 4 commands run at a time, and one of the checks
 // uses 4 worker threads, so the command stays within 8 threads.
 //

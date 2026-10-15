@@ -187,7 +187,7 @@ bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth o
 bun lab/recovery-parser/learn/intended-reached.ts <name>=<file.json> ...   # where saved tables are in the intended state
 ```
 
-`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in 60 to 71 s on an 18 core machine with the cache of the samples in place, and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
+`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in 57 to 73 s over five runs on an 18 core machine with the cache of the samples in place, and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
 
 The table of scores, from an empty scratch folder, in about 10 minutes with two commands at a time:
 
