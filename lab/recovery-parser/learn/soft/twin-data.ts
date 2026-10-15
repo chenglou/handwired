@@ -12,7 +12,7 @@ import {type Sample, sampleAt} from '../../samples.ts'
 import {containerObject, runTableParser} from '../../table-parser.ts'
 import {type Samples, codePointLabeled} from '../data.ts'
 import {createTrace, maximumDepth, runRecoveryParserInto} from '../recovery-parser.ts'
-import {actionPop, actionPushArray, actionPushObject, asIsTables, today} from '../recovery-tables.ts'
+import {type RecoveryTables, actionPop, actionPushArray, actionPushObject, asIsTables} from '../recovery-tables.ts'
 import type {TwinData} from './twin.ts'
 
 // For every code point of a sample's broken text: the stack of today's parser after the code point's counterpart in
@@ -90,14 +90,16 @@ const shared = <Typed>(type: new (buffer: SharedArrayBuffer) => Typed, bytesPerE
 // The samples at `places` of `samples` for the twin, in that order. `intendedObjects` holds the intended stacks of
 // every code point of `samples`, see loadIntendedObjects. Without it the twin cannot keep a run on track.
 //
-// The state at the first error comes from the exact parser with today's tables: every cell that a text reads before
-// its first error is frozen, so every choice of the open cells gives the same state there.
-export function packForTwin(samples: Samples, places: ArrayLike<number>, intendedObjects?: Uint16Array): TwinData {
+// `tables` are the tables that the twin will run, or others with the same added structure, e.g. the model's base
+// tables. Without them, today's. They decide the class of every code point, which tables with added classes give
+// otherwise than today's, and they give the state at the first error: every cell that a text reads before its first
+// error is frozen, so every choice of the open cells gives the same state there.
+export function packForTwin(samples: Samples, places: ArrayLike<number>, intendedObjects?: Uint16Array, tables: RecoveryTables = asIsTables()): TwinData {
   const sampleCount = places.length
   let codePointCount = 0
   for (let at = 0; at < sampleCount; at++) codePointCount += samples.start[places[at]! + 1]! - samples.start[places[at]!]!
   const data: TwinData = {
-    sampleCount,
+    sampleCount, classCount: tables.classCount,
     index: shared(Int32Array, 4, sampleCount), start: shared(Int32Array, 4, sampleCount + 1), firstDamage: shared(Int32Array, 4, sampleCount),
     firstError: shared(Int32Array, 4, sampleCount), startLexerState: shared(Uint8Array, 1, sampleCount), startGrammarState: shared(Uint8Array, 1, sampleCount),
     startDepth: shared(Int8Array, 1, sampleCount), startObjects: shared(Uint16Array, 2, sampleCount),
@@ -106,9 +108,8 @@ export function packForTwin(samples: Samples, places: ArrayLike<number>, intende
     intendedEvent: shared(Int8Array, 1, codePointCount), intendedGrammarAfter: shared(Int8Array, 1, codePointCount),
     intendedObjects: shared(Uint16Array, 2, codePointCount), hasIntendedObjects: intendedObjects !== undefined,
   }
-  const tables = asIsTables()
   const trace = createTrace()
-  const lastClassEntry = today.classOfCodePoint.length - 1
+  const lastClassEntry = tables.classOfCodePoint.length - 1
   let codePointAt = 0
   for (let at = 0; at < sampleCount; at++) {
     const place = places[at]!
@@ -145,7 +146,7 @@ export function packForTwin(samples: Samples, places: ArrayLike<number>, intende
     for (let position = 0; position < length; position++) {
       const from = start + position
       const to = codePointAt + position
-      data.classes[to] = today.classOfCodePoint[Math.min(samples.codePoints[from]! + 1, lastClassEntry)]!
+      data.classes[to] = tables.classOfCodePoint[Math.min(samples.codePoints[from]! + 1, lastClassEntry)]!
       data.flags[to] = samples.flags[from]!
       data.labelKind[to] = samples.labelKind[from]!
       data.labelDepth[to] = samples.labelDepth[from]!

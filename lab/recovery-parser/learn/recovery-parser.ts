@@ -79,7 +79,7 @@ const kindAtLevel = new Uint8Array(maximumDepth + 1)
 // scored, the entries from `positions` on keep what an earlier run wrote, and the first error and `valid` only say
 // what happened in the positions that ran.
 export function runRecoveryParserInto(trace: RecoveryTrace, codePoints: ArrayLike<number>, start: number, length: number, truncated: boolean, tables: RecoveryTables, positions: number = positionCount) {
-  const {classCount, tokenCount, contextCount, grammarStateCount, errorState, classOfCodePoint, tokenOfEvent, display, lexerNext, lexerEvent, grammarNext, grammarAction} = tables
+  const {classCount, tokenCount, contextCount, grammarStateCount, errorState, classToday, classOfCodePoint, tokenOfEvent, display, lexerNext, lexerEvent, grammarNext, grammarAction} = tables
   const lastClassEntry = classOfCodePoint.length - 1
   let lexerState = 0
   let grammarState = 0
@@ -99,7 +99,8 @@ export function runRecoveryParserInto(trace: RecoveryTrace, codePoints: ArrayLik
     const grammarCell = (grammarState * tokenCount + token) * contextCount + context
     if (firstErrorPosition === -1) {
       // Today's step from the same state. Up to here every cell that was read is frozen, so the state is today's.
-      const eventToday = today.lexerEvent[lexerCell]!
+      // Today's tables have no added class: they read the class that the code point has today.
+      const eventToday = today.lexerEvent[lexerState * today.classCount + classToday[characterClass]!]!
       const grammarCellToday = (grammarState * tokenCount + today.tokenOfEvent[eventToday]!) * contextCount + context
       if (today.grammarNext[grammarCellToday] === errorState) {
         firstErrorPosition = position

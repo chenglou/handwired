@@ -4,7 +4,9 @@
 //   bun lab/recovery-parser/learn/soft/check-gradient.ts [samples, default 24] [single weights per group and setting, default 60]
 //
 // Every open cell is trainable and its weights are random, so every mix is a random mix. For each setting of the
-// options below, the backward pass gives the gradient of the objective by every weight. The check compares it with
+// options below, the backward pass gives the gradient of the objective by every weight. The last settings run tables
+// with added structure, see ../structure/README.md: with added classes and two added tokenizer states, on samples
+// of which half need a class. The check compares the gradient with
 // central differences of the fourth order, (-f(2h) + 8 f(h) - 8 f(-h) + f(-2h)) / 12h, in two ways per group of weights:
 //
 // - Along random directions: every trainable weight of the group moves by +h or -h at once, and the difference is
@@ -20,8 +22,9 @@
 // reports the relative difference of the gradients of at least 1e-4, and the absolute difference of all.
 import {createRandom} from '../../random.ts'
 import {defaultSeed} from '../../samples.ts'
+import {classesOfTheChecks} from '../check-texts.ts'
 import {loadStandardSamples, splitNames} from '../data.ts'
-import {asIsTables} from '../recovery-tables.ts'
+import {type RecoveryTables, addClasses, addStates, asIsTables} from '../recovery-tables.ts'
 import {loadIntendedObjects, packForTwin, placesForTwin, softCacheFolderOf} from './twin-data.ts'
 import {type ObjectiveOptions, type TwinRunner, createCellArrays, createModel, createTwinRunner, groupNames, objective} from './twin.ts'
 
@@ -43,40 +46,53 @@ const samples = loadStandardSamples()
 // Train samples with at most 120 code points, so that many weights matter to the objective, and two long ones.
 const trainPlaces = placesForTwin(samples, splitNames.indexOf('train'))
 const lengthOf = (place: number) => samples.start[place + 1]! - samples.start[place]!
-const short = Array.from(trainPlaces).filter(place => lengthOf(place) <= 120).slice(0, sampleCount - 2)
+const short = Array.from(trainPlaces).filter(place => lengthOf(place) <= 120)
 const long = Array.from(trainPlaces).filter(place => lengthOf(place) >= 400).slice(0, 2)
-const data = packForTwin(samples, [...short, ...long], loadIntendedObjects(samples, softCacheFolderOf()))
-const everyPlace = Int32Array.from({length: data.sampleCount}, (_, place) => place)
+const intendedObjects = loadIntendedObjects(samples, softCacheFolderOf())
 
-const model = createModel(asIsTables(), {start: 'uniform'})
-const shape = model.shape
-const mixes = createCellArrays(shape)
-const mixGradients = createCellArrays(shape)
-const weightGradients = createCellArrays(shape)
+// A model of some base tables with every open cell trainable, and the samples packed for those tables.
+function setupOf(base: RecoveryTables, places: number[]) {
+  const data = packForTwin(samples, places, intendedObjects, base)
+  const model = createModel(base, {start: 'uniform'})
+  return {model, data, everyPlace: Int32Array.from({length: data.sampleCount}, (_, place) => place), mixes: createCellArrays(model.shape), mixGradients: createCellArrays(model.shape), weightGradients: createCellArrays(model.shape)}
+}
+const todays = setupOf(asIsTables(), [...short.slice(0, sampleCount - 2), ...long])
+// With added structure, half of the short samples are ones that need a class, so that the cells of the added classes
+// are read.
+const needsClass = short.filter(place => samples.needsClass[place] === 1).slice(0, Math.floor((sampleCount - 2) / 2))
+const withClasses = setupOf(addStates(addClasses(asIsTables(), classesOfTheChecks), 2, []), [...needsClass, ...short.filter(place => samples.needsClass[place] === 0).slice(0, sampleCount - 2 - needsClass.length), ...long])
 
-type Setting = {name: string, options: ObjectiveOptions, depthLow: number, depthHigh: number, weightScale: number}
+type Setting = {name: string, setup: ReturnType<typeof setupOf>, added: boolean, options: ObjectiveOptions, depthLow: number, depthHigh: number, weightScale: number}
+const everyOption: ObjectiveOptions = {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.3, onTrackSeed: 7, temperature: 0.7, sharpnessCost: 0.05}
 const settings: Setting[] = [
-  {name: 'the three label losses alone', options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
-  {name: 'every option on: intended targets, on track with probability 0.3, temperature 0.7, sharpness cost 0.05', depthLow: -8, depthHigh: 24, weightScale: 1.5,
-    options: {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.3, onTrackSeed: 7, temperature: 0.7, sharpnessCost: 0.05}},
-  {name: 'a narrow depth range, -1 to 17, so that shares reach its ends, temperature 2, other weights of the three losses', depthLow: -1, depthHigh: 17, weightScale: 1.5,
+  {name: 'the three label losses alone', setup: todays, added: false, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
+  {name: 'every option on: intended targets, on track with probability 0.3, temperature 0.7, sharpness cost 0.05', setup: todays, added: false, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
+  {name: 'a narrow depth range, -1 to 17, so that shares reach its ends, temperature 2, other weights of the three losses', setup: todays, added: false, depthLow: -1, depthHigh: 17, weightScale: 1.5,
     options: {kindWeight: 0.5, depthWeight: 2, containerWeight: 1.5, temperature: 2}},
-  {name: 'sharp mixes (weights 4 times as large), on track with probability 0.5, sharpness cost 0.2, an intended target', depthLow: -8, depthHigh: 24, weightScale: 6,
+  {name: 'sharp mixes (weights 4 times as large), on track with probability 0.5, sharpness cost 0.2, an intended target', setup: todays, added: false, depthLow: -8, depthHigh: 24, weightScale: 6,
     options: {onTrackProbability: 0.5, onTrackSeed: 11, sharpnessCost: 0.2, intendedGrammarWeight: 0.5}},
-  {name: 'the intended states at every kept code point, not only where a parser can follow them: intended targets, on track with probability 0.4', depthLow: -8, depthHigh: 24, weightScale: 1.5,
+  {name: 'the intended states at every kept code point, not only where a parser can follow them: intended targets, on track with probability 0.4', setup: todays, added: false, depthLow: -8, depthHigh: 24, weightScale: 1.5,
     options: {intendedLexerWeight: 0.3, intendedEventWeight: 0.2, intendedGrammarWeight: 0.4, onTrackProbability: 0.4, onTrackSeed: 13, intendedEverywhere: true}},
+  {name: `${classesOfTheChecks.length} added classes and 2 added tokenizer states: the three label losses alone`, setup: withClasses, added: true, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
+  {name: `${classesOfTheChecks.length} added classes and 2 added tokenizer states: every option on`, setup: withClasses, added: true, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
 ]
 
 // A normal random number from two uniform ones.
 const normal = (random: {next: () => number}) => Math.sqrt(-2 * Math.log(1 - random.next())) * Math.cos(2 * Math.PI * random.next())
 
+// The largest differences per group of weights, over the settings with today's tables and over the ones with added
+// structure.
 type Worst = {direction: number, directions: number, relative: number, large: number, absolute: number, singles: number}
-const worst: Record<string, Worst> = {}
-for (const name of groupNames) worst[name] = {direction: 0, directions: 0, relative: 0, large: 0, absolute: 0, singles: 0}
+const newWorst = () => Object.fromEntries(groupNames.map(name => [name, {direction: 0, directions: 0, relative: 0, large: 0, absolute: 0, singles: 0}])) as Record<string, Worst>
+const worstOfTodays = newWorst()
+const worstOfAdded = newWorst()
 
 const started = performance.now()
 for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
   const setting = settings[settingIndex]!
+  const {model, data, everyPlace, mixes, mixGradients, weightGradients} = setting.setup
+  const shape = model.shape
+  const worst = setting.added ? worstOfAdded : worstOfTodays
   const random = createRandom(defaultSeed + 77, settingIndex)
   for (let entry = 0; entry < model.weights.all.length; entry++) model.weights.all[entry] = setting.weightScale * normal(random)
   const runner: TwinRunner = createTwinRunner(shape, setting.depthLow, setting.depthHigh)
@@ -156,10 +172,12 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
   }
 }
 
-console.log('The largest differences per group of weights, over every setting:')
-for (const group of groupNames) {
-  const tally = worst[group]!
-  console.log(`  ${group.padEnd(13)} ${tally.directions} directions: relative ${tally.direction.toExponential(2)}. ${tally.singles} single weights: absolute ${tally.absolute.toExponential(2)}, relative ${tally.relative.toExponential(2)} over the ${tally.large} with a gradient of at least ${largeGradient}`)
+for (const [name, worst] of [['today\'s tables', worstOfTodays], ['added structure', worstOfAdded]] as const) {
+  console.log(`The largest differences per group of weights, over every setting with ${name}:`)
+  for (const group of groupNames) {
+    const tally = worst[group]!
+    console.log(`  ${group.padEnd(13)} ${tally.directions} directions: relative ${tally.direction.toExponential(2)}. ${tally.singles} single weights: absolute ${tally.absolute.toExponential(2)}, relative ${tally.relative.toExponential(2)} over the ${tally.large} with a gradient of at least ${largeGradient}`)
+  }
 }
 console.log(`${((performance.now() - started) / 1000).toFixed(1)} s.`)
 if (failures > 0) {

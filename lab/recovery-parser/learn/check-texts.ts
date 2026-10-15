@@ -2,6 +2,15 @@
 // and texts of exactly 512 code points, and broken texts, among them texts that are too long or too deep.
 import type {Random} from '../random.ts'
 import {capacity, maximumDepth} from '../table-parser.ts'
+import type {AddedClass} from './recovery-tables.ts'
+
+// The classes that the checks add: the apostrophe, the two curly double quotes, the no-break space, the signs = # *
+// and the round brackets. All of them have the class `other` today, the class of most letters, and the dataset's
+// broken texts hold them. textWithAddedClasses makes texts with them, inside strings and between tokens.
+export const classesOfTheChecks: AddedClass[] = [
+  {name: 'apostrophe', codePoints: [0x27]}, {name: 'curlyQuote', codePoints: [0x201c, 0x201d]}, {name: 'noBreakSpace', codePoints: [0xa0]},
+  {name: 'sign', codePoints: [0x3d, 0x23, 0x2a]}, {name: 'roundBracket', codePoints: [0x28, 0x29]},
+]
 
 const pieces = ['a', 'b', 'e', 'E', 'f', 'l', 'n', 'r', 's', 't', 'u', 'c', 'D', 'x', 'z', ' ', '/', '{', '}', '[', ']', ':', ',', '-', '+', '.', '0', '7', '\'', 'é', '東', '😀', '\u007f', ' ']
 const escapes = ['\\"', '\\\\', '\\/', '\\b', '\\f', '\\n', '\\r', '\\t']
@@ -92,6 +101,17 @@ export function editedText(random: Random): string {
     else if (choice === 2) codePoints.splice(at, 1, random.pick(insertions))
     else codePoints.length = at
   }
+  return codePoints.slice(0, capacity).join('')
+}
+
+// A text with code points of the classes that the checks add: a valid text in which one to four code points are
+// replaced by such a code point, or get one before them. Inside a string the text stays valid, e.g. "it's", and
+// between tokens it breaks, e.g. [1,'2].
+const addedCodePoints = classesOfTheChecks.flatMap(added => added.codePoints.map(codePoint => String.fromCodePoint(codePoint)))
+export function textWithAddedClasses(random: Random): string {
+  const codePoints = Array.from(validText(random))
+  const edits = random.integer(1, 4)
+  for (let edit = 0; edit < edits; edit++) codePoints.splice(random.integer(0, Math.max(0, codePoints.length - 1)), random.integer(0, 1), random.pick(addedCodePoints))
   return codePoints.slice(0, capacity).join('')
 }
 

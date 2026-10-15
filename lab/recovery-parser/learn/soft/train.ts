@@ -13,7 +13,8 @@
 // validation split, and the log gives their score on the other half. score.ts reads both files:
 //   bun lab/recovery-parser/learn/score.ts --tables <scratch>/soft/runs/<name>/best.json --cells
 //
-// --base starts from saved tables in place of today's, e.g. the hand-written ones. --open-share 0.1 trains a random
+// --base starts from saved tables in place of today's, e.g. the hand-written ones, or tables with added structure,
+// see ../structure/README.md. --open-share 0.1 trains a random
 // tenth of the open cells. --intended is one weight for the three extra targets. --every-intended uses the intended
 // states at every kept code point, as the first version did, see LossOptions.intendedEverywhere. --depth-low and
 // --depth-high set the depths that the twin holds a share for, e.g. --depth-high 48 for a uniform start, whose first
@@ -381,9 +382,9 @@ if (import.meta.main) {
   const samples = loadStandardSamples()
   const everyTrainPlace = placesForTwin(samples, splitNames.indexOf('train'))
   const trainPlaces = everyTrainPlace.subarray(0, Math.min(everyTrainPlace.length, trainSamples))
-  const data = packForTwin(samples, trainPlaces, onTrack > 0 ? loadIntendedObjects(samples, softCacheFolderOf(scratch)) : undefined)
   const baseFile = optionOf('--base')
   const base = baseFile === undefined ? asIsTables() : loadTables(baseFile).tables
+  const data = packForTwin(samples, trainPlaces, onTrack > 0 ? loadIntendedObjects(samples, softCacheFolderOf(scratch)) : undefined, base)
   const model = createModel(base, {start, startShare: number('--start-share', 0.9), ...(openShare < 1 ? {trainable: randomTrainableCells(base, openShare, seed)} : {})})
   const trainableCells = model.trainableLexer.reduce((total, bit) => total + bit, 0) + model.trainableGrammar.reduce((total, bit) => total + bit, 0)
   log(`bun ${process.argv.slice(1).join(' ')}`)

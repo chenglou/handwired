@@ -85,6 +85,8 @@ const validation = validationPart(samples)
 const prepared = prepareSamples(train)
 const tables: RecoveryTables = fromFile === undefined ? asIsTables() : loadTables(fromFile).tables
 checkTables(tables)
+// The search's own parser loop, in sample-runs.ts, gives every code point the class it has today.
+if (tables.addedClasses.length > 0) throw new Error('search.ts does not run tables with added classes, see ../structure/README.md')
 const startTables = fromFile === undefined ? asIsTables() : loadTables(fromFile).tables
 
 const percent = (count: number, of: number) => (100 * count / of).toFixed(2)

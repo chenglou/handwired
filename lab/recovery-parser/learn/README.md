@@ -2,11 +2,12 @@
 
 The JSON highlighter is a parser written as tables. It does not recover: after the first error everything is shown as an error or loses its meaning, e.g. every key after a missing comma is shown as a plain string. This experiment changes the table cells that only broken input reaches, by hand or by training, and measures how much of a broken text is then labeled as its author meant it.
 
-The files at the top of this folder are what every arm of the experiment shares. The three folders hold what the arms are compared with and built from:
+The files at the top of this folder are what every arm of the experiment shares. The folders hold what the arms are compared with and built from:
 
 - `handwritten/`: a recovery written by hand, as 35 rules that set open cells.
 - `search/`: the open cells filled without gradients, by votes of the train samples and by a search that tries one cell at a time.
 - `soft/`: the trainable twin of the parser and its trainer. No arm is run yet.
+- `structure/`: what an arm can add to the tables besides states, e.g. a character class for the apostrophe. This README describes the tables without any of it.
 
 **Every number in this folder is preliminary.** The dataset in `lab/recovery-parser/` is a snapshot that a reviewed version will replace. Every number has to be made again then, with the commands at the end.
 
@@ -120,7 +121,7 @@ Do not read the files of dumped samples that `lab/recovery-parser/dump.ts` wrote
 
 ## Files
 
-- `recovery-tables.ts`: the type `RecoveryTables` (sizes, the tokenizer's next state and event per cell, the grammar's next state and stack action per cell, the fixed tables, the masks of open cells). `asIsTables()` returns today's tables. `checkTables`, `saveTables` and `loadTables` (JSON), `lexerCellName` and `grammarCellName`, `differencesOf` for the cells in which two tables differ, `addStates` for tables with more tokenizer states and grammar states, `randomizeOpenCells`.
+- `recovery-tables.ts`: the type `RecoveryTables` (sizes, the tokenizer's next state and event per cell, the grammar's next state and stack action per cell, the fixed tables, the masks of open cells). `asIsTables()` returns today's tables. `checkTables`, `saveTables` and `loadTables` (JSON), `lexerCellName` and `grammarCellName`, `differencesOf` for the cells in which two tables differ, `addStates` for tables with more tokenizer states and grammar states, `addClasses` for tables with more classes, `randomizeOpenCells`.
 - `recovery-parser.ts`: `runRecoveryParser`, and `runRecoveryParserInto` for loops, which allocates nothing and does not check the tables.
 - `intended.ts`: `intendedOf(sample)`, the intended states and the mark of the ones that can be followed.
 - `data.ts`: `loadSamples(seed, from, to)` holds the samples in typed arrays: code points, labels, flags, intended states, and per sample the split, the kinds, the families, reachable, needsClass, debatable, heldOut and the source. `standardRange` is seed 20261015, samples 0 to 59,999. `trainPart`, `validationPart` and `testPart` return the parts. The cache folder comes from `RECOVERY_SCRATCH`, and passing `null` as the cache folder makes the samples without a cache.
@@ -188,7 +189,7 @@ saveTables(`${process.env['RECOVERY_SCRATCH']}/one-cell.json`, tables, 'one chan
 - **Should a recovering highlighter still mark the damage?** The labels say what kept code points are. Nothing says how an added code point should be shown, e.g. a stray closing bracket or the second quote of a doubled quote, so the best tables show no error anywhere. The numbers are in every score now. A label `error` for some added code points would put them into the main number.
 - **Valid JSON that is too deep.** Either such texts go into the dataset, with today's depths as labels, or an arm's tables have to pass `check-deep.ts`. Today only the hand-written rules were changed to pass it.
 - **Should a tokenizer cell be allowed an event of a text's end at all?** The search leaves them out. The core still allows them, so a trained cell can snap to one, and `checkTables` accepts it.
-- **Added character classes.** 11% of the broken samples need a class that the highlighter lacks, e.g. the apostrophe, and the core fixes the 33 classes. The hand-written rules read such strings as words, which is why "needs a class" is at 94.8% there.
+- **Added character classes.** 11% of the broken samples need a class that the highlighter lacks, e.g. the apostrophe. `addClasses` adds classes, see `structure/README.md`, and no arm has used it. The hand-written rules read such strings as words, which is why "needs a class" is at 94.8% there.
 - **Keeping a run on track.** With the mark it costs less than before and still costs. States taken from tables that already recover, e.g. the trace of the hand-written tables on the broken text, were proposed in a review and are not built.
 - **The test split, the held-out kinds and the held-out template** were never scored by anything here.
 - **`bun run check` of the repo does not type-check this folder.** `lab/recovery-parser/tsconfig.json` includes only its own files, so `bunx tsc -p lab/recovery-parser/learn` has to be run by hand.

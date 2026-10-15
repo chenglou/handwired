@@ -275,6 +275,9 @@ export function sharpnessOf(model: TwinModel, mixes: CellArrays) {
 // SharedArrayBuffers, so that worker threads read the same memory.
 export type TwinData = {
   sampleCount: number
+  // The number of classes of the tables that the samples were packed for, see packForTwin. A twin of tables with
+  // other classes would read other cells.
+  classCount: number
   // The sample's index in the dataset, e.g. for the random draws of one sample.
   index: Int32Array
   // The code points of sample s are the entries start[s] to start[s + 1] - 1 of the arrays per code point.
@@ -799,6 +802,7 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   // `end` given, e.g. 513 for the positions after the text too. Adds the sample's loss to `tally`, and with
   // `gradients`, the gradients of the loss by the cells' mixes to it. Neither is divided by the number of code points.
   function runSample(data: TwinData, place: number, options: LossOptions, tally: LossTally, gradients?: CellArrays, end?: number) {
+    if (data.classCount !== classCount) throw new Error(`the samples were packed for tables with ${data.classCount} classes, and the twin's tables have ${classCount}: give packForTwin the twin's tables`)
     const start = data.start[place]!
     const length = data.start[place + 1]! - start
     const first = data.firstError[place]!
