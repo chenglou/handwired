@@ -27,7 +27,7 @@ import {kinds} from './damage.ts'
 import {applyEdits, mergeEdits} from './edits.ts'
 import {kindLetters, labelsOfValidText} from './labels.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, labelsOf, sampleAt, scoredCodePoints, typingReplayOf} from './samples.ts'
+import {type Sample, defaultSeed, groupOf, labelsOf, limitsFor, sampleAt, scoredCodePoints, typingReplayOf} from './samples.ts'
 import {containerNames, runTableParser} from './table-parser.ts'
 
 // One column per code point: characters that would break the columns are shown as another character.
@@ -89,8 +89,16 @@ function headerOf(sample: Sample) {
   if (sample.needsRules.length > 0) header.push(`    needs the rule: ${sample.needsRules.join('; ')}`)
   if (sample.needsClass.length > 0) header.push(`    needs a character class the highlighter lacks: ${sample.needsClass.join(', ')}`)
   const group = groupOf(sample)
-  const also = [...(sample.needsNestingFix && group !== 'needs a nesting fix' ? ['needs a nesting fix'] : []), ...(sample.needsDisplayFix && group !== 'needs a display cell' ? ['needs a display cell'] : [])]
+  const also = [...(sample.needsNestingFix && group !== 'needs a nesting fix' ? ['needs a nesting fix'] : []), ...(sample.needsDisplayFix && group !== 'needs a display fix' ? ['needs a display fix'] : [])]
   header.push(`    group: ${group}${also.length > 0 ? ` (also: ${also.join(', ')})` : ''}${sample.debatable ? ', another repair is sensible' : ''}`)
+  // Where the highlighter's loop comes to its limit: the first code point whose scored value cannot be right together
+  // with those before it, with the code points before it for finding the place in the text.
+  if (sample.needsNestingFix || sample.needsDisplayFix) {
+    const limits = limitsFor(sample)
+    const codePoints = Array.from(sample.broken)
+    const place = (position: number) => `at ${position}, the ${JSON.stringify(visible(codePoints[position]!))} after ${JSON.stringify(visible(codePoints.slice(Math.max(0, position - 10), position).join('')))}`
+    header.push(`    out of the loop's reach: ${[...(limits.nestingStopsAt === -1 ? [] : [`the depth or the container ${place(limits.nestingStopsAt)}`]), ...(limits.displayStopsAt === -1 ? [] : [`the display kind ${place(limits.displayStopsAt)}`])].join('; ')}`)
+  }
   header.push(`    first damage at ${sample.firstDamage}, first error now at ${sample.firstErrorPosition} (${errorKinds[sample.firstErrorKind]}), ${scoredCodePoints(sample)} scored code points from the first error on${sample.documents.length > 1 ? `, ${sample.documents.length} documents` : ''}`)
   return header
 }

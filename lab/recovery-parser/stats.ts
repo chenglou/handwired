@@ -8,7 +8,8 @@ import {displayKind} from '../../src/json-search/highlighter/kinds.ts'
 import {contradictions, families, kinds, recipeNames} from './damage.ts'
 import {type HandRule, handRuleTables, handRules} from './hand-rules.ts'
 import {type Label, tokenSequenceOf} from './labels.ts'
-import {type Sample, defaultSeed, groupOf, groups, heldOutKinds, heldOutTemplate, labelsOf, sampleAt, sources, splits} from './samples.ts'
+import {cellsThatValidJsonReads} from './limits.ts'
+import {type Sample, defaultSeed, groupOf, groups, heldOutKinds, heldOutTemplate, labelsOf, mostRightFor, sampleAt, sources, splits} from './samples.ts'
 import {
   type ParserTables, type ParserTrace, classNames, containerNames, contextNames, defaultTables, eventNames, grammarCellName, grammarStateNames, isLexerErrorEvent,
   lexerCellName, lexerStateNames, positionCount, runTableParser, tokenNames,
@@ -82,8 +83,13 @@ type Score = {
   wholeRight: number, shareSum: number
 }
 const emptyScore = (): Score => ({scored: 0, right: 0, kindScored: 0, kindRight: 0, nestingScored: 0, depthRight: 0, containerRight: 0, stringScored: 0, stringRight: 0, wholeRight: 0, shareSum: 0})
-type Row = {samples: number, nothingToRecover: number, scores: Record<Reader, Score>}
-const emptyRow = (): Row => ({samples: 0, nothingToRecover: 0, scores: {now: emptyScore(), stay: emptyScore(), resync: emptyScore()}})
+// What two arms of the experiment can have right at most in a sample: the code points, and whether the whole sample.
+// `grammar` is for an arm that changes only cells of the grammar table, `tokenizer` for an arm that also changes cells
+// of the tokenizer's table, see `boundsOf`.
+type Bounds = {grammarRight: number, grammarWhole: number, tokenizerRight: number, tokenizerWhole: number, notExact: number}
+const emptyBounds = (): Bounds => ({grammarRight: 0, grammarWhole: 0, tokenizerRight: 0, tokenizerWhole: 0, notExact: 0})
+type Row = {samples: number, nothingToRecover: number, scores: Record<Reader, Score>, bounds: Bounds}
+const emptyRow = (): Row => ({samples: 0, nothingToRecover: 0, scores: {now: emptyScore(), stay: emptyScore(), resync: emptyScore()}, bounds: emptyBounds()})
 
 // One sample's numbers for one reader, to be added to every row that the sample belongs to.
 function scoreOf(sample: Sample, labels: readonly (Label | undefined)[], trace: ParserTrace): Score {
@@ -116,7 +122,7 @@ function scoreOf(sample: Sample, labels: readonly (Label | undefined)[], trace: 
   }
   return score
 }
-function addScores(row: Row, sampleScores: Record<Reader, Score>) {
+function addScores(row: Row, sampleScores: Record<Reader, Score>, sampleBounds: Bounds) {
   row.samples++
   if (sampleScores.now.scored === 0) row.nothingToRecover++
   for (const reader of readers) {
@@ -124,6 +130,7 @@ function addScores(row: Row, sampleScores: Record<Reader, Score>) {
     const one = sampleScores[reader]
     for (const key of Object.keys(total) as (keyof Score)[]) total[key] += one[key]
   }
+  for (const key of Object.keys(row.bounds) as (keyof Bounds)[]) row.bounds[key] += sampleBounds[key]
 }
 const scoreHeader = `${'samples'.padStart(7)} ${'nothing'.padStart(7)}   ${readers.map(reader => `${reader.padStart(6)} ${'whole'.padStart(5)}`).join('   ')}   ${'mean'.padStart(5)}`
 const scoreLine = (row: Row) => {
@@ -144,6 +151,32 @@ function grammarOnlyCanBeRight(label: Label, trace: ParserTrace, position: numbe
   if (label.depth !== undefined && (label.depth !== trace.depthAfter[position] || label.container !== trace.containerAfter[position])) return false
   if (label.kind === undefined || label.kind === trace.displayKind[position]) return true
   return stringEvents.has(trace.event[position]!) && (label.kind === displayKind.key || label.kind === displayKind.string)
+}
+
+// The two bounds of one sample. For the first arm every counted code point is looked at alone. For the second arm
+// limits.ts looks for the one run of the loop that has the most counted code points right, under its conditions.
+function boundsOf(sample: Sample, labels: readonly (Label | undefined)[], trace: ParserTrace): Bounds {
+  let counted = 0
+  let grammarRight = 0
+  for (let position = sample.firstErrorPosition; position < labels.length; position++) {
+    const label = labels[position]
+    if (label === undefined || (label.kind === undefined && label.depth === undefined)) continue
+    counted++
+    if (grammarOnlyCanBeRight(label, trace, position)) grammarRight++
+  }
+  const most = mostRightFor(sample, labels)
+  if (most.counted !== counted) throw new Error(`stats.ts and limits.ts count other code points in the sample ${sample.id}`)
+  if (most.right < grammarRight) throw new Error(`the bound of the second arm is below the bound of the first in the sample ${sample.id}`)
+  return {
+    grammarRight, grammarWhole: Number(counted > 0 && grammarRight === counted), tokenizerRight: most.right, tokenizerWhole: Number(counted > 0 && most.right === counted),
+    notExact: Number(!most.exact),
+  }
+}
+const boundHeader = `${'points'.padStart(6)} ${'whole'.padStart(5)}   ${'points'.padStart(6)} ${'whole'.padStart(5)}`
+const boundLine = (row: Row) => {
+  const withSomething = row.samples - row.nothingToRecover
+  const scored = row.scores.now.scored
+  return `${percent(row.bounds.grammarRight, scored).padStart(6)} ${percent(row.bounds.grammarWhole, withSomething)}   ${percent(row.bounds.tokenizerRight, scored).padStart(6)} ${percent(row.bounds.tokenizerWhole, withSomething)}`
 }
 
 function histogram(values: readonly number[], bucketSize: number, buckets: number) {
@@ -218,9 +251,6 @@ export function report(seed: number, sampleCount: number): string {
   const containerLabels = [0, 0, 0]
   const containerRightNow = [0, 0, 0]
   const depthLabels = new Map<number, number>()
-  let grammarOnlyBound = 0
-  let grammarOnlyBoundInReach = 0
-  let scoredInReach = 0
   let shownAsErrorByTokenizer = 0
 
   for (let index = 0; index < sampleCount; index++) {
@@ -286,10 +316,14 @@ export function report(seed: number, sampleCount: number): string {
     const traces = {now: runTableParser(sample.broken), stay: runTableParser(sample.broken, readerTables.stay), resync: runTableParser(sample.broken, readerTables.resync)}
     const trace = traces.now
     const sampleScores = {now: scoreOf(sample, labels, traces.now), stay: scoreOf(sample, labels, traces.stay), resync: scoreOf(sample, labels, traces.resync)}
+    const sampleBounds = boundsOf(sample, labels, trace)
+    for (const rule of handRules) {
+      if (sampleScores[rule].right > sampleBounds.tokenizerRight) throw new Error(`the hand rule ${rule} has more code points right than the bound of the second arm in the sample ${sample.id}`)
+    }
     const addTo = (map: Map<string, Row>, key: string) => {
       let row = map.get(key)
       if (row === undefined) map.set(key, row = emptyRow())
-      addScores(row, sampleScores)
+      addScores(row, sampleScores, sampleBounds)
     }
     for (const kind of sample.kinds) addTo(rowsByKind, kind)
     if (sample.kinds.length === 1) addTo(rowsByKindAlone, sample.kinds[0]!)
@@ -320,12 +354,6 @@ export function report(seed: number, sampleCount: number): string {
         containerLabels[label.container]!++
         if (label.container === trace.containerAfter[position]) containerRightNow[label.container]!++
         depthLabels.set(label.depth!, (depthLabels.get(label.depth!) ?? 0) + 1)
-      }
-      const canBeRight = grammarOnlyCanBeRight(label, trace, position)
-      if (canBeRight) grammarOnlyBound++
-      if (group === 'within reach of the tables') {
-        scoredInReach++
-        if (canBeRight) grammarOnlyBoundInReach++
       }
       if (trace.displayKind[position] === displayKind.error) shownAsErrorByTokenizer++
     }
@@ -366,7 +394,7 @@ export function report(seed: number, sampleCount: number): string {
   }
   table('Broken samples per reachable flag', byReachable, damagedSamples, ['yes', 'line rule', 'no'])
   table('Broken samples per group, see `groups` in samples.ts: the first group in this order that fits', byGroup, damagedSamples, groups)
-  lines.push(`  ${needsNestingFix} (${percent(needsNestingFix, damagedSamples).trim()}%) need a nesting fix, ${needsClass} (${percent(needsClass, damagedSamples).trim()}%) a character class, ${needsDisplayFix} (${percent(needsDisplayFix, damagedSamples).trim()}%) a display cell, whatever their group.`)
+  lines.push(`  ${needsNestingFix} (${percent(needsNestingFix, damagedSamples).trim()}%) need a nesting fix, ${needsClass} (${percent(needsClass, damagedSamples).trim()}%) a character class, ${needsDisplayFix} (${percent(needsDisplayFix, damagedSamples).trim()}%) a display fix, whatever their group.`)
   lines.push(`  ${debatable} (${percent(debatable, damagedSamples).trim()}%) have another sensible repair. ${unscoredKinds} kept code points have a display kind that is not scored, ${unscoredNesting} a depth and a container that are not scored.`)
   table('What the samples that need a character class need', byClass, damagedSamples)
   lines.push('', 'Rules that exclude each other: the samples that need each side. No single parser labels the samples of both sides right.')
@@ -421,11 +449,29 @@ export function report(seed: number, sampleCount: number): string {
   lines.push(`  container: the labels are ${containerNames.map((name, container) => `${name} ${percent(containerLabels[container]!, totalContainer).trim()}%`).join(', ')}. The parser as it is has ${containerNames.map((name, container) => `${percent(containerRightNow[container]!, containerLabels[container]!).trim()}% of the ${name} labels`).join(', ')} right, ${percent(nowScore.containerRight, nowScore.nestingScored).trim()}% in all.`)
   const depthShares = [...depthLabels].sort((left, right) => right[1] - left[1])
   lines.push(`  depth: the most frequent labels are ${depthShares.slice(0, 4).map(([depth, labels]) => `${depth} with ${percent(labels, totalContainer).trim()}%`).join(', ')}. The parser as it is has ${percent(nowScore.depthRight, nowScore.nestingScored).trim()}% right.`)
-  lines.push('', 'What the first arm can reach at most. It changes only cells of the grammar table. The depth and the container are sums over the')
-  lines.push('tokenizer\'s events, which no grammar cell feeds, so they stay what the parser as it is gives, and a display kind can only change')
-  lines.push('between key and string on a code point of a string.')
-  lines.push(`  every broken sample: at most ${percent(grammarOnlyBound, nowScore.scored).trim()}% of the code points can have every scored value right (now ${percent(nowScore.right, nowScore.scored).trim()}%). The tokenizer as it is shows ${percent(shownAsErrorByTokenizer, nowScore.scored).trim()}% as an error.`)
-  lines.push(`  group within reach of the tables: at most ${percent(grammarOnlyBoundInReach, scoredInReach).trim()}%.`)
+  const read = cellsThatValidJsonReads()
+  const readCount = (cells: Uint8Array) => cells.reduce((total, flag) => total + flag, 0)
+  lines.push('', 'What two arms of the experiment can reach at most. Both run the loop of table-parser.ts and keep every cell that valid JSON')
+  lines.push(`reads: ${readCount(read.tokenizer)} of the tokenizer's ${read.tokenizer.length} cells and ${readCount(read.grammar)} of the grammar's ${read.grammar.length}.`)
+  lines.push('  grammar    An arm that changes only the other cells of the grammar table. The depth and the container are sums over the tokenizer\'s')
+  lines.push('             events, which no grammar cell feeds, so they stay what the parser as it is gives, and a display kind can only change between')
+  lines.push('             key and string on a code point of a string. The bound holds for every such table, with or without more grammar states.')
+  lines.push('  tokenizer  An arm that also changes the other cells of the tokenizer\'s table, with or without more states. The classes, the events')
+  lines.push('             and the display table are as they are. The bound holds for tables that keep the two conditions of limits.ts: an event of')
+  lines.push('             a bracket, a colon or a comma is only given to its own character, and after a code point that is shown as white space or')
+  lines.push('             punctuation the tokenizer is in the state between. Both hand rules keep them. Without them nothing can be ruled out.')
+  lines.push('Both are upper bounds and no estimates: a code point counts when some run of the loop has it right, whether or not one table gives')
+  lines.push('that run in every sample, and whether or not the grammar can tell a key from a string there. For the second arm the bound is 100% in')
+  lines.push('the group within reach by the group\'s definition, since needsNestingFix and needsDisplayFix are true exactly when it is below 100%.')
+  lines.push('Columns: per arm the percentage of code points that can have every scored value right, and the percentage of samples with something')
+  lines.push('to recover that can be right as a whole.')
+  lines.push('', `  ${'grammar'.padStart(12)}   ${'tokenizer'.padStart(12)}`, `  ${boundHeader}  group`)
+  for (const key of ['every broken sample', ...groups.map(group => `group: ${group}`), 'layout: one line', 'layout: several lines']) {
+    const row = rowsByGroup.get(key)
+    if (row !== undefined) lines.push(`  ${boundLine(row)}  ${key}`)
+  }
+  lines.push(`  The parser as it is has ${percent(nowScore.right, nowScore.scored).trim()}% of the code points right and shows ${percent(shownAsErrorByTokenizer, nowScore.scored).trim()}% as an error. In ${everySample.bounds.notExact} samples the search for the second arm's best run`)
+  lines.push('  was cut short, and their bound is then higher than the best run.')
 
   const leftAbove = (row: Row) => {
     const best = Math.max(...handRules.map((rule: HandRule) => row.scores[rule].scored === 0 ? 0 : row.scores[rule].right / row.scores[rule].scored))

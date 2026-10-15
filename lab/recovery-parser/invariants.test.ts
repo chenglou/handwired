@@ -1,18 +1,19 @@
 // The invariants of the dataset, on a few thousand samples, and the table parser against the reference highlighter.
 // Run from the repo root: bun test lab/recovery-parser
 import {expect, test} from 'bun:test'
-import {maximumDepth} from '../../src/json-search/highlighter/kinds.ts'
+import {displayKind, maximumDepth} from '../../src/json-search/highlighter/kinds.ts'
 import {createCorpus} from '../../tests/json-search/highlighter/corpus.ts'
 import {highlightReference} from '../../tests/json-search/highlighter/reference.ts'
 import {sampleProblems} from './check-samples.ts'
 import {tableParserDifference} from './check-table-parser.ts'
 import {contradictions, kinds} from './damage.ts'
-import {applyEdits, canonicalEdits} from './edits.ts'
+import {type Edit, applyEdits, canonicalEdits, insertAt, removeRange, replaceOneForOne} from './edits.ts'
 import {handRuleTables, handRules} from './hand-rules.ts'
 import {labelsOfValidText, tokenSequenceOf} from './labels.ts'
+import {assumptionProblems, cellsThatValidJsonReads, limitsOf} from './limits.ts'
 import {createRandom} from './random.ts'
-import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, sampleAt, splitOf, typingReplayOf} from './samples.ts'
-import {capacity, defaultTables, isLexerErrorEvent, runTableParser} from './table-parser.ts'
+import {type Sample, defaultSeed, groupOf, heldOutKinds, heldOutTemplate, labelsOf, limitsFor, mostRightFor, sampleAt, scoredCodePoints, splitOf, typingReplayOf} from './samples.ts'
+import {capacity, classNames, defaultTables, eventNames, lexerStateNames, runTableParser} from './table-parser.ts'
 
 const sampleCount = 3000
 const samples: Sample[] = Array.from({length: sampleCount}, (_, index) => sampleAt(defaultSeed, index))
@@ -164,28 +165,126 @@ test('a second derivation that shares no code with the dataset agrees on every s
   }
 })
 
-test('the fields about what the tables can reach say what their definitions say', () => {
+// The labels of a broken text made by hand, for the tests of limits.ts: every label is scored, apart from the depth
+// and the container of the listed code points of the original.
+function limitsOfText(original: string, edits: Edit[], unscoredNesting: number[] = []) {
+  const originalCodePoints = Array.from(original)
+  const applied = applyEdits(originalCodePoints, edits)
+  const valid = labelsOfValidText(original)
+  const labels = applied.alignment.map(index => {
+    if (index === -1) return undefined
+    const scored = !unscoredNesting.includes(index)
+    return {kind: valid[index]!.kind, depth: scored ? valid[index]!.depth : undefined, container: scored ? valid[index]!.container : undefined}
+  })
+  const limits = limitsOf(Array.from(applied.broken), labels, originalCodePoints, applied.alignment, applied.replaced, runTableParser(applied.broken).firstErrorPosition)
+  return {...limits, broken: applied.broken}
+}
+
+test('the fields about what the loop can give say what limits.ts proves, on texts made by hand', () => {
+  // A key without quotes that starts with n, after an error: the n is read as the start of null.
+  const keys = limitsOfText('{"port": 1, "name": 2}', [removeRange(1, 2), removeRange(6, 7), removeRange(12, 13), removeRange(17, 18)])
+  expect(keys.broken).toBe('{port: 1, name: 2}')
+  expect([keys.needsDisplayFix, keys.displayStopsAt, keys.needsNestingFix]).toEqual([true, 10, false])
+  // The same with keys that start with other letters.
+  expect(limitsOfText('{"port": 1, "host": 2}', [removeRange(1, 2), removeRange(6, 7), removeRange(12, 13), removeRange(17, 18)])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // A closer that must close two containers after a comment. The line feed before it has no scored depth, and it
+  // cannot take the second step: only a bracket moves the depth.
+  const twoContainers = limitsOfText('{"a": ["x"]\n}', [insertAt(10, ' // note'), removeRange(10, 11)], [11])
+  expect(twoContainers.broken).toBe('{"a": ["x" // note\n}')
+  expect([twoContainers.needsNestingFix, twoContainers.nestingStopsAt]).toEqual([true, 19])
+  // A closer too many after an error: the loop reads it from the state between and lowers the depth.
+  const stray = limitsOfText('{"a": 1,\n"b": 2}', [insertAt(0, '\ufeff'), insertAt(9, '},\n')])
+  expect(stray.broken).toBe('\ufeff{"a": 1,\n},\n"b": 2}')
+  expect(stray.needsNestingFix).toBe(true)
+  // A closer of the other kind after an error: the depth is right, and the kind of the container around it is not.
+  const otherKind = limitsOfText('[{"a": [1]}, 2]', [insertAt(0, '\ufeff'), replaceOneForOne(9, '}')])
+  expect(otherKind.broken).toBe('\ufeff[{"a": [1}}, 2]')
+  expect(otherKind.needsNestingFix).toBe(true)
+  // A color code: its [ comes after a character that valid JSON never has, so the tables can skip it.
+  expect(limitsOfText('{"ok": true}', [insertAt(0, '\u001b[32m'), insertAt(12, '\u001b[0m')])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // {{id}} opens two braces and closes two.
+  expect(limitsOfText('{"a": 1, "b": 2}', [{at: 6, remove: 1, insert: '{{id}}'}])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+  // A second quote after a closing quote opens a string, which takes the comma after it.
+  const doubled = limitsOfText('{"a": "x", "b": 1}', [insertAt(9, '"')])
+  expect(doubled.broken).toBe('{"a": "x"", "b": 1}')
+  expect([doubled.needsDisplayFix, doubled.displayStopsAt]).toEqual([true, 10])
+  // A missing comma and a comment: nothing is out of reach.
+  expect(limitsOfText('{"a": 1,\n"b": 2}', [removeRange(7, 8), insertAt(8, '// b\n')])).toMatchObject({needsDisplayFix: false, needsNestingFix: false})
+})
+
+test('the fields about what the loop can give agree with the most that a run can have right, and no hand rule passes that', () => {
+  const read = cellsThatValidJsonReads()
+  expect(read.tokenizer.reduce((total, flag) => total + flag, 0)).toBe(148)
+  expect(read.grammar.reduce((total, flag) => total + flag, 0)).toBe(88)
+  const ruleTables = handRules.map(rule => handRuleTables(rule))
   let flagged = 0
+  let lost = 0
   for (const sample of samples) {
     if (sample.source === 'valid') continue
     const labels = labelsOf(sample)
     const trace = runTableParser(sample.broken)
-    let tokenizerError = 0
-    while (tokenizerError < trace.length && !isLexerErrorEvent(trace.event[tokenizerError]!)) tokenizerError++
-    // Up to the first tokenizer error, the depth and the container of every table arm are those of the parser as it
-    // is. A sample without the flag has no scored label there that differs.
-    let nestingDiffers = false
-    for (let position = 0; position < Math.min(tokenizerError, labels.length); position++) {
+    // Up to the first cell that valid JSON never reads, every event is the one of the parser as it is, so the depth,
+    // the container and the display kind are too, apart from key against string. A sample that has a scored label there
+    // which differs says so in its fields. This is a part of what limits.ts proves, derived here from the trace.
+    let differs: 'nesting' | 'display' | undefined
+    for (let position = 0; position < trace.length; position++) {
+      if (read.tokenizer[trace.lexerStateBefore[position]! * defaultTables.classCount + trace.characterClass[position]!] !== 1) break
       const label = labels[position]
-      if (label !== undefined && label.depth !== undefined && (label.depth !== trace.depthAfter[position] || label.container !== trace.containerAfter[position])) nestingDiffers = true
+      if (label === undefined) continue
+      if (label.depth !== undefined && (label.depth !== trace.depthAfter[position] || label.container !== trace.containerAfter[position])) differs ??= 'nesting'
+      const shown = trace.displayKind[position]!
+      const isString = shown === displayKind.string || shown === displayKind.key
+      if (label.kind !== undefined && (isString ? label.kind !== displayKind.string && label.kind !== displayKind.key : label.kind !== shown)) differs ??= 'display'
     }
-    if (nestingDiffers && !sample.needsNestingFix) fail(sample, 'a scored depth or container differs from the tokenizer\'s running totals, and the sample does not say that it needs a nesting fix')
+    if (differs === 'nesting' && !sample.needsNestingFix) fail(sample, 'a scored depth or container differs from the running totals before any cell that valid JSON never reads, and the sample does not say that it needs a nesting fix')
+    if (differs === 'display' && !sample.needsDisplayFix) fail(sample, 'a scored display kind differs from the event\'s kind before any cell that valid JSON never reads, and the sample does not say that it needs a display fix')
+    expect(limitsFor(sample, labels)).toMatchObject({needsNestingFix: sample.needsNestingFix, needsDisplayFix: sample.needsDisplayFix})
+    // The fields are true exactly when no run of the loop has every counted code point right.
+    const most = mostRightFor(sample, labels)
+    const counted = scoredCodePoints(sample, labels)
+    expect(most.counted).toBe(counted)
+    if (most.exact && (most.right < counted) !== (sample.needsNestingFix || sample.needsDisplayFix)) fail(sample, `the fields say ${sample.needsNestingFix || sample.needsDisplayFix ? 'out of reach' : 'nothing'}, and the most that a run has right is ${most.right} of ${counted}`)
     if (sample.needsNestingFix || sample.needsDisplayFix) flagged++
+    lost += counted - most.right
+    // The two hand rules keep the conditions, so neither has more code points right than the most.
+    for (const [index, ruleTable] of ruleTables.entries()) {
+      const ruleTrace = runTableParser(sample.broken, ruleTable)
+      let right = 0
+      for (let position = sample.firstErrorPosition; position < labels.length; position++) {
+        const label = labels[position]
+        if (label === undefined || (label.kind === undefined && label.depth === undefined)) continue
+        if ((label.kind === undefined || label.kind === ruleTrace.displayKind[position]) && (label.depth === undefined || (label.depth === ruleTrace.depthAfter[position] && label.container === ruleTrace.containerAfter[position]))) right++
+      }
+      if (right > most.right) fail(sample, `the hand rule ${handRules[index]} has ${right} code points right, more than the most that limits.ts allows, ${most.right}`)
+    }
     if (groupOf(sample) === 'within reach of the tables' && (sample.reachable !== 'yes' || sample.needsNestingFix || sample.needsDisplayFix || sample.needsClass.length > 0)) fail(sample, 'the group does not fit the flags')
     // A sample whose kinds need both rules of a pair that exclude each other has the flag 'no'.
     if (contradictions.some(([left, right]) => sample.needsRules.includes(left) && sample.needsRules.includes(right)) && sample.reachable !== 'no') fail(sample, 'the sample needs two rules that exclude each other and is not flagged no')
   }
-  expect(flagged).toBeGreaterThan(0)
+  expect(flagged).toBeGreaterThan(50)
+  expect(lost).toBeGreaterThan(1000)
+})
+
+test('the tables as they are and the two hand rules keep the conditions under which the limits hold, and changed tables are noticed', () => {
+  expect(assumptionProblems(defaultTables)).toEqual([])
+  for (const rule of handRules) expect(assumptionProblems(handRuleTables(rule))).toEqual([])
+  const cellOf = (state: string, characterClass: string) => lexerStateNames.indexOf(state as typeof lexerStateNames[number]) * defaultTables.classCount + classNames.indexOf(characterClass as typeof classNames[number])
+  const eventNamed = (name: typeof eventNames[number]) => eventNames.indexOf(name)
+  const withCell = (cell: number, event: number, next: string) => {
+    const lexerEvent = [...defaultTables.lexerEvent]
+    const lexerNext = [...defaultTables.lexerNext]
+    lexerEvent[cell] = event
+    lexerNext[cell] = lexerStateNames.indexOf(next as typeof lexerStateNames[number])
+    return {...defaultTables, lexerEvent, lexerNext}
+  }
+  // A cell that valid JSON reads is changed: the n between two tokens no longer starts a literal.
+  expect(assumptionProblems(withCell(cellOf('between', 'n'), eventNamed('stringStart'), 'string')).length).toBe(1)
+  // A closing event on a letter.
+  expect(assumptionProblems(withCell(cellOf('between', 'other'), eventNamed('closeObject'), 'between')).length).toBe(1)
+  // White space that leaves the tokenizer in another state than between.
+  expect(assumptionProblems(withCell(cellOf('tru', 'space'), eventNamed('whitespace'), 'errorLine')).length).toBe(1)
+  // A cell that valid JSON never reads may hold an event that is shown as a string, with any next state.
+  expect(assumptionProblems(withCell(cellOf('between', 'other'), eventNamed('stringContent'), 'errorLine'))).toEqual([])
 })
 
 test('the two hand-written settings of the tables read valid documents exactly as the tables as they are', () => {

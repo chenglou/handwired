@@ -113,6 +113,9 @@ function openStringMidLine(random: Random, scanned: Scan): Damage | undefined {
   return {
     edits: [removeRange(cut, key.end)], form: 'a key without its closing quote, its colon and value stay, and no quote or bracket follows on the line',
     reachable: 'line rule', needsRules: nextIsKey ? [endsAtLineFeed, nextKey] : [endsAtLineFeed],
+    // The colon, the value and the comma are inside the open string for every reader. When this damage is the text's
+    // first error, samples.ts finds that by itself, and when another damage comes before it, only this list says so.
+    unscoredKinds: Array.from({length: lineEndsAt - key.end}, (_, offset) => key.end + offset),
   }
 }
 
@@ -217,7 +220,7 @@ export const halfTypedKinds: KindDefinition[] = [
   {
     name: 'openStringMidLine', family: 'half typed', origin: 'file', weight: 1.6,
     example: '{"email": "ada@example.com, "role": "admin"}',
-    reachable: 'no: the open string ends at the next quote, which opens the next string in the original, and every later quote is read in the opposite role. line rule for a key without its closing quote when no quote follows on its line: the string then ends at the line feed',
+    reachable: 'no: the open string ends at the next quote, which opens the next string in the original, and every later quote is read in the opposite role. line rule for a key without its closing quote when no quote follows on its line: the string then ends at the line feed, and the display kind of what it took, the colon and the value, is not scored',
     apply: openStringMidLine,
   },
   {

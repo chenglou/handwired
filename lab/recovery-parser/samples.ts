@@ -11,7 +11,8 @@ import {type Edit, applyEdits, canonicalEdits, mergeEdits} from './edits.ts'
 import {type Label, type ValidLabel, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {type Random, createRandom, hashText} from './random.ts'
 import {scan} from './scan.ts'
-import {type ParserTrace, capacity, defaultTables, eventNames, isLexerErrorEvent, runTableParser} from './table-parser.ts'
+import {limitsOf, mostRightOf} from './limits.ts'
+import {type ParserTrace, capacity, runTableParser} from './table-parser.ts'
 import {type TypingReplay, type TypingStep, makeTypingReplay} from './typing.ts'
 
 export const defaultSeed = 20261015
@@ -84,11 +85,12 @@ export type Sample = {
   needsRules: Rule[]
   // What the tokenizer must tell apart and cannot with the highlighter's 33 character classes, e.g. the apostrophe as a quote.
   needsClass: string[]
-  // True when a scored depth or container cannot come out of the highlighter's loop, whatever its tables hold, e.g.
-  // the } of {"tags": ["ops", "beta"}, which must close two containers. See `nestingOutOfReach`.
+  // True when the scored depths and containers cannot all come out of the highlighter's loop, whatever the cells hold
+  // that valid JSON never reads, e.g. the } of {"tags": ["ops", "beta"}, which must close two containers, and a } too
+  // many, which the loop cannot skip. See limits.ts for the conditions and for what the field does not prove.
   needsNestingFix: boolean
-  // True when a scored display kind cannot come out of the loop as long as the display table is as it is, e.g. the n
-  // of the key in {name: "Ada"}, which the tokenizer reads as the start of null. See `displayOutOfReach`.
+  // True when the scored display kinds cannot all come out of the loop as long as the display table is as it is, e.g.
+  // the n of the key in {name: "Ada"}, which the tokenizer reads as the start of null. See limits.ts.
   needsDisplayFix: boolean
   // Whether another sensible repair would give other scored labels to kept code points.
   debatable: boolean
@@ -117,22 +119,6 @@ const parses = (text: string) => {
 }
 
 const punctuation = displayKind.punctuation
-const stringEvents = new Set(['stringStart', 'stringContent', 'stringEnd'].map(name => eventNames.indexOf(name as typeof eventNames[number])))
-// What the display table shows for an event that is not part of a string: the same in every grammar state.
-const displayOfEvent = eventNames.map((_, event) => defaultTables.display[event * defaultTables.grammarStateCount]!)
-for (let event = 0; event < eventNames.length; event++) {
-  if (stringEvents.has(event)) continue
-  for (let state = 0; state < defaultTables.grammarStateCount; state++) {
-    if (defaultTables.display[event * defaultTables.grammarStateCount + state] !== displayOfEvent[event]) throw new Error(`samples.ts expects the display kind of ${eventNames[event]} to be the same in every grammar state`)
-  }
-}
-
-// The position of the first tokenizer error of the parser as it is, or the text's length.
-function firstTokenizerError(trace: ParserTrace) {
-  let position = 0
-  while (position < trace.length && !isLexerErrorEvent(trace.event[position]!)) position++
-  return position
-}
 
 // The label values that are not scored, as indexes into the original. Three rules:
 // - What a kind of damage declares, e.g. the quote of "call "Ana" back" that lost its backslash.
@@ -168,46 +154,6 @@ function unscoredOf(original: readonly string[], labels: readonly ValidLabel[], 
   }
   const sorted = (set: Set<number>) => [...set].sort((left, right) => left - right)
   return {unscoredKinds: sorted(kinds), unscoredNesting: sorted(nesting)}
-}
-
-// Whether a scored depth or container is out of reach of the highlighter's loop with any tables that keep the cells
-// that valid input reaches. Two facts decide it:
-// - The depth and the container are running totals over the tokenizer's events, and up to the first tokenizer error
-//   every event comes from a cell that valid input reaches. So up to there they are what the parser as it is gives,
-//   whatever the grammar's cells hold.
-// - After that error the depth still changes by at most one per code point.
-// The test finds what these two facts rule out, e.g. a closer that must close two containers or none. It does not
-// find everything that the loop cannot do.
-function nestingOutOfReach(labels: readonly (Label | undefined)[], trace: ParserTrace, tokenizerError: number) {
-  for (let position = Math.max(0, trace.firstErrorPosition); position < Math.min(tokenizerError, labels.length); position++) {
-    const label = labels[position]
-    if (label === undefined || label.depth === undefined) continue
-    if (label.depth !== trace.depthAfter[position] || label.container !== trace.containerAfter[position]) return true
-  }
-  let lowest = tokenizerError === 0 ? 0 : trace.depthAfter[tokenizerError - 1]!
-  let highest = lowest
-  for (let position = tokenizerError; position < labels.length; position++) {
-    lowest--
-    highest++
-    const depth = labels[position]?.depth
-    if (depth === undefined) continue
-    if (depth < lowest || depth > highest) return true
-    lowest = highest = depth
-  }
-  return false
-}
-
-// Whether a scored display kind is out of reach of the loop as long as the display table is as it is: up to the first
-// tokenizer error the events are fixed, and the display table makes of an event the same kind in every grammar state,
-// except that a string's code points are a key or a string.
-function displayOutOfReach(labels: readonly (Label | undefined)[], trace: ParserTrace, tokenizerError: number) {
-  for (let position = Math.max(0, trace.firstErrorPosition); position < Math.min(tokenizerError, labels.length); position++) {
-    const kind = labels[position]?.kind
-    if (kind === undefined) continue
-    const event = trace.event[position]!
-    if (stringEvents.has(event) ? kind !== displayKind.key && kind !== displayKind.string : kind !== displayOfEvent[event]) return true
-  }
-  return false
 }
 
 type Draft = Omit<Sample, 'id' | 'split' | 'heldOut'>
@@ -266,12 +212,13 @@ function draftOf(parts: {
     const trace = runTableParser(applied.broken)
     if (trace.valid) return undefined
     for (let position = 0; position < trace.length; position++) if (trace.depthAfter[position]! > maximumDepth) return undefined
+    const brokenCodePoints = Array.from(applied.broken)
     const unscored = unscoredOf(originalCodePoints, labels, applied.alignment, firstDamage, trace, parts.unscoredKinds)
     const scored = applyUnscored(applied.alignment, labels, unscored.unscoredKinds, unscored.unscoredNesting)
-    const tokenizerError = firstTokenizerError(trace)
+    const limits = limitsOf(brokenCodePoints, scored, originalCodePoints, applied.alignment, applied.replaced, trace.firstErrorPosition)
     draft = {
       ...common, ...unscored, firstErrorPosition: trace.firstErrorPosition, firstErrorKind: trace.firstErrorKind,
-      needsNestingFix: nestingOutOfReach(scored, trace, tokenizerError), needsDisplayFix: displayOutOfReach(scored, trace, tokenizerError),
+      needsNestingFix: limits.needsNestingFix, needsDisplayFix: limits.needsDisplayFix,
     }
     // With no scored value from the first error on, nothing is left to recover, whatever the kind of damage: every
     // parser has the sample right, and it needs no rule and no class. E.g. {"a": {"b": 1, "c": 2} without the inner },
@@ -466,20 +413,36 @@ export function scoredCodePoints(sample: Sample, labels: readonly (Label | undef
   return count
 }
 
+// Where the limits of the highlighter's loop show in a sample, see Limits in limits.ts: the two fields again, and the
+// position of the first code point at which the scored labels can no longer all be right.
+export function limitsFor(sample: Sample, labels: readonly (Label | undefined)[] = labelsOf(sample)) {
+  return limitsOf(Array.from(sample.broken), labels, Array.from(sample.original), sample.alignment, sample.replaced, sample.firstErrorPosition)
+}
+
+// The most code points of a sample, of those that a score counts, that one run of the highlighter's loop can have
+// right when the cells that valid JSON never reads may hold anything, see limits.ts. An upper bound for tables that
+// keep the conditions there, and no estimate of what tables reach.
+export function mostRightFor(sample: Sample, labels: readonly (Label | undefined)[] = labelsOf(sample)) {
+  return mostRightOf(Array.from(sample.broken), labels, Array.from(sample.original), sample.alignment, sample.replaced, sample.firstErrorPosition)
+}
+
 // One group per broken sample, by what it takes to label it, so that every report splits the samples the same way.
-// The first group that fits, in this order:
+// The first group that fits, in this order. The README says next to its table of groups what each group assumes about
+// the parser.
 export const groups = [
-  // The flag is 'no'.
+  // The flag is 'no': a judgment about every parser that reads from left to right.
   'out of reach',
-  // A scored depth or container cannot come out of the highlighter's loop, see needsNestingFix.
+  // The scored depths and containers cannot all come out of the highlighter's loop, see needsNestingFix: a proof
+  // under the conditions of limits.ts.
   'needs a nesting fix',
-  // The tokenizer must tell characters apart that its classes lump together, see needsClass.
+  // The tokenizer must tell characters apart that its classes lump together, see needsClass: a judgment per form.
   'needs a character class',
-  // The flag is 'line rule'.
+  // The flag is 'line rule': a judgment.
   'needs a line rule',
-  // A scored display kind needs another display table, see needsDisplayFix.
-  'needs a display cell',
-  // None of the above: tables of the highlighter's own layout, with more states where needed, can label the sample.
+  // The scored display kinds cannot all come out of the loop, see needsDisplayFix: a proof, as for the nesting.
+  'needs a display fix',
+  // None of the above. Nothing is known that keeps tables of the highlighter's layout from labeling the sample, when
+  // the cells that valid JSON never reads may hold anything and the tables may have more states.
   'within reach of the tables',
 ] as const
 export type Group = typeof groups[number]
@@ -488,7 +451,7 @@ export function groupOf(sample: Sample): Group {
   if (sample.needsNestingFix) return 'needs a nesting fix'
   if (sample.needsClass.length > 0) return 'needs a character class'
   if (sample.reachable === 'line rule') return 'needs a line rule'
-  if (sample.needsDisplayFix) return 'needs a display cell'
+  if (sample.needsDisplayFix) return 'needs a display fix'
   return 'within reach of the tables'
 }
 
