@@ -10,7 +10,10 @@
 //
 // Where the broken text is the same whichever of two equal code points an edit touches, e.g. the `}}` that is left of
 // `}}}`, the edits say that the later one was removed, and that of `}}}}` for `}}}` the last one was added: see
-// canonicalEdits. So a code point of the broken text has the label of the earliest code point that it can stand for.
+// canonicalEdits. So next to one such edit, a kept code point has the label of the earlier of the two code points
+// that it can stand for. That is a rule for each edit alone: an edit moves as a whole and stops at the next edit, so
+// it is no rule for every way of pairing the two texts. E.g. when the line of an inner `}` is removed and the line of
+// the outer `}` follows, the `}` that is left is the outer one.
 
 export type Edit = {
   // An index into the original's code points.

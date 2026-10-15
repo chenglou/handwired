@@ -216,7 +216,7 @@ export const halfTypedKinds: KindDefinition[] = [
   {
     name: 'openStringAtLineEnd', family: 'half typed', origin: 'file', weight: 5,
     example: '{⏎  "name": "tiny-glob",⏎  "pri⏎}',
-    reachable: 'line rule: a JSON string holds no raw line feed, so "a string that is open at a line feed ends there" is sound. The display kind of a comma that ends up inside the open string is not scored',
+    reachable: 'line rule: a JSON string holds no raw line feed, so "a string that is open at a line feed ends there" is sound. The display kind of a comma that ends up inside the open string is not scored. In a file whose lines end with a carriage return and a line feed, the string must end at the carriage return, which the tables cannot tell from a tab',
     styles: [['indented', 80], ['tabbed', 20]],
     apply: openStringAtLineEnd,
   },
