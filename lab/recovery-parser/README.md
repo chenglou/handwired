@@ -53,7 +53,7 @@ The parser as it is does not recover on purpose, so nearly any change to its err
 
 | Reader | Code points with every scored value right | Samples right as a whole | The same two for the group "within reach of the tables" |
 | --- | --- | --- | --- |
-| the parser as it is | 41.3% | 10.5% | 50.5%, 15.5% |
+| the parser as it is | 41.2% | 10.5% | 50.4%, 15.5% |
 | `stay` | 72.6% | 28.4% | 81.5%, 40.9% |
 | `resync` | 82.5% | 69.4% | 94.7%, 88.7% |
 
@@ -206,7 +206,7 @@ What the proofs do not show is that a sample can be labeled. They let the tokeni
 | needs a character class | 7.6% | `needsClass` is not empty | A judgment per form: the form's rule must tell two characters apart that are in one class. With the classes as they are, tables still get a part of these samples right, e.g. a string in single quotes without a space |
 | needs a line rule | 8.9% | the flag is `line rule` | A judgment: a parser can label the sample when it ends a token at a line feed. Tables can hold such a rule, since the cell for a line feed inside a string is one that valid JSON never reads, and `resync` holds it. It excludes the rule that a line feed inside a string is content |
 | needs a display fix | 3.1% | `needsDisplayFix` | A proof, as for the nesting: with the display table as it is, the loop cannot show a scored code point as its label says. Most of these samples need one changed display cell, for the first letter of a key without quotes. A second quote after a closing quote needs more, a tokenizer state that the cells which valid JSON reads leave no room for |
-| within reach of the tables | 69.9% | none of the above | Nothing is known that keeps the loop from labeling the sample: the flag is `yes`, no form asks for a class, and some run of the loop has every scored label right when the cells that valid JSON never reads may hold anything. The tables may need more tokenizer states and grammar states than they have, e.g. a state inside a block comment, and nobody counted how many. It does not say that one setting of the tables labels every sample of the group: some rules exclude each other, see below, and `resync` has 88.7% of these samples right as a whole |
+| within reach of the tables | 70.0% | none of the above | Nothing is known that keeps the loop from labeling the sample: the flag is `yes`, no form asks for a class, and some run of the loop has every scored label right when the cells that valid JSON never reads may hold anything. The tables may need more tokenizer states and grammar states than they have, e.g. a state inside a block comment, and nobody counted how many. It does not say that one setting of the tables labels every sample of the group: some rules exclude each other, see below, and `resync` has 88.7% of these samples right as a whole |
 
 So a report on an arm should say what the arm is: which cells it may change, whether its tables have more states, whether its display table is changed, and whether its depth follows the tokenizer's events. An arm that changes only grammar cells cannot reach the 100% of the last group, see the bounds above.
 
@@ -218,8 +218,8 @@ Some rules behind a `yes` or a `line rule` contradict each other, so no single p
 
 | A rule | Samples | The rule that it excludes | Samples |
 | --- | --- | --- | --- |
-| a string that is open at a line feed ends there, e.g. after `"name": "tiny-gl` at the end of a line | 3,680 | a line feed inside a string is content, e.g. in a note of several lines that was pasted between quotes | 544 |
-| a string after a key is the next key, e.g. `"tar" "license": "MIT"`, where `"tar"` is half typed | 1,678 | a string after a key is that key's value, e.g. `"port" "8080"`, where the colon is missing | 122 |
+| a string that is open at a line feed ends there, e.g. after `"name": "tiny-gl` at the end of a line | 3,678 | a line feed inside a string is content, e.g. in a note of several lines that was pasted between quotes | 543 |
+| a string after a key is the next key, e.g. `"tar" "license": "MIT"`, where `"tar"` is half typed | 1,680 | a string after a key is that key's value, e.g. `"port" "8080"`, where the colon is missing | 122 |
 | a closer of the other kind closes one container, e.g. the first `}` of `[59.91, 10.75}}` | 214 | a closer of the other kind closes two containers, e.g. the `}` of `["ops", "beta"}` | 244 |
 | a comma after the top-level value is skipped, e.g. between the records of `{"id": 1}, {"id": 2}` | 77 | a comma after the top-level value opens the value again, e.g. after the first `}` of `{"name": "Ada"}, "active": true}` | 61 |
 

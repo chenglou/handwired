@@ -406,7 +406,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
         data: null,
         error: someKeys(random, {
           code: random.pick([400, 401, 404, 429, 500]), message: random.chance(0.5) ? logMessage(random) : freeText(random, random.integer(2, 8)),
-          details: random.pick<Json>([[], [issue()], [issue(), issue()], null]), requestId: hexId(random, 8), retryAfter: random.pick<Json>([null, 1, 30]), docs: 'https://example.com/docs/errors',
+          details: random.pick<Json>([[], [issue()], [issue(), issue()], null]), requestId: hexId(random, 8), retryAfter: random.pick<Json>([null, 1, 30]), docs: '/docs/errors',
         }, 2, size),
         ...(random.chance(0.3) ? {meta: {requestId: hexId(random, 8), durationMs: random.integer(1, 900)}} : {}),
       }
@@ -464,7 +464,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
         protocolVersion: '2025-06-18', capabilities: someKeys(random, {roots: {listChanged: random.chance(0.5)}, sampling: {}, elicitation: {}}, 0, size),
         clientInfo: someKeys(random, {name: random.pick(packageWords), version: version(random), title: random.pick(themes)}, 2, size),
       }, 1, size), 12],
-      [() => random.pick<Json>([{uri: 'file:///notes/today.md'}, {level: random.pick(levels)}, {requestId: random.integer(1, 999), reason: freeText(random, random.integer(2, 4))}]), 10],
+      [() => random.pick<Json>([{uri: 'notes/today.md'}, {level: random.pick(levels)}, {requestId: random.integer(1, 999), reason: freeText(random, random.integer(2, 4))}]), 10],
     ])()
     const roll = random.next()
     if (roll < 0.45) {
@@ -544,7 +544,7 @@ const builders: Record<Template, (random: Random, size: number) => Json> = {
     const entry = (): Json => someKeys(random, {
       version: version(random), resolved: `https://registry.example.com/${random.pick(packageWords)}/-/${random.pick(packageWords)}-${version(random)}.tgz`,
       integrity: `sha512-${hexId(random, 20)}==`, dev: true, optional: true, license: random.pick(licenses), dependencies: dependencies(random, random.integer(0, 2)), engines: {node: '>=18'},
-      bin: {[random.pick(packageWords)]: 'bin/cli.js'}, hasInstallScript: true, os: random.pick<Json>([['darwin'], ['darwin', 'linux']]), funding: {url: 'https://example.com/sponsor'},
+      bin: {[random.pick(packageWords)]: 'bin/cli.js'}, hasInstallScript: true, os: random.pick<Json>([['darwin'], ['darwin', 'linux']]), funding: {type: 'opencollective'},
     }, 2, size * 0.45)
     const root = someKeys(random, {
       name: packageName(), version: version(random), license: random.pick(licenses), dependencies: dependencies(random, 1 + Math.round(size * 2)),
