@@ -127,21 +127,29 @@ function rawLineFeedInString(random: Random, scanned: Scan, options: KindOptions
     // tabs to rawTabInString, which then takes those of every string.
     const alsoTabs = options.scope !== 'every' && random.chance(0.5)
     const edits: Edit[] = []
+    // A text that came from Windows has \r\n in its strings, e.g. "Dear {name},\r\n\r\nThank you.", and its carriage
+    // returns are raw too. The form text counts them apart from the line feeds.
+    let carriageReturns = 0
     let tabs = 0
     for (const {escapes} of changed) {
       for (const escape of escapes) {
         if (escape.character === 'n') edits.push({at: escape.at, remove: 2, insert: '\n'})
-        else if (escape.character === 'r') edits.push({at: escape.at, remove: 2, insert: '\r'})
-        else if (escape.character === 't' && alsoTabs) {
+        else if (escape.character === 'r') {
+          edits.push({at: escape.at, remove: 2, insert: '\r'})
+          carriageReturns++
+        } else if (escape.character === 't' && alsoTabs) {
           edits.push({at: escape.at, remove: 2, insert: '\t'})
           tabs++
         }
       }
     }
-    const lineFeeds = edits.length - tabs
+    const lineFeeds = edits.length - carriageReturns - tabs
+    const counted = (count: number, what: string) => count === 0 ? [] : [`${count} raw ${what}${count > 1 ? 's' : ''}`]
+    const raw = [...counted(lineFeeds, 'line feed'), ...counted(carriageReturns, 'carriage return'), ...counted(tabs, 'tab')]
     return {
       edits, reachable: 'yes', needsRules: ['a line feed inside a string is content'], ...(tabs > 0 ? {alsoKinds: ['rawTabInString']} : {}),
-      form: `${lineFeeds} raw line feed${lineFeeds > 1 ? 's' : ''}${tabs > 0 ? ` and ${tabs} raw tab${tabs > 1 ? 's' : ''}` : ''} for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
+      // E.g. "2 raw line feeds and 2 raw carriage returns", or "1 raw line feed, 1 raw carriage return and 2 raw tabs".
+      form: `${raw.length === 3 ? `${raw[0]}, ${raw[1]} and ${raw[2]}` : raw.join(' and ')} for the escapes of ${changed.length === 1 ? 'one string' : `${changed.length} strings`}`,
     }
   }
   if (long.length === 0) return undefined
