@@ -212,7 +212,7 @@ When the list of changes is not the damage that you made, look for an unintended
 - `blind.ts` writes the broken texts of all writers into part files, in a shuffled order and under ids that say nothing about the case.
 - Two repairers per part write repairs, by the rules of `REPAIR.md`. Their files go into `repairs/`.
 - `written.ts` reads `cases/` and `repairs/`. Per case it gives the opinions, i.e. your intended text and the repairs, the values of every code point by each opinion, and which code points are agreed, added by every opinion, or disputed. A value that the reading of one opinion does not score, by the rules of the `?` above, is no dispute with another opinion. `bun lab/recovery-parser/written/written.ts --disputed` prints every case with a disputed code point, opinion by opinion.
-- `left-out.txt` names the repairs that are left out of their case because they plainly break a rule of `REPAIR.md`. A line is the repair file without its ending, the id of the broken text, and the reason.
+- `left-out.txt` names the repairs that are left out of their case because they plainly break a rule of `REPAIR.md`. A line is the repair file without its ending, the id of the broken text, and the reason. A repair that reads the text in another way than the other opinions breaks no rule and stays, and its case is then disputed.
 - `no-label.txt` names text of a broken text that has no label, whatever the opinions make of it: `written.ts` takes it out before it holds the opinions against each other, so its code points are not scored and are no dispute. A line is the id of the case, the position of the text's first code point in the broken text, the reason, a colon and a space, and the text as a case file writes it, e.g. `⟦lf⟧` for a line feed. [Text without a label](#text-without-a-label) says what is on the list.
 - `score.ts` prints what today's highlighter and four hand-written settings of its tables get right on the set, and `scoreTables` scores any other tables.
 - `align.ts` pairs the code points of a broken text with those of a valid text, and `check-align.ts` measures it on generated samples whose changes are known: in 5,700 of them it finds the known pairing for 97.1% of the texts and for 99.96% of the code points. Taken as cases of this set, the same samples give today's highlighter and the four hand-written settings the scores that the samples' own values give, within 0.1 points per code point and about half a point per sample.
@@ -244,13 +244,13 @@ console.log(all.fullAgreement.right / all.fullAgreement.scored, all.fullAgreemen
 | --- | --- | --- | --- | --- | --- |
 | `documents-and-web.txt` | 40 | 37 | 3 | 3,772 | 3,613 |
 | `hand-editing.txt` | 40 | 37 | 3 | 2,661 | 2,483 |
-| `logs-and-transport.txt` | 40 | 38 | 2 | 3,563 | 3,339 |
+| `logs-and-transport.txt` | 40 | 37 | 3 | 3,563 | 3,288 |
 | `merges-and-tools.txt` | 40 | 36 | 4 | 3,142 | 2,852 |
 | `model-output.txt` | 40 | 38 | 2 | 3,547 | 3,498 |
 | `other-notations.txt` | 40 | 36 | 4 | 3,987 | 3,609 |
-| All | 240 | 222 | 18 | 20,672 | 19,394 |
+| All | 240 | 221 | 19 | 20,672 | 19,343 |
 
-The broken texts have 35,429 code points, and 27,048 of them stand from the first error of today's highlighter on. Of these, 20,672 are scored, 5,924 are added by every opinion, 224 have no label by the list of `no-label.txt`, and 228 are disputed. In 193 cases all opinions are the same text, and in 29 more they differ without a disputed code point from the first error on, e.g. a repair adds `null` where the writer knows the value that is missing, or the opinions differ only on text of the list.
+The broken texts have 35,429 code points, and 27,048 of them stand from the first error of today's highlighter on. Of these, 20,672 are scored, 5,922 are added by every opinion, 224 have no label by the list of `no-label.txt`, and 230 are disputed. In 192 cases all opinions are the same text, and in 29 more they differ without a disputed code point from the first error on, e.g. a repair adds `null` where the writer knows the value that is missing, or the opinions differ only on text of the list.
 
 7 cases have nothing to recover. A text that only stops early and a whole document with other text after it have no code point to score, as in the dataset, so the writers kept such cases few, and the set says nothing about them.
 
@@ -280,11 +280,11 @@ With the list, 5 cases that were disputed have full agreement, and 224 code poin
 
 | Cases | Count | Nothing to recover | Scored code points | `now` | `stay` | `resync` | `words` | `lines` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cases with full agreement | 222 | 6 | 19,394 | 22.0 / 2.3 | 50.4 / 18.1 | 62.6 / 44.9 | 75.6 / 49.5 | 76.1 / 50.0 |
+| Cases with full agreement | 221 | 6 | 19,343 | 22.0 / 2.3 | 50.4 / 18.1 | 62.5 / 45.1 | 75.6 / 49.8 | 76.1 / 50.2 |
 | All cases, the agreed code points | 240 | 7 | 20,672 | 21.4 / 2.6 | 50.5 / 18.9 | 62.7 / 45.1 | 76.5 / 50.2 | 76.9 / 50.6 |
 | `documents-and-web.txt`, full agreement | 37 | 1 | 3,613 | 15.3 / 0.0 | 56.5 / 16.7 | 78.5 / 63.9 | 89.0 / 66.7 | 89.0 / 66.7 |
 | `hand-editing.txt`, full agreement | 37 | 2 | 2,483 | 31.4 / 0.0 | 60.9 / 20.0 | 72.5 / 42.9 | 82.5 / 57.1 | 82.5 / 57.1 |
-| `logs-and-transport.txt`, full agreement | 38 | 3 | 3,339 | 20.5 / 2.9 | 40.1 / 8.6 | 51.3 / 37.1 | 56.4 / 40.0 | 56.4 / 40.0 |
+| `logs-and-transport.txt`, full agreement | 37 | 3 | 3,288 | 20.8 / 2.9 | 40.2 / 8.8 | 50.8 / 38.2 | 56.0 / 41.2 | 56.0 / 41.2 |
 | `merges-and-tools.txt`, full agreement | 36 | 0 | 2,852 | 18.8 / 2.8 | 49.1 / 25.0 | 54.8 / 50.0 | 73.5 / 55.6 | 73.5 / 55.6 |
 | `model-output.txt`, full agreement | 38 | 0 | 3,498 | 40.3 / 5.3 | 57.2 / 21.1 | 73.7 / 50.0 | 79.5 / 52.6 | 82.0 / 55.3 |
 | `other-notations.txt`, full agreement | 36 | 0 | 3,609 | 8.3 / 2.8 | 41.0 / 16.7 | 45.5 / 25.0 | 73.2 / 25.0 | 73.2 / 25.0 |
@@ -297,13 +297,13 @@ When the repairs came in, 27 cases had a disputed code point from the first erro
 
 | What the dispute is | Cases | What was done |
 | --- | --- | --- |
-| The opinions read the text differently | 18 | They stay disputed, with 228 code points |
+| The opinions read the text differently | 19 | They stay disputed, with 230 code points |
 | A placeholder stands where a value is meant, and the opinions keep it in different ways | 5 | The placeholders are on the list of `no-label.txt`, and the cases now have full agreement |
 | The tools gave the same reading other counterparts | 2 | The tools were changed, and both cases now have full agreement |
-| A repair is against a rule of `REPAIR.md` | 2 | The repair is left out, and both cases now have full agreement |
+| A repair is against a rule of `REPAIR.md` | 1 | The repair is left out, and the case now has full agreement |
 | The writer's intended text does not follow from the broken text by the damage alone | 0 | |
 
-The 18 cases that stay disputed, by what the opinions differ on:
+The 19 cases that stay disputed, by what the opinions differ on:
 
 | What the opinions differ on | Cases | Disputed code points |
 | --- | --- | --- |
@@ -311,17 +311,17 @@ The 18 cases that stay disputed, by what the opinions differ on:
 | A program changed a character inside a string on the way, e.g. two hyphens into a dash. One opinion puts the character back that was meant, and another keeps what stands there as the string's content | 7 | 25 |
 | Of two things in the text one is too many, e.g. the two sides of a merge conflict, and the opinions keep different ones | 3 | 142 |
 | The writer knows of content that the broken text lacks, and `REPAIR.md` tells a repairer not to invent it, e.g. the entry after the last comma of a text that is cut off | 2 | 3 |
-| The opinions mean the same document and keep other white space and another of two commas, where a wrapper that is removed runs over three lines and the rules do not say which white space goes with it | 1 | 17 |
+| The opinions mean the same document and keep other white space. In one case a wrapper that is removed runs over three lines, and the rules do not say which white space and which of two commas go with it. In the other the file's last line end stands between characters that a wrong encoding added, and one opinion keeps it as the file's own line end | 2 | 19 |
 
 - A value or a string: `documents-and-web-37`, `model-output-23`, `other-notations-08`, `other-notations-25`, `other-notations-29`.
 - A character inside a string: `documents-and-web-05`, `documents-and-web-06`, `hand-editing-22`, `logs-and-transport-15`, `logs-and-transport-31`, `merges-and-tools-12`, `merges-and-tools-35`.
 - One of two too many: `hand-editing-17`, `hand-editing-24`, `merges-and-tools-04`.
 - Content that is not invented: `merges-and-tools-11`, `model-output-12`.
-- White space: `other-notations-21`.
+- White space: `logs-and-transport-14`, `other-notations-21`.
 
 The 5 cases with a placeholder are `merges-and-tools-27`, `merges-and-tools-29`, `merges-and-tools-31`, `merges-and-tools-32` and `other-notations-12`, with 107 code points that were disputed.
 
-The writers marked 31 cases as debatable, and 3 of those are among the 18. In 14 of the 18 a repairer marked the repair as unsure.
+The writers marked 31 cases as debatable, and 3 of those are among the 19. In 15 of the 19 a repairer marked the repair as unsure.
 
 The two cases where the tools were wrong are `logs-and-transport-02`, with 1 disputed code point, and `model-output-22`, with 6. In both, `align.ts` took a short part of the document for a chance match, i.e. the first brace after a log prefix and the last two braces before a closing code fence, and one repairer had written the repair in another way to get around that. `align.ts` no longer takes such parts for chance matches, see the list under "What the tools cannot know". In `model-output-22` that repair still puts the missing bracket at another place among the white space than the writer and the other repair do, which gives three white space code points another depth. `written.ts` no longer takes that for a dispute: a value that the reading of one opinion does not score is no dispute with another opinion, and by the rule on a missing bracket the repair's reading does not score the depth there.
 
@@ -329,5 +329,6 @@ The same change of `align.ts` gives values to the short parts between two replac
 
 ### What is left out
 
-- No case is left out, and no text of a case was changed.
-- Two repairs are left out, both from `repairs/a-part-3.txt`: the one of `logs-and-transport-11` and the one of `logs-and-transport-14`. Each keeps white space that stands after text that follows the document. `REPAIR.md` asks for a repair that ends with the document's last character where text after the document is removed, and the writer's intended text and the other repair do. With the repair, each case had the kept white space as its only dispute, 1 and 2 code points. Without it, each case has the writer's opinion and one repair, which agree.
+- No case is left out, and no text of a case or of a repair was changed.
+- One repair is left out, the one of `logs-and-transport-11` in `repairs/a-part-3.txt`. It keeps the line feed after the last color code, i.e. white space after text that follows the document. `REPAIR.md` asks for a repair that ends with the document's last character where text after the document is removed, and the writer's intended text and the other repair end so. Leaving a repair out is a judgment: someone held the repair against the rules and found that it breaks one. Here the judgment changes no scored code point. With the repair, the case has the same 156 scored code points and the line feed as its one disputed code point, and without it the case has the writer's opinion and one repair, which agree.
+- The repair of `logs-and-transport-14` in the same file was left out for the same reason, and it is an opinion of its case again. The file of that case is UTF-16 read as bytes, so a NUL follows every character, also the carriage return and the line feed that end the file. The repair keeps these two as the file's own line end, which is what rule 3 asks of a writer for a file that ends with a line feed, and the repairer marked the repair as unsure and named the other reading. That is another reading and no break of a rule, so the case is disputed over the 2 code points, and its 51 scored code points are the same with the repair and without it.

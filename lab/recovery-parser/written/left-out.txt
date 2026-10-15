@@ -1,2 +1,1 @@
 a-part-3 03400e4a keeps the line feed after the last color code, and REPAIR.md asks for a repair that ends with the document's last character where text after the document is removed
-a-part-3 5e158bc5 keeps the carriage return and the line feed that stand between the NUL characters after the document, and REPAIR.md asks for a repair that ends with the document's last character where text after the document is removed

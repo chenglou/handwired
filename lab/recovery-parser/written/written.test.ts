@@ -554,7 +554,29 @@ test('the README has the numbers that score.ts gives', () => {
   expect(readme).toContain(`They stay disputed, with ${disputedCodePoints} code points`)
   // Every case that the page names as disputed is, and the page names every disputed case.
   for (const writtenCase of disputed) expect(readme).toContain(`\`${writtenCase.id}\``)
-  expect(cases.flatMap(writtenCase => writtenCase.leftOut.map(() => writtenCase.id))).toEqual(['logs-and-transport-11', 'logs-and-transport-14'])
+  expect(cases.flatMap(writtenCase => writtenCase.leftOut.map(() => writtenCase.id))).toEqual(['logs-and-transport-11'])
+})
+
+test('a repair of the set that is left out changes no scored code point', () => {
+  const {cases} = readWritten()
+  const withLeftOut = cases.filter(writtenCase => writtenCase.leftOut.length > 0)
+  expect(withLeftOut.length).toBeGreaterThan(0)
+  for (const writtenCase of withLeftOut) {
+    // The case again with every repair of the folder as an opinion.
+    const repairs = writtenCase.leftOut.map(({name}) => {
+      const repair = readRepairFile(readFileSync(join(writtenFolder, 'repairs', `${name}.txt`), 'utf8')).items.find(entry => entry.id === writtenCase.blindId)!
+      return {name, repaired: repair.repaired, unsure: repair.unsure}
+    })
+    const opinions = writtenCase.opinions.slice(1).map(opinion => ({name: opinion.name, repaired: opinion.text, unsure: opinion.unsure}))
+    const texts = {id: writtenCase.id, from: writtenCase.from, note: writtenCase.note, debatable: writtenCase.debatable, intended: writtenCase.original, broken: writtenCase.broken}
+    const withAll = caseOf(texts, writtenCase.file, [...opinions, ...repairs], [], writtenCase.noLabel)
+    // Leaving the repair out is what gives the case full agreement, and every label that the case has with the repair
+    // is the label that it has without it.
+    expect([writtenCase.id, writtenCase.disputedFromFirstError, withAll.disputedFromFirstError]).toEqual([writtenCase.id, false, true])
+    expect(scoredCodePointsOfWritten(withAll)).toBe(scoredCodePointsOfWritten(writtenCase))
+    const labels = labelsOfWritten(writtenCase)
+    labelsOfWritten(withAll).forEach((label, position) => { if (label !== undefined) expect(label).toEqual(labels[position]!) })
+  }
 })
 
 test('the cases and the repairs of the folder have no problem', () => {
