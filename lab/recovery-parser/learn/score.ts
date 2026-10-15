@@ -2,6 +2,16 @@
 // with all three labels right (the main number), with the display kind right, with the depth right, with the
 // container right, and the share of samples in which every such code point is right. Always with breakdowns.
 //
+// Three things that these shares do not show are counted next to them:
+// - The ceiling. Some of the scored code points come before the first error, e.g. everything after a removed closing
+//   bracket up to the text's end. Only frozen cells are read there, so what is shown is today's for every choice of
+//   the open cells, and the ones that are wrong today stay wrong for every tables.
+// - How the damage itself is shown. A code point that the damage added has no label, and no label is ever the
+//   display kind `error`. So tables lose nothing in the shares by never showing an error.
+// - Code points of the text that are shown as `pastEnd`, the display kind of the cells after a text's end. A
+//   tokenizer cell can hold one of the three events of a text's end, and a code point that reads the cell is then
+//   shown so.
+//
 // Run from the repo root:
 //   bun lab/recovery-parser/learn/score.ts [--tables <file.json>] [--split validation] [--cells]
 //       [--from 0] [--to 60000] [--seed 20261015] [--scratch <folder>]
@@ -10,9 +20,10 @@
 import {
   type Samples, cacheFolderOf, codePointKindScored, codePointLabeled, heldOutByKind, heldOutByTemplate, loadSamples, optionOf, reachableNames, splitNames, standardRange,
 } from './data.ts'
+import {displayKind} from '../labels.ts'
 import type {Split} from '../samples.ts'
 import {type RecoveryTrace, createTrace, positionCount, runRecoveryParserInto} from './recovery-parser.ts'
-import {type RecoveryTables, asIsTables, checkTables, describeDifferences, differencesOf, loadTables} from './recovery-tables.ts'
+import {type RecoveryTables, asIsTables, checkTables, copyTables, describeDifferences, differencesOf, loadTables} from './recovery-tables.ts'
 
 export type ScoreRow = {
   // Which samples the row counts, e.g. "all", "reachable: yes" or "kind: missingComma".
@@ -32,6 +43,21 @@ export type ScoreRow = {
   kindRight: number
   // Samples with something to recover in which every such code point has all three labels right.
   wholeSamples: number
+  // Of the code points: the ones before the first error, where only frozen cells are read, and how many of those do
+  // not have all three labels right. No tables get them right, so 1 - wrongBeforeError / codePoints is the ceiling
+  // of the main number.
+  beforeError: number
+  wrongBeforeError: number
+  // Samples with such a wrong code point. They can never be right as a whole.
+  samplesWrongBeforeError: number
+  // Code points at or after the first damage that the damage added, which have no label, and how many of them are
+  // shown as the display kind `error`.
+  addedCodePoints: number
+  addedShownAsError: number
+  // Samples in which a code point at or after the first damage is shown as `error`.
+  samplesShowingError: number
+  // Code points at or after the first damage that are shown as `pastEnd`.
+  shownAsPastEnd: number
 }
 
 export type Score = {
@@ -50,10 +76,16 @@ export type ScoreOptions = {
 }
 
 // A row's shares, from 0 to 1, and NaN where there is nothing to divide by. `allThree` is the main number.
+// `ceiling` and `wholeCeiling` are the highest that `allThree` and `whole` can be for any choice of the open cells.
+// `addedAsError` is the share of the added code points that are shown as an error, and `showsError` the share of the
+// samples that show an error at or after the first damage.
 export function sharesOf(row: ScoreRow) {
+  const withSomething = row.samples - row.nothingToRecover
   return {
     allThree: row.allRight / row.codePoints, kind: row.kindRight / row.kindScored, depth: row.depthRight / row.codePoints,
-    container: row.containerRight / row.codePoints, whole: row.wholeSamples / (row.samples - row.nothingToRecover),
+    container: row.containerRight / row.codePoints, whole: row.wholeSamples / withSomething,
+    ceiling: (row.codePoints - row.wrongBeforeError) / row.codePoints, wholeCeiling: (withSomething - row.samplesWrongBeforeError) / withSomething,
+    addedAsError: row.addedShownAsError / row.addedCodePoints, showsError: row.samplesShowingError / row.samples,
   }
 }
 
@@ -98,7 +130,10 @@ export function scoreWith(samples: Samples, options: ScoreOptions, run: (place: 
   const splits = options.splits ?? ['validation']
   const wanted = splitNames.map(name => splits.includes(name))
   const groups = groupsOf(samples)
-  const rows: ScoreRow[] = groups.names.map(group => ({group, samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, depthRight: 0, containerRight: 0, kindScored: 0, kindRight: 0, wholeSamples: 0}))
+  const rows: ScoreRow[] = groups.names.map(group => ({
+    group, samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, depthRight: 0, containerRight: 0, kindScored: 0, kindRight: 0, wholeSamples: 0,
+    beforeError: 0, wrongBeforeError: 0, samplesWrongBeforeError: 0, addedCodePoints: 0, addedShownAsError: 0, samplesShowingError: 0, shownAsPastEnd: 0,
+  }))
   const trace = createTrace()
   let validSamples = 0
   let scoredSamples = 0
@@ -119,9 +154,23 @@ export function scoreWith(samples: Samples, options: ScoreOptions, run: (place: 
     let containerRight = 0
     let kindScored = 0
     let kindRight = 0
+    let beforeError = 0
+    let wrongBeforeError = 0
+    let addedCodePoints = 0
+    let addedShownAsError = 0
+    let shownAsError = 0
+    let shownAsPastEnd = 0
+    const firstError = samples.firstErrorPosition[place]!
     for (let position = firstDamage; position < length; position++) {
       const flags = samples.flags[start + position]!
-      if ((flags & codePointLabeled) === 0) continue
+      const shown = trace.displayKind[position]
+      if (shown === displayKind.error) shownAsError++
+      else if (shown === displayKind.pastEnd) shownAsPastEnd++
+      if ((flags & codePointLabeled) === 0) {
+        addedCodePoints++
+        if (shown === displayKind.error) addedShownAsError++
+        continue
+      }
       codePoints++
       const depthIsRight = trace.depthAfter[position] === samples.labelDepth[start + position]
       const containerIsRight = trace.containerAfter[position] === samples.labelContainer[start + position]
@@ -133,7 +182,12 @@ export function scoreWith(samples: Samples, options: ScoreOptions, run: (place: 
       }
       if (depthIsRight) depthRight++
       if (containerIsRight) containerRight++
-      if (depthIsRight && containerIsRight && kindIsRight) allRight++
+      const isRight = depthIsRight && containerIsRight && kindIsRight
+      if (isRight) allRight++
+      if (position < firstError) {
+        beforeError++
+        if (!isRight) wrongBeforeError++
+      }
     }
     const lastGroup = options.breakdowns === false ? groups.start[place]! + 1 : groups.start[place + 1]!
     for (let at = groups.start[place]!; at < lastGroup; at++) {
@@ -147,6 +201,13 @@ export function scoreWith(samples: Samples, options: ScoreOptions, run: (place: 
       row.kindRight += kindRight
       if (codePoints === 0) row.nothingToRecover++
       else if (allRight === codePoints) row.wholeSamples++
+      row.beforeError += beforeError
+      row.wrongBeforeError += wrongBeforeError
+      if (wrongBeforeError > 0) row.samplesWrongBeforeError++
+      row.addedCodePoints += addedCodePoints
+      row.addedShownAsError += addedShownAsError
+      if (shownAsError > 0) row.samplesShowingError++
+      row.shownAsPastEnd += shownAsPastEnd
     }
   }
   if (scoredSamples === 0) throw new Error(`these samples have no broken sample of the split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}`)
@@ -167,17 +228,71 @@ export function scoreTables(tables: RecoveryTables, samples: Samples, options: S
   return scoreWith(samples, options, (place, trace) => runOnSample(trace, samples, place, tables))
 }
 
+export type CellsRead = {lexer: Uint8Array, grammar: Uint8Array}
+
+// Which cells the exact parser reads with `tables` at a code point of the samples at `places`: 1 per tokenizer cell
+// and per grammar cell that is read. Cells that are only read at the position after a text are not counted, since
+// nothing that is shown or scored depends on them.
+export function cellsReadAt(tables: RecoveryTables, samples: Samples, places: ArrayLike<number>): CellsRead {
+  checkTables(tables)
+  const lexer = new Uint8Array(tables.lexerNext.length)
+  const grammar = new Uint8Array(tables.grammarNext.length)
+  const trace = createTrace()
+  for (let at = 0; at < places.length; at++) {
+    const place = places[at]!
+    runOnSample(trace, samples, place, tables)
+    const length = samples.start[place + 1]! - samples.start[place]!
+    for (let position = 0; position < length; position++) {
+      lexer[trace.lexerCell[position]!] = 1
+      grammar[trace.grammarCell[position]!] = 1
+    }
+  }
+  return {lexer, grammar}
+}
+
+// The same for every sample of the given splits.
+export function cellsReadBy(tables: RecoveryTables, samples: Samples, splits: readonly Split[]): CellsRead {
+  const wanted = splitNames.map(name => splits.includes(name))
+  return cellsReadAt(tables, samples, Int32Array.from({length: samples.sampleCount}, (_, place) => place).filter(place => wanted[samples.split[place]!]!))
+}
+
+// A copy of `tables` in which every cell that `read` does not mark holds the choice of `base`, and how many cells
+// that puts back. When `read` holds the cells that `tables` read on some texts, the copy gives the same trace on those
+// texts, since a cell that is put back is one that they never read. E.g. a training run moves cells that only its
+// mixes read, and their choices in the snapped tables mean nothing.
+export function withUnreadCellsOf(base: RecoveryTables, tables: RecoveryTables, read: CellsRead): {tables: RecoveryTables, putBack: number} {
+  if (base.lexerNext.length !== tables.lexerNext.length || base.grammarNext.length !== tables.grammarNext.length) throw new Error('withUnreadCellsOf takes two tables with the same states')
+  const result = copyTables(tables)
+  let putBack = 0
+  for (let cell = 0; cell < result.lexerNext.length; cell++) {
+    if (read.lexer[cell] === 1 || (result.lexerNext[cell] === base.lexerNext[cell] && result.lexerEvent[cell] === base.lexerEvent[cell])) continue
+    result.lexerNext[cell] = base.lexerNext[cell]!
+    result.lexerEvent[cell] = base.lexerEvent[cell]!
+    putBack++
+  }
+  for (let cell = 0; cell < result.grammarNext.length; cell++) {
+    if (read.grammar[cell] === 1 || (result.grammarNext[cell] === base.grammarNext[cell] && result.grammarAction[cell] === base.grammarAction[cell])) continue
+    result.grammarNext[cell] = base.grammarNext[cell]!
+    result.grammarAction[cell] = base.grammarAction[cell]!
+    putBack++
+  }
+  return {tables: result, putBack}
+}
+
 const percent = (share: number) => Number.isNaN(share) ? '    -' : (100 * share).toFixed(1).padStart(5)
 const count = (value: number) => String(value).padStart(7)
 
 // The score as aligned text: per group the samples, the samples with nothing to recover, the percentages of code
 // points with all three labels right, the display kind right, the depth right and the container right, and the
-// percentage of samples with something to recover in which every code point is right.
+// percentage of samples with something to recover in which every code point is right. Then what the shares do not
+// show: the ceilings of "all 3" and of "whole" for any choice of the open cells, the percentage of the added code
+// points that are shown as an error, the percentage of the samples that show an error at or after the first damage,
+// and the number of code points that are shown as past the end.
 export function describeScore(score: Score): string {
-  const lines = [`${'samples'.padStart(7)} ${'nothing'.padStart(7)}  ${'all 3'.padStart(5)} ${'kind'.padStart(5)} ${'depth'.padStart(5)} ${'cont.'.padStart(5)}  ${'whole'.padStart(5)}  group`]
+  const lines = [`${'samples'.padStart(7)} ${'nothing'.padStart(7)}  ${'all 3'.padStart(5)} ${'kind'.padStart(5)} ${'depth'.padStart(5)} ${'cont.'.padStart(5)}  ${'whole'.padStart(5)}  ${'ceil.'.padStart(5)} ${'ceil.w'.padStart(6)}  ${'addedE'.padStart(6)} ${'showsE'.padStart(6)} ${'pastEnd'.padStart(7)}  group`]
   for (const row of score.rows) {
     const shares = sharesOf(row)
-    lines.push(`${count(row.samples)} ${count(row.nothingToRecover)}  ${percent(shares.allThree)} ${percent(shares.kind)} ${percent(shares.depth)} ${percent(shares.container)}  ${percent(shares.whole)}  ${row.group}`)
+    lines.push(`${count(row.samples)} ${count(row.nothingToRecover)}  ${percent(shares.allThree)} ${percent(shares.kind)} ${percent(shares.depth)} ${percent(shares.container)}  ${percent(shares.whole)}  ${percent(shares.ceiling)} ${percent(shares.wholeCeiling).padStart(6)}  ${percent(shares.addedAsError).padStart(6)} ${percent(shares.showsError).padStart(6)} ${count(row.shownAsPastEnd)}  ${row.group}`)
   }
   return lines.join('\n')
 }
@@ -195,11 +310,16 @@ if (import.meta.main) {
   const started = performance.now()
   const score = scoreTables(loaded.tables, samples, {splits})
   const milliseconds = performance.now() - started
-  console.log(`Tables: ${tablesFile ?? 'today\'s'}${loaded.note === '' ? '' : ` (${loaded.note})`}. ${differences.length} cells differ from today's tables.`)
+  const read = cellsReadBy(loaded.tables, samples, splits)
+  const differencesRead = differences.filter(difference => (difference.table === 'tokenizer' ? read.lexer : read.grammar)[difference.cell] === 1).length
+  console.log(`Tables: ${tablesFile ?? 'today\'s'}${loaded.note === '' ? '' : ` (${loaded.note})`}. ${differences.length} cells differ from today's tables, and a code point of the scored samples reads ${differencesRead} of them.`)
   if (process.argv.includes('--cells') && differences.length > 0) console.log(describeDifferences(differences))
   console.log(`Seed ${seed}, samples ${from} to ${to - 1}, split${splits.length === 1 ? '' : 's'} ${splits.join(', ')}: ${score.rows[0]!.samples} broken samples, ${score.validSamples} valid ones left out. Scored in ${milliseconds.toFixed(0)} ms.`)
   console.log('Percentages of the labeled code points at or after the first damage: all three labels right, the display kind right (of those whose')
   console.log('kind is scored), the depth right, the container right. Then the percentage of samples with something to recover that are right as a whole.')
+  console.log('ceil. and ceil.w: the highest that "all 3" and "whole" can be for any choice of the open cells, since the scored code points before the')
+  console.log('first error are shown as today. addedE: the percentage of the code points that the damage added that are shown as an error. showsE: the')
+  console.log('percentage of the samples that show an error at or after the first damage. pastEnd: code points shown as the cells after a text are.')
   console.log('')
   console.log(describeScore(score))
 }

@@ -9,7 +9,10 @@
 // - The first error, its kind and `valid` come from today's tables, whatever the open cells hold: the first error is
 //   the first position at which today's tables lead into the grammar state `error`.
 //
-// The edges, chosen so that asIsTables() gives today's depths and contexts everywhere:
+// The edges, chosen so that asIsTables() gives today's depths everywhere, and today's contexts up to and at the first
+// error. After a first error the contexts can differ from today's, because the stack and today's running sum then
+// disagree about the innermost container, e.g. today's parser can read the context "depth 0, object", which this
+// parser never reads:
 // - A pop at depth 0 or below lowers the depth as at any depth, so the depth can be negative, e.g. -1 after the ] of
 //   1] . There is no kind to forget.
 // - A push at depth 16 or above raises the depth as at any depth. The stack holds kinds for the levels 1 to 16 only,

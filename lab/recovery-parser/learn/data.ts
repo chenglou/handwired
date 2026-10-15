@@ -21,6 +21,9 @@ export const reachableNames = ['yes', 'line rule', 'no'] as const
 export const codePointLabeled = 1
 export const codePointKindScored = 2
 export const codePointReplaced = 4
+// The intended state after the code point is one that a parser of the broken text can be in, see canFollowOf in
+// intended.ts. Only there may the intended states be targets of training, or states to put a run on.
+export const codePointCanFollow = 8
 // The bits of Samples.heldOut, per sample.
 export const heldOutByKind = 1
 export const heldOutByTemplate = 2
@@ -67,7 +70,7 @@ export type Samples = {
   codePoints: Int32Array
   // codePointLabeled when the code point has a label, i.e. the damage kept it: its depth and container are scored.
   // codePointKindScored when its display kind is scored too. codePointReplaced when it stands for another code point,
-  // e.g. ' for ".
+  // e.g. ' for ". codePointCanFollow when a parser of the broken text can be in the intended state after it.
   flags: Uint8Array
   // The label: the display kind, the depth after the code point and the innermost container after it, as they are
   // for the counterpart in the original. -1 without a label, and labelKind is -1 too where the kind is not scored.
@@ -75,7 +78,8 @@ export type Samples = {
   labelDepth: Int8Array
   labelContainer: Int8Array
   // The intended states, see intended.ts: the tokenizer state after, the event and the grammar state after. -1 without
-  // a counterpart. The intended depth and container after are labelDepth and labelContainer.
+  // a counterpart. The intended depth and container after are labelDepth and labelContainer. Use them only where
+  // flags has codePointCanFollow: elsewhere no choice of the open cells leads to them, e.g. after a removed comma.
   intendedLexerAfter: Int8Array
   intendedEvent: Int8Array
   intendedGrammarAfter: Int8Array
@@ -160,7 +164,8 @@ export function makeSamples(seed: number, from: number, to: number): Samples {
     for (let position = 0; position < brokenCodePoints.length; position++) {
       const label = labels[position]
       codePoints.push(brokenCodePoints[position]!)
-      flags.push((label === undefined ? 0 : codePointLabeled) | (label?.kind === undefined ? 0 : codePointKindScored) | (sample.replaced[position] === true ? codePointReplaced : 0))
+      flags.push((label === undefined ? 0 : codePointLabeled) | (label?.kind === undefined ? 0 : codePointKindScored) | (sample.replaced[position] === true ? codePointReplaced : 0)
+        | (intended.canFollow[position] === 1 ? codePointCanFollow : 0))
       labelKind.push(label?.kind ?? -1)
       labelDepth.push(label?.depth ?? -1)
       labelContainer.push(label?.container ?? -1)
@@ -318,17 +323,18 @@ function readCache(path: string): {samples: Samples, from: number, to: number} |
 
 const cacheFileName = (seed: number, from: number, to: number) => `samples-${seed}-${from}-${to}.bin`
 
-// The cache folder of a scratch folder, or undefined without one. The scratch folder comes from the argument, or from
-// the environment variable RECOVERY_SCRATCH.
-export function cacheFolderOf(scratchFolder: string | undefined = process.env['RECOVERY_SCRATCH']) {
-  return scratchFolder === undefined || scratchFolder === '' ? undefined : join(scratchFolder, 'cache')
+// The cache folder of a scratch folder, or null without one. The scratch folder comes from the argument, or from the
+// environment variable RECOVERY_SCRATCH.
+export function cacheFolderOf(scratchFolder: string | undefined = process.env['RECOVERY_SCRATCH']): string | null {
+  return scratchFolder === undefined || scratchFolder === '' ? null : join(scratchFolder, 'cache')
 }
 
 // The samples `from` to `to - 1` of a seed. With a cache folder: read from the folder's file of that range, or from
 // its file of a range around it, e.g. the samples 0 to 19,999 from the file of the standard set, and otherwise made
-// and written to the folder. Without a cache folder the samples are made each time.
-export function loadSamples(seed: number, from: number, to: number, cacheFolder: string | undefined = cacheFolderOf()): Samples {
-  if (cacheFolder === undefined) return makeSamples(seed, from, to)
+// and written to the folder. With `null` as the cache folder the samples are made each time. Without the argument,
+// the cache folder is the one of the environment variable RECOVERY_SCRATCH, so only `null` switches the cache off.
+export function loadSamples(seed: number, from: number, to: number, cacheFolder: string | null = cacheFolderOf()): Samples {
+  if (cacheFolder === null) return makeSamples(seed, from, to)
   mkdirSync(cacheFolder, {recursive: true})
   const covering = readdirSync(cacheFolder).flatMap(name => {
     const match = /^samples-(\d+)-(\d+)-(\d+)\.bin$/.exec(name)
@@ -346,7 +352,7 @@ export function loadSamples(seed: number, from: number, to: number, cacheFolder:
   return samples
 }
 
-export const loadStandardSamples = (cacheFolder: string | undefined = cacheFolderOf()) => loadSamples(standardRange.seed, standardRange.from, standardRange.to, cacheFolder)
+export const loadStandardSamples = (cacheFolder: string | null = cacheFolderOf()) => loadSamples(standardRange.seed, standardRange.from, standardRange.to, cacheFolder)
 
 // The value of a command's option, e.g. optionOf('--split') for `--split validation`.
 export function optionOf(name: string, argv: readonly string[] = process.argv): string | undefined {
@@ -363,7 +369,7 @@ if (import.meta.main) {
   const samples = loadSamples(seed, from, to, cacheFolder)
   const seconds = ((performance.now() - started) / 1000).toFixed(2)
   const tally = (values: Uint8Array, names: readonly string[]) => names.map((name, value) => `${name} ${values.reduce((total, entry) => total + Number(entry === value), 0)}`).join(', ')
-  console.log(`seed ${seed}, samples ${from} to ${to - 1}: ${samples.sampleCount} samples and ${samples.codePointCount} code points in ${seconds} s${cacheFolder === undefined ? ', without a cache' : `, cache in ${cacheFolder}`}`)
+  console.log(`seed ${seed}, samples ${from} to ${to - 1}: ${samples.sampleCount} samples and ${samples.codePointCount} code points in ${seconds} s${cacheFolder === null ? ', without a cache' : `, cache in ${cacheFolder}`}`)
   console.log(`splits: ${tally(samples.split, splitNames)}`)
   console.log(`sources: ${tally(samples.source, sourceNames)}`)
   console.log(`reachable, with the valid samples under yes: ${tally(samples.reachable, reachableNames)}`)

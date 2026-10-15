@@ -10,8 +10,8 @@
 //    in check-texts.ts, among them valid ones with 16 levels and with 512 code points. Then the same for every text
 //    of up to 6 code points.
 // 4. Writes tables as JSON and reads them again, lists the cells in which two tables differ, and shows that a change
-//    of a frozen cell is refused. With the environment variable RECOVERY_SCRATCH it also saves the tables to a file
-//    in that folder and loads the file.
+//    of a frozen cell is refused, and so is a file with a number that a byte does not hold, e.g. the state 259. With
+//    the environment variable RECOVERY_SCRATCH it also saves the tables to a file in that folder and loads the file.
 import {mkdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {createRandom} from '../random.ts'
@@ -183,6 +183,19 @@ broken.grammarNext[frozenGrammarCell] = tables.errorState
 const problems = problemsOf(broken)
 if (problems.length !== 1) fail('a changed frozen cell is not reported as one problem')
 console.log(`   A change of the frozen cell ${grammarCellName(tables, frozenGrammarCell)} is refused: ${problems.join('; ')}.`)
+// A number that a byte array would cut to its low 8 bits, e.g. 259 to 3, and a number that is no whole number.
+for (const value of [259, -1, 1.5]) {
+  const file = JSON.parse(tablesToJson(changed)) as {lexerNext: number[]}
+  file.lexerNext[openLexerCell] = value
+  let refused = ''
+  try {
+    tablesFromJson(JSON.stringify(file))
+  } catch (error) {
+    refused = String(error)
+  }
+  if (refused === '') fail(`a file with the state ${value} in an open cell is loaded`)
+  else if (value === 259) console.log(`   A file with the state 259 in an open cell is refused: ${refused.replace(/^Error: /, '')}.`)
+}
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)
 if (failures > 0) process.exitCode = 1

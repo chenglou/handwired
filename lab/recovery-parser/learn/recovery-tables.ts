@@ -415,13 +415,18 @@ export function tablesFromJson(text: string): {tables: RecoveryTables, note: str
   if (parsed['format'] !== 'recovery tables 1') throw new Error(`not a file of recovery tables: its format is ${JSON.stringify(parsed['format'])}`)
   const size = (field: string) => {
     const value = parsed[field]
-    if (typeof value !== 'number') throw new Error(`the field ${field} is missing`)
+    if (typeof value !== 'number' || !Number.isInteger(value)) throw new Error(`the field ${field} is missing, or is no whole number`)
     return value
   }
+  // The arrays are bytes. A number that is no whole number from 0 to 255 is refused, since a byte array would keep
+  // only its low 8 bits without a word, e.g. the state 259 as the state 3.
   const array = (field: string) => {
-    const value = parsed[field]
+    const value: unknown = parsed[field]
     if (!Array.isArray(value)) throw new Error(`the field ${field} is missing`)
-    return Uint8Array.from(value as number[])
+    const numbers = value as unknown[]
+    const bad = numbers.findIndex(entry => typeof entry !== 'number' || !Number.isInteger(entry) || entry < 0 || entry > 255)
+    if (bad !== -1) throw new Error(`the field ${field} holds ${JSON.stringify(numbers[bad])} at entry ${bad}, and every entry has to be a whole number from 0 to 255`)
+    return Uint8Array.from(numbers as number[])
   }
   const tables: RecoveryTables = {
     classCount: size('classCount'), lexerStateCount: size('lexerStateCount'), eventCount: size('eventCount'), tokenCount: size('tokenCount'),

@@ -6,19 +6,23 @@
 //
 // 1. Intended states: before the first damage they are the states of today's parser on the broken text, and at every
 //    kept code point whose display kind is scored, the display table gives the label's kind for the intended event
-//    and grammar state.
+//    and grammar state. The mark "a parser of the broken text can be in the intended state" (canFollow) is set at
+//    every code point before the first damage and at no added code point, and the check counts how many of the kept
+//    code points from the first damage on have it.
 // 2. The arrays of loadSamples hold what sampleAt and labelsOf give, sample by sample.
 // 3. scoreTables with today's tables against a count made here from sampleAt, labelsOf and today's parser: the same
-//    samples, code points, display kinds right and depths right. The container and all three labels can differ,
-//    because today's parser keeps the containers in a running sum and the recovery parser in a stack. With --stats,
+//    samples, code points, display kinds right and depths right, the same scored code points before the first error
+//    and wrong ones among them, the same added code points and shown errors. The container and all three labels can
+//    differ, because today's parser keeps the containers in a running sum and the recovery parser in a stack. With --stats,
 //    the percentages of the rows of a statistics file, as lab/recovery-parser/stats.ts writes it, are compared too.
 //    This check reads every split, the test split too, and only with today's tables.
 // 4. The time of one scoring pass over the validation part of the standard set.
 import {readFileSync} from 'node:fs'
+import {displayKind} from '../labels.ts'
 import {type Label, labeledAfterDamage, labelsOf, sampleAt} from '../samples.ts'
 import {runTableParser} from '../table-parser.ts'
 import {
-  cacheFolderOf, codePointKindScored, codePointLabeled, codePointReplaced, heldOutByKind, heldOutByTemplate, kindsOf, loadSamples, loadStandardSamples, optionOf,
+  cacheFolderOf, codePointCanFollow, codePointKindScored, codePointLabeled, codePointReplaced, heldOutByKind, heldOutByTemplate, kindsOf, loadSamples, loadStandardSamples, optionOf,
   reachableNames, sourceNames, splitNames, standardRange, textOf, validationPart,
 } from './data.ts'
 import {intendedOf} from './intended.ts'
@@ -37,8 +41,11 @@ const fail = (message: string) => {
 
 const samples = loadSamples(seed, 0, sampleCount, cacheFolder)
 // The count made here, as lab/recovery-parser/stats.ts counts its headroom table: one row for every broken sample.
-const expected: ScoreRow = {group: 'all', samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, depthRight: 0, containerRight: 0, kindScored: 0, kindRight: 0, wholeSamples: 0}
-const tally = {beforeDamage: 0, keptAndScored: 0, replaced: 0, added: 0, codePoints: 0}
+const expected: ScoreRow = {
+  group: 'all', samples: 0, nothingToRecover: 0, codePoints: 0, allRight: 0, depthRight: 0, containerRight: 0, kindScored: 0, kindRight: 0, wholeSamples: 0,
+  beforeError: 0, wrongBeforeError: 0, samplesWrongBeforeError: 0, addedCodePoints: 0, addedShownAsError: 0, samplesShowingError: 0, shownAsPastEnd: 0,
+}
+const tally = {beforeDamage: 0, keptAndScored: 0, replaced: 0, added: 0, codePoints: 0, keptFromDamage: 0, canFollowFromDamage: 0}
 
 for (let place = 0; place < sampleCount; place++) {
   const sample = sampleAt(seed, place)
@@ -67,6 +74,7 @@ for (let place = 0; place < sampleCount; place++) {
     const label = labels[position]
     const flags = samples.flags[start + position]!
     const wantedFlags = (label === undefined ? 0 : codePointLabeled) | (label?.kind === undefined ? 0 : codePointKindScored) | (sample.replaced[position] === true ? codePointReplaced : 0)
+      | (intended.canFollow[position] === 1 ? codePointCanFollow : 0)
     if (flags !== wantedFlags || samples.labelKind[start + position] !== (label?.kind ?? -1) || samples.labelDepth[start + position] !== (label?.depth ?? -1) || samples.labelContainer[start + position] !== (label?.container ?? -1)) {
       fail(`sample ${sample.id}, code point ${position}: the arrays do not hold the label`)
     }
@@ -78,7 +86,12 @@ for (let place = 0; place < sampleCount; place++) {
     if (sample.alignment[position] === -1) {
       tally.added++
       if (intended.event[position] !== -1 || intended.lexerStateAfter[position] !== -1 || intended.grammarAfter[position] !== -1 || intended.depthAfter[position] !== -1 || intended.containerAfter[position] !== -1) fail(`sample ${sample.id}, code point ${position}: an added code point has an intended state`)
+      if (intended.canFollow[position] !== 0) fail(`sample ${sample.id}, code point ${position}: an added code point is marked as one whose intended state can be followed`)
       continue
+    }
+    if (sample.source !== 'valid' && position >= sample.firstDamage) {
+      tally.keptFromDamage++
+      if (intended.canFollow[position] === 1) tally.canFollowFromDamage++
     }
     if (sample.replaced[position] === true) tally.replaced++
     if (label !== undefined && label.kind !== undefined) {
@@ -93,6 +106,8 @@ for (let place = 0; place < sampleCount; place++) {
         || intended.depthAfter[position] !== trace.depthAfter[position] || intended.containerAfter[position] !== trace.containerAfter[position]) {
         fail(`sample ${sample.id}, code point ${position}, before the first damage: the intended states are not the states of today's parser on the broken text`)
       }
+      // Before the first damage every cell that is read is frozen and gives the intended state.
+      if (intended.canFollow[position] !== 1) fail(`sample ${sample.id}, code point ${position}, before the first damage: not marked as one whose intended state can be followed`)
     }
   }
 
@@ -101,9 +116,18 @@ for (let place = 0; place < sampleCount; place++) {
   expected.samples++
   let labeled = 0
   let right = 0
+  let wrongBeforeError = 0
+  let showsError = false
   for (let position = sample.firstDamage; position < length; position++) {
     const label = labels[position]
-    if (label === undefined) continue
+    const shown = trace.displayKind[position]
+    if (shown === displayKind.error) showsError = true
+    if (shown === displayKind.pastEnd) expected.shownAsPastEnd++
+    if (label === undefined) {
+      expected.addedCodePoints++
+      if (shown === displayKind.error) expected.addedShownAsError++
+      continue
+    }
     labeled++
     const kindRight = label.kind === undefined || label.kind === trace.displayKind[position]
     const depthRight = label.depth === trace.depthAfter[position]
@@ -115,7 +139,15 @@ for (let place = 0; place < sampleCount; place++) {
     if (depthRight) expected.depthRight++
     if (containerRight) expected.containerRight++
     if (kindRight && depthRight && containerRight) right++
+    // Before the first error the running sum and the stack hold the same containers.
+    if (position < trace.firstErrorPosition) {
+      expected.beforeError++
+      if (!(kindRight && depthRight && containerRight)) wrongBeforeError++
+    }
   }
+  expected.wrongBeforeError += wrongBeforeError
+  if (wrongBeforeError > 0) expected.samplesWrongBeforeError++
+  if (showsError) expected.samplesShowingError++
   if (labeled !== labeledAfterDamage(sample)) fail(`sample ${sample.id}: ${labeled} labeled code points from the damage on, and labeledAfterDamage says ${labeledAfterDamage(sample)}`)
   expected.codePoints += labeled
   expected.allRight += right
@@ -123,11 +155,27 @@ for (let place = 0; place < sampleCount; place++) {
   else if (right === labeled) expected.wholeSamples++
 }
 console.log(`1. Intended states of ${sampleCount} samples: ${tally.beforeDamage} code points before a first damage have the states of today's parser on the broken text, ${tally.keptAndScored} kept code points are shown as their label's kind. ${tally.added} added code points have none, ${tally.replaced} are replaced.`)
-console.log(`2. The arrays of loadSamples hold the ${sampleCount} samples as sampleAt and labelsOf give them, ${tally.codePoints} code points.`)
+console.log(`   A parser of the broken text can be in the intended state after every code point before a first damage, and after ${tally.canFollowFromDamage} of the ${tally.keptFromDamage} kept code points from a first damage on (${(100 * tally.canFollowFromDamage / tally.keptFromDamage).toFixed(1)}%), as intended.ts marks them.`)
+// With `null` as the cache folder the samples are made now, whatever RECOVERY_SCRATCH says. They have to be the
+// arrays above, which come from the cache when there is one.
+{
+  const fresh = loadSamples(seed, 0, Math.min(200, sampleCount), null)
+  const fields = ['codePoints', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'intendedLexerAfter', 'intendedEvent', 'intendedGrammarAfter'] as const
+  for (const field of fields) {
+    for (let at = 0; at < fresh.codePointCount; at++) {
+      if (fresh[field][at] !== samples[field][at]) {
+        fail(`${field} at code point ${at}: ${fresh[field][at]} when made without a cache, and ${samples[field][at]} in the arrays`)
+        break
+      }
+    }
+  }
+  if (fresh.codePointCount !== samples.start[fresh.sampleCount]) fail(`the first ${fresh.sampleCount} samples have ${fresh.codePointCount} code points when made without a cache, and ${samples.start[fresh.sampleCount]} in the arrays`)
+}
+console.log(`2. The arrays of loadSamples hold the ${sampleCount} samples as sampleAt and labelsOf give them, ${tally.codePoints} code points${cacheFolder === null ? '' : ', and the first 200 made without the cache are the same'}.`)
 
 const score = scoreTables(asIsTables(), samples, {splits: ['train', 'validation', 'test']})
 const all = score.rows[0]!
-for (const field of ['samples', 'nothingToRecover', 'codePoints', 'kindScored', 'kindRight', 'depthRight'] as const) {
+for (const field of ['samples', 'nothingToRecover', 'codePoints', 'kindScored', 'kindRight', 'depthRight', 'beforeError', 'wrongBeforeError', 'samplesWrongBeforeError', 'addedCodePoints', 'addedShownAsError', 'samplesShowingError', 'shownAsPastEnd'] as const) {
   if (all[field] !== expected[field]) fail(`${field}: scoreTables counts ${all[field]}, and the count made here ${expected[field]}`)
 }
 const percent = (share: number) => (100 * share).toFixed(1)
@@ -137,6 +185,7 @@ console.log(`   scoreTables and the count made here with today's parser agree on
 console.log(`   Container right: ${all.containerRight} with the stack (${percent(mine.container)}%), ${expected.containerRight} with today's running sum (${percent(theirs.container)}%), ${all.containerRight - expected.containerRight} more.`)
 console.log(`   All three right: ${all.allRight} with the stack (${percent(mine.allThree)}%), ${expected.allRight} with today's running sum (${percent(theirs.allThree)}%), ${all.allRight - expected.allRight} more.`)
 console.log(`   Whole samples right: ${all.wholeSamples} with the stack (${percent(mine.whole)}%), ${expected.wholeSamples} with today's running sum (${percent(theirs.whole)}%).`)
+console.log(`   Both counts also agree on what the shares do not show: ${all.beforeError} scored code points come before the first error, and ${all.wrongBeforeError} of them are wrong for every choice of the open cells, in ${all.samplesWrongBeforeError} samples, so no tables pass ${percent(mine.ceiling)}% of all three and ${percent(mine.wholeCeiling)}% of whole samples. ${all.addedShownAsError} of the ${all.addedCodePoints} added code points are shown as an error (${percent(mine.addedAsError)}%), ${all.samplesShowingError} samples show an error at or after the first damage (${percent(mine.showsError)}%), and ${all.shownAsPastEnd} code points are shown as past the end.`)
 
 if (statsFile !== undefined) {
   // A line of the statistics file's headroom table: samples, nothing, all 3, kind, depth, cont., whole, and the group.
