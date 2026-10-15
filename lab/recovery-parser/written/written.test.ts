@@ -283,6 +283,28 @@ test('a value that an opinion does not score is no dispute with another opinion'
   expect(otherKind.agreement).toContain('disputed')
 })
 
+test('the display kind of the digits after a leading zero is not scored', () => {
+  // A file mode without quotes, which the writer means as a string.
+  const texts = {...madeUp, intended: '{"mode": "0644", "owner": "www-data"}', broken: '{"mode": 0644, "owner": "www-data"}'}
+  const asString = labelsOfWritten(caseOf(texts, 'made-up.txt'))
+  for (const position of [9, 10, 11, 12]) expect(asString[position]).toEqual({kind: undefined, depth: 1, container: 1})
+  // A repair that means the number 644 calls the zero added, so the zero is disputed, and the opinions agree on the
+  // three digits after it, whose display kind neither reading scores.
+  const both = caseOf(texts, 'made-up.txt', [{name: 'part-1.a', repaired: '{"mode": 644, "owner": "www-data"}', unsure: undefined}])
+  expect(both.agreement.slice(9, 13).join()).toBe('disputed,agreed,agreed,agreed')
+  for (const position of [10, 11, 12]) expect(labelsOfWritten(both)[position]).toEqual({kind: undefined, depth: 1, container: 1})
+  expect(both.disputedFromFirstError).toBe(false)
+  // The rule is for a value that is digits alone. A time without quotes is scored as a string after its first digit,
+  const time = {...madeUp, intended: '{"open": "09:00", "days": 5}', broken: '{"open": 09:00, "days": 5}'}
+  expect(labelsOfWritten(caseOf(time, 'made-up.txt')).slice(9, 14).map(label => label?.kind)).toEqual([undefined, displayKind.string, displayKind.string, displayKind.string, displayKind.string])
+  // the digits of a number after a line feed that a window's edge put into it stay a number,
+  const wrappedNumber = {...madeUp, intended: '[0.5, 0.0102, 3]', broken: '[0.5, 0.01\n02, 3]'}
+  expect(labelsOfWritten(caseOf(wrappedNumber, 'made-up.txt')).slice(11, 13).map(label => label?.kind)).toEqual([displayKind.number, displayKind.number])
+  // and so do digits inside a string between quotes.
+  const quoted = {...madeUp, intended: '{"note": "call 0800 now", "ok": true}', broken: '{"note": "call 0800 now", "ok": true,}'}
+  expect(labelsOfWritten(caseOf(quoted, 'made-up.txt')).slice(15, 19).map(label => label?.kind)).toEqual(new Array<number>(4).fill(displayKind.string))
+})
+
 test('a repair that left-out.txt names is no opinion of its case', () => {
   const folder = mkdtempSync(join(tmpdir(), 'written-'))
   mkdirSync(join(folder, 'cases'))

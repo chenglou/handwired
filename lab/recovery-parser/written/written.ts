@@ -32,10 +32,11 @@
 // - unscoredKinds and unscoredNesting as indexes into the original: with several opinions there is no one original,
 //   so unscoredKindPositions and unscoredNestingPositions hold positions in the broken text.
 // - What a kind of damage declares as not scored, the first of the four rules of the dataset's README. A written case
-//   has no kind. Two of the things that kinds declare show in the two texts and are applied here, see unscoredOf: a
-//   quote that lost its backslash, and what reads as an escape after a backslash that lost its second half. The rest
-//   is scored unless the opinions differ on it, e.g. the comma after a string whose last backslash now escapes the
-//   closing quote, which every reader takes for the string's content. The other three rules are applied.
+//   has no kind. Three of the things that kinds declare show in the two texts and are applied here, see unscoredOf: a
+//   quote that lost its backslash, what reads as an escape after a backslash that lost its second half, and the
+//   digits of a number with a leading zero. The rest is scored unless the opinions differ on it, e.g. the comma after
+//   a string whose last backslash now escapes the closing quote, which every reader takes for the string's content.
+//   The other three rules are applied.
 //
 // Run from the repo root: bun lab/recovery-parser/written/written.ts [folder] [--disputed]
 // It prints one line per case, and with --disputed every case that has a disputed code point, opinion by opinion.
@@ -176,6 +177,11 @@ function firstDamageOf(alignment: readonly number[], replaced: readonly boolean[
 // - What reads as an escape after a backslash that lost its second half, e.g. the t of `C:\temp` for `C:\\temp`,
 //   the `u00e` of `C:\u00e`, and a closing quote with the comma after it: the labels say string and punctuation, and
 //   every reader shows an escape and goes on with the string.
+// And one thing that the kind numberFormat declares:
+// - The display kind of the digits of a number with a leading zero, e.g. the `0644` of `"mode": 0644`: the number
+//   644 and the string "0644" are as sensible, so the dataset does not score the digits' display kind. Here the
+//   digits are those of a value that is digits alone after a zero, which the opinion reads as a number with zeros
+//   added before it or as a string that lost both of its quotes.
 function unscoredOf(opinion: Opinion, broken: readonly string[], trace: ParserTrace) {
   const valid = Array.from(opinion.text)
   const validLabels = labelsOfValidText(opinion.text)
@@ -217,6 +223,28 @@ function unscoredOf(opinion: Opinion, broken: readonly string[], trace: ParserTr
       else if (broken[after] === 'u') for (let digit = after; digit <= after + 4 && (digit === after || /^[0-9a-fA-F]$/.test(broken[digit] ?? '')); digit++) kinds.add(digit)
     }
     index += length - 1
+  }
+  const isDigit = (character: string | undefined) => character !== undefined && character >= '0' && character <= '9'
+  for (let start = 0; start < broken.length; start++) {
+    if (broken[start] !== '0' || !isDigit(broken[start + 1]) || (start > 0 && !' \t\r\n{[:,'.includes(broken[start - 1]!))) continue
+    let end = start
+    while (isDigit(broken[end])) end++
+    // The value is the digits alone: white space, a comma or a closing bracket follows, or the text ends.
+    if (end < broken.length && !' \t\r\n,}]'.includes(broken[end]!)) continue
+    const digits = Array.from({length: end - start}, (_, offset) => start + offset)
+    // A number after zeros that the opinion calls added, e.g. 644 after the 0 of 0644.
+    let firstOfNumber = start
+    while (firstOfNumber < end && broken[firstOfNumber] === '0' && labels[firstOfNumber] === undefined) firstOfNumber++
+    const number = digits.filter(position => position >= firstOfNumber)
+    const asNumber = firstOfNumber > start && number.length > 0
+      && number.every(position => labels[position]?.kind === displayKind.number && alignment[position] === alignment[firstOfNumber]! + position - firstOfNumber)
+    // A string of these digits alone, whose two quotes the broken text lacks, e.g. "0644".
+    const first = alignment[start]!
+    const asString = digits.every(position => alignment[position] === first + position - start && labels[position]?.kind === displayKind.string)
+      && valid[first - 1] === '"' && !kept.has(first - 1) && valid[first + digits.length] === '"' && !kept.has(first + digits.length)
+    if (asNumber) for (const position of number) kinds.add(position)
+    if (asString) for (const position of digits) kinds.add(position)
+    start = end
   }
   let depthBefore = 0
   let containerBefore = 0

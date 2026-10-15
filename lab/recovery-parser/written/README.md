@@ -190,6 +190,7 @@ A `?` in the `want` rows stands for a value that no highlighter can be asked for
 - After a bracket that is missing, the depth and the container are not scored up to the next bracket, since nothing in the broken text shows that a container started or ended. E.g. in `"tags": "tea", "filter", "count": 2}` for `"tags": ["tea", "filter"], "count": 2}` they are not scored from `"tea"` up to the last brace, also for the key `"count"`.
 - The display kind of a quote that lost its backslash is not scored: in `"call "Ana" back"` the inner quotes were the second halves of `\"`, and no reader of the broken text can show them as an escape. The same holds for what reads as an escape after a backslash that lost its second half, e.g. the `t` of `C:\temp` for `C:\\temp` in a text that is broken at another place.
 - The display kind of the start of a value that lost its quotes is not scored where that start reads as a number or a literal, e.g. the `2031` of `"due": 2031-07-04`, which is wanted as a string.
+- The display kind of the digits of a number with a leading zero is not scored, e.g. the `0644` of `"mode": 0644`: the number 644 and the string `"0644"` are as sensible. The rule is for a value that is digits alone, and not for the `09` of `09:00`.
 - Before the first error of today's highlighter, a value that today's highlighter does not give is not scored, since the experiment changes only what the highlighter does from its first error on. E.g. after a quote too many in `{"retries": "3, "host": "db"}`, today's highlighter reads `3, ` and the quote after it as the rest of a string, without an error, so the display kind of these four code points is not scored.
 
 A score counts the code points from the `^` on that have a value in the `want` rows. A case where the header says "no scored code point from there on" has nothing to recover, e.g. a text that is cut off, where every code point after the cut is missing. Such a case is fine, and a file should hold few of them.
@@ -266,6 +267,7 @@ The edge of the first rule is the value: the list holds text that stands for a v
 
 - A word or a date where a string is meant has the string's label, and the display kind of a start that reads as a number or a literal is not scored, e.g. the `2031` of `"due": 2031-07-04`. The word that a model writes without quotes where its source says nothing, in `model-output-32`, is such a word: it is the value that the answer gives, and all three opinions take it for a string.
 - A number with text added to it keeps the labels of its digits, e.g. those of `1,400,000` and of `+5`, and the added text has none.
+- A number with a leading zero, e.g. a file mode `0644`, has the depth and the container of its digits and not their display kind, as in the dataset: the number and the string of the same digits are as sensible. Two cases have such a value, and in both all three opinions take it for a string, which a score counted as a string before.
 - A word of another notation in the place of a literal or a number has no label, e.g. `True`, `nil` and `0x1F`.
 
 Where the opinions of a case differ on which of these three a text is, the text is disputed, e.g. `yes` as `true` or as the string `"yes"`, and `$9.99` as a number or as a string.
@@ -278,14 +280,14 @@ With the list, 5 cases that were disputed have full agreement, and 224 code poin
 
 | Cases | Count | Nothing to recover | Scored code points | `now` | `stay` | `resync` | `words` | `lines` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cases with full agreement | 222 | 6 | 19,394 | 22.0 / 1.9 | 50.4 / 17.1 | 62.5 / 44.0 | 75.6 / 48.6 | 76.1 / 49.1 |
-| All cases, the agreed code points | 240 | 7 | 20,672 | 21.4 / 2.1 | 50.4 / 18.0 | 62.7 / 44.2 | 76.5 / 49.4 | 76.9 / 49.8 |
+| Cases with full agreement | 222 | 6 | 19,394 | 22.0 / 2.3 | 50.4 / 18.1 | 62.6 / 44.9 | 75.6 / 49.5 | 76.1 / 50.0 |
+| All cases, the agreed code points | 240 | 7 | 20,672 | 21.4 / 2.6 | 50.5 / 18.9 | 62.7 / 45.1 | 76.5 / 50.2 | 76.9 / 50.6 |
 | `documents-and-web.txt`, full agreement | 37 | 1 | 3,613 | 15.3 / 0.0 | 56.5 / 16.7 | 78.5 / 63.9 | 89.0 / 66.7 | 89.0 / 66.7 |
-| `hand-editing.txt`, full agreement | 37 | 2 | 2,483 | 31.2 / 0.0 | 60.8 / 17.1 | 72.3 / 40.0 | 82.4 / 54.3 | 82.4 / 54.3 |
+| `hand-editing.txt`, full agreement | 37 | 2 | 2,483 | 31.4 / 0.0 | 60.9 / 20.0 | 72.5 / 42.9 | 82.5 / 57.1 | 82.5 / 57.1 |
 | `logs-and-transport.txt`, full agreement | 38 | 3 | 3,339 | 20.5 / 2.9 | 40.1 / 8.6 | 51.3 / 37.1 | 56.4 / 40.0 | 56.4 / 40.0 |
 | `merges-and-tools.txt`, full agreement | 36 | 0 | 2,852 | 18.8 / 2.8 | 49.1 / 25.0 | 54.8 / 50.0 | 73.5 / 55.6 | 73.5 / 55.6 |
 | `model-output.txt`, full agreement | 38 | 0 | 3,498 | 40.3 / 5.3 | 57.2 / 21.1 | 73.7 / 50.0 | 79.5 / 52.6 | 82.0 / 55.3 |
-| `other-notations.txt`, full agreement | 36 | 0 | 3,609 | 8.3 / 0.0 | 40.9 / 13.9 | 45.4 / 22.2 | 73.2 / 22.2 | 73.2 / 22.2 |
+| `other-notations.txt`, full agreement | 36 | 0 | 3,609 | 8.3 / 2.8 | 41.0 / 16.7 | 45.5 / 25.0 | 73.2 / 25.0 | 73.2 / 25.0 |
 
 Every reader gets less right here than on generated samples: for the broken samples of one document among the first 6,000, `check-align.ts` prints 41.7% of the code points for `now`, 73.8% for `stay`, 82.7% for `resync`, 91.4% for `words` and 91.3% for `lines`.
 
