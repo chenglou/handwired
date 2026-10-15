@@ -130,6 +130,17 @@ test('labels are those of the documents, each alone, and added code points have 
   }
 })
 
+// The index in the original of the first code point of a string value whose opening quote is not in the broken text,
+// which stands after the first error and whose display kind is not scored, or -1.
+function valueStartOf(sample: Sample) {
+  const original = Array.from(sample.original)
+  for (let position = sample.firstErrorPosition + 1; position < sample.alignment.length; position++) {
+    const index = sample.alignment[position]!
+    if (index > 0 && original[index - 1] === '"' && /[-0-9tfn]/.test(original[index]!) && !sample.alignment.includes(index - 1) && sample.unscoredKinds.includes(index) && sample.alignment[position - 1] === index - 2) return index
+  }
+  return -1
+}
+
 test('a second derivation that shares no code with the dataset agrees on every sample, and reports samples that are spoiled', () => {
   for (const sample of samples) {
     const problems = sampleProblems(sample)
@@ -146,6 +157,9 @@ test('a second derivation that shares no code with the dataset agrees on every s
     ['an added code point gets a counterpart', sample => sample.alignment.includes(-1), sample => { sample.alignment[sample.alignment.indexOf(-1)] = 0 }],
     // A kind of damage may leave any display kind after the first damage unscored, so only one before it is a mistake for certain.
     ['a display kind before the first damage is listed as not scored', sample => sample.firstDamage > 0 && !sample.unscoredKinds.includes(0), sample => { sample.unscoredKinds.push(0) }],
+    // A value without quotes that starts like a number or a literal, after the first error, where only the rule for
+    // such values leaves its first code points unscored.
+    ['the start of a value without quotes that reads as a number is scored', sample => valueStartOf(sample) !== -1, sample => { sample.unscoredKinds.splice(sample.unscoredKinds.indexOf(valueStartOf(sample)), 1) }],
     ['a depth that is scored is listed as not scored', sample => sample.unscoredNesting.length === 0, sample => { sample.unscoredNesting.push(sample.alignment.find(index => index !== -1)!) }],
     ['a depth that is not scored is scored', sample => sample.unscoredNesting.length > 0, sample => { sample.unscoredNesting.pop() }],
     ['a replaced flag is set on a kept code point', sample => sample.alignment[0] === 0 && !sample.replaced[0], sample => { sample.replaced[0] = true }],

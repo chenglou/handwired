@@ -11,7 +11,7 @@ import {type Edit, applyEdits, canonicalEdits, mergeEdits} from './edits.ts'
 import {type Label, type ValidLabel, labelsOfValidText, tokenSequenceOf} from './labels.ts'
 import {type Random, createRandom, hashText} from './random.ts'
 import {scan} from './scan.ts'
-import {limitsOf, mostRightOf} from './limits.ts'
+import {limitsOf, mostRightOf, readsAsNumberOrLiteral} from './limits.ts'
 import {type ParserTrace, capacity, runTableParser} from './table-parser.ts'
 import {type TypingReplay, type TypingStep, makeTypingReplay} from './typing.ts'
 
@@ -120,7 +120,7 @@ const parses = (text: string) => {
 
 const punctuation = displayKind.punctuation
 
-// The label values that are not scored, as indexes into the original. Three rules:
+// The label values that are not scored, as indexes into the original. Four rules:
 // - What a kind of damage declares, e.g. the quote of "call "Ana" back" that lost its backslash.
 // - Before the first error of the parser as it is, a value that the parser as it is does not give. Up to its first
 //   error a text is the start of a valid text, and every arm of the experiment reads valid JSON as now. E.g. in
@@ -128,7 +128,12 @@ const punctuation = displayKind.punctuation
 // - Where the labels' depth or container changes at a code point that is not a bracket, a bracket was removed before
 //   it and nothing in the text shows the change. From there to the next kept bracket the depth and the container are
 //   not scored, e.g. for the line feed after {"tags": ["ops", "beta"<line feed>}, where the ] is missing.
-function unscoredOf(original: readonly string[], labels: readonly ValidLabel[], alignment: readonly number[], firstDamage: number, trace: ParserTrace, declared: readonly number[]) {
+// - A string value that lost its opening quote and stands after white space or punctuation starts where a number or
+//   a literal can start. Its first code points that read as one have a display kind that is not scored, e.g. the 0.2
+//   of `version: 0.2.0` and the t of `NODE_ENV: test`: at the t no parser can tell test from true. Before the first
+//   error the second rule says the same, and this rule says it for the rest of the text. A key is another matter: no
+//   literal can stand where a key is expected, so the n of the key `name` is scored, see needsDisplayFix.
+function unscoredOf(original: readonly string[], broken: readonly string[], labels: readonly ValidLabel[], alignment: readonly number[], firstDamage: number, trace: ParserTrace, declared: readonly number[]) {
   const kept = new Set(alignment)
   const kinds = new Set(declared.filter(index => kept.has(index)))
   const nesting = new Set<number>()
@@ -138,6 +143,18 @@ function unscoredOf(original: readonly string[], labels: readonly ValidLabel[], 
     const label = labels[index]!
     if (label.kind !== trace.displayKind[position]) kinds.add(index)
     if (label.depth !== trace.depthAfter[position] || label.container !== trace.containerAfter[position]) nesting.add(index)
+  }
+  for (let position = 0; position < alignment.length; position++) {
+    const index = alignment[position]!
+    if (index <= 0 || labels[index]!.kind !== displayKind.string) continue
+    // The code point before it in the original is the value's opening quote, which is not in the broken text.
+    if (original[index - 1] !== '"' || labels[index - 1]!.kind !== displayKind.string || kept.has(index - 1)) continue
+    if (position > 0) {
+      const before = alignment[position - 1]!
+      if (before === -1 || kinds.has(before) || (labels[before]!.kind !== displayKind.whitespace && labels[before]!.kind !== punctuation)) continue
+    }
+    const run = readsAsNumberOrLiteral(broken, position)
+    for (let offset = 0; offset < run && alignment[position + offset] === index + offset && labels[index + offset]!.kind === displayKind.string; offset++) kinds.add(index + offset)
   }
   let previousDepth = 0
   let previousContainer = 0
@@ -213,7 +230,7 @@ function draftOf(parts: {
     if (trace.valid) return undefined
     for (let position = 0; position < trace.length; position++) if (trace.depthAfter[position]! > maximumDepth) return undefined
     const brokenCodePoints = Array.from(applied.broken)
-    const unscored = unscoredOf(originalCodePoints, labels, applied.alignment, firstDamage, trace, parts.unscoredKinds)
+    const unscored = unscoredOf(originalCodePoints, brokenCodePoints, labels, applied.alignment, firstDamage, trace, parts.unscoredKinds)
     const scored = applyUnscored(applied.alignment, labels, unscored.unscoredKinds, unscored.unscoredNesting)
     const limits = limitsOf(brokenCodePoints, scored, originalCodePoints, applied.alignment, applied.replaced, trace.firstErrorPosition)
     draft = {

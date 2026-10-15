@@ -539,7 +539,7 @@ export const notationKinds: KindDefinition[] = [
   {
     name: 'unquotedValue', family: 'other notation', origin: 'file', weight: 0.9,
     example: '{⏎  "env": production,⏎  "port": 8080⏎}',
-    reachable: 'yes: the value runs to the next comma or closer. line rule for several words that run to a line feed. Leading characters that read as a number or a literal, e.g. the 1.4 of 1.4.2, are shown as one by every parser, so their display kind is not scored. A colon inside the value, e.g. in a time, needs a tokenizer that knows that it is not reading a key',
+    reachable: 'yes: the value runs to the next comma or closer. line rule for several words that run to a line feed. Leading characters that read as a number or a literal, e.g. the 1.4 of 1.4.2 and the t of test, are shown as one by every parser, so their display kind is not scored. A colon inside the value, e.g. in a time, needs a tokenizer that knows that it is not reading a key',
     apply: unquotedValue,
   },
   {

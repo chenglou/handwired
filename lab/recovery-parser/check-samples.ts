@@ -1,5 +1,5 @@
 // A second derivation of what a sample holds, which shares no code with the dataset: its own JSON parser, its own
-// application of the edits, its own first damage and its own reading of the two rules about what is not scored. It
+// application of the edits, its own first damage and its own reading of the rules about what is not scored. It
 // takes from the dataset only the sample and labelsOf, to have something to compare with, and from the highlighter its
 // plain JavaScript reference.
 //
@@ -142,6 +142,34 @@ function ownNesting(codePoints: readonly string[], upTo: number) {
   return {depth, container}
 }
 
+// How many code points of a text from `position` on are one JSON number or one literal or the start of one, e.g. 3 for
+// `0.2.0`, 2 for `1.`, 1 for `test`, 4 for `nullable` and 0 for `production`.
+function ownNumberOrLiteralStart(codePoints: readonly string[], position: number): number {
+  for (const word of ['true', 'false', 'null']) {
+    let length = 0
+    while (length < word.length && codePoints[position + length] === word[length]) length++
+    if (length > 0) return length
+  }
+  // The places in a number: after the minus sign, after a leading zero, in the integer part, after the point, in the
+  // fraction, after the e, after the exponent's sign, in the exponent.
+  let place: 'start' | 'minus' | 'zero' | 'integer' | 'point' | 'fraction' | 'e' | 'sign' | 'exponent' = 'start'
+  let index = position
+  for (; index < codePoints.length; index++) {
+    const character = codePoints[index]!
+    const digit = isDigit(character)
+    if (place === 'start' && character === '-') place = 'minus'
+    else if ((place === 'start' || place === 'minus') && digit) place = character === '0' ? 'zero' : 'integer'
+    else if (place === 'integer' && digit) place = 'integer'
+    else if ((place === 'zero' || place === 'integer') && character === '.') place = 'point'
+    else if ((place === 'point' || place === 'fraction') && digit) place = 'fraction'
+    else if ((place === 'zero' || place === 'integer' || place === 'fraction') && (character === 'e' || character === 'E')) place = 'e'
+    else if (place === 'e' && (character === '+' || character === '-')) place = 'sign'
+    else if ((place === 'e' || place === 'sign' || place === 'exponent') && digit) place = 'exponent'
+    else break
+  }
+  return index - position
+}
+
 // What is wrong with a sample, as sentences, or an empty list.
 export function sampleProblems(sample: Sample): string[] {
   const problems: string[] = []
@@ -278,6 +306,22 @@ export function sampleProblems(sample: Sample): string[] {
     if ((label.kind === undefined) !== unscoredKinds.has(index)) problems.push(`the display kind at ${at} is scored or not against the sample's list`)
     if (!kindReadable && !unscoredKinds.has(index)) problems.push(`the display kind at ${at}, before the first error, is scored and is not what the parser as it is gives`)
     if (label.kind !== undefined && label.kind !== own.kind) problems.push(`the display kind at ${at} is not its counterpart's`)
+  })
+
+  // A string value without its opening quote, after white space or punctuation: the code points at its start that read
+  // as a number or a literal are not scored, e.g. the 0.2 of `version: 0.2.0`.
+  alignment.forEach((index, at) => {
+    if (index <= 0 || labels[index]!.kind !== kindOf.string) return
+    const quote = labels[index - 1]!
+    if (original[index - 1] !== '"' || quote.kind !== kindOf.string || kept.has(index - 1)) return
+    if (at > 0) {
+      const before = alignment[at - 1]!
+      if (before === -1 || unscoredKinds.has(before) || (labels[before]!.kind !== kindOf.whitespace && labels[before]!.kind !== kindOf.punctuation)) return
+    }
+    const length = ownNumberOrLiteralStart(broken, at)
+    for (let offset = 0; offset < length && alignment[at + offset] === index + offset && labels[index + offset]!.kind === kindOf.string; offset++) {
+      if (!unscoredKinds.has(index + offset)) problems.push(`the display kind at ${at + offset} is scored as a string, and the code point starts a value without quotes that reads as a number or a literal there`)
+    }
   })
   return problems
 }

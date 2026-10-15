@@ -226,7 +226,7 @@ export const stringKinds: KindDefinition[] = [
   {
     name: 'missingOpeningQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": Lisbon",⏎  "country": "PT"⏎}',
-    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. A value that starts like a number or a literal, e.g. 2.0", is shown as one up to the quote, which the tables then read as the start of a string',
+    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display cell, as a key without quotes does',
     apply: missingOpeningQuote,
   },
   {
