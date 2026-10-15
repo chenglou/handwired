@@ -2,7 +2,7 @@
 
 The shared core lets an arm change open cells and add tokenizer states and grammar states (`addStates`). This folder documents what else an arm can add, each as a function of `../recovery-tables.ts` that takes tables and returns tables. `../handwritten/rules-with-structure.md` says why a programmer would want them. With none of them used, tables, the parser, the twin and saved files are what they were. When the three were built, the exact parser got about 6% slower for such tables, measured on the old snapshot of the dataset: a scoring pass over that snapshot's train split took 143 to 145 ms where it took 135 to 137 ms before.
 
-The numbers here were made on the reviewed dataset. **The smoke runs are one seed each and untuned, so their scores are preliminary**: five seeds of the plain run are 0.7 points apart, see `../arms/plain-pass/README.md`.
+The numbers here were made on the reviewed dataset. **The smoke runs are one seed each and untuned, so their scores are preliminary**: five seeds of the plain run are 0.9 points apart, see `../arms/plain-pass/README.md`.
 
 ## Added character classes
 
@@ -114,18 +114,18 @@ Each check of the core and of the twin runs as before for today's tables, with t
 - `../check-tables.ts`, for each of the three alone and for all three with added states.
   - With the eight classes the tokenizer's table has 1,066 cells, 184 frozen and 882 open: a class out of `other` has 1 frozen cell, each of the two classes of digits has 13, and the carriage return's has 5. With open entries the display table has 140 open entries. With the bit the grammar's table has 176 frozen cells.
   - Each frozen cell, and each of the 37 entries that the search found, has a text that today's parser reads without an error up to it.
-  - No text reads an open cell or an open entry before its first error: the 68,290 texts of the check without structure, 4,000 texts with code points of the eight classes inside strings and between tokens, and every text of up to 6 code points, with one code point per class, 54,305,443 texts with the eight classes. The first two of these run today's parser, `../table-parser.ts`, and work out the cell themselves: the cell of a new class from the code point, and the bit from the text's line feeds and the trace's tokens.
+  - No text reads an open cell or an open entry before its first error: the 68,107 texts of the check without structure, 4,000 texts with code points of the eight classes inside strings and between tokens, and every text of up to 6 code points, with one code point per class, 54,305,443 texts with the eight classes. The first two of these run today's parser, `../table-parser.ts`, and work out the cell themselves: the cell of a new class from the code point, and the bit from the text's line feeds and the trace's tokens.
   - Tables with added structure are the same after saving and loading, and the four functions give the same tables in every order.
   - Refused: a changed frozen cell of a new class or with the bit, a file whose class table does not fit its added classes, five lists of classes that cannot be, a changed entry that a text reads before an error, `pastEnd` in an open entry, another kind for an event of a text's end, and a changed entry in tables without open entries.
   - Every cell in each of its two fields, every entry and every bit of the three masks is changed, one at a time, in each of the five kinds of tables. The 14,496 changes of a frozen cell, of an entry that is not open or of a mask are all refused, and the 17,230 changes of an open cell or an open entry are not.
   - `differencesOf` lists the 154 cells of 2 added tokenizer states and an added grammar state and no entry of the display table, and with open entries the state's 22 open entries too. No difference from today's tables is listed as one in a frozen cell.
-- `../check-parser.ts`, on 6,183 texts.
-  - Part c, for each of the three alone and for all three. With no cell changed, the tables give the trace of `asIsTables()` at all 513 positions, with the class of a code point compared as the class it has today and the context without the bit. 165,390 code points of those texts read a context with the bit. With 40 random settings of every open cell and every open entry, 10 of them with added states, every text has today's trace before its first error and today's verdict. In every run, the bit of every position's context is the one that the check counts from the trace's line feeds and tokens, and the two cells that the trace names are the cells of its state, class, token and context.
+- `../check-parser.ts`, on 6,168 texts.
+  - Part c, for each of the three alone and for all three. With no cell changed, the tables give the trace of `asIsTables()` at all 513 positions, with the class of a code point compared as the class it has today and the context without the bit. 165,373 code points of those texts read a context with the bit. With 40 random settings of every open cell and every open entry, 10 of them with added states, every text has today's trace before its first error and today's verdict. In every run, the bit of every position's context is the one that the check counts from the trace's line feeds and tokens, and the two cells that the trace names are the cells of its state, class, token and context.
   - Part d: structure that is added to tables whose open cells are changed already. Each step gives every open cell and entry a random choice and then adds one kind of structure: two classes that are taken out of added classes (the 9 out of the digits 7 to 9, the star out of the signs), the bit, open entries, added states. Every text has the same trace at all 513 positions before and after each step. So a new class's cell is a copy of the cell of the class that its code points came out of, also when that cell is changed.
   - Part e: tables with 133 classes, 255 tokenizer states, 200 grammar states and the bit have 33,915 tokenizer cells and 35,200 grammar cells, more than 16 bits can number. The trace names the cells that were read, which `cellsReadAt` and `withUnreadCellsOf` go by, and the ground rules hold.
 - `../soft/check-twin.ts`, for each of the three alone and for all three.
   - With today's choices and with 4 random settings, one of them with added states, the twin with exact tables is the exact parser on the 2,500 samples, the context with the bit among what is compared. 12,500 runs each, none differs when the depth range holds the run's depths.
-  - For the tables with the bit, the same 12,500 runs once more, kept on track after every code point whose intended state can be followed. No parser gives the trace of such a run, so the check counts the bit itself from the text's line feeds and the run's tokens, and the twin's bit before and after every step has to be that count. 1,626,535 states are replaced, about 265,000 of them while the bit is set.
+  - For the tables with the bit, the same 12,500 runs once more, kept on track after every code point whose intended state can be followed. No parser gives the trace of such a run, so the check counts the bit itself from the text's line feeds and the run's tokens, and the twin's bit before and after every step has to be that count. 1,635,760 states are replaced, about 266,000 of them while the bit is set.
   - Samples that were packed for other tables are refused: for today's classes, for another list of added classes of the same length, and for tables with or without the bit where the twin's tables are the other way round. Samples packed for the same classes under other names run.
 - `../soft/check-gradient.ts`: three more settings, with the eight classes, 2 added tokenizer states, an added grammar state, open entries of the display table and the bit, on 24 samples of which 11 need a class. Two of the settings keep the run on track, so the gradient crosses replaced states through the bit. All five groups of weights are compared, the display table's 1,458 weights among them. The backward pass agrees with finite differences as for today's tables: the largest relative difference of a direction is 2.0e-8.
 - `../soft/check-circuit.ts`: the step of tables with the eight classes, an added grammar state, open entries and the bit, as a Handwired circuit of 78,693 source cells and 81,357 operations, has the twin's values and gradients in 4 trials, one of them at a line feed.
@@ -174,7 +174,7 @@ And more places, each broken alone with the extended checks:
 
 ## Smoke runs
 
-These runs only show that training can use each kind of structure, and that the snapped tables can be scored. **They are no result of the experiment**: nothing was tuned, each run has one seed, and five seeds of the run `plain` range from 96.2% to 96.9% (`../arms/plain-pass/`), so a run here that is within that range of another is not told apart from it.
+These runs only show that training can use each kind of structure, and that the snapped tables can be scored. **They are no result of the experiment**: nothing was tuned, each run has one seed, and five seeds of the run `plain` range from 95.9% to 96.7% (`../arms/plain-pass/`), so a run here that is within that range of another is not told apart from it.
 
 ```sh
 export RECOVERY_SCRATCH=<a folder outside the repo>
@@ -182,37 +182,37 @@ bun lab/recovery-parser/learn/structure/smoke.ts                  # four runs, a
 bun lab/recovery-parser/learn/structure/smoke.ts display          # one of plain, classes, display, bit
 ```
 
-Each run is one pass of the trainer over the 37,570 train samples that give the twin a step, with every default: the start at the base's choices, every open cell and every open entry trainable, seed 1. `plain` trains today's tables, for comparison. `classes` adds a class for the apostrophe and two tokenizer states. `display` opens the display table's entries. `bit` adds the bit. The numbers are of the last snapped tables in the exact parser on the validation split, in percent:
+Each run is one pass of the trainer over the 37,381 train samples that give the twin a step, with every default: the start at the base's choices, every open cell and every open entry trainable, seed 1. `plain` trains today's tables, for comparison. `classes` adds a class for the apostrophe and two tokenizer states. `display` opens the display table's entries. `bit` adds the bit. The numbers are of the last snapped tables in the exact parser on the validation split, in percent:
 
 | run | cells changed against the run's base | all three, all samples | all three, group "needs a character class" | all three, group "needs a display fix" | all three, group "needs a line rule" | all three, singleQuotedString | display kind, unquotedKey | first letters t, f, n of keys without quotes that are shown as a key | all three, colonWithoutValue |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | the parser as it is | 0 | 42.7 | 10.1 | 18.3 | 63.8 | 4.4 | 25.1 | 0 of 438 | 63.9 |
-| `plain` | 990 | 96.6 | 89.3 | 96.6 | 99.7 | 93.2 | 95.3 | 0 of 438 | 99.7 |
-| `classes` | 1,069 | 96.7 | 89.5 | 95.7 | 99.5 | 93.0 | 93.9 | 0 of 438 | 99.7 |
-| `display` | 956 | 97.4 | 94.5 | 98.7 | 98.7 | 97.8 | 98.3 | 431 of 438 | 99.7 |
-| `bit` | 1,255 | 96.6 | 90.0 | 96.7 | 99.9 | 93.5 | 96.1 | 0 of 438 | 99.6 |
+| `plain` | 972 | 96.7 | 88.9 | 96.8 | 99.9 | 93.3 | 96.0 | 0 of 438 | 99.8 |
+| `classes` | 1,053 | 96.7 | 90.8 | 95.9 | 99.6 | 93.5 | 94.2 | 0 of 438 | 99.7 |
+| `display` | 966 | 97.5 | 95.2 | 98.9 | 99.4 | 98.3 | 98.4 | 429 of 438 | 99.8 |
+| `bit` | 1,214 | 96.8 | 91.7 | 97.2 | 99.9 | 94.6 | 96.5 | 0 of 438 | 99.4 |
 
-The tables of `classes` differ from today's parser in 1,079 cells: 10 cells of its two added tokenizer states were not changed and still count there.
+The tables of `classes` differ from today's parser in 1,065 cells: 12 cells of its two added tokenizer states were not changed and still count there.
 
-All three at the last 3 log points of each run: 95.6, 95.6, 96.6 for `plain`, 96.5, 96.7, 96.7 for `classes`, 97.4, 97.4, 97.4 for `display`, 96.2, 96.2, 96.6 for `bit`. So `classes`, `bit` and `plain` are not told apart by these runs: all three end inside the range of the five seeds of `plain`. `display` ends 0.4 points above the highest of those five seeds, with one seed of its own.
+All three at the last 3 log points of each run: 96.5, 96.8, 96.7 for `plain`, 96.3, 96.7, 96.7 for `classes`, 97.3, 97.2, 97.5 for `display`, 96.4, 96.7, 96.8 for `bit`. So `classes`, `bit` and `plain` are not told apart by these runs: `plain` and `classes` end inside the range of the five seeds of `plain`, and `bit` ends 0.1 points above the highest of them, where those seeds are 0.9 points apart. `display` ends 0.8 points above the highest of those five seeds, with one seed of its own.
 
 What the trained cells of each structure hold, from `differencesOf` of the run's base and its last tables, for the cells that a code point of a trained text reads:
 
-- **`classes`.** 23 cells of the class apostrophe changed. (between, apostrophe) holds the event `stringStart` and the next state `zero`, where it held `unexpectedCharacter` and `errorLine`. In 20 other states, e.g. the states of a number, of a literal and of an escape, the apostrophe's cell holds the event `stringContent` where it held an error event. Five cells lead into the added state 26, e.g. (hex1, comma) and (exponentSign, comma), and 10 cells of state 26 changed. No changed cell that a trained text reads leads into state 27.
-- **`display`.** 84 entries changed, and a trained text reads 75 of them. A literal's first letter is shown as a key when the grammar's next state is `keyOrClose`, `key` or `colon`, and a literal's later letters when it is `key`. Of the 56 entries of the 7 error events, 55 changed, and none of the 55 holds `error`: 31 hold `string`, 14 `key`, 7 `whitespace` and 3 `punctuation`.
-- **`bit`.** 88 grammar cells that a trained text reads both with and without the bit hold another choice with the bit, e.g. (value, comma, depth 1, object) holds the next state `key` without the bit and `colon` with it, and (commaOrClose, string, depth 1, array) holds `valueOrClose` without the bit and `error` with it.
+- **`classes`.** 22 cells of the class apostrophe changed. (between, apostrophe) holds the event `stringStart` and the next state `exponentDigits`, where it held `unexpectedCharacter` and `errorLine`. In 19 other states, e.g. the states of a number, of a literal and of an escape, the apostrophe's cell holds the event `stringContent` where it held an error event. One cell leads into the added state 26, (exponentSign, closeBracket), and 4 cells of state 26 changed. No changed cell that a trained text reads leads into state 27.
+- **`display`.** 86 entries changed, and a trained text reads 71 of them. A literal's first letter is shown as a key when the grammar's next state is `keyOrClose`, `key` or `colon`, and a literal's later letters when it is `keyOrClose` or `key`. Of the 56 entries of the 7 error events, 55 changed, and none of the 55 holds `error`: 32 hold `string`, 11 `key`, 7 `whitespace`, 3 `punctuation` and 2 `literal`.
+- **`bit`.** 97 grammar cells that a trained text reads both with and without the bit hold another choice with the bit, e.g. (value, comma, depth 2 to 15, object) holds the next state `keyOrClose` without the bit and `colon` with it, and (commaOrClose, string, depth 1, array) holds `value` without the bit and `error` with it.
 
 What the main number does not show, from `../compare.ts` and `../check-deep.ts`:
 
 | run | added code points shown as an error | code points shown as past the end | wrong depths on valid JSON of 17 to 19 levels, nothing after the nested containers | the same, members after |
 | --- | --- | --- | --- | --- |
-| the parser as it is | 89.5% | 0 | 0.0% | 0.0% |
-| `plain` | 0.9% | 20 | 0.0% | 0.0% |
-| `classes` | 5.9% | 101 | 0.0% | 0.0% |
-| `display` | 0.0% | 24 | 0.0% | 0.6% |
-| `bit` | 0.8% | 154 | 4.1% | 2.9% |
+| the parser as it is | 89.6% | 0 | 0.0% | 0.0% |
+| `plain` | 1.1% | 90 | 0.0% | 0.0% |
+| `classes` | 4.2% | 282 | 0.0% | 0.0% |
+| `display` | 0.0% | 0 | 0.0% | 0.2% |
+| `bit` | 0.4% | 0 | 0.0% | 2.6% |
 
-The run with the bit trains slower, since the grammar's part of a step has twice the cells, and the number moves with what else the machine runs. With 4 worker threads on an 18 core machine with other jobs running, two sets of the four runs gave 925 samples per second for `bit` against 975 to 1,472 for the others (a second job with 4 worker threads ran at the same time), and 1,196 against 1,284 to 1,676. The two sets ended with the same four tables, byte for byte.
+The run with the bit trains slower, since the grammar's part of a step has twice the cells, and the number moves with what else the machine runs. With 4 worker threads on an 18 core machine with other jobs running, two sets of the four runs gave 1,199 samples per second for `bit` against 1,229 to 1,632 for the others, and 910 against 1,306 to 1,417, each set with one or two other jobs with 4 worker threads running at the same time. The two sets ended with the same four tables, byte for byte.
 
 On the 2,800 fixed texts of `../arms/harness.ts`, each run's tables have today's trace at every position before the first error, and today's verdict (`groundRulesOn`).
 

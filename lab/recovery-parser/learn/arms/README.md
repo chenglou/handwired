@@ -15,9 +15,9 @@ The JSON highlighter is a parser written as two tables. The experiment changes t
 The samples are the dataset of `lab/recovery-parser/`: broken JSON, the text that was meant, and a label per code point. Its README is the reference. What an arm needs of it:
 
 - A score counts the **scored code points**: the ones from the first error on whose label has a scored value. "All three" is the share of them at which the display kind, the depth and the container are right, each where it is scored.
-- Every broken sample is in one of **six groups**, by what it takes to label it: "within reach of the tables" (72.7% of the broken validation samples), "needs a display fix", "needs a line rule", "needs a character class", "needs a nesting fix", "out of reach". Report the group "within reach of the tables" first: one number over all samples says little.
+- Every broken sample is in one of **six groups**, by what it takes to label it: "within reach of the tables" (73.4% of the broken validation samples), "needs a display fix", "needs a line rule", "needs a character class", "needs a nesting fix", "out of reach". Report the group "within reach of the tables" first: one number over all samples says little.
 - The splits are train, validation and test. Train on the train split, choose on the validation split, and leave the test split alone, see [The test split](#the-test-split).
-- Every record, every saved file of tables and every cache file holds the **dataset's key**, a hash of the dataset's source files, e.g. `8ba8aa239ccd8c78`. Results of two keys are results on two datasets, see [Tables of another dataset](#tables-of-another-dataset).
+- Every record, every saved file of tables and every cache file holds the **dataset's key**, a hash of the dataset's source files, `a71c027d33a5cd7b` for the dataset as it is. Results of two keys are results on two datasets, see [Tables of another dataset](#tables-of-another-dataset).
 
 ## Setup
 
@@ -28,8 +28,8 @@ export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-parser/learn/data.ts                    # the cache of the samples, about 12 s once
 bun lab/recovery-parser/learn/arms/baselines.ts          # the rows that every arm is read against, under 1 s
 bun lab/recovery-parser/learn/handwritten/rules.ts       # the hand-written tables, which the next command starts from
-bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json   # the number to beat
-bun lab/recovery-parser/learn/arms/plain-pass/run.ts     # the first arm, 5 seeds, about 2.5 minutes
+bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json   # the number to beat, about 2.5 minutes
+bun lab/recovery-parser/learn/arms/plain-pass/run.ts     # the first arm, 5 seeds, about 2 minutes
 bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and every check, 1 to 1.7 minutes
 ```
 
@@ -99,7 +99,7 @@ All in `harness.ts`, unless a file is named.
 - `build` returns `{tables, base}`: snapped tables, and the tables that the build started from. It may be async. `base` is another object than `tables`, with the same states, classes, contexts and open entries: `recordOf` throws otherwise, e.g. for a build that changed its base in place and returns it twice.
 - **`build` makes its model itself, once per seed.** `train` changes the model that it is given: the weights after the call are the trained ones. A model that is made once outside `build` is trained by the first seed, and the second seed then starts from the first seed's weights.
 - `seeds` are 1 to 5 unless you pass others. With fewer than 5 the summary says that the run is a try-out. An empty list throws, and so do a seed that is named twice, e.g. `[1, 1, 2]`, and a seed that is no whole number, e.g. `2.5`.
-- Per setting and seed it saves `<RECOVERY_SCRATCH>/arms/<name>/<setting>/seed-<seed>.tables.json` and `seed-<seed>.record.json`, and it prints and saves `summary.md`: one markdown row per setting with the mean, the lowest and the highest over the seeds, e.g. `96.62 (96.23 to 96.92)`. What an earlier run left in a setting's folder is moved into a folder `earlier-<time>` there first, so the files next to a summary are the files of that run.
+- Per setting and seed it saves `<RECOVERY_SCRATCH>/arms/<name>/<setting>/seed-<seed>.tables.json` and `seed-<seed>.record.json`, and it prints and saves `summary.md`: one markdown row per setting with the mean, the lowest and the highest over the seeds, e.g. `96.50 (95.88 to 96.74)`. What an earlier run left in a setting's folder is moved into a folder `earlier-<time>` there first, so the files next to a summary are the files of that run.
 - The seed has to reach everything that is random in the build: the order of the samples (`train`'s `seed`), a random choice of trainable cells, a random start. **All randomness of a build comes from its seed**: a build that draws something of its own takes `createRandom(seed, stream)` of `../../random.ts`, e.g. `createRandom(seed, 0).integer(0, 9)`, and never `Math.random()`. With `Math.random()` two runs of one seed give two tables, so a record cannot be made again, and the spread over the seeds also holds what the seed does not decide.
 - **When every seed gives the same tables, the build does not use its seed**: `runArm` says so in the summary, e.g. "5, which all gave the same tables" in the column of the seeds, and `describeComparison` then calls the setting one run and no spread. A setting whose first seeds give the same tables and a later one other tables is not named.
 - **A setting in which nothing is random** says so: `{name: 'search from the votes', withoutSeed: true, build: () => ...}`. It is built once, saved as `no-seed.tables.json` and `no-seed.record.json`, and reported and compared as one number, like a baseline.
@@ -140,60 +140,76 @@ What a build function calls from the rest of `learn/`:
 
 ## The bound of the plain table parser is not this parser's bound
 
-The dataset proves, per sample, what its plain table parser cannot label: `needsNestingFix`, `needsDisplayFix`, and the bound `mostRightFor`. That parser is the loop of `../../table-parser.ts`, whose depth moves only at a bracket that the tokenizer reads, and which keeps the kinds of the open containers in a running sum. On the validation split its bound is 97.94% of all three and 92.34% of whole samples.
+The dataset proves, per sample, what its plain table parser cannot label: `needsNestingFix`, `needsDisplayFix`, and the bound `mostRightFor`. That parser is the loop of `../../table-parser.ts`, whose depth moves only at a bracket that the tokenizer reads, and which keeps the kinds of the open containers in a running sum. On the validation split its bound is 97.94% of all three and 92.45% of whole samples.
 
-The parser of this experiment has a stack action in every grammar cell, e.g. a comma can pop, and a real stack. So its reach is larger, and its score can be above the bound: in the group "needs a nesting fix" the hand-written tables have 76.1% where the bound is 43.4%. Every place that prints the bound names it as the bound of the plain table parser. When you quote it, do the same.
+The parser of this experiment has a stack action in every grammar cell, e.g. a comma can pop, and a real stack. So its reach is larger, and its score can be above the bound: in the group "needs a nesting fix" the hand-written tables have 76.1% where the bound is 43.3%. Every place that prints the bound names it as the bound of the plain table parser. When you quote it, do the same.
 
-`plainParserProblems` in a record says whether your tables are tables of the plain loop: an empty list for today's tables and for the dataset's hand rules, and a sentence for a stack action that does something else than its token, for an added class, for the bit, and for a changed display table. Even with an empty list the two parsers are not the same: after a closing bracket that does not match, the real stack and the running sum disagree about the innermost container, the grammar reads another context, and the display kind can differ from there on. For the hand rule `words` that is 0.12% of the code points of 4,530 broken texts (`check.ts`).
+`plainParserProblems` in a record says whether your tables are tables of the plain loop: an empty list for today's tables and for the dataset's hand rules, and a sentence for a stack action that does something else than its token, for an added class, for the bit, and for a changed display table. Even with an empty list the two parsers are not the same: after a closing bracket that does not match, the real stack and the running sum disagree about the innermost container, the grammar reads another context, and the display kind can differ from there on. For the hand rule `words` that is 0.12% of the code points of 4,512 broken texts (`check.ts`).
 
 ## What a build function may read
 
 - **The train split**, for training: `trainDataFor(base)` and `trainPartOfTheStandardSet()`. `train` throws for a sample of another split, and so does `countVotes`: `samplesOfTheStandardSet()` holds the validation split too, and a build that packed `placesForTwin(samples, 'validation')` by mistake would train on the split that its record scores. `alsoOtherSplits: true` switches the error off, and no arm should need it.
 - **The validation split**, to choose between tables, e.g. the best of several log points. Then say so in the README: the validation score of tables that were chosen on the validation split is optimistic. `train` picks its `best` tables on one half of the validation split and reports the other half for this reason. The record of `runArm` is always the whole validation split.
 - **Never the test split.** It is not in the samples, see below.
-- **The dataset's hand rules `stay`, `resync` and `words` as a base, with care.** For them no split counts as unseen, the test split included: `../../hand-rules.ts` chooses between rules by the dataset's statistics, which are over the samples of every split. An arm that starts from one of them has no unseen split either, and their rows in `baselines()` and in `final.ts` are no numbers on unseen data.
+- **The dataset's hand rules `stay`, `resync`, `words` and `lines` as a base, with care.** For them no split counts as unseen, the test split included: `../../hand-rules.ts` chooses between rules by the dataset's statistics, which are over the samples of every split. An arm that starts from one of them has no unseen split either, and their rows in `baselines()` and in `final.ts` are no numbers on unseen data.
 - **The hand-written tables as a base, with care**: their rules were written with the old snapshot's samples in view, so for them, and for everything that starts from them, no split of this dataset counts as unseen.
 
 ## The rows that every arm is read against
 
-From `baselines.ts` and `plain-pass/run.ts`, on the validation split: 4,878 broken samples, 375 of them with nothing to recover, 675,695 scored code points. Percentages.
+From `baselines.ts` and `plain-pass/run.ts`, on the validation split: 5,021 broken samples, 425 of them with nothing to recover, 675,949 scored code points. Percentages.
 
 | setting | seeds | all three | display kind | depth | container | whole samples | cells changed against the base |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| the parser as it is | none | 42.68 | 49.14 | 75.06 | 88.65 | 11.10 | 0 |
-| the dataset's hand rule `stay`, as tables of the experiment | none | 73.80 | 78.15 | 93.91 | 98.15 | 28.09 | 1,058 |
-| the dataset's hand rule `resync`, as tables of the experiment | none | 84.34 | 88.17 | 94.97 | 98.33 | 70.95 | 1,078 |
-| the dataset's hand rule `words`, as tables of the experiment | none | 93.09 | 97.00 | 95.36 | 98.60 | 76.93 | 1,078 |
-| hand-written, the 35 rules of `../handwritten/rules.ts` | none | 96.51 | 98.69 | 97.65 | 99.56 | 80.04 | 915 |
-| one pass of the trainer from today's tables, defaults | 5 | 96.62 (96.23 to 96.92) | 98.26 (98.02 to 98.46) | 98.21 (97.85 to 98.35) | 99.79 (99.78 to 99.80) | 72.23 (71.29 to 73.22) | 980 (976 to 990) |
+| the parser as it is | none | 42.69 | 49.15 | 75.06 | 88.65 | 11.92 | 0 |
+| the dataset's hand rule `stay`, as tables of the experiment | none | 73.81 | 78.16 | 93.90 | 98.15 | 28.74 | 1,058 |
+| the dataset's hand rule `resync`, as tables of the experiment | none | 84.35 | 88.17 | 94.97 | 98.33 | 71.39 | 1,078 |
+| the dataset's hand rule `words`, as tables of the experiment | none | 93.09 | 97.00 | 95.36 | 98.60 | 77.31 | 1,078 |
+| the dataset's hand rule `lines`, as tables of the experiment | none | 93.23 | 97.00 | 95.50 | 98.59 | 77.48 | 1,108 |
+| hand-written, the 35 rules of `../handwritten/rules.ts` | none | 96.52 | 98.69 | 97.66 | 99.56 | 80.44 | 915 |
+| search from the hand-written tables, the number to beat | none | 97.75 | 99.09 | 98.53 | 99.71 | 79.37 | 429 |
+| one pass of the trainer from today's tables, defaults | 5 | 96.50 (95.88 to 96.74) | 98.22 (98.11 to 98.27) | 98.13 (97.64 to 98.35) | 99.68 (99.39 to 99.79) | 73.22 (72.76 to 73.54) | 967 (935 to 984) |
 
-All three per group, with the group's validation samples:
+All three per group of the dataset, with the group's validation samples:
 
-| setting | within reach of the tables, 3,547 | needs a display fix, 37 | needs a line rule, 487 | needs a character class, 326 | needs a nesting fix, 74 | out of reach, 407 |
+| setting | within reach of the tables, 3,687 | needs a display fix, 37 | needs a line rule, 488 | needs a character class, 326 | needs a nesting fix, 76 | out of reach, 407 |
 | --- | --- | --- | --- | --- | --- | --- |
 | the parser as it is | 47.4 | 18.3 | 63.8 | 10.1 | 26.5 | 25.6 |
 | `stay` | 79.0 | 57.9 | 90.8 | 49.5 | 36.1 | 50.1 |
 | `resync` | 92.8 | 70.3 | 96.7 | 49.9 | 42.3 | 53.3 |
 | `words` | 98.3 | 95.0 | 97.8 | 85.7 | 42.7 | 62.4 |
+| `lines` | 98.3 | 95.0 | 99.6 | 85.7 | 42.7 | 62.4 |
 | hand-written, 35 rules | 99.5 | 98.2 | 99.0 | 92.2 | 76.1 | 78.0 |
-| one pass of the trainer, 5 seeds | 99.0 (98.7 to 99.2) | 96.6 (95.6 to 97.2) | 99.8 (99.7 to 99.9) | 89.8 (88.0 to 91.1) | 91.9 (91.6 to 92.1) | 82.9 (81.1 to 84.0) |
+| search from the hand-written tables | 99.7 | 98.0 | 99.1 | 94.9 | 90.3 | 85.4 |
+| one pass of the trainer, 5 seeds | 99.1 (98.9 to 99.3) | 96.2 (94.2 to 96.8) | 99.7 (98.9 to 99.9) | 89.7 (88.9 to 90.5) | 89.4 (83.1 to 92.8) | 81.6 (76.9 to 83.6) |
 
 What the main number does not show:
 
 | setting | added code points shown as an error | code points shown as past the end | wrong depths on valid JSON of 17 to 19 levels: nothing after the nested containers | the same, members after | tables of the plain table parser |
 | --- | --- | --- | --- | --- | --- |
-| the parser as it is | 89.5 | 0 | 0.0 | 0.0 | yes |
-| `stay` | 62.6 | 0 | 0.0 | 0.0 | yes |
-| `resync` | 60.1 | 0 | 0.0 | 0.0 | yes |
+| the parser as it is | 89.6 | 0 | 0.0 | 0.0 | yes |
+| `stay` | 62.7 | 0 | 0.0 | 0.0 | yes |
+| `resync` | 60.2 | 0 | 0.0 | 0.0 | yes |
 | `words` | 3.7 | 0 | 0.0 | 0.0 | yes |
+| `lines` | 3.7 | 0 | 0.0 | 0.0 | yes |
 | hand-written, 35 rules | 0.0 | 0 | 0.0 | 0.0 | no: 21 grammar cells hold a stack action that does something else than their token does |
-| one pass of the trainer, 5 seeds | 0.9 (0.7 to 1.1) | 7 (0 to 20) | 3.0 (0.0 to 8.1) | 4.8 (0.0 to 9.4) | no: 24 such grammar cells in the first seed |
+| search from the hand-written tables | 0.0 | 0 | 18.5 | 30.2 | no: 94 such grammar cells |
+| one pass of the trainer, 5 seeds | 0.9 (0.7 to 1.1) | 50 (0 to 160) | 3.0 (0.0 to 12.3) | 4.7 (0.0 to 16.4) | no: 26 such grammar cells in the first seed |
+
+The base of `lines` is today's tables with the tokenizer state that the rule adds, so its tables differ from today's parser in 1,111 cells. The base of the search is the hand-written tables, and its tables differ from today's parser in 983 cells.
+
+The sentences of `describeComparison` for the plain pass, as `plain-pass/run.ts` prints them:
+
+- All three, all validation samples: "one pass of the trainer from today's tables, defaults" has 96.50 (95.88 to 96.74) over 5 seeds, "hand-written, the 35 rules of handwritten/rules.ts" has 96.52 and no seed. The means differ by -0.01 points, and the two ranges overlap, so these seeds do not tell the two settings apart.
+- All three, group: within reach of the tables: "one pass of the trainer from today's tables, defaults" has 99.11 (98.87 to 99.31) over 5 seeds, "hand-written, the 35 rules of handwritten/rules.ts" has 99.51 and no seed. The means differ by -0.39 points, and the two ranges do not overlap.
+- All three, all validation samples: "one pass of the trainer from today's tables, defaults" has 96.50 (95.88 to 96.74) over 5 seeds, "search from the hand-written tables" has 97.75 and no seed. The means differ by -1.24 points, and the two ranges do not overlap.
+- All three, group: within reach of the tables: "one pass of the trainer from today's tables, defaults" has 99.11 (98.87 to 99.31) over 5 seeds, "search from the hand-written tables" has 99.68 and no seed. The means differ by -0.57 points, and the two ranges do not overlap.
 
 What to read from them:
 
-- **Two seeds of one setting are up to 0.7 points apart.** The plain pass ranges from 96.23% to 96.92%. A setting that is half a point above another in one seed each has shown nothing.
-- **The number to beat is not in this table.** A plain search that starts from the hand-written tables ends at 97.71%, see `../search/README.md`. An arm without added structure that ends below it has found nothing that a search does not find.
-- **The dataset's `words` is 93.09% here, and the dataset's README says 92.0%.** That number is over all splits and from the plain table parser. Here it is the validation split and the parser with a real stack.
+- **Two seeds of one setting are up to 0.9 points apart.** The plain pass ranges from 95.88% to 96.74%. A setting that is half a point above another in one seed each has shown nothing.
+- **The number to beat is the row "search from the hand-written tables", 97.75%.** `numberToBeat()` gives it. An arm without added structure that ends below it has found nothing that a search does not find, see `../search/README.md`.
+- **The two rows of a comparison can disagree.** On all samples the plain pass is not told apart from the hand-written tables. In the group "within reach of the tables" it is 0.4 points below them, and no seed reaches them: what the trainer gains is in the groups "needs a nesting fix" and "out of reach", where it has 89.4% and 81.6% against 76.1% and 78.0%.
+- **The dataset's `words` is 93.09% here, and the dataset's README says 91.9%.** That number is over all splits and from the plain table parser. Here it is the validation split and the parser with a real stack. The same holds for `lines`, 93.23% here and 92.3% there.
 - **The plain pass is untuned.** It is the spread that matters in its row, not its mean.
 
 ## The test split

@@ -448,7 +448,7 @@ export const numberToBeatFileOf = (scratchFolder: string) => join(scratchFolder,
 // search does not find. Its base is the hand-written tables, which the search started from, and for which no split
 // counts as unseen, so the same holds for this row.
 //
-// The tables are read from <scratch>/search/search-from-handwritten.json, which these two commands make, in about 5
+// The tables are read from <scratch>/search/search-from-handwritten.json, which these two commands make, in about 3
 // minutes:
 //   bun lab/recovery-parser/learn/handwritten/rules.ts
 //   bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json

@@ -37,13 +37,13 @@ The rules rest on which cells are open. `recovery-tables.ts` finds the frozen ce
 
 How the rules are checked:
 
-- `check-tables.ts`: for each of the 236 frozen cells, a text reads the cell before any error, so no cell is frozen without need. And no text reads an open cell before its first error: 68,290 texts, among them the originals and the broken texts of the samples with the indexes 0 to 29,999 that are not in the test split, and valid texts with 16 levels and with 512 code points. The same holds for every text of up to 6 code points, which the check goes through class by class, 17,303,316 texts. A table file with a changed frozen cell is refused, and so is one with a number that a byte does not hold. Every cell is also changed alone, in each of its two fields, and so is every bit of the masks of open cells: the 2,434 changes of a frozen cell or of a mask are refused, and the 2,652 changes of an open cell are not.
-- `check-parser.ts`: with today's tables the parser gives the trace of `table-parser.ts` on 58,290 texts. And for 200 random settings of every open cell, 50 of them with added states, rules 1 and 2 hold on 5,183 texts each, with every valid text's whole trace identical.
+- `check-tables.ts`: for each of the 236 frozen cells, a text reads the cell before any error, so no cell is frozen without need. And no text reads an open cell before its first error: 68,107 texts, among them the originals and the broken texts of the samples with the indexes 0 to 29,999 that are not in the test split, and valid texts with 16 levels and with 512 code points. The same holds for every text of up to 6 code points, which the check goes through class by class, 17,303,316 texts. A table file with a changed frozen cell is refused, and so is one with a number that a byte does not hold. Every cell is also changed alone, in each of its two fields, and so is every bit of the masks of open cells: the 2,434 changes of a frozen cell or of a mask are refused, and the 2,652 changes of an open cell are not.
+- `check-parser.ts`: with today's tables the parser gives the trace of `table-parser.ts` on 58,107 texts. And for 200 random settings of every open cell, 50 of them with added states, rules 1 and 2 hold on 5,168 texts each, with every valid text's whole trace identical.
 - Both checks then run the same parts for tables with added structure, which is most of their time. `structure/README.md` says what those parts cover.
 - `arms/harness.ts` runs every tables that an arm records on 2,800 fixed texts and writes into the record whether each has today's trace up to its first error and today's verdict. `arms/check.ts` shows that this check can say no: for tables with one changed frozen cell it does, for each of 40 frozen cells that were tried.
 - A review of the first version ran its own exact search over 4,063,196 parser states, with the kind of every open container, and found the same 148 and 88 frozen cells. Those scripts are not in the repo.
 
-**What rule 1 does not cover: valid JSON that is too deep or too long.** A valid JSON text of 17 levels or more has a first error at its 17th opening bracket, and reads open cells from there on, so tables may show the rest of it otherwise than today. The dataset has no text deeper than 16 levels, so no score sees that. Today's parser keeps the depth of such a text right at every code point. `check-deep.ts` counts the code points at which saved tables do not, on 300 texts with nothing but closing brackets after their innermost container, e.g. `[1, [2, [3]]]`, and on 300 texts in which members follow the nested containers, e.g. `[[[3], 2], 1]`. Tables can pass the first form and fail the second. The hand-written tables and the votes have no wrong depth in either. Every search has, at 17% to 70% of the code points after the 17th bracket, and so have 4 of the 5 seeds of the trainer's plain pass, see the table of scores. A valid text of more than 512 code points is safe: its first error is at position 512, after everything that is shown.
+**What rule 1 does not cover: valid JSON that is too deep or too long.** A valid JSON text of 17 levels or more has a first error at its 17th opening bracket, and reads open cells from there on, so tables may show the rest of it otherwise than today. The dataset has no text deeper than 16 levels, so no score sees that. Today's parser keeps the depth of such a text right at every code point. `check-deep.ts` counts the code points at which saved tables do not, on 300 texts with nothing but closing brackets after their innermost container, e.g. `[1, [2, [3]]]`, and on 300 texts in which members follow the nested containers, e.g. `[[[3], 2], 1]`. Tables can pass the first form and fail the second. The hand-written tables and the votes have no wrong depth in either. Every search has, at 6% to 79% of the code points after the 17th bracket, and so have 2 of the 5 seeds of the trainer's plain pass, see the table of scores. A valid text of more than 512 code points is safe: its first error is at position 512, after everything that is shown.
 
 ## The parser
 
@@ -58,7 +58,7 @@ The edges, chosen so that today's tables give today's depths everywhere, and tod
 - The context of a depth below 0 is the one of depth 0, without a container. The context of a depth above 16 is the one of depth 16, with the kind at level 16, which above 16 levels is not the innermost container.
 - Position 512 reads the context of an array or of no container, even inside an object, as in the highlighter's program.
 
-**This parser is not the dataset's plain table parser.** The dataset's loop, `../table-parser.ts`, changes the depth by the tokenizer's event and keeps the running sum. Its two proofs (`needsNestingFix`, `needsDisplayFix`) and its bound (`mostRightFor`) are about that loop, and its README says that they say nothing about a parser whose depth changes by something else. Here a grammar cell holds a stack action, e.g. a comma can pop, and the stack is real. So this parser can label samples that the plain loop provably cannot: in the group "needs a nesting fix" the hand-written tables have 76.1% of the scored code points right, where the bound of the plain loop is 43.4%. Wherever the bound is printed, it is named as the bound of the plain table parser. `plainParserProblems` in `plain-tables.ts` says in sentences whether some tables are tables of the plain loop at all, and every record of an arm holds what it says.
+**This parser is not the dataset's plain table parser.** The dataset's loop, `../table-parser.ts`, changes the depth by the tokenizer's event and keeps the running sum. Its two proofs (`needsNestingFix`, `needsDisplayFix`) and its bound (`mostRightFor`) are about that loop, and its README says that they say nothing about a parser whose depth changes by something else. Here a grammar cell holds a stack action, e.g. a comma can pop, and the stack is real. So this parser can label samples that the plain loop provably cannot: in the group "needs a nesting fix" the hand-written tables have 76.1% of the scored code points right, where the bound of the plain loop is 43.3%. Wherever the bound is printed, it is named as the bound of the plain table parser. `plainParserProblems` in `plain-tables.ts` says in sentences whether some tables are tables of the plain loop at all, and every record of an arm holds what it says.
 
 What a port of trained tables into the highlighter's program would need:
 
@@ -84,12 +84,12 @@ As the dataset says a score counts (see "What a score counts" in `../README.md`)
 
 **Training reads the train split only.** `train` of `soft/train.ts` throws for a sample of the validation split, since the packed samples hold their split, and `countVotes` of `search/votes.ts` does the same. A call that wants such samples has to ask for them with `alsoOtherSplits: true`.
 
-**The validation split is not all unseen text.** A sample has the split of its original document, by the document's tokens (`../splits.ts`), so two documents of two splits can end as the same short broken text. 18 of the 4,878 broken validation samples have a broken text that a broken train sample has too, e.g. `{...}` and `0.` (13 texts). 8 of them have something to score: 57 of the 675,695 scored code points. `data.ts` prints the count.
+**The validation split is not all unseen text.** A sample has the split of its original document, by the document's tokens (`../splits.ts`), so two documents of two splits can end as the same short broken text. 52 of the 5,021 broken validation samples have a broken text that a broken train sample has too (15 texts). 32 of them are a `[` alone, and 29 of those are the document `[]` before its closing bracket is typed, or cut off after its first: `[]` is a validation document since the dataset split its ten smallest documents by hand, and one train sample, the first keystroke of a longer array, has the same text. Others are e.g. `0.` and `{...}`. 11 of the 52 have something to score: 60 of the 675,949 scored code points. `data.ts` prints the count.
 
 Three things that the shares do not show are counted next to them, in every row:
 
-- **The bound of the plain table parser.** The dataset's `mostRightFor` gives the most scored code points that one run of the plain loop can have right, whatever its open cells hold. On the validation split it is 97.94% of all three and 92.34% of whole samples. It is no bound for this parser, see [The parser](#the-parser).
-- **How the damage itself is shown.** A code point that the damage added has no label, and no label is ever the display kind `error`. So tables lose nothing in the shares by never showing an error. The score counts the added code points that are shown as an error, and the samples that show an error at or after the first damage. Today's parser shows 89.5% of the added code points as an error. The hand-written tables show none.
+- **The bound of the plain table parser.** The dataset's `mostRightFor` gives the most scored code points that one run of the plain loop can have right, whatever its open cells hold. On the validation split it is 97.94% of all three and 92.45% of whole samples. It is no bound for this parser, see [The parser](#the-parser).
+- **How the damage itself is shown.** A code point that the damage added has no label, and no label is ever the display kind `error`. So tables lose nothing in the shares by never showing an error. The score counts the added code points that are shown as an error, and the samples that show an error at or after the first damage. Today's parser shows 89.6% of the added code points as an error. The hand-written tables show none.
 - **Code points shown as "past the end"**, the display kind of the cells after a text. A tokenizer cell can hold one of the three events of a text's end, and a code point that reads the cell is then shown so. The search no longer tries these events. A trained cell can still snap to one.
 
 Two counts of cells stand next to a score, under two names, because they are not the same number once tables have added structure:
@@ -101,49 +101,52 @@ On the samples with the indexes 0 to 19,999 of the train and validation splits, 
 
 ## Scores on the validation split
 
-The validation split of the standard set (seed 20261015, indexes 0 to 59,999) has 4,878 broken samples, 375 of them with nothing to recover, and 675,695 scored code points. The percentages are of those code points, and of the samples with something to recover for "whole samples". The last four columns are what the main number does not show. The rows come from `arms/baselines.ts`, `arms/plain-pass/run.ts`, `compare.ts` and `check-deep.ts`.
+The validation split of the standard set (seed 20261015, indexes 0 to 59,999) has 5,021 broken samples, 425 of them with nothing to recover, and 675,949 scored code points. The percentages are of those code points, and of the samples with something to recover for "whole samples". The last four columns are what the main number does not show. The rows come from `arms/baselines.ts`, `arms/plain-pass/run.ts`, `compare.ts` and `check-deep.ts`.
 
 | tables | cells changed against the base | all three | display kind | depth | container | whole samples | added code points shown as an error | samples that show an error | wrong depths on valid JSON of 17 to 19 levels: nothing after, members after |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| the parser as it is | 0 | 42.68 | 49.14 | 75.06 | 88.65 | 11.10 | 89.5 | 61.1 | 0.0, 0.0 |
-| the dataset's hand rule `stay` | 1,058 | 73.80 | 78.15 | 93.91 | 98.15 | 28.09 | 62.6 | 61.1 | 0.0, 0.0 |
-| the dataset's hand rule `resync` | 1,078 | 84.34 | 88.17 | 94.97 | 98.33 | 70.95 | 60.1 | 45.0 | 0.0, 0.0 |
-| the dataset's hand rule `words` | 1,078 | 93.09 | 97.00 | 95.36 | 98.60 | 76.93 | 3.7 | 14.0 | 0.0, 0.0 |
-| hand-written, 35 rules | 915 | 96.51 | 98.69 | 97.65 | 99.56 | 80.04 | 0.0 | 0.0 | 0.0, 0.0 |
-| votes, the walk as specified | 211 | 69.47 | 80.83 | 77.17 | 89.30 | 62.82 | 4.1 | 11.2 | 0.0, 0.0 |
-| votes, `--follow` | 303 | 80.84 | 88.66 | 86.83 | 96.25 | 66.67 | 0.9 | 2.0 | 0.0, 0.0 |
-| search from today's tables | 866 | 94.22 | 96.23 | 97.60 | 99.64 | 72.88 | 0.5 | 9.5 | 22.4, 39.0 |
-| search from today's tables, `--order 1` | 894 | 96.16 | 97.58 | 98.29 | 99.71 | 57.50 | 0.1 | 1.6 | 42.5, 50.1 |
-| search from today's tables, `--order 2` | 946 | 88.65 | 92.01 | 94.04 | 98.74 | 55.21 | 6.5 | 33.3 | 68.6, 70.4 |
-| search from the votes | 785 | 86.52 | 91.38 | 91.34 | 97.75 | 67.11 | 0.5 | 10.9 | 51.9, 51.4 |
-| search from the hand-written tables | 464 | 97.71 | 99.12 | 98.47 | 99.73 | 78.33 | 0.0 | 0.1 | 16.9, 21.9 |
-| the trainer's plain pass, 5 seeds: mean (lowest to highest) | 980 (976 to 990) | 96.62 (96.23 to 96.92) | 98.26 (98.02 to 98.46) | 98.21 (97.85 to 98.35) | 99.79 (99.78 to 99.80) | 72.23 (71.29 to 73.22) | 0.9 (0.7 to 1.1) | 5.7 (3.2 to 9.2) | 3.0 (0.0 to 8.1), 4.8 (0.0 to 9.4) |
+| the parser as it is | 0 | 42.69 | 49.15 | 75.06 | 88.65 | 11.92 | 89.6 | 61.0 | 0.0, 0.0 |
+| the dataset's hand rule `stay` | 1,058 | 73.81 | 78.16 | 93.90 | 98.15 | 28.74 | 62.7 | 61.0 | 0.0, 0.0 |
+| the dataset's hand rule `resync` | 1,078 | 84.35 | 88.17 | 94.97 | 98.33 | 71.39 | 60.2 | 44.8 | 0.0, 0.0 |
+| the dataset's hand rule `words` | 1,078 | 93.09 | 97.00 | 95.36 | 98.60 | 77.31 | 3.7 | 13.9 | 0.0, 0.0 |
+| the dataset's hand rule `lines` | 1,108 | 93.23 | 97.00 | 95.50 | 98.59 | 77.48 | 3.7 | 13.9 | 0.0, 0.0 |
+| hand-written, 35 rules | 915 | 96.52 | 98.69 | 97.66 | 99.56 | 80.44 | 0.0 | 0.0 | 0.0, 0.0 |
+| votes, the walk as specified | 210 | 69.47 | 80.83 | 77.17 | 89.30 | 63.19 | 4.0 | 11.0 | 0.0, 0.0 |
+| votes, `--follow` | 302 | 80.84 | 88.65 | 86.83 | 96.25 | 67.04 | 0.9 | 2.0 | 0.0, 0.0 |
+| search from today's tables | 870 | 94.34 | 96.07 | 97.95 | 99.71 | 72.78 | 0.4 | 6.2 | 5.6, 11.5 |
+| search from today's tables, `--order 1` | 931 | 96.30 | 97.69 | 98.35 | 99.70 | 56.64 | 0.0 | 0.9 | 43.3, 48.1 |
+| search from today's tables, `--order 2` | 937 | 89.41 | 92.40 | 94.70 | 98.95 | 55.11 | 5.4 | 33.9 | 79.0, 73.4 |
+| search from the votes | 823 | 86.56 | 91.44 | 91.41 | 97.79 | 67.75 | 0.4 | 10.5 | 52.2, 54.6 |
+| search from the hand-written tables | 429 | 97.75 | 99.09 | 98.53 | 99.71 | 79.37 | 0.0 | 0.2 | 18.5, 30.2 |
+| the trainer's plain pass, 5 seeds: mean (lowest to highest) | 967 (935 to 984) | 96.50 (95.88 to 96.74) | 98.22 (98.11 to 98.27) | 98.13 (97.64 to 98.35) | 99.68 (99.39 to 99.79) | 73.22 (72.76 to 73.54) | 0.9 (0.7 to 1.1) | 6.2 (4.6 to 7.8) | 3.0 (0.0 to 12.3), 4.7 (0.0 to 16.4) |
 
-The base of every row is today's tables, except for the two searches from other tables, whose base is the tables they started from. The three hand rules are the dataset's (`../hand-rules.ts`) as tables of this experiment, with the stack action `by token` in every grammar cell. Their numbers here are not the ones of the dataset's statistics: those are over all splits, and this parser keeps a real stack, see `arms/README.md`.
+The base of every row is today's tables, with two exceptions. The base of the two searches from other tables is the tables they started from. And the base of `lines` is today's tables with the tokenizer state that the rule adds: its tables differ from today's parser in 1,111 cells, since each of the 33 cells of that state counts there. The four hand rules are the dataset's (`../hand-rules.ts`) as tables of this experiment, with the stack action `by token` in every grammar cell. Their numbers here are not the ones of the dataset's statistics: those are over all splits, and this parser keeps a real stack, see `arms/README.md`.
 
 **For the dataset's hand rules no split counts as unseen, the test split included.** `../hand-rules.ts` chooses between rules by the dataset's statistics, which `../stats.ts` counts over the samples of every split. So their rows are no numbers on unseen data, here or in `arms/final.ts`, and an arm that starts from one of them has no unseen split either. The same holds for the hand-written rules, see below.
 
 All three per group of the dataset, with the group's validation samples:
 
-| tables | within reach of the tables, 3,547 | needs a display fix, 37 | needs a line rule, 487 | needs a character class, 326 | needs a nesting fix, 74 | out of reach, 407 |
+| tables | within reach of the tables, 3,687 | needs a display fix, 37 | needs a line rule, 488 | needs a character class, 326 | needs a nesting fix, 76 | out of reach, 407 |
 | --- | --- | --- | --- | --- | --- | --- |
 | the parser as it is | 47.4 | 18.3 | 63.8 | 10.1 | 26.5 | 25.6 |
 | the dataset's hand rule `words` | 98.3 | 95.0 | 97.8 | 85.7 | 42.7 | 62.4 |
+| the dataset's hand rule `lines` | 98.3 | 95.0 | 99.6 | 85.7 | 42.7 | 62.4 |
 | hand-written, 35 rules | 99.5 | 98.2 | 99.0 | 92.2 | 76.1 | 78.0 |
-| search from the hand-written tables | 99.6 | 98.1 | 99.3 | 95.2 | 88.5 | 84.8 |
-| the trainer's plain pass, 5 seeds | 99.0 (98.7 to 99.2) | 96.6 (95.6 to 97.2) | 99.8 (99.7 to 99.9) | 89.8 (88.0 to 91.1) | 91.9 (91.6 to 92.1) | 82.9 (81.1 to 84.0) |
-| the bound of the plain table parser | 100.0 | 99.1 | 100.0 | 100.0 | 43.4 | 84.6 |
+| search from the hand-written tables | 99.7 | 98.0 | 99.1 | 94.9 | 90.3 | 85.4 |
+| the trainer's plain pass, 5 seeds | 99.1 (98.9 to 99.3) | 96.2 (94.2 to 96.8) | 99.7 (98.9 to 99.9) | 89.7 (88.9 to 90.5) | 89.4 (83.1 to 92.8) | 81.6 (76.9 to 83.6) |
+| the bound of the plain table parser | 100.0 | 99.1 | 100.0 | 100.0 | 43.3 | 84.6 |
 
 What to take from it:
 
-- **The number to beat is the search from the hand-written tables, 97.71%.** The hand-written tables are a recovery that a person can read, not the best that the cells hold: a plain search changes 464 of their cells and gains 1.2 points. It loses 1.7 points of whole samples on the way, and the depth of valid JSON that is too deep.
-- **Where a search ends depends on where it starts and on the order of its cells.** From today's tables three orders end at 94.22%, 96.16% and 88.65%, 7.5 points apart, and from the votes the search ends at 86.52%. None of these is the limit of the cells.
-- **The trainer's plain pass is no arm, and it is already at 96.62%.** It is one pass over the train split with every default, untuned. Its five seeds are 0.69 points apart, from 96.23% to 96.92%, so a difference of half a point between two runs of one seed each says nothing. The mean is 0.1 points above the hand-written tables and 1.1 below the search from them.
+- **The number to beat is the search from the hand-written tables, 97.75%.** The hand-written tables are a recovery that a person can read, not the best that the cells hold: a plain search changes 429 of their cells and gains 1.2 points. It loses 1.1 points of whole samples on the way, and the depth of valid JSON that is too deep. `numberToBeat()` of `arms/harness.ts` gives an arm this row.
+- **Where a search ends depends on where it starts and on the order of its cells.** From today's tables three orders end at 94.34%, 96.30% and 89.41%, 6.9 points apart, and from the votes the search ends at 86.56%. None of these is the limit of the cells.
+- **The trainer's plain pass is no arm, and it is already at 96.50%.** It is one pass over the train split with every default, untuned. Its five seeds are 0.86 points apart, from 95.88% to 96.74%, so a difference of half a point between two runs of one seed each says nothing. The mean is 0.01 points below the hand-written tables, which lie inside the range of the seeds, and 1.2 below the search from them, which is above every seed.
 - **The hand-written rules were written with the old snapshot's samples in view**, so for them no split of this dataset counts as unseen, see `handwritten/README.md`. The same holds for everything that starts from them.
-- **Code points and whole samples do not rank the tables alike.** The hand-written tables have the most whole samples, 80.04%. The search with `--order 1` has 96.16% of the code points and 57.50% of the whole samples.
-- **No tables that score well show the damage as an error**, and most tables that a search or the trainer made break the depth of valid JSON that is too deep. Neither is in the main number. Whether a recovering highlighter should mark the damage, and whether texts that are too deep should be in the dataset, is not settled, see [Not settled](#not-settled).
-- Code points shown as "past the end": 0 to 20 for the seeds of the trainer's plain pass, 0 for every other row.
-- In the group "needs a nesting fix" the hand-written tables, the search from them and the trainer's plain pass are far above the bound of the plain table parser, 43.4%, with 76.1%, 88.5% and 91.9%. That is what the stack actions are for. The dataset's hand rule `words`, which has no stack action, is at 42.7% there.
+- **Code points and whole samples do not rank the tables alike.** The hand-written tables have the most whole samples, 80.44%. The search with `--order 1` has 96.30% of the code points and 56.64% of the whole samples.
+- **One added tokenizer state gives the group "needs a line rule" more than the open cells did.** The dataset's hand rule `lines` is `words` with a state for the start of the line after a string that a line feed ended. It has 99.6% of that group, where `words` has 97.8%, the hand-written tables 99.0% and the search from them 99.1%. Over all samples that is 0.14 points, 93.23% against 93.09%.
+- **No tables that score well show the damage as an error**, and every search's tables and two of the trainer's five seeds break the depth of valid JSON that is too deep. Neither is in the main number. Whether a recovering highlighter should mark the damage, and whether texts that are too deep should be in the dataset, is not settled, see [Not settled](#not-settled).
+- Code points shown as "past the end": 0 to 160 for the seeds of the trainer's plain pass, 0 for every other row.
+- In the group "needs a nesting fix" the hand-written tables, the search from them and the trainer's plain pass are far above the bound of the plain table parser, 43.3%, with 76.1%, 90.3% and 89.4%. That is what the stack actions are for. The dataset's hand rules `words` and `lines`, which have no stack action, are at 42.7% there.
 
 ## Intended states
 
@@ -175,7 +178,7 @@ Do not read the files of dumped samples that `lab/recovery-parser/dump.ts` write
 - `recovery-parser.ts`: `runRecoveryParser`, and `runRecoveryParserInto` for loops, which allocates nothing and does not check the tables.
 - `plain-tables.ts`: between the dataset's layout of tables and this one. `recoveryTablesOf` turns e.g. a hand rule's tables into tables of the experiment, and `plainParserProblems` says what keeps tables from being tables of the plain table parser.
 - `intended.ts`: `intendedOf(sample)`, the intended states and the mark of the ones that can be followed. `intended-reached.ts` counts where saved tables are in them.
-- `data.ts`: `loadSamples(seed, from, to)` holds the samples of an index range that are not in the test split in typed arrays: code points, labels, flags, intended states, and per sample the split, the kinds, the families, the group, the count of scored code points, the bound of the plain table parser, and more. `standardRange` is seed 20261015, indexes 0 to 59,999: 48,136 samples, 42,979 of the train split and 5,157 of the validation split. A sample's place in the arrays is not its index in the dataset. `trainPart` and `validationPart` return the parts. `allowedSampleAt` gives one sample of the dataset, and none of the test split. The cache folder comes from `RECOVERY_SCRATCH`, and passing `null` as the cache folder makes the samples without a cache. `refuseUnknownOptions` is what makes a command fail for an option that it does not have, e.g. `search/mistakes.ts --split test`, where the command used to run as if the option were not there.
+- `data.ts`: `loadSamples(seed, from, to)` holds the samples of an index range that are not in the test split in typed arrays: code points, labels, flags, intended states, and per sample the split, the kinds, the families, the group, the count of scored code points, the bound of the plain table parser, and more. `standardRange` is seed 20261015, indexes 0 to 59,999: 47,960 samples, 42,630 of the train split and 5,330 of the validation split. A sample's place in the arrays is not its index in the dataset. `trainPart` and `validationPart` return the parts. `allowedSampleAt` gives one sample of the dataset, and none of the test split. The cache folder comes from `RECOVERY_SCRATCH`, and passing `null` as the cache folder makes the samples without a cache. `refuseUnknownOptions` is what makes a command fail for an option that it does not have, e.g. `search/mistakes.ts --split test`, where the command used to run as if the option were not there.
 - `score.ts`: `scoreTables(tables, samples, options)`, `scoreWith` for a parser that is not made of these tables, `runOnSample` for the trace of one sample, `wrongLabelsAt` for what is wrong at one code point, `cellsReadBy` and `cellsReadAt` for the cells that the exact parser reads on some samples, `withUnreadCellsOf`, which puts another table's choice back into the cells that are not read, and `cellCountsOf` for the two counts of cells.
 - `compare.ts`: several saved tables next to today's, one row each.
 - `check-tables.ts`, `check-parser.ts`, `check-data.ts`, `check-deep.ts`, `check-guard.ts`, `check-commands.ts`: the checks. `check-texts.ts` makes their texts. `check-all.ts` runs them all.
@@ -196,43 +199,45 @@ bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth o
 bun lab/recovery-parser/learn/intended-reached.ts <name>=<file.json> ...   # where saved tables are in the intended state
 ```
 
-`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in about a minute on an idle 18 core machine and in up to 100 s with other jobs running, with the cache of the samples in place (57 to 99 s in nine runs), and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
+`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in about a minute on an idle 18 core machine and in up to 100 s with other jobs running, with the cache of the samples in place (57 to 99 s in twelve runs), and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
 
-The table of scores, from an empty scratch folder, in about 10 minutes with two commands at a time:
+The table of scores, from an empty scratch folder, in about 17 minutes with one command after the other, and in less with two searches at a time:
 
 ```sh
-bun lab/recovery-parser/learn/arms/baselines.ts                    # the first five rows, under 1 s
-bun lab/recovery-parser/learn/arms/plain-pass/run.ts               # the last row, 5 seeds, about 2.5 minutes
+bun lab/recovery-parser/learn/arms/baselines.ts                    # the first six rows, under 1 s
 bun lab/recovery-parser/learn/handwritten/rules.ts                 # <scratch>/handwritten/tables.json
 bun lab/recovery-parser/learn/search/votes.ts                      # <scratch>/search/votes.json
 bun lab/recovery-parser/learn/search/votes.ts --follow             # <scratch>/search/votes-follow.json
-bun lab/recovery-parser/learn/search/search.ts                     # <scratch>/search/search-from-today.json, about 3 minutes
-bun lab/recovery-parser/learn/search/search.ts --order 1           # about 3.5 minutes
-bun lab/recovery-parser/learn/search/search.ts --order 2           # about 4 minutes
-bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/search/votes.json --out $RECOVERY_SCRATCH/search/search-from-votes.json
-bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json
+bun lab/recovery-parser/learn/search/search.ts                     # <scratch>/search/search-from-today.json, about 2 minutes
+bun lab/recovery-parser/learn/search/search.ts --order 1           # about 3 minutes
+bun lab/recovery-parser/learn/search/search.ts --order 2           # about 6.5 minutes
+bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/search/votes.json --out $RECOVERY_SCRATCH/search/search-from-votes.json   # about 1.5 minutes
+bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json   # the number to beat, about 2.5 minutes
+bun lab/recovery-parser/learn/arms/plain-pass/run.ts               # the last row, 5 seeds, about 2 minutes. It reads the number to beat, so it comes after the search above
 bun lab/recovery-parser/learn/compare.ts hand-written=$RECOVERY_SCRATCH/handwritten/tables.json votes=$RECOVERY_SCRATCH/search/votes.json search=$RECOVERY_SCRATCH/search/search-from-today.json
 ```
+
+Every search and every seed of the trainer gives the same tables when it is run again: the five searches of the table and the five seeds of the plain pass were each run twice for these numbers, and the files of tables are the same, byte for byte.
 
 The cache file is made again by itself when a source file of the dataset, `data.ts`, `intended.ts` or `recovery-tables.ts` changes: its name holds a key of those files, so a file of another version of the dataset is never read. `check-guard.ts` checks that every file that `data.ts` imports, directly or through another file, is in the key, and that a change of one file gives another key. The file of intended stacks of `soft/twin-data.ts` has the dataset's key and a hash of `twin-data.ts` in its name. Cache files of an earlier key stay in the folder and are never read: put them into the trash when the folder grows.
 
 ## Taking a new commit of the dataset
 
-The dataset's files are everything in `lab/recovery-parser/` that is not under `learn/`. They are the dataset branch's files, whole, with one change: `highlightReference` takes one argument on this branch, so seven calls lose their `, 0` (one in `labels.ts`, two each in `check-table-parser.ts`, `check-samples.ts` and `invariants.test.ts`). After a merge of a later commit of the dataset:
+The dataset's files are everything in `lab/recovery-parser/` that is not under `learn/`. They are the files of the dataset branch at its commit 83834c3, whole, with one change: `highlightReference` takes one argument on this branch, so seven calls lose their `, 0` (one in `labels.ts`, two each in `check-table-parser.ts`, `check-samples.ts` and `invariants.test.ts`). The dataset is finished at that commit, and every number in this folder is of it. The dataset branch goes on after it with a folder `lab/recovery-parser/written/`, which is no part of the dataset and is kept out of this branch on purpose: a merge takes the commit, not the branch's tip. After a merge of a later commit of the dataset:
 
 1. Take the dataset branch's version of every dataset file, and make those calls take one argument again. `bunx tsc -p lab/recovery-parser` names every such call.
 2. Run `bun test lab/recovery-parser`, `bun lab/recovery-parser/check-samples.ts` and `bun lab/recovery-parser/check-table-parser.ts`.
 3. Run `bun lab/recovery-parser/learn/check-all.ts`. The cache of the samples is made again by itself, since its name holds a key of the dataset's source files, and every record of an arm holds that key as `datasetKey`.
 4. Every number in the READMEs is then of another dataset: make the tables again with the commands above. Tables and records that were saved under `RECOVERY_SCRATCH` before are of the old dataset.
 
-**A later commit of the dataset can move a sample from one split to another.** E.g. between the commit that these numbers are of (3bf415c) and the dataset branch twelve commits later (7eed824), 176 of the 60,000 indexes of the standard set go from the train split to the test split and 173 from the train split to the validation split, by a count of the splits alone. Tables that were trained before such a commit have trained on samples that are scored after it. So every saved file of tables holds the dataset's key of the moment it was saved, and:
+**A later commit of the dataset can move a sample from one split to another.** E.g. between the commit that the numbers of this folder were of before (3bf415c) and the commit that they are of now (83834c3), nine commits later, 176 of the 60,000 indexes of the standard set went from the train split to the test split and 173 from the train split to the validation split, by a count of the splits alone. Tables that were trained before such a commit have trained on samples that are scored after it. So every saved file of tables holds the dataset's key of the moment it was saved, a71c027d33a5cd7b for the dataset as it is, and:
 
-- `arms/final.ts`, `search/search.ts --from` and `soft/train.ts --base` refuse a file with another key or without one. Make the tables again.
+- `arms/final.ts`, `search/search.ts --from`, `soft/train.ts --base`, and `numberToBeat` and `savedResultOf` of `arms/harness.ts` refuse a file with another key or without one. Make the tables again.
 - `compare.ts`, `score.ts`, `check-deep.ts`, `intended-reached.ts`, `search/mistakes.ts` and the scripts of `handwritten/` that take `--tables` load such a file and print a line that starts with "Note:".
 
 So take the dataset's last commit before the arms start, or keep one commit of the dataset up to and including the final numbers.
 
-The baselines of `arms/harness.ts` follow the dataset's list of hand rules, so a hand rule that a later commit adds gets a row by itself, also one with a tokenizer state of its own.
+The baselines of `arms/harness.ts` follow the dataset's list of hand rules, so a hand rule that a later commit adds gets a row by itself. The rule `lines` came so, at 83834c3, with a tokenizer state of its own.
 
 In code:
 
@@ -255,8 +260,8 @@ saveTables(`${process.env['RECOVERY_SCRATCH']}/one-cell.json`, tables, 'one chan
 ## Not settled
 
 - **Should a recovering highlighter still mark the damage?** The labels say what kept code points are. Nothing says how an added code point should be shown, e.g. a stray closing bracket or the second quote of a doubled quote, so the best tables show no error anywhere. The numbers are in every score and in every record. A label `error` for some added code points would put them into the main number.
-- **Valid JSON that is too deep.** Either such texts go into the dataset, with today's depths as labels, or an arm's tables have to pass `check-deep.ts --must-hold`. Of the tables above, the dataset's hand rules, the hand-written rules, the votes and one seed of the trainer's plain pass pass it. Every record of an arm holds the two shares.
+- **Valid JSON that is too deep.** Either such texts go into the dataset, with today's depths as labels, or an arm's tables have to pass `check-deep.ts --must-hold`. Of the tables above, the dataset's hand rules, the hand-written rules, the votes and three seeds of the trainer's plain pass pass it. Every record of an arm holds the two shares.
 - **Should a tokenizer cell be allowed an event of a text's end at all?** The search leaves them out. The core still allows them, so a trained cell can snap to one, and `checkTables` accepts it.
-- **Added character classes.** 6.7% of the broken validation samples are in the group "needs a character class", e.g. a string in single quotes with a space in it. `addClasses` adds classes, see `structure/README.md`, and no arm has used it. The hand-written rules read such strings as words, which is why they have 92.2% of that group.
+- **Added character classes.** 6.5% of the broken validation samples are in the group "needs a character class", e.g. a string in single quotes with a space in it. The dataset names the class that a sample needs, and a sample can need two, e.g. the apostrophe as a quote and the backtick as a quote in a Node print with `'two words'` next to `` `5' 11"` ``. The most frequent class text among the train and validation samples of the standard set is "the apostrophe as a quote", 1,762 samples, and "the backtick as a quote" has 20. `addClasses` adds classes, see `structure/README.md`, and no arm has used it. The hand-written rules read such strings as words, which is why they have 92.2% of that group.
 - **Keeping a run on track.** It costs score, see `soft/README.md`. States taken from tables that already recover, e.g. the trace of the hand-written tables on the broken text, were proposed in a review and are not built.
 - **The test split, the held-out kinds and the held-out template** were never scored by anything here.

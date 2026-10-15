@@ -2,7 +2,7 @@
 
 `rules.ts` uses only the open cells of the tables as they are. This note lists the structures that a programmer would add to the parser next, in the order of what they gain for what they cost. No rule here is written. The core can add three of the structures since: the classes of 3 and 6, the bit of 4 and the open entries of 5, see `../structure/README.md`. The later arms can use the list to judge whether training finds the same structures, e.g. when an arm adds tokenizer states and one of them turns out to be "inside a string in apostrophes".
 
-The gains are estimates from the validation split, not measurements. They come from `where-wrong.ts --split validation --causes`, which guesses the cause of each wrong sample from its first wrong code point and its kinds of damage, and counts every wrong code point of the sample for that cause. A gain is given in points of the main number, i.e. the share of the 675,695 scored code points. The hand-written rules have 96.5 points, so 3.5 are left.
+The gains are estimates from the validation split, not measurements. They come from `where-wrong.ts --split validation --causes`, which guesses the cause of each wrong sample from its first wrong code point and its kinds of damage, and counts every wrong code point of the sample for that cause. A gain is given in points of the main number, i.e. the share of the 675,949 scored code points. The hand-written rules have 96.5 points, so 3.5 are left.
 
 The list and its order were made on the old snapshot of the dataset. The counts and the estimates below are made again on the reviewed dataset, and two entries are worth less now than they were then: the reviewed dataset gives a word such as `True` no label, so entry 2 lost most of its code points, and it no longer scores a code point before the first error. The order of the list was not made again.
 
@@ -13,20 +13,20 @@ Two limits on every estimate below:
 
 ## The list
 
-| | structure | what it gives | validation samples with the kinds, of 4,878 broken ones | wrong code points with the rules | wrong, search from the rules' tables | estimated gain in points |
+| | structure | what it gives | validation samples with the kinds, of 5,021 broken ones | wrong code points with the rules | wrong, search from the rules' tables | estimated gain in points |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | the column of a line's first token, and the column of every open container | a closing bracket that is missing or stray in an indented text | missingCloser 180, strayCloser 59 | 6,652 | 3,603 | up to 0.5 |
-| 2 | an event and a token for a word, with a display column of its own | `=` or `=>` read as a colon, a word after a string not read as a key | foreignKeySeparator 24, unescapedQuote 80 | 2,619 | 1,298 | up to 0.2 |
-| 3 | a class for the apostrophe and the curly quotes, and tokenizer states for a string between them | a colon, a comma or a bracket inside such a string | singleQuotedString 330, curlyQuotes 63, quotedDocument 22 | 781 for the colon alone | 333 | under 0.1 for the colon alone |
-| 4 | a bit for the grammar: the token is the first on its line | a new document after a line that was cut after a key, a colon or a comma, the next key after a colon without a value | 10 with a cut line before a document, colonWithoutValue 356, missingColon 29 | 1,445 | 637 | under 0.1 |
-| 5 | open entries of the display table | the first letter of a key without quotes that starts with t, f or n | unquotedKey 256 | 800 | 880 | 0.1 |
-| 6 | a class for the no-break space | indentation with no-break spaces shown as white space | nonBreakingSpace 42 | 1,414 | 1,247 | 0.2 |
-| 7 | a stack action that pops twice | the depth at a closing bracket of the other kind, and after it when no comma follows | missingCloser 180, typing replays | not counted apart | not counted apart | not estimated |
-| 8 | a comment state in the tokenizer | a comment with a bracket that has no partner, or with a comma and then a colon | lineComment 465, blockComment 59, hashComment 15 | not counted apart | not counted apart | under 0.1 |
+| 1 | the column of a line's first token, and the column of every open container | a closing bracket that is missing or stray in an indented text | missingCloser 181, strayCloser 64 | 6,652 | 3,523 | up to 0.5 |
+| 2 | an event and a token for a word, with a display column of its own | `=` or `=>` read as a colon, a word after a string not read as a key | foreignKeySeparator 24, unescapedQuote 80 | 2,619 | 1,137 | up to 0.2 |
+| 3 | a class for the apostrophe and the curly quotes, and tokenizer states for a string between them | a colon, a comma or a bracket inside such a string | singleQuotedString 333, curlyQuotes 63, quotedDocument 24 | 781 for the colon alone | 271 | under 0.1 for the colon alone |
+| 4 | a bit for the grammar: the token is the first on its line | a new document after a line that was cut after a key, a colon or a comma, the next key after a colon without a value | 10 with a cut line before a document, colonWithoutValue 360, missingColon 29 | 1,445 | 631 | under 0.1 |
+| 5 | open entries of the display table | the first letter of a key without quotes that starts with t, f or n | unquotedKey 256 | 800 | 906 | 0.1 |
+| 6 | a class for the no-break space | indentation with no-break spaces shown as white space | nonBreakingSpace 42 | 1,414 | 1,513 | 0.2 |
+| 7 | a stack action that pops twice | the depth at a closing bracket of the other kind, and after it when no comma follows | missingCloser 181, typing replays | not counted apart | not counted apart | not estimated |
+| 8 | a comment state in the tokenizer | a comment with a bracket that has no partner, or with a comma and then a colon | lineComment 476, blockComment 59, hashComment 15 | not counted apart | not counted apart | under 0.1 |
 
 Two structures of the first version of this list are gone, because the cells turned out to hold them: a cut line followed by a document on the next line (an opening brace after a complete value in the outermost object starts the object again), and the color codes of a terminal (the tokenizer state `nul` as the state after a control character). Both were in the list as "needs a structure", and a review found the cells. The same may hold for other entries: an estimate here is an upper bound on what the structure is needed for.
 
-What is left after all eight is what a parser that reads from left to right without looking ahead cannot know: a string that is open by mistake in the middle of a line (0.16 points with the rules, 0.14 with the search), a text that starts inside the document (0.10), a stray closer in a one-line text, an inner quote without a backslash.
+What is left after all eight is what a parser that reads from left to right without looking ahead cannot know: a string that is open by mistake in the middle of a line (0.16 points with the rules and with the search), a text that starts inside the document (0.10 with the rules, 0.04 with the search), a stray closer in a one-line text, an inner quote without a backslash.
 
 ## 1. The column of a line's first token
 
@@ -56,7 +56,7 @@ The apostrophe and the curly quotes have the class `other`, the class of most le
 
 The structure: a class for the apostrophe, one for the two curly quotes, and per kind of quote a tokenizer state "inside the string" and one "after a backslash". The cells mirror the ones of the state `string`. An apostrophe inside a string in double quotes stays content, as today.
 
-The gain is small in points, because the word reading already recovers most of it: the group "needs a character class" is at 92.2% with the rules and at 95.2% with the search from them. What it buys beyond the points: once these strings are strings, a word is almost always a literal or a key, which is what structure 2 needs.
+The gain is small in points, because the word reading already recovers most of it: the group "needs a character class" is at 92.2% with the rules and at 94.9% with the search from them. What it buys beyond the points: once these strings are strings, a word is almost always a literal or a key, which is what structure 2 needs.
 
 A trained arm cannot find this one by adding states alone: without the class, the tokenizer cannot see an apostrophe.
 
@@ -76,7 +76,7 @@ What a programmer would write with it:
 
 The core keeps the display table fixed. Some of its entries are read only after an error, as the open cells of the two other tables are: the characters of a literal or of a number when the grammar expects a colon after them. Valid JSON never has a literal or a number as a key.
 
-With these entries open, a programmer would show them as a key. Then the `t` of `tags:` and the `n` of `name:` are keys, where today the frozen cell (between, t) starts a literal and the letter is shown as one. 203 validation samples are wrong first at such a letter, 0.1 points, and the dataset has a group for the samples in which nothing else can be right, "needs a display fix". No tables of the cells as they are get these code points: the search's tables have more of them wrong than the rules. The structure costs nothing in the parser: it only extends the search for open cells to the third table. The smoke run `display` of `../structure/README.md` shows 431 of 438 such letters as a key.
+With these entries open, a programmer would show them as a key. Then the `t` of `tags:` and the `n` of `name:` are keys, where today the frozen cell (between, t) starts a literal and the letter is shown as one. 203 validation samples are wrong first at such a letter, 0.1 points, and the dataset has a group for the samples in which nothing else can be right, "needs a display fix". No tables of the cells as they are get these code points: the search's tables have more of them wrong than the rules. The structure costs nothing in the parser: it only extends the search for open cells to the third table. The smoke run `display` of `../structure/README.md` shows 429 of 438 such letters as a key.
 
 ## 6. A class for the no-break space
 

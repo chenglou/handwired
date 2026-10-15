@@ -2,7 +2,7 @@
 
 Training by gradients has to be compared with something plain, or its result means nothing. This folder fills the open cells of the recovery tables in two plain ways and scores both in the exact parser: by votes of the train samples (`votes.ts`), and by a search that tries the choices of one cell at a time (`search.ts`). Neither reads the test split, whose samples are not loaded. The words cell, frozen, open, choice and base are the ones of [the shared core](../README.md).
 
-The numbers come from the standard set of the reviewed dataset (seed 20261015, indexes 0 to 59,999, without the test split): 40,759 broken train samples with 5,546,159 scored code points, and 4,878 broken validation samples with 675,695. A scored code point is one from the first error on whose label has a scored value, see `../README.md`. Every search and every vote is deterministic, so a row has no seed. But three orders of the cells show how much of a search's score is the order's doing: 7.5 points.
+The numbers come from the standard set of the reviewed dataset (seed 20261015, indexes 0 to 59,999, without the test split): 40,457 broken train samples with 5,545,145 scored code points, and 5,021 broken validation samples with 675,949. A scored code point is one from the first error on whose label has a scored value, see `../README.md`. Every search and every vote is deterministic, so a row has no seed. But three orders of the cells show how much of a search's score is the order's doing: 6.9 points.
 
 ## Results
 
@@ -10,85 +10,85 @@ The numbers come from the standard set of the reviewed dataset (seed 20261015, i
 
 | tables | cells changed against the base | train, all three | validation, all three | kind | depth | container | whole samples |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| today's tables | 0 | 41.91 | 42.68 | 49.14 | 75.06 | 88.65 | 11.10 |
-| votes | 211 | 67.71 | 69.47 | 80.83 | 77.17 | 89.30 | 62.82 |
-| votes, `--follow` | 303 | 80.10 | 80.84 | 88.66 | 86.83 | 96.25 | 66.67 |
-| votes, `--stay` | 360 | 67.73 | 68.37 | 75.06 | 82.63 | 93.04 | 55.10 |
-| votes, `--follow --stay` | 537 | 76.98 | 77.56 | 84.26 | 85.94 | 95.46 | 66.24 |
-| search from today's tables | 866 | 94.69 | 94.22 | 96.23 | 97.60 | 99.64 | 72.88 |
-| search from today's tables, `--order 1` | 894 | 96.25 | 96.16 | 97.58 | 98.29 | 99.71 | 57.50 |
-| search from today's tables, `--order 2` | 946 | 88.88 | 88.65 | 92.01 | 94.04 | 98.74 | 55.21 |
-| search from the votes | 785 | 86.24 | 86.52 | 91.38 | 91.34 | 97.75 | 67.11 |
-| search from the votes with `--follow` | 744 | 86.45 | 86.49 | 91.52 | 91.20 | 98.01 | 68.00 |
-| the hand-written tables of `../handwritten`, for comparison | 915 | 96.22 | 96.51 | 98.69 | 97.65 | 99.56 | 80.04 |
-| search from the hand-written tables | 464 | 97.72 | 97.71 | 99.12 | 98.47 | 99.73 | 78.33 |
+| today's tables | 0 | 41.91 | 42.69 | 49.15 | 75.06 | 88.65 | 11.92 |
+| votes | 210 | 67.72 | 69.47 | 80.83 | 77.17 | 89.30 | 63.19 |
+| votes, `--follow` | 302 | 80.10 | 80.84 | 88.65 | 86.83 | 96.25 | 67.04 |
+| votes, `--stay` | 359 | 67.73 | 68.37 | 75.07 | 82.63 | 93.04 | 55.55 |
+| votes, `--follow --stay` | 537 | 76.98 | 77.56 | 84.26 | 85.94 | 95.46 | 66.56 |
+| search from today's tables | 870 | 94.49 | 94.34 | 96.07 | 97.95 | 99.71 | 72.78 |
+| search from today's tables, `--order 1` | 931 | 96.38 | 96.30 | 97.69 | 98.35 | 99.70 | 56.64 |
+| search from today's tables, `--order 2` | 937 | 89.60 | 89.41 | 92.40 | 94.70 | 98.95 | 55.11 |
+| search from the votes | 823 | 86.17 | 86.56 | 91.44 | 91.41 | 97.79 | 67.75 |
+| search from the votes with `--follow` | 714 | 86.38 | 86.69 | 91.36 | 91.55 | 97.82 | 67.75 |
+| the hand-written tables of `../handwritten`, for comparison | 915 | 96.22 | 96.52 | 98.69 | 97.66 | 99.56 | 80.44 |
+| search from the hand-written tables | 429 | 97.83 | 97.75 | 99.09 | 98.53 | 99.71 | 79.37 |
 
-The base of a row is today's tables, and for a search from other tables it is those tables. The searches from the votes differ from today's parser in 858 and 827 cells, and the search from the hand-written tables in 978.
+The base of a row is today's tables, and for a search from other tables it is those tables. The searches from the votes differ from today's parser in 886 and 817 cells, and the search from the hand-written tables in 983.
 
 The same tables by the dataset's groups, validation split, all three:
 
 | validation samples | today's | votes | votes, `--follow` | search | search, `--order 1` | search from the votes | search from the hand-written tables |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| all, 4,878 | 42.7 | 69.5 | 80.8 | 94.2 | 96.2 | 86.5 | 97.7 |
-| damage, 3,779 | 40.3 | 65.5 | 78.3 | 94.0 | 96.1 | 84.8 | 97.8 |
-| typing, 1,099 | 57.2 | 93.6 | 96.2 | 95.8 | 96.7 | 96.9 | 97.3 |
-| within reach of the tables, 3,547 | 47.4 | 74.6 | 85.4 | 97.7 | 98.4 | 91.0 | 99.6 |
-| needs a display fix, 37 | 18.3 | 26.8 | 39.2 | 90.1 | 93.6 | 61.6 | 98.1 |
-| needs a line rule, 487 | 63.8 | 95.0 | 97.5 | 99.0 | 99.0 | 98.8 | 99.3 |
-| needs a character class, 326 | 10.1 | 29.1 | 38.5 | 80.6 | 88.8 | 49.1 | 95.2 |
-| needs a nesting fix, 74 | 26.5 | 41.9 | 77.6 | 80.3 | 90.2 | 92.5 | 88.5 |
-| out of reach, 407 | 25.6 | 57.2 | 82.7 | 80.7 | 85.3 | 84.4 | 84.8 |
+| all, 5,021 | 42.7 | 69.5 | 80.8 | 94.3 | 96.3 | 86.6 | 97.7 |
+| damage, 3,862 | 40.3 | 65.5 | 78.3 | 93.9 | 96.3 | 84.8 | 97.8 |
+| typing, 1,159 | 57.2 | 93.6 | 96.2 | 96.8 | 96.6 | 97.2 | 97.4 |
+| within reach of the tables, 3,687 | 47.4 | 74.6 | 85.4 | 97.6 | 98.3 | 91.3 | 99.7 |
+| needs a display fix, 37 | 18.3 | 26.8 | 39.2 | 89.4 | 94.3 | 57.9 | 98.0 |
+| needs a line rule, 488 | 63.8 | 95.0 | 97.5 | 99.4 | 99.0 | 98.7 | 99.1 |
+| needs a character class, 326 | 10.1 | 29.1 | 38.5 | 79.7 | 89.8 | 49.0 | 94.9 |
+| needs a nesting fix, 76 | 26.5 | 41.9 | 77.6 | 81.7 | 91.1 | 92.0 | 90.3 |
+| out of reach, 407 | 25.6 | 57.2 | 82.7 | 83.2 | 86.0 | 83.4 | 85.4 |
 
 The rows per family and per kind of damage are in the output of `../score.ts` for each of the saved tables, and `../compare.ts` prints several tables side by side.
 
 What the numbers say:
 
-- **Where the search starts decides where it ends, and so does the order of its cells.** From today's tables three orders of the cells end at 94.2%, 96.2% and 88.6% on the validation split. From the votes the search ends at 86.5%, and most of that is in the samples that need a character class: 49.1% against 80.6%. From the hand-written tables it ends at 97.7%: 1.2 points above the tables it started from, and 1.5 above the best search from today's tables. So no search here is at the limit of the cells, and each is one of many places where no single cell can be improved.
-- **The number to beat is 97.7%.** A gradient arm without added structure that ends below the search from the hand-written tables has found nothing that a plain search does not find. The hand-written rules were written with the old snapshot's samples in view, see `../handwritten/README.md`, so this number is no number on unseen data. Train and validation are 0.5 points or less apart for every search.
-- **The votes get half of the way.** The walk as specified ends at 69.5%, and at 80.8% when it follows frozen cells. On the typing replays the followed votes are within a point of every search from today's tables, and in the group "out of reach" they are within 3 points of the best one.
-- **The search's tables do not read like a recovery.** The votes change 211 to 303 cells, and many of them read like a rule, e.g. (commaOrClose, string, depth 1, object) goes to `colon`, which is what a missing comma needs (325 votes in the walk as specified, 4,240 of 4,407 with `--follow`). The search changes 860 to 950 cells and uses the tokenizer's states as memory without regard to their names.
-- **Samples that are right as a whole** do not follow the code points. The hand-written tables have 80.0%, which the search from them lowers to 78.3% while it raises the code points. The search with `--order 1` has the most code points of the three orders and 57.5% of whole samples: of the 487 samples that need a line rule it has 99.0% of the code points and 5 samples right as a whole, because it shows the line feed that ends an open string as a number.
+- **Where the search starts decides where it ends, and so does the order of its cells.** From today's tables three orders of the cells end at 94.3%, 96.3% and 89.4% on the validation split. From the votes the search ends at 86.6%, and most of that is in the samples that need a character class: 49.0% against 79.7%. From the hand-written tables it ends at 97.7%: 1.2 points above the tables it started from, and 1.4 above the best search from today's tables. So no search here is at the limit of the cells, and each is one of many places where no single cell can be improved.
+- **The number to beat is 97.7%**, 97.75% with two digits. A gradient arm without added structure that ends below the search from the hand-written tables has found nothing that a plain search does not find. `numberToBeat()` of `../arms/harness.ts` reads these tables from the scratch folder and gives an arm their row. The hand-written rules were written with the old snapshot's samples in view, see `../handwritten/README.md`, so this number is no number on unseen data. Train and validation are 0.4 points or less apart for every search.
+- **The votes get half of the way.** The walk as specified ends at 69.5%, and at 80.8% when it follows frozen cells. On the typing replays the followed votes are within a point of every search from today's tables, and in the group "out of reach" they are within 4 points of the best one.
+- **The search's tables do not read like a recovery.** The votes change 210 to 302 cells, and many of them read like a rule, e.g. (commaOrClose, string, depth 1, object) goes to `colon`, which is what a missing comma needs (325 votes in the walk as specified, 4,240 of 4,407 with `--follow`). The search changes 870 to 940 cells and uses the tokenizer's states as memory without regard to their names.
+- **Samples that are right as a whole** do not follow the code points. The hand-written tables have 80.4%, which the search from them lowers to 79.4% while it raises the code points. The search with `--order 1` has the most code points of the three orders and 56.6% of whole samples: of the 488 samples that need a line rule it has 99.0% of the code points and 3 samples right as a whole, because it shows the line feed that ends an open string as a number.
 
 What the main number does not show, for the same tables on the validation split (the columns of `../compare.ts`, and `../check-deep.ts`):
 
 | tables | added code points shown as an error | samples that show an error | wrong depths on valid JSON of 17 to 19 levels, nothing after the nested containers | the same, members after |
 | --- | --- | --- | --- | --- |
-| today's tables | 89.5% | 61.1% | 0% | 0% |
-| votes | 4.1% | 11.2% | 0% | 0% |
+| today's tables | 89.6% | 61.0% | 0% | 0% |
+| votes | 4.0% | 11.0% | 0% | 0% |
 | votes, `--follow` | 0.9% | 2.0% | 0% | 0% |
-| search from today's tables | 0.5% | 9.5% | 22.4% | 39.0% |
-| search, `--order 1` | 0.1% | 1.6% | 42.5% | 50.1% |
-| search, `--order 2` | 6.5% | 33.3% | 68.6% | 70.4% |
-| search from the votes | 0.5% | 10.9% | 51.9% | 51.4% |
-| search from the votes with `--follow` | 0.4% | 7.8% | 61.3% | 51.5% |
+| search from today's tables | 0.4% | 6.2% | 5.6% | 11.5% |
+| search, `--order 1` | 0.0% | 0.9% | 43.3% | 48.1% |
+| search, `--order 2` | 5.4% | 33.9% | 79.0% | 73.4% |
+| search from the votes | 0.4% | 10.5% | 52.2% | 54.6% |
+| search from the votes with `--follow` | 0.3% | 6.9% | 47.4% | 34.6% |
 | hand-written | 0.0% | 0.0% | 0% | 0% |
-| search from the hand-written tables | 0.0% | 0.1% | 16.9% | 21.9% |
+| search from the hand-written tables | 0.0% | 0.2% | 18.5% | 30.2% |
 
 - **Errors.** A code point that the damage added has no label, so tables lose nothing in the main number by showing no error at all. Which of the search's tables still show errors is an accident of the order of the cells.
-- **Valid JSON that is too deep.** A valid JSON text of 17 levels or more has a first error at its 17th opening bracket, and reads open cells from there on. Today's parser keeps its depth right at every code point, since the depth is a count of brackets. Every search loses that: the depth is wrong at 17% to 70% of the code points after the 17th bracket, of 300 such texts in each of two forms. The dataset has no such text, so the search's score does not see it. The votes change no cell that these texts read.
-- **No code point is shown as "past the end".** A tokenizer cell can hold one of the three events of a text's end, and a code point with such an event is shown as the cells after a text are, which no recovery would show for a character of the text. The search leaves these events out unless `--end-events` asks for them. With them, the three orders show 226, 765 and 873 code points of the validation split so, and end at 93.9%, 96.4% and 88.6%, where they end at 94.2%, 96.2% and 88.6% without. So leaving them out costs nothing that these runs can tell.
+- **Valid JSON that is too deep.** A valid JSON text of 17 levels or more has a first error at its 17th opening bracket, and reads open cells from there on. Today's parser keeps its depth right at every code point, since the depth is a count of brackets. Every search loses that: the depth is wrong at 6% to 79% of the code points after the 17th bracket, of 300 such texts in each of two forms. The dataset has no such text, so the search's score does not see it. The votes of the walk as specified and with `--follow` change no cell that these texts read. With `--stay` they do, and the depth is then wrong at 16% of those code points in both forms.
+- **No code point is shown as "past the end".** A tokenizer cell can hold one of the three events of a text's end, and a code point with such an event is shown as the cells after a text are, which no recovery would show for a character of the text. The search leaves these events out unless `--end-events` asks for them. With them, the three orders show 173, 2,581 and 1,311 code points of the validation split so, and end at 94.0%, 96.3% and 92.1%, where they end at 94.3%, 96.3% and 89.4% without: 0.3 points lower, the same, and 2.7 points higher. Three orders without them are 6.9 points apart, so these runs do not tell whether leaving them out costs anything.
 
 ## The votes
 
 `votes.ts` walks every broken train sample with the parser forced onto the intended state (`../intended.ts`) after every kept code point. `countVotes` lets every broken sample of the set vote that it is given, so the set is the train split: a set with a sample of another split throws, unless the call says `alsoOtherSplits: true`. Where the walk knows the state before a kept code point and the cell that the code point reads is open, the sample votes for the choice that gives the intended state after the code point: a tokenizer cell's next state and event as one choice, a grammar cell's next state and stack action as one choice. Each cell takes its most voted choice. Of several choices with the same votes, today's wins. A cell without votes keeps today's choice.
 
-The votes change 211 cells: 163 of the 710 open tokenizer cells and 59 of the 616 open grammar cells get votes, 222 of 1,326. There are 84,881 votes, and 76.9% of them are for the choice that their cell took. The most contested cell is (between, other), which every letter without a class of its own reads between tokens, and so do the apostrophe and the curly quotes: 35,891 votes for (string, stringStart), 10,230 for (between, whitespace) and 8,274 for (string, stringContent).
+The votes change 210 cells: 162 of the 710 open tokenizer cells and 59 of the 616 open grammar cells get votes, 221 of 1,326. There are 84,803 votes, and 76.9% of them are for the choice that their cell took. The most contested cell is (between, other), which every letter without a class of its own reads between tokens, and so do the apostrophe and the curly quotes: 35,873 votes for (string, stringStart), 10,228 for (between, whitespace) and 8,273 for (string, stringContent).
 
-Most code points give no vote. Of the 6,045,835 code points at or after the first damage of the broken train samples:
+Most code points give no vote. Of the 6,041,761 code points at or after the first damage of the broken train samples:
 
 | what the walk does with the code point | code points |
 | --- | --- |
-| added by the damage, so there is no intended state after it | 431,365 |
-| kept, right after an added one: the walk does not know the state before it | 39,208 |
-| kept, with a known state before | 5,575,262 |
+| added by the damage, so there is no intended state after it | 428,368 |
+| kept, right after an added one: the walk does not know the state before it | 39,094 |
+| kept, with a known state before | 5,574,299 |
 
-And of those 5,575,262, once per table:
+And of those 5,574,299, once per table:
 
 | the cell that the code point reads | tokenizer | grammar |
 | --- | --- | --- |
-| is frozen and gives the intended state | 5,431,934 | 5,504,919 |
-| is frozen and gives another state than the intended one | 69,850 | 58,746 |
-| is open: a vote | 73,478 | 11,403 |
+| is frozen and gives the intended state | 5,431,064 | 5,504,009 |
+| is frozen and gives another state than the intended one | 69,821 | 58,707 |
+| is open: a vote | 73,414 | 11,389 |
 | is open, and no single stack action gives the intended stack | | 194 |
 
 The situations without a vote, with an example each:
@@ -123,34 +123,36 @@ How far the runs got:
 
 | run | how it ended | runs of a sample | time | validation, all three |
 | --- | --- | --- | --- | --- |
-| from today's tables | pass 19 changed nothing | 520.7 million | 169 s | 94.22 |
-| from today's tables, `--order 1` | pass 20 changed nothing | 630.0 million | 206 s | 96.16 |
-| from today's tables, `--order 2` | pass 28 changed nothing | 741.6 million | 233 s | 88.65 |
-| from the votes | pass 15 changed nothing | 211.7 million | 71 s | 86.52 |
-| from the votes with `--follow` | pass 16 changed nothing | 228.9 million | 78 s | 86.49 |
-| from the hand-written tables | pass 12 changed nothing | 458.5 million | 136 s | 97.71 |
-| from today's tables, `--pairs all` | the budget of 1,400 million runs, in pass 8, after 10 of the 1,326 cells | 1,401.0 million | 552 s | 94.02 |
-| from today's tables, `--pairs parts`, `--passes 1` | the limit of 1 pass | 17.3 million | 7 s | 84.07 |
+| from today's tables | pass 13 changed nothing | 417.9 million | 120 s | 94.34 |
+| from today's tables, `--order 1` | pass 20 changed nothing | 570.8 million | 165 s | 96.30 |
+| from today's tables, `--order 2` | pass 46 changed nothing | 1,256.3 million | 383 s | 89.41 |
+| from the votes | pass 23 changed nothing | 329.8 million | 90 s | 86.56 |
+| from the votes with `--follow` | pass 15 changed nothing | 206.5 million | 57 s | 86.69 |
+| from the hand-written tables | pass 16 changed nothing | 572.5 million | 156 s | 97.75 |
+| from today's tables, `--pairs all` | the budget of 1,400 million runs, in pass 7, after 545 of the 1,326 cells | 1,400.0 million | 523 s | 94.27 |
+| from today's tables, `--pairs parts`, `--passes 1` | the limit of 1 pass | 17.2 million | 9 s | 83.78 |
 
-- From today's tables the first pass alone goes from 41.9% to 84.9% on the train split, and the passes after it add 7.5, 1.2, 0.5 and 0.2 points. From pass 8 on a pass changes fewer than 100 cells.
-- The first step is the largest: the grammar cell (error, none, depth 1, object) goes from `error` to `colon`, which gets 865,103 more code points right, 15.6 points. After an error in an object at depth 1, every code point without a token then moves the grammar to `colon`, where string content is shown as a key. Today no key after a first error is shown as a key.
-- From the hand-written tables the search changes 464 cells in 11 passes. Its first pass alone goes from 96.22% to 97.44% on the train split.
-- The search gives the same tables with 1, 2 and 4 worker threads: two passes from today's tables take 98, 34 and 20 seconds, and the three files of tables are the same, byte for byte.
-- With `--pairs all` a pass costs about eight times as many runs, 214.9 million in pass 5 against 26.7 million, and gains nothing: after 5 passes the train split is at 94.2%, where `--pairs known` is at 94.4%, and when the budget ends it is at 94.0% on the validation split against 94.2%. More choices per cell did not make better steps here.
+The times of the first six rows are of a second run of each search with no other job of the experiment running. Each second run gave the tables of the first, byte for byte. The last two rows ran next to two other jobs.
+
+- From today's tables the first pass alone goes from 41.9% to 85.1% on the train split, and the passes after it add 7.4, 1.2, 0.4 and 0.2 points. From pass 8 on a pass changes fewer than 100 cells.
+- The first step is the largest: the grammar cell (error, none, depth 1, object) goes from `error` to `colon`, which gets 865,037 more code points right, 15.6 points. After an error in an object at depth 1, every code point without a token then moves the grammar to `colon`, where string content is shown as a key. Today no key after a first error is shown as a key.
+- From the hand-written tables the search changes 429 cells in 15 passes. Its first pass alone goes from 96.22% to 97.46% on the train split.
+- The search gives the same tables with 1, 2 and 4 worker threads: two passes from today's tables take 75, 40 and 23 seconds, and the three files of tables are the same, byte for byte.
+- With `--pairs all` a pass costs about seven times as many runs, 221.6 million in pass 5 against 32.7 million, and gains nothing that these runs can tell: after 5 passes the train split is at 94.3%, where `--pairs known` is at 94.2%, and when the budget ends it is at 94.27% on the validation split against 94.34%. More choices per cell did not make better steps here.
 
 ## What is still wrong
 
-`mistakes.ts` counts the wrong labels on the validation split and prints samples for reading. The best tables from today's tables (`--order 1`) are wrong at 25,945 of 675,695 scored code points, 3.84%, in 1,914 of 4,878 samples. Only the display kind is wrong at 55.4% of those code points and only the depth at 32.8%. Punctuation shown as a key is 16.2% of them, a key shown as a string 15.8%, a string shown as a key 6.8%, and white space shown as a key 4.2%.
+`mistakes.ts` counts the wrong labels on the validation split and prints samples for reading. The best tables from today's tables (`--order 1`) are wrong at 25,038 of 675,949 scored code points, 3.70%, in 1,993 of 5,021 samples. Only the display kind is wrong at 55.3% of those code points and only the depth at 32.7%. Punctuation shown as a string is 18.8% of them, a key shown as a string 12.5%, a string shown as a key 6.8%, and white space shown as a key 4.3%.
 
 30 wrong samples, drawn without order, by their groups:
 
-- **Needs a line rule, 9 of 30**, each with one wrong code point: the line feed that ends an open string is shown as a number, e.g. after `"ema` at the end of a line. The rest of each text is right.
-- **Needs a character class, 8 of 30**, with 2 to 41 wrong code points: strings in single quotes, `=>` for the colon, a backslash that should have been doubled. E.g. the colon after the key `'first name'` is shown as a key.
-- **Within reach of the tables, 7 of 30**, with 1 to 14 wrong code points: a document with a backslash before every quote, keys without quotes next to a comment, a key without its colon, `ObjectId(…)` calls, a backslash that should have been doubled, a statement around the document.
-- **Out of reach, 4 of 30**, with 7 to 89 wrong code points: a text that starts inside the document, a missing closing bracket, an inner quote without its backslash.
-- **Needs a nesting fix and needs a display fix, 1 each**: a stray closing bracket, and a key without quotes that starts with a letter of a literal.
+- **Within reach of the tables, 11 of 30**, with 1 to 17 wrong code points. In 4 of them the one wrong code point is a line feed that is shown as a number, after a comment or after a word such as `undefined`. The others: strings in single quotes, where the colon after a key such as `'env'` is shown as a string, `ObjectId(…)` calls, a key without its colon, after which the next key is shown as a string, two numbers without their comma, a backslash before an apostrophe.
+- **Needs a character class, 7 of 30**, with 1 to 19 wrong code points: strings in single quotes, `=` for the colon, `ObjectId(…)` calls, a no-break space.
+- **Needs a line rule, 6 of 30**, each with one wrong code point: the line feed that ends an open string is shown as a number, e.g. after `"plai` at the end of a line. The rest of each text is right.
+- **Needs a display fix, 3 of 30**, with 8 to 15 wrong code points: keys without quotes that start with a letter of a literal, e.g. `name:` and `tags:`.
+- **Out of reach, 3 of 30**, with 1 to 16 wrong code points: an inner quote without its backslash, a string that is open in the middle of a line, a missing closing bracket.
 
-By kind, the lowest of the `--order 1` tables are missingCloser at 81.1%, backslashEscapedDocument at 81.2% and nonBreakingSpace at 81.4%. The family of bracket damage is at 84.8%, the group "out of reach" at 85.3% and "needs a character class" at 88.8%.
+By kind, the lowest of the `--order 1` tables are backslashEscapedDocument at 71.5%, with 11 samples, missingCloser at 80.8% and nonBreakingSpace at 81.1%. The family of bracket damage is at 85.1%, the group "out of reach" at 86.0% and "needs a character class" at 89.8%.
 
 ## Damage that the search has not seen
 
@@ -160,17 +162,17 @@ The test split holds kinds of damage that training never sees, and nothing here 
 bun lab/recovery-parser/learn/search/search.ts --without-kinds hashComment,foreignLiteral,statementWrapper,newlineDelimited
 ```
 
-It ended when pass 20 changed nothing, after 506.4 million runs and 192 s, with 36,724 of the 40,759 broken train samples. Validation split, all three:
+It ended when pass 22 changed nothing, after 526.6 million runs and 256 s next to two other jobs, with 36,443 of the 40,457 broken train samples. Validation split, all three:
 
 | kind, validation samples | today's | search with the kind | search without the kind |
 | --- | --- | --- | --- |
-| hashComment, 15 | 31.0 | 77.0 | 86.8 |
-| foreignLiteral, 232 | 12.9 | 85.8 | 80.2 |
-| statementWrapper, 167 | 3.5 | 94.6 | 80.4 |
-| newlineDelimited, 79 | 53.9 | 97.4 | 92.6 |
-| all, 4,878 | 42.7 | 94.2 | 93.0 |
+| hashComment, 15 | 31.0 | 86.2 | 81.3 |
+| foreignLiteral, 232 | 12.9 | 85.2 | 81.9 |
+| statementWrapper, 175 | 3.5 | 93.6 | 89.5 |
+| newlineDelimited, 79 | 53.9 | 97.7 | 92.5 |
+| all, 5,021 | 42.7 | 94.3 | 94.3 |
 
-Three of the kinds that the search did not see lose 5 to 14 points and stay far above today's tables, and hashComment, with 15 samples, gains 10. How much of a difference is the missing kind is not settled by one run: callWrapper stayed in the train samples and differs by 3 points between the two searches, 95.0% and 92.1%, and three orders of the cells end 7.5 points apart on all samples.
+The four kinds that the search did not see lose 3 to 5 points and stay far above today's tables, and all samples together end at the same 94.3%. How much of a difference is the missing kind is not settled by one run: callWrapper stayed in the train samples and differs by 0.3 points between the two searches, 94.7% and 95.0%, but three orders of the cells end 6.9 points apart on all samples.
 
 Whether the dataset's own held-out kinds were seen by the hand-written rules is a separate question, see `../handwritten/README.md`: the files of samples that their builder was told to read held test samples.
 

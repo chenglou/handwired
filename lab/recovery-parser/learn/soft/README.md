@@ -2,7 +2,7 @@
 
 This folder holds the part of the experiment that tests the idea "unfreeze the cells that only broken input reaches, and train them": the recovery parser of `../recovery-parser.ts` written a second time, so that the choices of the open cells are weights that gradients can move. It builds on the shared core in the folder above, whose README explains cells, frozen and open cells, choices, snapping and the score. The arms that use it are in `../arms/`, and an arm is scored and reported with the harness there.
 
-Every number here was made on the reviewed dataset, on the validation split of the standard set. **Every run of this README is one seed of an untuned run unless a row says otherwise, so its score is preliminary.** Five seeds of the default one-pass run are 0.7 points apart, from 96.2% to 96.9% (`../arms/plain-pass/`), so a difference of half a point between two runs below says nothing.
+Every number here was made on the reviewed dataset, on the validation split of the standard set. **Every run of this README is one seed of an untuned run unless a row says otherwise, so its score is preliminary.** Five seeds of the default one-pass run are 0.9 points apart, from 95.9% to 96.7% (`../arms/plain-pass/`), so a difference of half a point between two runs below says nothing.
 
 ## What the twin holds
 
@@ -43,7 +43,7 @@ The twin holds each part of the state on its own, and a step multiplies the part
 - **The event and the next grammar state.** Half "a quote that starts a key" and half "a comma" is shown as a quarter key, a quarter plain string and half punctuation, although the truth is half key and half punctuation.
 - **The stack action and the depth.** The stack action's mix is one mix for the whole step. When only the cells of the context "depth 1" pop, their share of a pop also moves the share at depth 5 one depth down.
 - **The stack.** A level has one share of "an object", whatever the depth is. Half "depth 1, in an object" and half "depth 2, in an array inside an array" makes level 1 half an object. After a pop, the half that is now at depth 1 is shown as half in an object, although all of it is in an array.
-- **The depth range.** A pop at the lowest depth of the range and a push at the highest leave the share where it is. The exact parser's depth has no bounds, so the two differ once a share reaches an end of the range. With today's tables no run of `check-twin.ts` gets there. With random tables, 9,210 of 50,000 runs do.
+- **The depth range.** A pop at the lowest depth of the range and a push at the highest leave the share where it is. The exact parser's depth has no bounds, so the two differ once a share reaches an end of the range. With today's tables no run of `check-twin.ts` gets there. With random tables, 9,215 of 50,000 runs do.
 - **The bit "first on its line"**, for tables that have it, see `../structure/README.md`. The twin holds the bit as one share, and a step gives that share of every context to the context with the bit, whatever the tokenizer state is. E.g. a quote after a line feed, in a state that is half "inside a string" and half "between tokens": inside the string the quote ends the string, has the token `none` and leaves the bit set, and between tokens the quote starts a string and clears the bit. The twin's bit is then 0.5, and the next step reads the cells with the bit and the cells without the bit for both halves, a quarter each. In truth only the half whose string has ended still has the bit. So the cells with the bit are also trained by code points that are not the first token on their line.
 
 So a low loss of the twin does not promise a good parser. Only the score of the snapped tables in the exact parser counts, and the trainer prints it.
@@ -67,19 +67,19 @@ The backward pass is written by hand in `stepBackward`, in the order of the step
 
 `snappedTables(model)` returns tables in which every trainable cell holds the choice with the largest weight. Among equal weights it keeps the base tables' choice, e.g. in a cell that started uniform and that no training sample read. `saveTables` of the core writes them as JSON, which `../score.ts --tables` reads.
 
-**Cells that only the twin reads.** The twin reads every cell that has a share, however small, so training also moves cells that the exact parser reads at no code point of a trained text. After one pass over the train split, the snapped tables of the default run differ from today's in 990 cells, and the exact parser reads 703 of them on the train texts. With a uniform start it is 644 of 1,160. So "cells changed against the base" overstates what the exact parser uses, and the trainer logs both counts.
+**Cells that only the twin reads.** The twin reads every cell that has a share, however small, so training also moves cells that the exact parser reads at no code point of a trained text. After one pass over the train split, the snapped tables of the default run differ from today's in 972 cells, and the exact parser reads 727 of them on the train texts. With a uniform start it is 593 of 1,155. So "cells changed against the base" overstates what the exact parser uses, and the trainer logs both counts.
 
 These other cells are not noise, though. The trainer also scores the snapped tables with the base tables' choice put back into them, which changes no trace of a trained text:
 
 | run | cells changed against the base | of those, read by a trained text | validation, snapped | validation, with the others as in the base |
 | --- | --- | --- | --- | --- |
-| 400 train samples, 50 passes | 897 | 373 | 90.8% | 88.2% |
-| the same, seed 2 | 891 | 387 | 90.3% | 87.3% |
-| the same, `--start uniform` | 1,163 | 337 | 92.3% | 85.6% |
-| one pass over the train split | 990 | 703 | 96.6% | 96.5% |
-| one pass, `--start uniform` | 1,160 | 644 | 97.0% | 97.0% |
+| 400 train samples, 50 passes | 896 | 389 | 90.9% | 88.9% |
+| the same, seed 2 | 897 | 406 | 91.1% | 90.1% |
+| the same, `--start uniform` | 1,161 | 360 | 92.8% | 87.6% |
+| one pass over the train split | 972 | 727 | 96.7% | 96.7% |
+| one pass, `--start uniform` | 1,155 | 593 | 96.8% | 96.7% |
 
-After training on 400 samples, validation texts read cells that none of the 400 read, and what the twin put there through small shares is worth 2.6 to 6.7 points. After the whole train split the two scores are 0.1 points apart or the same. So the trainer saves the snapped tables as they come, and `--only-read-cells` (`onlyReadCells` in `train`) saves the ones with the other cells put back, for a reader or a port that wants no cell without a text that reads it.
+After training on 400 samples, validation texts read cells that none of the 400 read, and what the twin put there through small shares is worth 1.0 to 5.2 points. After the whole train split the two scores are 0.1 points apart or the same. So the trainer saves the snapped tables as they come, and `--only-read-cells` (`onlyReadCells` in `train`) saves the ones with the other cells put back, for a reader or a port that wants no cell without a text that reads it.
 
 ## Training
 
@@ -91,7 +91,7 @@ bun lab/recovery-parser/learn/score.ts --tables $RECOVERY_SCRATCH/soft/runs/smok
 
 `train.ts` runs Adam over the weights of the trainable cells, in batches of 32 samples, split over up to 4 worker threads. It writes `log.txt`, `best.json` and `last.json` to `<scratch>/soft/runs/<name>`. It never reads the test split.
 
-`last.json` holds the snapped tables after the last sample. `best.json` holds the snapped tables of the log point with the best score on one half of the validation split, the samples at even places, and the log gives their score on the other half. A call of `train` without `validation` scores nothing, and its `best` tables are its `last` ones. The score of snapped tables moves by more than half a point between two log lines, e.g. the last five log points of the one-pass run below range from 96.0% to 96.6%, so the best of 20 log points is partly picked noise. Quote its score on the other half, or the last tables with the range of the last log points, which the run's last lines give. The two halves are not equally hard (today's tables have 42.4% and 43.0%), so compare a score on a half only with other scores on that half. To compare two arms, run several seeds with `runArm` of `../arms/harness.ts`: five seeds of the one-pass run end between 96.2% and 96.9%, and two seeds of the smoke run at 90.8% and 90.3%.
+`last.json` holds the snapped tables after the last sample. `best.json` holds the snapped tables of the log point with the best score on one half of the validation split, the samples at even places, and the log gives their score on the other half. A call of `train` without `validation` scores nothing, and its `best` tables are its `last` ones. The score of snapped tables can move by more than half a point between two log lines, e.g. the last five log points of the one-pass run from a uniform start below range from 95.9% to 96.8%, where those of the default run range from 96.7% to 96.8%, so the best of 20 log points is partly picked noise. Quote its score on the other half, or the last tables with the range of the last log points, which the run's last lines give. The two halves are not equally hard (today's tables have 42.1% and 43.2%), so compare a score on a half only with other scores on that half. To compare two arms, run several seeds with `runArm` of `../arms/harness.ts`: five seeds of the one-pass run end between 95.9% and 96.7%, and two seeds of the smoke run at 90.9% and 91.1%.
 
 Its options:
 
@@ -118,8 +118,8 @@ Its options:
 A log line has:
 
 - The loss per scored code point since the line before, with its parts. It holds the extra targets, and in a run that is kept on track it is the loss of a run that was put right after most code points. So it does not compare between runs with other options.
-- **The loss of a free run**: the loss of the three labels on the first 100 trained samples, without the extra targets and without keeping the run on track. This one compares between runs. E.g. after the smoke run below, the run that is always kept on track has the lowest loss of all, 0.042, and a free-run loss of 1.07, against 0.080 and 0.066 for the default run.
-- **The free-run loss without the code points at which a label is ruled out.** A cell that is not trainable holds exact 0 and 1, so a label that those cells rule out has a share of exactly 0 and costs 13.8 whatever is trained. The line gives their count and their share, e.g. "9 of 15140 code points with a label ruled out (0.1%)". With a random tenth of the open cells trainable, 10.9% of the code points of the fixed samples have such a label: the free-run loss is 3.01, and 1.56 without them. With every open cell trainable a few labels are still ruled out: 9 of the 15,140 code points of the 100 fixed samples. At 5 of them a first letter `t`, `f` or `n` of a key or of a string reads the frozen cell (between, t), (between, f) or (between, n), which starts a literal, and the display table shows a literal's first letter as a literal in every column, e.g. the `n` of `{ name:`. At 1 a closing brace is read inside a string that is open by mistake, by the frozen cell (string, closeBrace), and the table shows a string's content as a string or a key in every column, never as punctuation. At 3, the closing braces after a missing `]` in `"packages/*"}}}`, the label's depth is two levels below the depth before, and one step pops once. That is 0.06% of the code points and 14% of the free-run loss at the end of the default one-pass run: 0.0875, and 0.0750 without them. Open entries of the display table can change the first six of these labels, see `../structure/README.md`: with open entries the count is 3. So to compare a run with open entries with a run without, take the loss without these code points.
+- **The loss of a free run**: the loss of the three labels on the first 100 trained samples, without the extra targets and without keeping the run on track. This one compares between runs. E.g. after the smoke run below, the run that is always kept on track has the lowest loss of all, 0.041, and a free-run loss of 1.18, against 0.080 and 0.066 for the default run.
+- **The free-run loss without the code points at which a label is ruled out.** A cell that is not trainable holds exact 0 and 1, so a label that those cells rule out has a share of exactly 0 and costs 13.8 whatever is trained. The line gives their count and their share, e.g. "9 of 15140 code points with a label ruled out (0.1%)". With a random tenth of the open cells trainable, 10.9% of the code points of the fixed samples have such a label: the free-run loss is 3.00, and 1.55 without them. With every open cell trainable a few labels are still ruled out: 9 of the 15,140 code points of the 100 fixed samples. At 5 of them a first letter `t`, `f` or `n` of a key or of a string reads the frozen cell (between, t), (between, f) or (between, n), which starts a literal, and the display table shows a literal's first letter as a literal in every column, e.g. the `n` of `{ name:`. At 1 a closing brace is read inside a string that is open by mistake, by the frozen cell (string, closeBrace), and the table shows a string's content as a string or a key in every column, never as punctuation. At 3, the closing braces after a missing `]` in `"packages/*"}}}`, the label's depth is two levels below the depth before, and one step pops once. That is 0.06% of the code points and 14% of the free-run loss at the end of the default one-pass run: 0.0885, and 0.0758 without them. Open entries of the display table can change the first six of these labels, see `../structure/README.md`: with open entries the count is 3. So to compare a run with open entries with a run without, take the loss without these code points.
 - **How often the twin reads as its snapped tables**: the share of the scored code points of the fixed samples at which the twin's largest shares are the display kind, the depth and the container that the exact parser gives with the snapped tables. See the next section.
 - The mean entropy and the mean largest share of the trainable mixes.
 - The score of the snapped tables on the validation split in the exact parser, on the whole split and on its two halves.
@@ -137,9 +137,9 @@ A log line has:
 
 A review of the first version of the twin measured the drift by distance on 400 train samples of the old snapshot: with 0.9 the twin's reading is the exact parser's at every code point within 5 steps of the first error, at 88% in the steps 6 to 20, at 8% in the steps 21 to 100, and nowhere later. That count is not made again here.
 
-So the loss at the start of a default run is not the base parser's loss, and a run from a base that already recovers, e.g. the hand-written tables, does not start from that recovery's behaviour unless the start share is 0.999 or the base's cells are not trainable. In the smoke setting the start share made no clear difference to the end: 90.8% with 0.9, 92.0% with 0.999, 92.3% from a uniform start, one seed each. One short run from the hand-written tables with a start share of 0.999 and every open cell trainable (400 samples, 10 passes) went from 96.5% to 96.7% and changed 14 cells, none of which a trained text reads: it is only a test of `--base`, not a result.
+So the loss at the start of a default run is not the base parser's loss, and a run from a base that already recovers, e.g. the hand-written tables, does not start from that recovery's behaviour unless the start share is 0.999 or the base's cells are not trainable. In the smoke setting the start share made no clear difference to the end: 90.9% with 0.9, 91.5% with 0.999, 92.8% from a uniform start, one seed each. One short run from the hand-written tables with a start share of 0.999 and every open cell trainable (400 samples, 10 passes) went from 96.5% to 96.6% and changed 12 cells, none of which a trained text reads: it is only a test of `--base`, not a result.
 
-**The depth range.** A push at the highest depth of the range and a pop at the lowest leave the share where it is, which the exact parser does not do. The review measured that a uniform start puts more than 1% of the depth's share at an end of the range in 45% of the steps before training, because uniform action mixes push more than they pop, and in none after training. Here the smoke run from a uniform start ended at the same score, 92.3%, with `--depth-high 48` as with 24, in tables that differ in one cell, so the default range was left as it is.
+**The depth range.** A push at the highest depth of the range and a pop at the lowest leave the share where it is, which the exact parser does not do. The review measured that a uniform start puts more than 1% of the depth's share at an end of the range in 45% of the steps before training, because uniform action mixes push more than they pop, and in none after training. Here the smoke run from a uniform start ended with the same tables, at 92.8%, with `--depth-high 48` as with 24, so the default range was left as it is.
 
 ## What the two options with intended states do
 
@@ -147,15 +147,15 @@ The intended states are the states of today's parser on the original. After a re
 
 | run | defaults | `--intended 0.3` | `--on-track 0.5` | `--on-track 1` |
 | --- | --- | --- | --- | --- |
-| 400 samples, 50 passes, with the mark | 90.8% | 92.8% | 85.8% | 78.0% |
-| the same, every kept code point (`--every-intended`) | | 91.0% | 90.8% | 75.2% |
-| the same with the mark, seed 2 | 90.3% | 91.9% | 85.4% | |
-| one pass over the train split, with the mark | 96.6% | 96.1% | 90.4% | 67.6% |
-| the same, every kept code point | | | | 78.0% |
+| 400 samples, 50 passes, with the mark | 90.9% | 92.3% | 85.8% | 79.3% |
+| the same, every kept code point (`--every-intended`) | | 91.5% | 89.4% | 75.2% |
+| the same with the mark, seed 2 | 91.1% | 92.6% | 84.8% | |
+| one pass over the train split, with the mark | 96.7% | 96.6% | 92.4% | 70.0% |
+| the same, every kept code point | | | | 78.8% |
 
-- **The extra targets are not told apart from the default.** With the mark they end 1.6 to 2.0 points above the default in the two pairs of smoke runs and 0.5 points below it after one pass, where five seeds of the default are 0.7 points apart.
-- **Keeping the run on track costs**: 5 to 6 points at a probability of 0.5, and 13 to 29 points at a probability of 1. After one pass with probability 1 the last tables have 67.6%, and the run's best log point was 84.9%, after 6,048 samples. A run that is put right after most code points never has to go on from its own mistakes, and the exact parser has to: after the smoke run with probability 1, the twin reads as its snapped tables at 76.5% of the code points of a free run, against 99.5% for the default run. So the option stays off by default. An arm that wants it should lower the probability to 0 by the end of training, and judge by the free-run loss and the snapped score, never by the loss.
-- **These runs do not show that the mark helps.** With the intended states at every kept code point, the extra targets end 1.8 points lower in the smoke setting, and a run that is kept on track ends 5.0 points higher at a probability of 0.5, 2.8 points lower at a probability of 1, and 10.4 points higher after one pass at a probability of 1. One run each: the mark is right about the states that frozen cells rule out, and whether it is the better choice for training is open.
+- **The extra targets are not told apart from the default.** With the mark they end 1.4 to 1.5 points above the default in the two pairs of smoke runs and 0.1 points below it after one pass, where five seeds of the default are 0.9 points apart.
+- **Keeping the run on track costs**: 4 to 6 points at a probability of 0.5, and 12 to 27 points at a probability of 1. After one pass with probability 1 the last tables have 70.0%, and the run's best log point was 81.7%, after 8,064 samples. A run that is put right after most code points never has to go on from its own mistakes, and the exact parser has to: after the smoke run with probability 1, the twin reads as its snapped tables at 71.5% of the code points of a free run, against 99.7% for the default run. So the option stays off by default. An arm that wants it should lower the probability to 0 by the end of training, and judge by the free-run loss and the snapped score, never by the loss.
+- **These runs do not show that the mark helps.** With the intended states at every kept code point, the extra targets end 0.8 points lower in the smoke setting, and a run that is kept on track ends 3.6 points higher at a probability of 0.5, 4.1 points lower at a probability of 1, and 8.8 points higher after one pass at a probability of 1. One run each: the mark is right about the states that frozen cells rule out, and whether it is the better choice for training is open.
 
 An arm calls the same parts from its own script, e.g. with hand-written recovery as the base tables and its holes as the trainable cells:
 
@@ -178,7 +178,7 @@ const result = await train(model, data, {epochs: 1, validation: validationPart(s
 saveTables(`${process.env['RECOVERY_SCRATCH']}/grammar-only.json`, result.last, 'grammar cells only')
 ```
 
-This example ends at 67.8% of all three on the validation split after one pass, with 213 cells changed against the base.
+This example ends at 67.7% of all three on the validation split after one pass, with 201 cells changed against the base.
 
 What used to go wrong in these calls without an error, and throws now:
 
@@ -190,7 +190,7 @@ What used to go wrong in these calls without an error, and throws now:
 
 Keeping the run on track also needs the third argument of `packForTwin`: `loadIntendedObjects(samples, softCacheFolderOf())`.
 
-Speed on the machine of these runs, an 18 core machine with other jobs running, in two runs each: 583 and 644 samples per second in one thread, 1,430 and 1,857 with 4 worker threads over the first 3,000 samples of a run from today's choices, and 1,691 and 1,632 over a whole pass. A run that is kept on track is several times faster, since most of its shares are 0 and a step skips them. A log point also runs the first 100 trained samples twice in the main thread, and the exact parser over every trained text and over the validation split.
+Speed on the machine of these runs, an 18 core machine with other jobs running, in two runs each: 488 and 483 samples per second in one thread, and 1,227 and 1,351 with 4 worker threads, over the first 3,000 samples of a run from today's choices. Over a whole pass with 4 worker threads it is 1,251 and 1,238 next to two other jobs of the experiment, and 1,874 with none. A run that is kept on track is several times faster, since most of its shares are 0 and a step skips them. A log point also runs the first 100 trained samples twice in the main thread, and the exact parser over every trained text and over the validation split.
 
 ## Checks
 
@@ -198,18 +198,18 @@ Each check is a script that ends with "Every check passed." or with a count of f
 
 **`bun lab/recovery-parser/learn/soft/check-twin.ts`** (about a minute, and half a minute more the first time, for the intended stacks): the twin with exact tables is the exact parser. For 2,500 broken samples of the train split, with today's tables and with 20 random settings of every open cell, 5 of them with added states, the twin runs from the first error to position 512 and every share has to be exactly 0 or 1 and equal to the trace of `recovery-parser.ts`: the tokenizer state after, the event, the token, the context, the grammar state after, the stack action, the display kind, the depth after and the container after.
 
-- Today's tables: 2,500 runs, 1,003,404 positions, 0 runs differ. No run reaches an end of the depths -8 to 24.
-- Random settings: 50,000 runs, 20,068,080 positions, 0 runs differ when the twin's depth range holds the depths that the exact parser reaches in the run. With the depths -8 to 24, 8,958 runs differ, all of them among the 9,210 runs that reach an end of that range.
-- The intended stacks of `twin-data.ts` are the exact parser's stack after every code point of 2,130 original documents, 537,341 code points. They are the documents of the first 2,000 samples that are not in the test split.
+- Today's tables: 2,500 runs, 1,002,718 positions, 0 runs differ. No run reaches an end of the depths -8 to 24.
+- Random settings: 50,000 runs, 20,054,360 positions, 0 runs differ when the twin's depth range holds the depths that the exact parser reaches in the run. With the depths -8 to 24, 8,963 runs differ, all of them among the 9,215 runs that reach an end of that range.
+- The intended stacks of `twin-data.ts` are the exact parser's stack after every code point of 2,130 original documents, 538,933 code points. They are the documents of the first 2,000 samples that are not in the test split.
 
-**`bun lab/recovery-parser/learn/soft/check-gradient.ts`** (about 45 s, and half a minute more the first time, for the intended stacks): the backward pass against finite differences on random mixes. Every open cell is trainable with random weights. There are 5 settings with today's tables: the three losses alone; every option on; a depth range of -1 to 17, so that shares reach its ends; sharp mixes with the run kept on track; the intended states at every kept code point, with targets and with the run kept on track. Each uses 24 samples with 1,654 steps. Per setting and group of weights, the check compares 6 random directions, each of which moves every weight of the group, and about 60 single weights. The largest differences over the 5 settings:
+**`bun lab/recovery-parser/learn/soft/check-gradient.ts`** (about 45 s, and half a minute more the first time, for the intended stacks): the backward pass against finite differences on random mixes. Every open cell is trainable with random weights. There are 5 settings with today's tables: the three losses alone; every option on; a depth range of -1 to 17, so that shares reach its ends; sharp mixes with the run kept on track; the intended states at every kept code point, with targets and with the run kept on track. Each uses 24 samples with 1,658 steps. Per setting and group of weights, the check compares 6 random directions, each of which moves every weight of the group, and about 60 single weights. The largest differences over the 5 settings:
 
 | Group of weights | 30 directions, relative | 300 single weights, absolute | single weights with a gradient of at least 1e-4, relative |
 | --- | --- | --- | --- |
 | tokenizer, next state | 1.3e-8 | 2.3e-12 | 2.1e-9 |
-| tokenizer, event | 6.0e-9 | 2.2e-12 | 2.2e-9 |
-| grammar, next state | 4.0e-9 | 8.8e-12 | 1.4e-8 |
-| grammar, stack action | 1.6e-9 | 5.0e-11 | 8.9e-9 |
+| tokenizer, event | 5.9e-9 | 2.2e-12 | 2.2e-9 |
+| grammar, next state | 3.9e-9 | 8.8e-12 | 1.4e-8 |
+| grammar, stack action | 1.6e-9 | 5.0e-11 | 8.6e-9 |
 
 The largest relative difference is 1.4e-8. A direction's difference is divided by the length of the group's gradient. For single weights with a gradient below 1e-4 only the absolute difference is reported: the objective holds terms -ln(share + 1e-6), in which a rounding error of 1e-16 in a share near 0 is an error of 1e-10, so a finite difference of the objective cannot resolve a small gradient to many digits.
 
@@ -225,28 +225,28 @@ To see that the checks can fail, the first version of `twin.ts` was broken in fi
 
 These runs only show that the loss falls and that snapped tables can be scored. Nothing was tuned and each run is one seed, so they are no result of the experiment.
 
-400 train samples, 50 passes, 20,000 samples, 6 to 14 s per run, seed 1. The score is of the snapped tables in the exact parser on the validation split, 4,878 broken samples: the percentage of the scored code points with all three labels right. Today's tables have 42.7%.
+400 train samples, 50 passes, 20,000 samples, 5 to 18 s per run with two other jobs running, seed 1. The score is of the snapped tables in the exact parser on the validation split, 5,021 broken samples: the percentage of the scored code points with all three labels right. Today's tables have 42.7%.
 
 | Run | Loss per code point, first 4,000 samples | Loss, last 4,000 samples | Free-run loss at the end | All three, last tables | Lowest and highest of the last 5 log points | Cells changed, and read by a trained text |
 | --- | --- | --- | --- | --- | --- | --- |
-| defaults: start at today's choices, every open cell trainable | 1.25 | 0.080 | 0.066 | 90.8% | 86.1% to 90.8% | 897, 373 |
-| `--start uniform` | 2.03 | 0.081 | 0.070 | 92.3% | 88.9% to 92.5% | 1,163, 337 |
-| `--intended 0.3 --on-track 0.5 --temperature 1 --temperature-end 0.5 --sharpness-cost 0.01` | 0.26 | 0.052 | 0.509 | 88.3% | 87.8% to 90.4% | 405, 242 |
-| `--open-share 0.1`: 129 of the 1,326 open cells | 4.28 | 3.49 | 3.01, and 1.56 without the labels that are ruled out | 63.6% | 63.6% to 63.6% | 89, 24 |
+| defaults: start at today's choices, every open cell trainable | 1.26 | 0.080 | 0.066 | 90.9% | 86.3% to 90.9% | 896, 389 |
+| `--start uniform` | 2.04 | 0.088 | 0.066 | 92.8% | 88.3% to 92.8% | 1,161, 360 |
+| `--intended 0.3 --on-track 0.5 --temperature 1 --temperature-end 0.5 --sharpness-cost 0.01` | 0.27 | 0.052 | 0.454 | 87.5% | 87.5% to 90.0% | 401, 244 |
+| `--open-share 0.1`: 129 of the 1,326 open cells | 4.28 | 3.49 | 3.00, and 1.55 without the labels that are ruled out | 63.6% | 63.6% to 63.7% | 90, 25 |
 
-The first two losses of the third run hold the extra targets and are those of a run that is kept on track half of the time. Its free-run loss is almost eight times the default run's, and its score is 2.5 points lower. The loss of the fourth run stays high because 10.9% of its code points have a label that cells outside the trainable tenth rule out, at 13.8 per label. For the default run, `score.ts` gives the same numbers from `last.json` as the trainer's log: all three 90.8%, display kind 96.3%, depth 93.4%, container 97.7%, whole samples 69.1%.
+The first two losses of the third run hold the extra targets and are those of a run that is kept on track half of the time. Its free-run loss is almost seven times the default run's, and its score is 3.4 points lower. The loss of the fourth run stays high because 10.9% of its code points have a label that cells outside the trainable tenth rule out, at 13.8 per label. For the default run, `score.ts` gives the same numbers from `last.json` as the trainer's log: all three 90.9%, display kind 96.3%, depth 93.6%, container 97.7%, whole samples 68.5%.
 
-One pass over all 37,570 train samples that give the twin a step takes 11 to 32 s with 4 worker threads:
+One pass over all 37,381 train samples that give the twin a step takes 14 to 38 s with 4 worker threads and two other jobs running. The default run alone takes 25 s, and gives the same tables as the first time:
 
 | Run | All three, last tables | Best log point, picked on one half: the other half, the whole split | Lowest and highest of the last 5 log points | Cells changed, and read by a trained text |
 | --- | --- | --- | --- | --- |
-| defaults | 96.6% | 96.4%, 96.5% | 96.0% to 96.6% | 990, 703 |
-| defaults, seed 2 | 96.9% | 96.8%, 96.9% | 96.6% to 96.9% | 977, 669 |
-| `--start uniform` | 97.0% | 97.0%, 97.0% | 96.8% to 97.0% | 1,160, 644 |
-| the third setting above | 91.9% | 93.9%, 94.1% | 91.6% to 93.6% | 452, 341 |
-| `--open-share 0.1` | 64.1% | 64.4%, 64.1% | 62.3% to 64.1% | 101, 56 |
+| defaults | 96.7% | 96.8%, 96.8% | 96.7% to 96.8% | 972, 727 |
+| defaults, seed 2 | 96.7% | 96.8%, 96.7% | 96.6% to 96.7% | 966, 671 |
+| `--start uniform` | 96.8% | 96.8%, 96.8% | 95.9% to 96.8% | 1,155, 593 |
+| the third setting above | 93.5% | 94.6%, 94.6% | 93.5% to 94.6% | 459, 365 |
+| `--open-share 0.1` | 64.3% | 64.6%, 64.3% | 62.4% to 64.3% | 101, 56 |
 
-What the score does not show, for the last tables of the default one-pass run on the validation split (`../compare.ts` and `../check-deep.ts`): 0.9% of the code points that the damage added are shown as an error, where today's tables show 89.5% so; 20 code points are shown as "past the end", the display kind of the cells after a text, because a tokenizer cell holds an event of a text's end; and the depth of a valid JSON text of 17 to 19 levels stays right at every code point, as today, in both forms of such texts. With seed 2 no code point is shown as past the end and the depth of such texts is wrong at 4.6% and 7.1% of the code points after the 17th bracket. From a uniform start the last tables show no error at all, and that depth is wrong at 72% and 80%. None of this is in the loss, so which run keeps which is an accident. Over five seeds of the default run, see `../arms/plain-pass/README.md`.
+What the score does not show, for the last tables of the default one-pass run on the validation split (`../compare.ts` and `../check-deep.ts`): 1.1% of the code points that the damage added are shown as an error, where today's tables show 89.6% so; 90 code points are shown as "past the end", the display kind of the cells after a text, because a tokenizer cell holds an event of a text's end; and the depth of a valid JSON text of 17 to 19 levels stays right at every code point, as today, in both forms of such texts. With seed 2 no code point is shown as past the end and the depth of such texts is wrong at 12.3% and 16.4% of the code points after the 17th bracket. From a uniform start the last tables show no error at all, and that depth is wrong at 68% and 79%. None of this is in the loss, so which run keeps which is an accident. Over five seeds of the default run, see `../arms/plain-pass/README.md`.
 
 ## The step as a Handwired circuit
 
