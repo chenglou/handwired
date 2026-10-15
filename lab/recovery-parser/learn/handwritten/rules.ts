@@ -1,12 +1,15 @@
-// A recovering JSON parser written by hand, as choices of open cells: the answer key that training is compared
-// against, and the score to beat.
+// A recovering JSON parser written by hand, as choices of open cells: a recovery that a person can read rule by
+// rule, to compare the trained arms with. It is a lower bound on what these cells can hold, not the best they can
+// hold: a search that starts from these tables scores higher, see README.md.
 //
 // Each rule below has a name, the reason a person would give for it, an example, and the cells it sets. A rule sets
 // only open cells, to choices that the core allows: no new state, no new character class, no memory beyond the
 // tokenizer state, the grammar state and the stack of open containers. No two rules set the same cell.
 //
 // The rules were written from JSON's grammar and from reading samples of the train split. No script picked a cell's
-// choice by its score. What the cells cannot express is listed in README.md, not faked here.
+// choice, but scores were in view: the scores of hand-made variants on the train split were compared, and the
+// validation scores were printed by every run of report.ts. Five rules came from a review that tried cells with the
+// train and validation scores in view. README.md says which, and what the cells cannot express.
 //
 // Run from the repo root to save the tables and print how many cells each rule sets:
 //   bun lab/recovery-parser/learn/handwritten/rules.ts [--scratch <folder>]
@@ -50,11 +53,20 @@ export type Rule = {
 
 // The grammar's contexts: no open container, or the depth class (1, 2 to 15, 16) and the kind of the innermost one.
 const topContext = 0
+const outermostArrayContext = 2
+const outermostObjectContext = 3
 const arrayContexts = [2, 4, 6]
 const objectContexts = [3, 5, 7]
 // An array or an object that is inside another container.
 const nestedArrayContexts = [4, 6]
 const nestedObjectContexts = [5, 7]
+// The contexts of depth 16, which the parser also reads at every depth above 16, with the kind of the container at
+// level 16: the stack keeps no kind above that level. In a valid JSON text of 17 levels or more, which today's
+// parser reports as too deep, the context can so name a container that is not the innermost one. No rule repairs
+// the stack there by a pop on a comma or a colon: the depth of such a text is right today, as a count of brackets,
+// and a pop that rests on the wrong kind would make it wrong.
+const isDeepestContext = (context: number) => context >= 6
+const popUnlessDeepest = (context: number) => isDeepestContext(context) ? actionByToken : actionPop
 // After a closing bracket: the document is complete when the bracket closed the container at depth 1, and otherwise
 // the container around it expects a comma or its own closing bracket.
 const afterClose = (context: number): GrammarStateName => context >> 1 === 1 ? 'end' : 'commaOrClose'
@@ -70,9 +82,10 @@ const eventBetweenTokens: Partial<Record<ClassName, EventName>> = {
   space: 'whitespace', tabOrCarriageReturn: 'whitespace', lineFeed: 'whitespace', comma: 'comma', colon: 'colon',
   closeBrace: 'closeObject', closeBracket: 'closeArray', openBrace: 'openObject', openBracket: 'openArray',
 }
-const hexStates: readonly LexerStateName[] = ['hex4', 'hex3', 'hex2', 'hex1']
+// The states inside a \u escape with fewer than three hex digits. The state after three, hex1, has a second meaning.
+const shortHexStates: readonly LexerStateName[] = ['hex4', 'hex3', 'hex2']
 
-// Two tokenizer states get a second meaning through their open cells. No state is added: a text that reaches one of
+// Four tokenizer states get a second meaning through their open cells. No state is added: a text that reaches one of
 // them the old way is read by the new meaning too.
 //
 // - `errorLine` is the word state. Today it follows a tokenizer error and skips to the line feed. Each of its cells
@@ -80,9 +93,18 @@ const hexStates: readonly LexerStateName[] = ['hex4', 'hex3', 'hex2', 'hex1']
 // - `exponentSign`, the state after `1e+`, is also the state inside a word that starts with a slash, e.g. a comment.
 //   Its only frozen cells are the digits, which lead to `exponentDigits`. The open cells of `exponentDigits` lead back
 //   into the word. Its frozen cells end the word after a digit at white space, a comma or a closing bracket.
+// - `hex1`, the state after \u and three hex digits, is also the state after a line feed inside a string, in which
+//   the tokenizer waits for the next line's first character. Its frozen cells are the hex digits, so a line that
+//   starts with one, e.g. with a d, goes on with the string and shows that one character as an escape.
+// - `nul`, the state after the letters nul, is also the state after a control character between tokens. Its only
+//   frozen cell is the l, which ends a literal.
 const word: LexerStateName = 'errorLine'
 const slashWord: LexerStateName = 'exponentSign'
 const slashWordAfterDigits: LexerStateName = 'exponentDigits'
+const afterLineFeedInString: LexerStateName = 'hex1'
+const afterControlCharacter: LexerStateName = 'nul'
+// What the state after a control character skips, see the rule `a control character between tokens`.
+const skippedAfterControlCharacter: readonly ClassName[] = ['openBracket', 'zero', 'digit', 'other', 'control']
 // The states of a literal or a number that is not complete, and of a complete number, without the states above.
 const unfinishedTokenStates: readonly LexerStateName[] = ['t', 'tr', 'tru', 'f', 'fa', 'fal', 'fals', 'n', 'nu', 'nul', 'minus', 'dot', 'exponent']
 const finishedNumberStates: readonly LexerStateName[] = ['zero', 'integer', 'fraction']
@@ -142,6 +164,8 @@ export const rules: readonly Rule[] = [
           if (state === 'minus' && characterClass === 'dot') continue
           // After a complete number a quote starts a string, as it does today, e.g. the missing comma of [1"a"].
           if (finishedNumberStates.includes(state) && characterClass === 'quote') continue
+          // `a control character between tokens` sets these.
+          if (state === afterControlCharacter && (characterClass === 'quote' || skippedAfterControlCharacter.includes(characterClass))) continue
           set.lexer(state, characterClass, word, 'stringContent')
         }
       }
@@ -160,7 +184,11 @@ export const rules: readonly Rule[] = [
     example: '{"paid": tru, "lat": 59.}',
     cells: set => {
       for (const state of unfinishedTokenStates) {
-        for (const characterClass of endingClasses) set.lexer(state, characterClass, 'between', eventBetweenTokens[characterClass]!)
+        for (const characterClass of endingClasses) {
+          // `a control character between tokens` sets this one.
+          if (state === afterControlCharacter && characterClass === 'openBracket') continue
+          set.lexer(state, characterClass, 'between', eventBetweenTokens[characterClass]!)
+        }
       }
     },
   },
@@ -204,11 +232,27 @@ export const rules: readonly Rule[] = [
     },
   },
   {
-    name: 'a string ends at the line feed',
-    reason: 'A JSON string holds no raw line feed, so a line feed inside a string means that the closing quote is not typed yet: the string ends there and the line feed is white space.',
+    name: 'a line feed inside a string',
+    reason: 'A JSON string holds no raw line feed. A line feed inside a string is white space, and the tokenizer waits for the first character of the next line, which says what the line feed was, see the next rule. After a backslash or inside a \\u escape the string ends at the line feed.',
     example: '{⏎  "name": "tiny-glob",⏎  "pri⏎}',
     cells: set => {
-      for (const state of ['string', 'escape', ...hexStates] as const) set.lexer(state, 'lineFeed', 'between', 'whitespace')
+      set.lexer('string', 'lineFeed', afterLineFeedInString, 'whitespace')
+      for (const state of ['escape', ...shortHexStates] as const) set.lexer(state, 'lineFeed', 'between', 'whitespace')
+    },
+  },
+  {
+    name: 'the line after a line feed inside a string',
+    reason: 'After a line feed inside a string, white space is skipped. Then a quote starts the next string and a bracket is read as itself: the closing quote of the string before was not typed yet. Any other character goes on with the string: the line feed was pasted into it.',
+    example: '{⏎  "note": "first line⏎second line",⏎  "pri⏎}',
+    cells: set => {
+      for (const characterClass of classNames) {
+        if (characterClass === 'end' || characterClass === 'truncatedEnd' || !set.lexerIsOpen(afterLineFeedInString, characterClass)) continue
+        if (characterClass === 'space' || characterClass === 'tabOrCarriageReturn' || characterClass === 'lineFeed') set.lexer(afterLineFeedInString, characterClass, afterLineFeedInString, 'whitespace')
+        else if (characterClass === 'quote') set.lexer(afterLineFeedInString, characterClass, 'string', 'stringStart')
+        else if (characterClass === 'closeBrace' || characterClass === 'closeBracket' || characterClass === 'openBrace' || characterClass === 'openBracket') set.lexer(afterLineFeedInString, characterClass, 'between', eventBetweenTokens[characterClass]!)
+        else if (characterClass === 'backslash') set.lexer(afterLineFeedInString, characterClass, 'escape', 'escape')
+        else set.lexer(afterLineFeedInString, characterClass, 'string', 'stringContent')
+      }
     },
   },
   {
@@ -233,10 +277,10 @@ export const rules: readonly Rule[] = [
   },
   {
     name: 'a \\u escape that is too short',
-    reason: 'A character that is no hex digit ends a \\u escape, and is read as the string reads it: a quote ends the string, a backslash starts an escape, anything else is content.',
-    example: '{"unit": "\\u00b"}',
+    reason: 'A character that is no hex digit ends a \\u escape of fewer than three hex digits, and is read as the string reads it: a quote ends the string, a backslash starts an escape, anything else is content. After three hex digits the tokenizer is in the state that also waits after a line feed inside a string, and is read by that rule.',
+    example: '{"unit": "\\u0b"}',
     cells: set => {
-      for (const state of hexStates) {
+      for (const state of shortHexStates) {
         for (const characterClass of classNames) {
           if (characterClass === 'end' || characterClass === 'truncatedEnd' || characterClass === 'lineFeed' || !set.lexerIsOpen(state, characterClass)) continue
           if (characterClass === 'quote') set.lexer(state, characterClass, 'between', 'stringEnd')
@@ -248,9 +292,13 @@ export const rules: readonly Rule[] = [
   },
   {
     name: 'a control character between tokens',
-    reason: 'A control character between tokens is skipped like white space, e.g. a NUL or an end-of-file character after the document.',
-    example: '{"ok": true}␚',
-    cells: set => set.lexer('between', 'control', 'between', 'whitespace'),
+    reason: 'A control character between tokens is skipped like white space, e.g. a NUL or an end-of-file character after the document. An escape character starts a color code of a terminal, e.g. ␛[34;1m, so after a control character an opening square bracket, digits and characters without a class of their own are skipped too, and a quote starts a string.',
+    example: '␛[1m{␛[0m"ok": ␛[33mtrue␛[0m}',
+    cells: set => {
+      set.lexer('between', 'control', afterControlCharacter, 'whitespace')
+      for (const characterClass of skippedAfterControlCharacter) set.lexer(afterControlCharacter, characterClass, afterControlCharacter, 'whitespace')
+      set.lexer(afterControlCharacter, 'quote', 'string', 'stringStart')
+    },
   },
 
   // ---- The grammar ----
@@ -259,7 +307,8 @@ export const rules: readonly Rule[] = [
     reason: 'A closing bracket right after a comma closes the container: the comma was one too many.',
     example: '{⏎  "host": "localhost",⏎  "port": 8080,⏎}',
     cells: set => {
-      for (const context of objectContexts) set.grammar('key', 'closeObject', context, afterClose(context))
+      // In the outermost object the rule `a closing bracket that may be one too many` has the cell.
+      for (const context of nestedObjectContexts) set.grammar('key', 'closeObject', context, afterClose(context))
       for (const context of arrayContexts) set.grammar('value', 'closeArray', context, afterClose(context))
     },
   },
@@ -268,10 +317,8 @@ export const rules: readonly Rule[] = [
     reason: 'A comma or a closing brace right after a colon: the value is not typed yet, and the object goes on or ends as the character says.',
     example: '{⏎  "version": ,⏎  "license": "MIT"⏎}',
     cells: set => {
-      for (const context of objectContexts) {
-        set.grammar('value', 'comma', context, 'key')
-        set.grammar('value', 'closeObject', context, afterClose(context))
-      }
+      for (const context of objectContexts) set.grammar('value', 'comma', context, 'key')
+      for (const context of nestedObjectContexts) set.grammar('value', 'closeObject', context, afterClose(context))
     },
   },
   {
@@ -281,9 +328,9 @@ export const rules: readonly Rule[] = [
     cells: set => {
       for (const context of objectContexts) {
         set.grammar('colon', 'comma', context, 'key')
-        set.grammar('colon', 'closeObject', context, afterClose(context))
         set.grammar('colon', 'string', context, 'colon')
       }
+      for (const context of nestedObjectContexts) set.grammar('colon', 'closeObject', context, afterClose(context))
     },
   },
   {
@@ -312,10 +359,17 @@ export const rules: readonly Rule[] = [
         set.grammar('commaOrClose', 'scalar', context, 'commaOrClose')
       }
       for (const context of [...arrayContexts, ...objectContexts]) {
-        set.grammar('commaOrClose', 'openObject', context, 'keyOrClose')
+        // In the outermost object the rule `an opening brace after a value in the outermost object` has the cell.
+        if (context !== outermostObjectContext) set.grammar('commaOrClose', 'openObject', context, 'keyOrClose')
         set.grammar('commaOrClose', 'openArray', context, 'valueOrClose')
       }
     },
+  },
+  {
+    name: 'an opening brace after a value in the outermost object',
+    reason: 'An opening brace after a complete value in the outermost object starts the object again: the line before was cut off and a new document follows, e.g. one document per line. The stack stays as it is, so the new object takes the place of the one that was cut. In a nested object the brace opens an object, so that a pair of braces stays a pair, e.g. in \'${file}\'.',
+    example: '{"t": 1, "msg": "sta⏎{"t": 2, "msg": "done"}',
+    cells: set => set.grammar('commaOrClose', 'openObject', outermostObjectContext, 'keyOrClose', actionNone),
   },
   {
     name: 'extra comma',
@@ -370,28 +424,42 @@ export const rules: readonly Rule[] = [
     reason: 'A colon after a value inside an array that is inside another container: only an object has keys, so the array lost its closing bracket. The colon closes the array, and the value of the key comes next.',
     example: '{⏎  "files": [⏎    "dist",⏎    "src"⏎  "license": "MIT"⏎}',
     cells: set => {
-      for (const context of nestedArrayContexts) set.grammar('commaOrClose', 'colon', context, 'value', actionPop)
+      for (const context of nestedArrayContexts) set.grammar('commaOrClose', 'colon', context, 'value', popUnlessDeepest(context))
     },
   },
   {
     name: 'a colon inside the outermost array',
-    reason: 'No object is around the outermost array, so a colon after one of its values belongs to no key and changes nothing.',
-    example: '[1, 2: 3]',
-    cells: set => set.grammar('commaOrClose', 'colon', 2, 'commaOrClose'),
+    reason: 'No object is around the outermost array, so a colon after one of its values belongs to no key: the opening bracket was no real one, e.g. the [ of a sentence in front of the document. The colon closes the array, and what follows is read as after the document.',
+    example: 'Fields marked [optional may be null:⏎{"id": 7, "note": null}',
+    cells: set => set.grammar('commaOrClose', 'colon', outermostArrayContext, 'end', actionPop),
   },
   {
     name: 'a closing bracket of the other kind',
     reason: 'A closing bracket of the other kind closes the innermost container: it was mistyped, or the innermost container is still being typed and the bracket is the one of the container around it. One step can pop only once, so inside a nested container the grammar remembers the bracket: the state `error` after a brace, the state `end` after a square bracket.',
     example: '{⏎  "user": {⏎    "roles": ["admin"⏎  },⏎  "active": true⏎}',
     cells: set => {
-      // At depth 1 the state `end` is the document's end, as after any closing bracket there.
+      // At depth 1 the state `end` is the document's end, as after any closing bracket there. After a complete value
+      // in the outermost container the rule `a closing bracket that may be one too many` has the cell.
       for (const context of objectContexts) {
-        for (const state of ['value', 'keyOrClose', 'key', 'colon', 'commaOrClose'] as const) set.grammar(state, 'closeArray', context, owesCloseOfArray)
+        for (const state of ['value', 'keyOrClose', 'key', 'colon', 'commaOrClose'] as const) {
+          if (state === 'commaOrClose' && context === outermostObjectContext) continue
+          set.grammar(state, 'closeArray', context, owesCloseOfArray)
+        }
       }
       for (const state of ['value', 'valueOrClose', 'commaOrClose'] as const) {
-        set.grammar(state, 'closeObject', 2, 'end')
+        if (state !== 'commaOrClose') set.grammar(state, 'closeObject', outermostArrayContext, 'end')
         for (const context of nestedArrayContexts) set.grammarAsToday(state, 'closeObject', context, owesCloseOfObject)
       }
+    },
+  },
+  {
+    name: 'a closing bracket that may be one too many',
+    reason: 'A closing bracket that closes the outermost container where the grammar did not expect that bracket may be one too many: a closing brace after a comma, after a key or after a colon, and a closing bracket of the other kind after a complete value. The grammar then expects a comma or a closing bracket at depth 0, where the rule `the document goes on after its end` lets a comma open the object again at once. When no comma follows, the document has ended.',
+    example: '{⏎  "name": "Ada",⏎},⏎  "active": true⏎}',
+    cells: set => {
+      for (const state of ['key', 'colon', 'value'] as const) set.grammar(state, 'closeObject', outermostObjectContext, 'commaOrClose')
+      set.grammar('commaOrClose', 'closeArray', outermostObjectContext, 'commaOrClose')
+      set.grammar('commaOrClose', 'closeObject', outermostArrayContext, 'commaOrClose')
     },
   },
   {
@@ -403,7 +471,7 @@ export const rules: readonly Rule[] = [
       set.grammar(owesCloseOfObject, 'comma', 3, 'key')
       set.grammar(owesCloseOfObject, 'closeObject', 3, 'end')
       for (const context of nestedObjectContexts) {
-        set.grammar(owesCloseOfObject, 'comma', context, 'key', actionPop)
+        set.grammar(owesCloseOfObject, 'comma', context, 'key', popUnlessDeepest(context))
         // The brace pops, and the state stays.
         set.grammarAsToday(owesCloseOfObject, 'closeObject', context, owesCloseOfObject)
       }
@@ -427,7 +495,7 @@ export const rules: readonly Rule[] = [
       set.grammar(owesCloseOfObject, 'closeObject', 2, 'end')
       set.grammar(owesCloseOfObject, 'colon', 2, 'commaOrClose')
       for (const context of nestedArrayContexts) {
-        set.grammar(owesCloseOfObject, 'colon', context, 'value', actionPop)
+        set.grammar(owesCloseOfObject, 'colon', context, 'value', popUnlessDeepest(context))
         // A second closing brace in a row: it closes this array too, and the state stays.
         set.grammarAsToday(owesCloseOfObject, 'closeObject', context, owesCloseOfObject)
       }
@@ -446,11 +514,11 @@ export const rules: readonly Rule[] = [
       for (const context of nestedArrayContexts) {
         // The container around the array may be an object or an array: `a key state inside an array` reads the
         // state `key` in both.
-        set.grammar(owesCloseOfArray, 'comma', context, 'key', actionPop)
+        set.grammar(owesCloseOfArray, 'comma', context, isDeepestContext(context) ? 'value' : 'key', popUnlessDeepest(context))
         // The bracket pops, and the state stays.
         set.grammar(owesCloseOfArray, 'closeArray', context, owesCloseOfArray)
         set.grammarAsToday(owesCloseOfArray, 'closeObject', context, owesCloseOfObject)
-        set.grammar(owesCloseOfArray, 'colon', context, 'value', actionPop)
+        set.grammar(owesCloseOfArray, 'colon', context, 'value', popUnlessDeepest(context))
       }
       for (const context of arrayContexts) {
         set.grammar(owesCloseOfArray, 'string', context, 'commaOrClose')
@@ -551,7 +619,7 @@ export const rules: readonly Rule[] = [
   },
   {
     name: 'deeper than the maximum depth',
-    reason: 'An opening bracket at depth 16 still opens a container, so that its closing bracket finds it.',
+    reason: 'An opening bracket at depth 16 still opens a container, so that its closing bracket finds it. Above 16 levels the stack keeps no kinds, so there the rules that close a container at a comma or a colon do not close it: the depth stays a count of brackets, as it is today for a valid JSON text that is too deep.',
     example: '[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]',
     cells: set => {
       for (const context of [6, 7]) {

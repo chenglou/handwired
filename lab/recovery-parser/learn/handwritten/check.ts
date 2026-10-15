@@ -6,8 +6,12 @@
 // - How many code points are read in the grammar state `error`, to which the rules give a meaning.
 // - Per rule, how many samples read one of its cells from the first error on. A rule that no sample reads is there
 //   for completeness only.
+// - On valid JSON texts of 17 to 19 levels, which today's parser reports as too deep and whose depth it still has
+//   right at every code point: the hand-written tables must not have more wrong depths. The dataset has no such
+//   text, so no score sees them, see ../check-deep.ts.
 //
 // Run from the repo root: bun lab/recovery-parser/learn/handwritten/check.ts [--scratch <folder>] [--to 60000]
+import {deepTexts, depthsOnDeepTexts} from '../check-deep.ts'
 import {cacheFolderOf, loadSamples, optionOf, splitNames, standardRange} from '../data.ts'
 import {createTrace} from '../recovery-parser.ts'
 import {asIsTables, grammarCellName, grammarChoiceName, lexerCellName, lexerChoiceName} from '../recovery-tables.ts'
@@ -77,5 +81,10 @@ if (import.meta.main) {
   console.log('')
   console.log('Samples that read a cell of each rule, from the first error on:')
   rules.forEach((rule, index) => console.log(`${String(samplesOfRule[index]).padStart(8)}  ${rule.name}`))
-  if (differencesBeforeError > 0) process.exit(1)
+  console.log('')
+  const tooDeep = deepTexts(300)
+  const deepAsIs = depthsOnDeepTexts(asIs, tooDeep)
+  const deep = depthsOnDeepTexts(tables, tooDeep)
+  console.log(`${deep.texts} valid JSON texts of 17 to 19 levels, ${deep.fromFirstError} code points at or after the first error: the depth is wrong at ${deep.depthWrong} of them (the parser as it is: ${deepAsIs.depthWrong}, and it must not be more), the container at ${deep.containerWrong} (the parser as it is: ${deepAsIs.containerWrong}).`)
+  if (differencesBeforeError > 0 || deep.depthWrong > deepAsIs.depthWrong) process.exit(1)
 }
