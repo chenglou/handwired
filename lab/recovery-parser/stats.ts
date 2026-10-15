@@ -227,6 +227,10 @@ export function report(seed: number, sampleCount: number): string {
   const rowsByGroup = new Map<string, Row>()
   const grammarFirstError = new Map<number, number>()
   const lexerFirstError = new Map<number, number>()
+  // Per hand rule and table: how many samples make the rule read each error cell somewhere in the text.
+  const visited = {stay: {grammar: new Map<number, number>(), lexer: new Map<number, number>()}, resync: {grammar: new Map<number, number>(), lexer: new Map<number, number>()}}
+  const isGrammarErrorCell = new Set(grammarErrorCells)
+  const isLexerErrorCell = new Set(lexerErrorCells)
   const validCells = new Map<number, number>()
   const validCellsBySplit = new Map<string, Set<number>>()
   const brokenTexts = new Map<string, number>()
@@ -371,6 +375,21 @@ export function report(seed: number, sampleCount: number): string {
         depthLabels.set(label.depth!, (depthLabels.get(label.depth!) ?? 0) + 1)
       }
       if (trace.displayKind[position] === displayKind.error) shownAsErrorByTokenizer++
+    }
+
+    // The error cells that each hand rule reads over the whole text, up to and with the cell after the last code point.
+    for (const rule of handRules) {
+      const ruleTrace = traces[rule]
+      const grammarCells = new Set<number>()
+      const lexerCells = new Set<number>()
+      for (let at = 0; at <= ruleTrace.length; at++) {
+        const grammarCell = ruleTrace.grammarBefore[at]! * tables.symbolCount + ruleTrace.token[at]! * tables.contextCount + ruleTrace.context[at]!
+        if (isGrammarErrorCell.has(grammarCell)) grammarCells.add(grammarCell)
+        const lexerCell = ruleTrace.lexerStateBefore[at]! * tables.classCount + ruleTrace.characterClass[at]!
+        if (isLexerErrorCell.has(lexerCell)) lexerCells.add(lexerCell)
+      }
+      for (const cell of grammarCells) visited[rule].grammar.set(cell, (visited[rule].grammar.get(cell) ?? 0) + 1)
+      for (const cell of lexerCells) visited[rule].lexer.set(cell, (visited[rule].lexer.get(cell) ?? 0) + 1)
     }
 
     // The cells at the first error of the parser as it is.
@@ -581,6 +600,19 @@ export function report(seed: number, sampleCount: number): string {
     cell => lexerStateNames[Math.floor(cell / tables.classCount)] !== 'errorLine' && classNames[cell % tables.classCount] !== 'truncatedEnd',
     'the others are the row of the state errorLine, which only follows an earlier error, and the column of the class truncatedEnd, which only a text past the capacity has')
   lines.push(`  Tokenizer states: ${lexerStateNames.length}, character classes: ${classNames.length}.`)
+
+  lines.push('', 'The error cells that a reader visits over whole texts. The two lists above count the cell of the first error only. A reader that')
+  lines.push('goes on reads other error cells later in the text, and which ones depends on its tables, so the cells that get any signal in')
+  lines.push('training are not the same for two arms. Per hand rule and table: the cells that some sample makes the rule read, of all error cells,')
+  lines.push('how many samples reach a cell (a sample counts once per cell), and the samples that the rarest quarter of the visited cells has in all.')
+  for (const rule of handRules) {
+    for (const [name, cells, reached] of [['grammar table', grammarErrorCells, visited[rule].grammar], ['tokenizer table', lexerErrorCells, visited[rule].lexer]] as const) {
+      const counts = [...reached.values()].sort((left, right) => left - right)
+      const rarest = counts.slice(0, Math.ceil(counts.length / 4))
+      lines.push(`  ${rule.padEnd(6)} ${name.padEnd(15)} ${String(counts.length).padStart(3)} of ${cells.length} cells. By 1 to 4 samples: ${counts.filter(value => value <= 4).length}, by 5 to 49: ${counts.filter(value => value >= 5 && value < 50).length}, by 50 or more: ${counts.filter(value => value >= 50).length}. Samples per cell: ${quartiles(counts)}. The rarest ${rarest.length} cells: ${rarest.reduce((total, value) => total + value, 0)} samples, at most ${rarest.at(-1) ?? 0} per cell.`)
+    }
+  }
+  lines.push(`  At the first error of the parser as it is: ${grammarFirstError.size} cells of the grammar table and ${lexerFirstError.size} of the tokenizer's.`)
 
   const repeated = [...brokenTexts].filter(([, times]) => times > 1)
   lines.push('', 'Duplicates and situations')
