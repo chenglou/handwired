@@ -419,6 +419,21 @@ test('the hand-written settings of the tables read valid documents exactly as th
   // The hand rule words shows a key and a value without quotes as what they are, and a word in single quotes too.
   const shown = runTableParser("{port: 8080, 'env': production}", handRuleTables('words'))
   expect(Array.from(shown.displayKind.slice(0, shown.length), kind => kindLetters[kind]).join('')).toBe('pkkkkpwnnnnpwkkkkkpwssssssssssp')
+  // The hand rule lines has one more tokenizer state than the tables as they are. After a string that a line feed
+  // ended, the brace at the very start of the next line does not open, so the second line of a file with one document
+  // per line stays at depth 1 when the first line is cut short inside a string, and the third line starts at depth 0.
+  // The hand rule words opens a second level there. With a space before the brace, both open it.
+  const cutLine = '{"id": "7a919a\n{"id": "7a919a-2", "ok": true}\n{"id": 3}'
+  const read = (text: string, rule: typeof handRules[number]) => {
+    const trace = runTableParser(text, handRuleTables(rule))
+    return [Array.from(trace.displayKind.slice(0, trace.length), kind => kindLetters[kind]).join(''), Array.from(trace.depthAfter.slice(0, trace.length)).join('')]
+  }
+  expect(handRuleTables('lines').lexerNext.length).toBe((lexerStateNames.length + 1) * defaultTables.classCount)
+  expect(read(cutLine, 'lines')).toEqual(['pkkkkpwssssssswpkkkkpwsssssssssspwkkkkpwllllpwpkkkkpwnp', '1111111111111111111111111111111111111111111100111111110'])
+  expect(read(cutLine, 'words')).toEqual(['pkkkkpwssssssswpkkkkpwsssssssssspwkkkkpwllllpwpkkkkpwnp', '1111111111111112222222222222222222222222222211222222221'])
+  expect(read('{"id": "7a\n {"id": 2}', 'lines')).toEqual(read('{"id": "7a\n {"id": 2}', 'words'))
+  // The three earlier settings have the 26 tokenizer states of the tables as they are.
+  for (const rule of ['stay', 'resync', 'words'] as const) expect(handRuleTables(rule).lexerNext.length).toBe(lexerStateNames.length * defaultTables.classCount)
 })
 
 test('the split is a function of a document\'s tokens, also for each record of a text of several documents, and held-out kinds and the held-out template only sit in the test split', () => {
