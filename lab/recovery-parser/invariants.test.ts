@@ -633,6 +633,27 @@ test('the form texts of raw line feeds and of single quotes give the numbers tha
   expect(withEscapedApostrophe).toBeGreaterThan(0)
 })
 
+test('a string without its opening quote is flagged yes exactly when the closing quote ends what is left, as the README says', () => {
+  const seen = new Set<string>()
+  for (let index = 0; index < 500; index++) {
+    const sample = sampleAt(defaultSeed, index, {kind: 'missingOpeningQuote'})
+    // The one edit removes the opening quote, and the content runs from there to the closing quote of the original.
+    const original = Array.from(sample.original)
+    const start = sample.edits[0]!.at + 1
+    let end = start
+    while (original[end] !== '"') end += original[end] === '\\' ? 2 : 1
+    const content = original.slice(start, end).join('')
+    const isKey = sample.forms[0]!.includes('of a key')
+    // What ends the string before its closing quote: a comma, a bracket, a quote, a backslash, a tab or a line feed,
+    // which are escapes in the original, a space at either end, and in a key any space or a colon.
+    const endsEarly = /[,{}[\]\\]/.test(content) || content.startsWith(' ') || content.endsWith(' ') || (isKey && /[ :]/.test(content))
+    if ((sample.reachable === 'yes') !== !endsEarly && scoredCodePoints(sample) > 0) fail(sample, `the content ${JSON.stringify(content)} ${endsEarly ? 'ends' : 'does not end'} before its closing quote, and the flag is ${sample.reachable}`)
+    seen.add(`${isKey ? 'key' : 'value'}, ${endsEarly ? 'ends early' : content.includes(' ') ? 'several words' : 'one word'}`)
+  }
+  // A value of several words that the closing quote ends is among them, e.g. "street": 362 Rua das Flores",
+  for (const what of ['key, one word', 'value, ends early', 'value, one word', 'value, several words']) expect([...seen]).toContain(what)
+})
+
 test('a damaged document with carriage return line ends has them at every line end, in the original and in the broken text', () => {
   let found = 0
   let withOpenString = 0

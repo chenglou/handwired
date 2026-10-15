@@ -179,7 +179,9 @@ function missingOpeningQuote(random: Random, scanned: Scan): Damage | undefined 
   const ofKey = keys.length > 0 && (stringValues.length === 0 || random.chance(0.3))
   if (!ofKey && stringValues.length === 0) return undefined
   const part = random.pick(ofKey ? keys : stringValues)
-  // What is left reads as a word that the closing quote ends, unless the word holds a character that ends it early.
+  // What is left runs on to the closing quote, unless it holds a character that ends it early. A key must be one
+  // word. A value may be several words with spaces between them, e.g. 362 Rua das Flores", as a value without quotes
+  // of several words runs on to its comma, see unquotedValue. A colon inside a value ends nothing either.
   const breaks = ofKey ? /[\s",:{}[\]\\]/ : /[\n\t",{}[\]\\]|^ | $/
   const readable = !breaks.test(part.content)
   return {
@@ -234,7 +236,7 @@ export const stringKinds: KindDefinition[] = [
   {
     name: 'missingOpeningQuote', family: 'inside a string', origin: 'file', weight: 0.3,
     example: '{⏎  "city": Lisbon",⏎  "country": "PT"⏎}',
-    reachable: 'yes when what is left reads as one word that the closing quote ends. no when the content holds a character that ends a word, e.g. a comma. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
+    reachable: 'yes when the closing quote ends what is left: a key that is one word, or a value of one word or of several words with spaces between them, e.g. 362 Rua das Flores", which runs on to the quote as a value without quotes runs on to its comma. no when the content holds a character that ends it before the closing quote: a comma, a bracket, a quote, a backslash, a tab or a line feed, a space at either end, and in a key any space or a colon. The leading characters of a value that read as a number or a literal, e.g. the 2.0 of 2.0", are shown as one by every parser, so their display kind is not scored. A key that starts so, e.g. name", needs a display fix where a key without quotes does',
     apply: missingOpeningQuote,
   },
   {
