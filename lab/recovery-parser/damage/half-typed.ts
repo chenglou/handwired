@@ -160,7 +160,7 @@ function colonWithoutValue(random: Random, scanned: Scan): Damage | undefined {
   // Mostly a scalar or a string: a container is a value too, but people rarely delete one whole.
   const short = pool.filter(entry => entry.value.container === null)
   const entry = random.pick(short.length > 0 && random.chance(0.85) ? short : pool)
-  // The space after the colon stays in half of the texts.
+  // The space after the colon stays in half of the texts that have one.
   const from = random.chance(0.5) ? entry.value.start : entry.colon + 1
   let follows = place === 'comma' ? 'its comma stays' : 'the closer follows'
   let to = entry.value.end
@@ -171,7 +171,10 @@ function colonWithoutValue(random: Random, scanned: Scan): Damage | undefined {
     // go on from there: a colon after a value means that the value was a key.
     follows = `the next key follows ${hasLineFeedBetween(codePoints, to, entry.container.entries[entry.index + 1]!.start) ? 'on the next line' : 'on the same line'}`
   }
-  return {edits: [removeRange(from, to)], form: `${from === entry.value.start ? 'the space after the colon stays' : 'nothing after the colon'}, ${follows}`, reachable: 'yes'}
+  // What the form says about the space is read off the text that is left: white space between the colon and the
+  // removed part stays, and so does a space right after the removed part. A compact text has neither.
+  const spaceStays = from > entry.colon + 1 || codePoints[to] === ' ' || codePoints[to] === '\t'
+  return {edits: [removeRange(from, to)], form: `${spaceStays ? 'the space after the colon stays' : 'nothing after the colon'}, ${follows}`, reachable: 'yes'}
 }
 
 function partialLiteral(random: Random, scanned: Scan): Damage | undefined {
