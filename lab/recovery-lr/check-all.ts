@@ -1,9 +1,9 @@
 // One command for everything that has to hold in lab/recovery-lr: the type check of this folder, the lint of the
-// whole folder, and the check scripts.
+// whole folder, the check scripts and the test of the dataset's invariants.
 //
 // Run from the repo root, with RECOVERY_LR_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-lr/check-all.ts [--only <part of a name>]
-// It takes about 10 s. Up to 4 commands run at a time, each in one thread.
+// It takes about 20 s. Up to 4 commands run at a time, each in one thread.
 //
 // check-tools.ts and check-changed.ts need bison 2.3, flex 2.6.4 and cc. Where the tools are missing, the two say
 // so and pass, since the committed grammar/tables.json needs no tool: the other checks still run.
@@ -20,6 +20,7 @@ const here = relative(root, import.meta.dir)
 const checks: {name: string, arguments?: string[]}[] = [
   {name: 'check-cells.ts'},
   {name: 'check-samples.ts'},
+  {name: 'check-dataset.ts'},
   {name: 'check-language.ts'},
   {name: 'check-guard.ts'},
   {name: 'check-tools.ts', arguments: ['--skip-without-tools']},
@@ -28,6 +29,7 @@ const checks: {name: string, arguments?: string[]}[] = [
 const commands: {name: string, command: string[], isCheck: boolean}[] = [
   {name: 'tsc', command: ['bunx', 'tsc', '-p', here], isCheck: false},
   {name: 'oxlint', command: ['bunx', 'oxlint', '--type-aware', here], isCheck: false},
+  {name: 'invariants.test.ts', command: ['bun', 'test', join(here, 'invariants.test.ts')], isCheck: false},
   ...checks.map(check => ({name: check.name, command: ['bun', join(here, check.name), ...(check.arguments ?? [])], isCheck: true})),
 ]
 const options = process.argv.slice(2)

@@ -66,7 +66,7 @@ export function differingTexts(group: TextGroup, expected: readonly Lines[], tab
 
 const within = (codePoints: readonly number[]): Int32Array => Int32Array.from(codePoints.slice(0, maximumCodePoints))
 
-// Valid programs of the stand-in generator and their neutral damage: `damagedPerProgram` damaged texts per
+// Valid programs of the generator and their neutral damage: `damagedPerProgram` damaged texts per
 // program, as the damage draws them, also the ones that are still valid.
 export function programTexts(programCount: number, damagedPerProgram: number): TextGroup[] {
   const programs: Int32Array[] = [], damaged: Int32Array[] = []
