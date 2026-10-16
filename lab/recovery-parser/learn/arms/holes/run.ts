@@ -2,14 +2,17 @@
 // the hand-written tables of ../../handwritten/rules.ts, and a share of its decisions is taken back. Does training
 // put the right choices into the blanks? README.md has the question, the setup and the results.
 //
-// A seed draws the blanked decisions and orders the training. Per share and seed:
+// A seed draws the blanked decisions, orders the samples of the training and orders the cells of the search. Per
+// share and seed:
 // - "not filled": the hand-written tables with today's choice in the blanked cells, which is what blanking costs,
 // - "trained": only the blanked cells are trainable, with the one setting of the trainer that tune.ts chose,
-// - "searched": the search of ../../search/ over the blanked cells alone, as the comparison without gradients.
-// The share 10 also has runs whose blanks are the ones of seed 1 for every seed, so that the seed only orders the
-// training. The share 100 blanks every decision, so its base is today's tables for every seed, its search has no
-// seed, and it has a third setting in which every open cell is trainable: the same run without the knowledge of
-// which cells the person changed.
+// - "searched": the search of ../../search/ over the blanked cells alone, as the comparison without gradients. A
+//   search ends in other tables for another order of its cells, so the seed draws a random order for every pass.
+// The share 10 also has a trained and a searched setting whose blanks are the ones of seed 1 for every seed, so that
+// the seed only orders the training and the search. The share 100 blanks every decision, so its base is today's
+// tables for every seed, and its seeds only order too. It has two more settings: the search with the most read
+// cells first, which is the order that search.ts has by default and has no seed, and a training in which every open
+// cell is trainable, which is the same run without the knowledge of which cells the person changed.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-parser/learn/arms/holes/run.ts --share 10 [--seeds 1,2,3,4,5]
@@ -35,8 +38,10 @@ const searchSamples = prepareSamples(trainPartOfTheStandardSet())
 const names = settingNamesOf(sharePercent)
 
 const trained = async (blanks: Blanks, seed: number): Promise<Built> => ({tables: await trainCells(blanks.base, blanks.trainable, data, seed, trainerSetting), base: blanks.base})
-const searched = async (blanks: Blanks): Promise<Built> => {
-  const result = await searchCells(blanks.base, blanks.cells, searchSamples)
+// The search of the blanked cells, in a random order that `orderSeed` draws, or with the most read cells first
+// when no seed is given.
+const searched = async (blanks: Blanks, orderSeed?: number): Promise<Built> => {
+  const result = await searchCells(blanks.base, blanks.cells, searchSamples, orderSeed)
   if (!result.lastPassChangedNothing) throw new Error(`the search of ${blanks.cells.length} blanked cells did not end in ${result.passes} passes`)
   console.log(`The search of ${blanks.cells.length} blanked cells ended when pass ${result.passes} changed nothing, after ${result.changes} changes of a cell and ${(result.runs / 1e6).toFixed(1)} million runs of a sample.`)
   return {tables: result.tables, base: blanks.base}
@@ -45,14 +50,18 @@ const searched = async (blanks: Blanks): Promise<Built> => {
 const settings: ArmSetting[] = sharePercent === 100
   ? [
     {name: names.trained, build: seed => trained(blanksOf(100, seed), seed)},
-    {name: names.searched, withoutSeed: true, build: () => searched(blanksOf(100, seeds[0]!))},
+    {name: names.searched, build: seed => searched(blanksOf(100, seed), seed)},
+    {name: names.searchedMostReadFirst, withoutSeed: true, build: () => searched(blanksOf(100, seeds[0]!))},
     {name: names.everyOpenCellTrained, build: async seed => ({tables: await trainCells(asIsTables(), undefined, data, seed, trainerSetting), base: asIsTables()})},
   ]
   : [
     {name: names.notFilled, build: seed => ({tables: blanksOf(sharePercent, seed).base, base: hand})},
     {name: names.trained, build: seed => trained(blanksOf(sharePercent, seed), seed)},
-    {name: names.searched, build: seed => searched(blanksOf(sharePercent, seed))},
-    ...(sharePercent === 10 ? [{name: names.trainedOnFixedBlanks, build: (seed: number) => trained(blanksOf(sharePercent, seedOfTheFixedBlanks), seed)}] : []),
+    {name: names.searched, build: seed => searched(blanksOf(sharePercent, seed), seed)},
+    ...(sharePercent === 10 ? [
+      {name: names.trainedOnFixedBlanks, build: (seed: number) => trained(blanksOf(sharePercent, seedOfTheFixedBlanks), seed)},
+      {name: names.searchedOnFixedBlanks, build: (seed: number) => searched(blanksOf(sharePercent, seedOfTheFixedBlanks), seed)},
+    ] : []),
   ]
 
 await runArm({name: armNameOf(sharePercent), seeds, settings})

@@ -7,7 +7,7 @@
 import {createRandom} from '../../../random.ts'
 import {handwrittenTables} from '../../handwritten/rules.ts'
 import {createTrace} from '../../recovery-parser.ts'
-import {type RecoveryTables, actionByToken, actionOfToken, asIsTables, copyTables, grammarCellName, lexerCellName} from '../../recovery-tables.ts'
+import {type RecoveryTables, actionByToken, actionOfToken, asIsTables, copyTables} from '../../recovery-tables.ts'
 import {runOnSample} from '../../score.ts'
 import {train} from '../../soft/train.ts'
 import {type TwinData, createModel} from '../../soft/twin.ts'
@@ -15,8 +15,6 @@ import {trainPartOfTheStandardSet} from '../harness.ts'
 
 // A cell of the tokenizer's table or of the grammar's table, by its index in that table.
 export type Cell = {grammar: boolean, cell: number}
-
-export const cellNameOf = (tables: RecoveryTables, {grammar, cell}: Cell) => grammar ? grammarCellName(tables, cell) : lexerCellName(tables, cell)
 
 // The stack action of a grammar cell as what it does: an action that does what the cell's token does by itself is
 // `by token`, e.g. `pop` in a cell of a closing bracket, and `none` in a cell of a comma. The parser cannot tell the
@@ -35,7 +33,7 @@ export function sameChoice(first: RecoveryTables, second: RecoveryTables, {gramm
 }
 
 // Writes the choice that `from` hold in a cell into `tables`.
-export function copyChoice(tables: RecoveryTables, from: RecoveryTables, {grammar, cell}: Cell) {
+function copyChoice(tables: RecoveryTables, from: RecoveryTables, {grammar, cell}: Cell) {
   if (grammar) {
     tables.grammarNext[cell] = from.grammarNext[cell]!
     tables.grammarAction[cell] = from.grammarAction[cell]!
@@ -52,7 +50,8 @@ export const handTables = (): RecoveryTables => handwrittenTables().tables
 // run of the same name away.
 export const sharesOfTheArm = [10, 25, 50, 100] as const
 export const armNameOf = (sharePercent: number) => `holes-${sharePercent}`
-// The seed whose blanks the setting with fixed blanks uses for every seed, so that its seeds only order the training.
+// The seed whose blanks the settings with fixed blanks use for every seed, so that their seeds only order the
+// training and the search.
 export const seedOfTheFixedBlanks = 1
 // The names of a share's settings, which are also the names of their rows.
 export const settingNamesOf = (sharePercent: number) => ({
@@ -60,6 +59,8 @@ export const settingNamesOf = (sharePercent: number) => ({
   trained: `${sharePercent}% blanked, trained`,
   searched: `${sharePercent}% blanked, searched`,
   trainedOnFixedBlanks: `${sharePercent}% blanked as with seed ${seedOfTheFixedBlanks}, trained`,
+  searchedOnFixedBlanks: `${sharePercent}% blanked as with seed ${seedOfTheFixedBlanks}, searched`,
+  searchedMostReadFirst: `${sharePercent}% blanked, searched with the most read cells first`,
   everyOpenCellTrained: 'every open cell trainable, the same setting of the trainer',
 })
 

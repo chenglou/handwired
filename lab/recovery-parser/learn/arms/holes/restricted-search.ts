@@ -4,10 +4,14 @@
 //
 // It is that search with its defaults, run by the search's own worker threads (../../search/search-worker.ts) on the
 // search's own parser loop (../../search/sample-runs.ts): the choices of `--pairs known` without the events of a
-// text's end, the cells of a pass from the most read one to the least read one, and a choice is kept when it has more
-// scored code points with every label right, or as many and more right labels. It has no budget of runs: a search of
-// this arm ends by a pass that changes nothing. check-search.ts shows that with every open cell as the cells it
-// gives the tables of search.ts.
+// text's end, and a choice is kept when it has more scored code points with every label right, or as many and more
+// right labels. The cells of a pass are in one of the two orders of search.ts: from the most read cell to the least
+// read one, its `--order 0`, or in a random order that a seed draws anew for every pass, its `--order <seed>`. The
+// search ends in other tables for another order. It has no budget of runs: a search of this arm ends by a pass that
+// changes nothing, which has to come, since every change of a cell raises the score on the train split. The limit
+// of passes is only a guard: search.ts stops after 50 passes, and a random order of all 915 decisions took up to 29.
+// check-search.ts shows that with every open cell as the cells it gives the tables of search.ts, in both orders.
+import {createRandom} from '../../../random.ts'
 import {type RecoveryTables, actionByToken, actionCount, actionOfToken, copyTables, eventNames, today} from '../../recovery-tables.ts'
 import {type RunSamples, cellBitCount, messageOf, totalScore} from '../../search/sample-runs.ts'
 import type {Reply, Request} from '../../search/search-worker.ts'
@@ -20,7 +24,7 @@ const knownPairs = [...new Set(Array.from(today.lexerNext, (next, cell) => next 
 
 // The choices to try for a cell, two numbers each, without the one that the cell holds: as candidatesOf of search.ts
 // with `--pairs known`.
-function candidatesOf(tables: RecoveryTables, {grammar, cell}: Cell): Uint8Array {
+export function candidatesOf(tables: RecoveryTables, {grammar, cell}: Cell): Uint8Array {
   const candidates: number[] = []
   if (grammar) {
     // A stack action that does what the cell's token does by itself is kept as `by token`, so there are four actions.
@@ -61,8 +65,9 @@ export type SearchResult = {
 }
 
 // Searches the choices of `cells` from the tables `start`, which are not changed, on the broken samples of `train`,
-// e.g. prepareSamples(trainPartOfTheStandardSet()).
-export async function searchCells(start: RecoveryTables, cells: readonly Cell[], train: RunSamples, maximumPasses = 50): Promise<SearchResult> {
+// e.g. prepareSamples(trainPartOfTheStandardSet()). Without `orderSeed` a pass goes from the most read cell to the
+// least read one. With it, every pass has a random order of its own, which the seed draws.
+export async function searchCells(start: RecoveryTables, cells: readonly Cell[], train: RunSamples, orderSeed?: number, maximumPasses = 200): Promise<SearchResult> {
   if (start.addedClasses.length > 0 || start.contextCount !== today.contextCount) throw new Error('the search does not run tables with added classes or with the bit "first on its line"')
   const tables = copyTables(start)
   const lexerCellCount = tables.lexerNext.length
@@ -83,14 +88,22 @@ export async function searchCells(start: RecoveryTables, cells: readonly Cell[],
     let passes = 0
     let lastPassChangedNothing = false
     await ask(share => ({type: 'start', samples: messageOf(train), tables, share, shares: workerCount}))
-    while (passes < maximumPasses && !lastPassChangedNothing) {
-      passes++
+    // The cells in the order of the tables: a random order is drawn from them as search.ts draws it, whatever the
+    // order in which the caller lists the cells.
+    const inTableOrder = [...cells].sort((left, right) => bitOf(left) - bitOf(right))
+    // The cells from the most read one to the least read one, by how many samples read them with the tables as they
+    // are at the start of the pass.
+    const mostReadFirst = async () => {
       const readers = new Int32Array(cellBitCount(tables))
       for (const reply of await ask(() => ({type: 'readers'}))) {
         if (reply.type !== 'readers') throw new Error('a worker gave another reply than readers')
         for (let bit = 0; bit < readers.length; bit++) readers[bit]! += reply.readers[bit]!
       }
-      const order = [...cells].sort((left, right) => readers[bitOf(right)]! - readers[bitOf(left)]! || bitOf(left) - bitOf(right))
+      return [...inTableOrder].sort((left, right) => readers[bitOf(right)]! - readers[bitOf(left)]! || bitOf(left) - bitOf(right))
+    }
+    while (passes < maximumPasses && !lastPassChangedNothing) {
+      passes++
+      const order = orderSeed === undefined ? await mostReadFirst() : createRandom(orderSeed, passes).shuffled(inTableOrder)
       let changesOfPass = 0
       for (const cell of order) {
         const candidates = candidatesOf(tables, cell)
