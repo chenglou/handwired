@@ -1,0 +1,835 @@
+⟦repair hand-editing-01⟧
+from: a function that was one line got a local definition, and the `in` after the new line was forgotten
+⟦aligned⟧
+(* Convert readings from the sensor log. *)
+let freezing = 32
+let to_celsius reading =
+  let offset = reading - freezing
+  ⟦missing⟧in ⟦/⟧offset * 5 / 9
+
+let describe reading =
+  let degrees = to_celsius reading in
+  if degrees < 0 then "frost" else "mild"
+
+let readings = [41; 28; 35]
+let () = print_string (join ", " (map describe readings))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-02⟧
+from: an argument copied for the call below and pasted by a stray click into the head of a definition
+⟦aligned⟧
+(* Layout of the preview pane. *)
+let margin = 6
+let width = 120
+let scale factor ⟦added⟧(width - margin) ⟦/⟧value = value * factor / 100
+let inner = scale 80 (width - margin)
+let () = print_int inner⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-03⟧
+from: a first check added in front of a chain of conditions, typed without its `then`
+⟦aligned⟧
+(* A piece walks down the board until it leaves it or runs out of steps. *)
+let board_size = 8
+let on_board row column =
+  row >= 0 && row < board_size && column >= 0 && column < board_size
+
+let rec walk row column steps =
+  if steps = 0 ⟦missing⟧then ⟦/⟧(row, column)
+  else if on_board (row + 1) column then walk (row + 1) column (steps - 1)
+  else (row, column)
+
+let finish = walk 0 3 5
+let () = print_string (string_of_int (fst finish) ^ "," ^ string_of_int (snd finish))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-04⟧
+from: the shift key was not down for the first quote of a string
+⟦aligned⟧
+let player = "Robin"
+let greeting = ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧welcome back, " ^ player
+let () = print_string greeting⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-05⟧
+from: a function of three lines cut and pasted further up, with its last line left behind where the function was
+note: the line that was left behind is missing at the end of the function. Without that missing text the kept code points have the same three values
+⟦aligned⟧
+(* Volume control of the player. *)
+let clamp low high value =
+  if value < low then low
+  else if value > high then high
+
+⟦missing⟧else value ⟦/⟧let min_volume = 0
+let max_volume = 11
+⟦added⟧  else value
+⟦/⟧let set_volume requested = clamp min_volume max_volume requested
+let louder current = set_volume (current + 1)
+let quieter current = set_volume (current - 1)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-06⟧
+from: the last bracket of a line left out while typing a recursive call
+⟦aligned⟧
+let names = ["ada"; "grace"; "edsger"]
+
+let rec join separator parts =
+  if parts = [] then ""
+  else if tail parts = [] then head parts
+  else head parts ^ separator ^ join separator (tail parts
+
+⟦missing⟧)⟦/⟧let greeting = "hello, " ^ join ", " names
+let () = print_string greeting⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-07⟧
+from: a file saved while a new setting had its name and its `=` and no value yet
+⟦aligned⟧
+let columns = 4
+let gutter =
+⟦missing⟧() ⟦/⟧let page_width = 96
+let column_width = (page_width - gutter) / columns⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-08⟧
+from: `i` replaced by `index` in the lines of one function without asking for whole words, which also changed its `in` and its `if`
+⟦aligned⟧
+let rec sum_squares index last =
+  let square = index * index i⟦added⟧ndex⟦/⟧n
+  i⟦added⟧ndex⟦/⟧f index > last then 0 else square + sum_squares (index + 1) last
+
+let small = sum_squares 1 10
+let large = sum_squares 1 100
+let () = print_int (large - small)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-09⟧
+from: the closing quote of the first of two strings on a line was not typed
+⟦aligned⟧
+let count = 3
+let unit = if count = 1 then "item⟦missing⟧"⟦/⟧ else "items"
+let () = print_string unit⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-10⟧
+from: a function that got a second parameter for the width, and its calls were changed with a comma after the new argument
+⟦aligned⟧
+let rec repeat text count = if count <= 0 then "" else text ^ repeat text (count - 1)
+let pad width text = text ^ repeat " " (width - length text)
+let header = pad 12⟦added⟧,⟦/⟧ "name" ^ "score"
+let row name score = pad 12⟦added⟧,⟦/⟧ name ^ string_of_int score
+let table = [row "ada" 91; row "linus" 78; row "grace" 88]
+let () = print_string (header ^ "\n" ^ join "\n" table)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-11⟧
+from: a name deleted to be replaced by another one, and the file saved before the new name was typed
+⟦aligned⟧
+let screen_width = 80
+let rule = repeat "-" screen_width
+let centered text =
+  let padding = (screen_width - ⟦missing⟧()⟦/⟧) / 2 in
+  repeat " " padding ^ text
+
+let title = centered "High scores"
+let () = print_string (title ^ "\n" ^ rule)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-12⟧
+from: a `then` typed at the end of the line above, and the old one at the start of the next line stayed
+⟦aligned⟧
+let adult_price = 9
+let child_price = 4
+let classify age =
+  if age < 13 then
+    ⟦added⟧then ⟦/⟧"child"
+  else if age < 20 then "teenager"
+  else "adult"
+
+let ticket_price age =
+  if classify age = "child" then child_price else adult_price
+let family = [41; 39; 12; 4]
+let total = sum (map ticket_price family)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-13⟧
+from: two letters typed in the wrong order in the first word of the file
+⟦aligned⟧
+l⟦missing⟧e⟦/⟧t⟦added⟧e⟦/⟧ max_retries = 3
+let delay attempt = 100 * attempt
+let rec schedule attempt =
+  if attempt > max_retries then []
+  else delay attempt :: schedule (attempt + 1)
+let () = print_int (length (schedule 1))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-14⟧
+from: a selection that started in the middle of one line and ended in the middle of the next was deleted, so the end of one definition and the head of the next are gone
+note: the closing quote alone would make the program valid too, as one definition, and gives every kept code point the same three values
+⟦aligned⟧
+let greet name = "hello, ⟦missing⟧" ^ name
+let shout text = ⟦/⟧uppercase text ^ "!"
+let whisper text = lowercase text ^ "..."
+let () = print_string (shout (greet "world"))
+⟦end⟧
+
+⟦repair hand-editing-15⟧
+from: the opening bracket of a pair deleted together with the word before it
+⟦aligned⟧
+let origin = ⟦missing⟧(⟦/⟧0, 0)
+let step position direction =
+  (fst position + fst direction, snd position + snd direction)
+
+let north = (0, 1)
+let after_two = step (step origin north) north⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-16⟧
+from: a string with a quoted phrase inside it, typed without the backslashes before the inner quotes
+⟦aligned⟧
+let hint = "enter the size as ⟦missing⟧\⟦/⟧"width, height⟦missing⟧\⟦/⟧" in cells"
+let prompt = "> "
+let ask () =
+  let _ = print_string hint in
+  read_line prompt
+let size = ask ()⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-17⟧
+from: a line moved up by one with the editor's key for it, so that the `else` branch stands before the `then` branch
+unsure: the line with `then` could be the one that stays, with the line with `else` added before it and missing after it
+⟦aligned⟧
+(* Distances on the city grid, in blocks. *)
+let abs_diff left right =
+  if left > right
+  ⟦missing⟧then left - right
+  ⟦/⟧else right - left⟦added⟧
+  then left - right⟦/⟧
+
+let distance start finish = abs_diff (fst start) (fst finish) + abs_diff (snd start) (snd finish)
+let home = (2, 3)
+let office = (7, 1)
+let () = print_int (distance home office)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-18⟧
+from: the head of a definition typed without its `=` before going to the next line
+⟦aligned⟧
+let rec power base exponent
+  ⟦missing⟧= ⟦/⟧if exponent = 0 then 1
+  else base * power base (exponent - 1)
+
+let kilobyte = power 2 10
+let megabyte = kilobyte * kilobyte
+let () = print_int megabyte⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-19⟧
+from: the command to save, typed while the editor was still taking text
+⟦aligned⟧
+let greeting = "good morning"⟦added⟧:w⟦/⟧
+let farewell = "see you soon"
+let () = print_string greeting⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-20⟧
+from: a branch for zero being added in the middle of a conditional: its condition is typed and its `then` is not yet
+⟦aligned⟧
+let sign number =
+  if number < 0 then "negative"
+  else if number = 0
+  ⟦missing⟧then () ⟦/⟧else "positive"
+
+let describe number = string_of_int number ^ " is " ^ sign number
+let () = print_string (describe (-4))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-21⟧
+from: a tuple of four cells that was turned into a list: two of its three commas were not changed
+⟦aligned⟧
+(* Scoring of the opening moves. *)
+let size = 10
+let last = size - 1
+let corners = [(0, 0)⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ (0, last); (last, 0)⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ (last, last)]
+let is_corner cell = member cell corners
+let is_edge cell = fst cell = 0 || snd cell = 0 || fst cell = last || snd cell = last
+let score cell = if is_corner cell then 5 else if is_edge cell then 2 else 1
+let moves = [(0, 0); (4, 9); (5, 5)]
+let () = print_int (sum (map score moves))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-22⟧
+from: a line being rewritten from left to right, from `(first + second) / 2` to a mean of all marks: its start is the new expression already, and its end is still the old one, with the closing bracket of the old one
+⟦aligned⟧
+(* The mean of the marks of a class. *)
+let marks = [14; 9; 17; 12; 16]
+let first = head marks
+let second = head (tail marks)
+let mean = sum marks + second⟦added⟧)⟦/⟧ / 2
+let above_mean = filter (fun mark -> mark > mean) marks
+let () = print_int (length above_mean)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-23⟧
+from: the space between `then` and the next word deleted while the line was changed
+⟦aligned⟧
+let rec last items =
+  if tail items = [] then⟦missing⟧ ⟦/⟧head items
+  else last (tail items)
+let newest = last [3; 8; 5]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-24⟧
+from: a definition copied to make a new one from it, and pasted while the cursor stood inside the function below
+⟦aligned⟧
+(* Marks of the autumn term. *)
+let pass_mark = 50
+let top_mark = 90
+let grade score =
+  if score >= top_mark then "top"
+⟦added⟧let pass_mark = 50
+⟦/⟧  else if score >= pass_mark then "pass"
+  else "fail"
+
+let marks = [("ines", 93); ("jonas", 48); ("mei", 71)]
+let line entry = fst entry ^ ": " ^ grade (snd entry)
+let () = print_string (join "\n" (map line marks))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-25⟧
+from: a function typed in a hurry inside a call, without its `->`
+⟦aligned⟧
+let prices = [120; 45; 300]
+let doubled = map (fun price ⟦missing⟧-> ⟦/⟧price * 2) prices
+let cheap = filter (fun price -> price < 100) prices
+let () = print_int (length cheap)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-26⟧
+from: a definition that was commented out is put back in: the `(*` before it was deleted and the `*)` after it was not
+⟦aligned⟧
+let verbose = false
+let trace message =
+  if verbose then print_string ("[trace] " ^ message) ⟦added⟧*)⟦/⟧
+let run job =
+  let _ = trace "job starts" in
+  let result = job () in
+  let _ = trace "job done" in
+  result
+let () = print_int (run main)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-27⟧
+from: a line copied from the one above and changed, saved before the right side of its `*` was typed
+⟦aligned⟧
+let invoice lines =
+  let subtotal = sum lines in
+  let shipping = if subtotal > 200 then 0 else 15 in
+  let tax = subtotal * ⟦missing⟧() ⟦/⟧in
+  subtotal + tax + shipping
+
+let () = print_int (invoice [40; 85; 110])⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-28⟧
+from: a space typed between the two characters of an arrow, in both functions of the file
+⟦aligned⟧
+let stock = [("apples", 12); ("pears", 0); ("plums", 7)]
+let names = map (fun entry -⟦added⟧ ⟦/⟧> fst entry) stock
+let in_stock = filter (fun entry -⟦added⟧ ⟦/⟧> snd entry > 0) stock
+let () = print_int (length in_stock)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-29⟧
+from: a name replaced by a longer one after it was selected with the mouse, and the selection took the `if` before it too
+⟦aligned⟧
+let base_rate = 5
+let shipping parcel_weight =
+  ⟦missing⟧if ⟦/⟧parcel_weight > 10 then base_rate + 7 else base_rate
+let insured parcel_weight value =
+  let cover = value / 50 in
+  shipping parcel_weight + cover
+let () = print_int (insured 12 400)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-30⟧
+from: the closing bracket of a list left out at the end of its line
+⟦aligned⟧
+(* The first primes, and what they multiply to. *)
+let rec product numbers = if numbers = [] then 1 else head numbers * product (tail numbers)
+let rec count numbers = if numbers = [] then 0 else 1 + count (tail numbers)
+let primes = [2; 3; 5; 7; 11
+⟦missing⟧]⟦/⟧let primorial = product primes
+let () = print_int (primorial / count primes)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-31⟧
+from: the end of a line deleted by a slip of the keys, in the middle of a call in brackets
+⟦aligned⟧
+(* The first Fibonacci numbers, for the table in the handout. *)
+let rec fib n =
+  if n < 2 then n
+  else fib (n - 1) + fib (n -
+
+⟦missing⟧())⟦/⟧let first_ten = map fib [0; 1; 2; 3; 4; 5; 6; 7; 8; 9]
+let rec show numbers =
+  if numbers = [] then ""
+  else string_of_int (head numbers) ^ " " ^ show (tail numbers)
+let () = print_string (show first_ten)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-32⟧
+from: a copied argument pasted with the cursor in the middle of a word, one line above the place that was meant
+⟦aligned⟧
+(* Merge sort for the high score table. *)
+let rec merge left right =
+  if left = [] then right
+  else if right = [] th⟦added⟧(tail left)⟦/⟧en left
+  else if head left < head right then head left :: merge (tail left) right
+  else head right :: merge left (tail right)
+
+let rec sort items =
+  if items = [] || tail items = [] then items
+  else merge (sort (first_half items)) (sort (second_half items))
+let sorted = sort [9; 1; 4; 10; 3; 2]
+let () = print_int (head sorted)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-33⟧
+from: a path that ends with a backslash, typed without doubling that last backslash
+⟦aligned⟧
+let name_of month = "sales-" ^ string_of_int month ^ ".txt"
+let reports = "C:\\reports\⟦missing⟧\⟦/⟧"
+let path month = reports ^ name_of month
+let () = print_string (path 6)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-34⟧
+from: three local definitions typed one under the other, and only the last one got its `in`
+⟦aligned⟧
+let receipt items =
+  let subtotal = sum items
+  ⟦missing⟧in ⟦/⟧let tax = subtotal / 10
+  ⟦missing⟧in ⟦/⟧let total = subtotal + tax in
+  "total: " ^ string_of_int total ^ " (tax " ^ string_of_int tax ^ ")"
+
+let () = print_string (receipt [250; 120; 75])⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-35⟧
+from: a space typed for the `_` of a name whose second word is a keyword
+⟦aligned⟧
+let fade⟦added⟧ ⟦/⟧⟦missing⟧_⟦/⟧in = 12
+let fade_out = 30
+let title_time = fade_in + 90 + fade_out
+⟦end⟧
+
+⟦repair hand-editing-36⟧
+from: two local definitions pulled out of a function to the top of the file, each still with its `in`
+⟦aligned⟧
+let margin = 4⟦added⟧ in⟦/⟧
+let gap = 2⟦added⟧ in⟦/⟧
+let inner_width width columns = width - 2 * margin - gap * (columns - 1)
+let column_width width columns = inner_width width columns / columns
+let () = print_int (column_width 80 3)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-37⟧
+from: a local definition deleted from the middle of three, with its `in` left on a line of its own
+⟦aligned⟧
+let report entries =
+  let total = sum entries in
+⟦added⟧  in
+⟦/⟧  let mean = total / length entries in
+  string_of_int total ^ " in all, " ^ string_of_int mean ^ " each"
+
+let () = print_string (report [12; 30; 18])⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-38⟧
+from: a file saved in the middle of a string: the rest of the sentence and the closing quote are not typed yet
+⟦aligned⟧
+let width = 40
+let line = repeat "*" width
+let banner = "*** welcome to the⟦missing⟧"⟦/⟧
+let show () =
+  let _ = print_string line in
+  let _ = print_string banner in
+  print_string line
+let () = show ()⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-39⟧
+from: the short name `th` replaced by `thickness` in the whole file without asking for whole words, which also changed both `then` and the names that hold `th`
+⟦aligned⟧
+let board_weight widthickness lengthickness thickness = widthickness * lengthickness * thickness * 7 / 10
+let grade thickness =
+  if thickness < 12 th⟦added⟧ickness⟦/⟧en "slim"
+  else if thickness < 30 th⟦added⟧ickness⟦/⟧en "sturdy"
+  else "heavy"
+let label = grade 18 ^ " board"
+let () = print_string label⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-40⟧
+from: a function with a local helper moved below the list that it is used on, and its last line stayed where the function was
+note: the line that was left behind is missing at the end of the function, where `in ()` would give the kept code points the same three values
+⟦aligned⟧
+let pass_mark = 80
+⟦added⟧  in go 0 items
+⟦/⟧let scores = [70; 85; 92; 64]
+
+let count_over limit items =
+  let rec go seen rest =
+    if rest = [] then seen
+    else if head rest > limit then go (seen + 1) (tail rest)
+    else go seen (tail rest)
+⟦missing⟧in go 0 items ⟦/⟧let passed = count_over pass_mark scores
+let () = print_int passed⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-41⟧
+from: the shift key held too long: `_` for the `-` of an arrow
+⟦aligned⟧
+(* Savings with yearly interest, in whole cents. *)
+let rate = 3
+let years = 10
+let deposit = 100000
+let grow = fun balance ⟦added⟧_⟦/⟧⟦missing⟧-⟦/⟧> balance + balance * rate / 100
+let rec after remaining balance = if remaining = 0 then balance else after (remaining - 1) (grow balance)
+let () = print_int (after years deposit)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-42⟧
+from: a file saved while a conditional had only its condition
+⟦aligned⟧
+let subtotal = 130
+let discount =
+  if subtotal > 100
+
+⟦missing⟧then () ⟦/⟧let shipping = if subtotal > 50 then 0 else 7
+let total = subtotal - discount + shipping
+let () = print_int total⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-43⟧
+from: the opening bracket of a list deleted while its first item was changed
+⟦aligned⟧
+let rec nth items position = if position = 0 then head items else nth (tail items) (position - 1)
+let month_lengths = ⟦missing⟧[⟦/⟧31; 28; 31; 30; 31; 30; 31; 31; 30; 31; 30; 31]
+let days month = nth month_lengths (month - 1)
+let () = print_int (days 9)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-44⟧
+from: a line end deleted together with the first letter of the next line
+⟦aligned⟧
+(* Numbers for the times table. *)
+let start = 1
+let limit = 10⟦missing⟧
+l⟦/⟧et rec count_up from = if from > limit then [] else from :: count_up (from + 1)
+let numbers = count_up start
+let () = print_int (length numbers)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-45⟧
+from: a definition `let name = fun … -> …` being turned into one with parameters: `= fun` is deleted, and the `->` is not yet an `=`
+unsure: `= fun` could be missing after the name, with the `->` kept
+⟦aligned⟧
+(* The ranking, best score first. *)
+let compare_scores left right ⟦added⟧->⟦/⟧⟦missing⟧=⟦/⟧ snd left - snd right
+let rec insert entry ranking =
+  if ranking = [] then [entry]
+  else if compare_scores entry (head ranking) > 0 then entry :: ranking
+  else head ranking :: insert entry (tail ranking)
+
+let first_two = insert ("mia", 31) (insert ("tom", 27) [])
+let ranking = insert ("ana", 29) first_two
+let () = print_string (fst (head ranking))⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-46⟧
+from: an editor that closes quotes and brackets by itself, and the person typed the closing ones again
+⟦aligned⟧
+let title = "Monthly budget"⟦added⟧"⟦/⟧
+let underline = repeat "=" (length title)⟦added⟧)⟦/⟧
+let () = print_string title⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-47⟧
+from: the editor's key that copies a line pressed by mistake: the last line of a function stands twice
+⟦aligned⟧
+(* The square of the sum less the sum of the squares. *)
+let rec sum_to limit =
+  if limit = 0 then 0
+  else limit + sum_to (limit - 1)
+⟦added⟧  else limit + sum_to (limit - 1)
+⟦/⟧
+let rec squares_to limit =
+  if limit = 0 then 0
+  else limit * limit + squares_to (limit - 1)
+
+let gap = sum_to 10 * sum_to 10 - squares_to 10
+let () = print_int gap⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-48⟧
+from: the shift key was down for one `;` of a list
+⟦aligned⟧
+let directions = ["north"; "east"⟦added⟧:⟦/⟧⟦missing⟧;⟦/⟧ "south"; "west"]
+let rec turn_right heading remaining =
+  if remaining = [] then head directions
+  else if head remaining = heading && tail remaining <> [] then head (tail remaining)
+  else turn_right heading (tail remaining)
+let () = print_string (turn_right "east" directions)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-49⟧
+from: the first line of a comment of three lines deleted, with the `(*` on it
+⟦aligned⟧
+let cell_width = 9
+⟦missing⟧(* ⟦/⟧every cell is nine characters wide,
+   and a row has one more for each border *)
+let row_width cells = cells * cell_width + cells + 1
+let fits cells = row_width cells <= 80
+let () = print_int (row_width 6)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-50⟧
+from: a function being typed as an argument, inside brackets that the editor closed already: its body is not there yet
+⟦aligned⟧
+(* Readings of the week, in degrees Celsius. *)
+let temperatures = [18; 21; 25; 19]
+let warmest = fold max 0 temperatures
+let coldest = fold min 100 temperatures
+let in_fahrenheit = map (fun celsius -> ⟦missing⟧()⟦/⟧) temperatures
+let () = print_int (warmest - coldest)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-51⟧
+from: a list of three numbers that was turned into a tuple: the square brackets and one `;` were changed, and the other `;` stayed
+⟦aligned⟧
+let red color = first color
+let green color = second color
+let blue color = third color
+let darker channel = channel * 3 / 4
+let orange = (255, 128⟦added⟧;⟦/⟧⟦missing⟧,⟦/⟧ 0)
+let shade color = (darker (red color), darker (green color), darker (blue color))
+let () = show (shade orange)
+⟦end⟧
+
+⟦repair hand-editing-52⟧
+from: the opening quote of one string of a list was not typed
+⟦aligned⟧
+let ranks = [2; 3; 4; 5; 6; 7; 8; 9; 10]
+let faces = ["jack"; "queen"; "king"; "ace"]
+let suits = ["hearts"; ⟦missing⟧"⟦/⟧spades"; "clubs"; "diamonds"]
+let deck_size = length suits * (length ranks + length faces)
+let () = print_int deck_size⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-53⟧
+from: the cursor jumped two lines up while `^ "\n"` was typed in the definition of `page`, so the text landed in the head of the definition of `title`
+note: the text that landed in the wrong line is missing in the definition of `page`. Without that missing text the kept code points have the same three values
+⟦aligned⟧
+let name = "Inventory"
+let items = [("bolts", 140); ("nuts", 95); ("washers", 310)]
+let show_item item = fst item ^ ": " ^ string_of_int (snd item)
+let title ⟦added⟧^ "\n" ⟦/⟧= "== " ^ name ^ " =="
+let body = join "\n" (map show_item items)
+let page = title ⟦missing⟧^ "\n" ⟦/⟧^ body
+let () = print_string page⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-54⟧
+from: a list of pairs written with commas between the pairs, then every comma of the line replaced by `;`, also the ones inside the pairs
+⟦aligned⟧
+(* What one unit of each currency is worth, in cents of a dollar. *)
+let rates = [("usd"⟦added⟧;⟦/⟧⟦missing⟧,⟦/⟧ 100); ("eur"⟦added⟧;⟦/⟧⟦missing⟧,⟦/⟧ 92); ("gbp"⟦added⟧;⟦/⟧⟦missing⟧,⟦/⟧ 79)]
+let rec rate_of currency table =
+  if table = [] then 0
+  else if fst (head table) = currency then snd (head table)
+  else rate_of currency (tail table)
+let () = print_int (rate_of "eur" rates)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-55⟧
+from: the start of a line deleted by mistake: a local definition lost its `let` and its name
+⟦aligned⟧
+let average items =
+  let total = sum items in
+  ⟦missing⟧let _ ⟦/⟧= length items in
+  if count = 0 then 0 else total / count
+
+let grades = [14; 9; 17; 12]
+let () = print_int (average grades)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-56⟧
+from: two letters of `fun` typed in the wrong order inside a call
+⟦aligned⟧
+let entries = [("rent", 900); ("food", 340); ("books", 55)]
+let total = fold (f⟦missing⟧u⟦/⟧n⟦added⟧u⟦/⟧ sum entry -> sum + snd entry) 0 entries
+let largest = fold (fun best entry -> if snd entry > snd best then entry else best) (head entries) entries
+let () = print_string (fst largest)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-57⟧
+from: a `]` typed where the bracket that was open is a `(`
+⟦aligned⟧
+let rec range low high = if low > high then [] else low :: range (low + 1) high
+let square number = number * number
+let squares = map square (range 1 10⟦added⟧]⟦/⟧⟦missing⟧)⟦/⟧
+let cubes = map (fun number -> number * square number) (range 1 10)
+let () = print_int (sum cubes - sum squares)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-58⟧
+from: a long string broken into two lines with the enter key
+unsure: the string could end on its first line and go on with `^ "` on the second line, which keeps the line feed as white space
+⟦aligned⟧
+let program = "report"
+let version = "1.2"
+let usage = "usage: report [--csv] [--limit count] file⟦added⟧
+⟦/⟧⟦missing⟧\n⟦/⟧reads the file and prints one line per entry"
+let show_usage () = print_string usage
+let () = if arguments = [] then show_usage ()⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-59⟧
+from: a `rec` added to a definition afterwards, with the cursor one word too far to the right
+note: the `rec` is missing before the name. Without that missing text the kept code points have the same three values
+⟦aligned⟧
+let ⟦missing⟧rec ⟦/⟧countdown ⟦added⟧rec ⟦/⟧from =
+  if from = 0 then "liftoff"
+  else string_of_int from ^ ", " ^ countdown (from - 1)
+
+let () = print_string (countdown 5)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-60⟧
+from: an argument in brackets replaced by a plain string, with the closing bracket of the old argument left
+⟦aligned⟧
+(* Break a line of words where it gets wider than the page. *)
+let rec wrap words width line =
+  if words = [] then [line]
+  else if length line + length (head words) > width then line :: wrap words width ""⟦added⟧)⟦/⟧
+  else wrap (tail words) width (line ^ " " ^ head words)
+
+let lines = wrap ["the"; "quick"; "brown"; "fox"] 10 ""
+let () = print_string (join "\n" lines)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-61⟧
+from: a file saved while an item was being added to a list: the `;` is typed and the item is not yet
+unsure: the last `;` could be added, with nothing missing after it
+⟦aligned⟧
+let stripes = 3
+let palette = ["red"; "amber"; ⟦missing⟧()⟦/⟧]
+let color_of position = nth palette (remainder position (length palette))
+let flag = map color_of (range 0 stripes)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-62⟧
+from: a command to replace a name, typed into the text as a line of its own
+⟦aligned⟧
+let price = 250
+let quantity = 4
+let subtotal = price * quantity
+⟦added⟧:%s/price/cost/g
+⟦/⟧let discount = if quantity > 3 then subtotal / 10 else 0
+let total = subtotal - discount
+let () = print_int total⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-63⟧
+from: the head of a definition typed anew with its parameters in another order, before the old head was deleted
+⟦aligned⟧
+(* Boxes of text for the report. *)
+let width = 40
+let rec repeat count text ⟦added⟧let rec repeat text count ⟦/⟧=
+  if count = 0 then "" else text ^ repeat (count - 1) text
+
+let rule = repeat width "-"
+let box title = rule ^ "\n" ^ title ^ "\n" ^ rule
+let () = print_string (box "Totals")⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-64⟧
+from: a space typed between the `(` and the `*` that start a comment
+⟦aligned⟧
+let speed_limit = 50
+let fine speed =
+  if speed <= speed_limit then 0
+  else (speed - speed_limit) * 12
+(⟦added⟧ ⟦/⟧* fines double near schools *)
+let school_fine speed = 2 * fine speed
+let () = print_int (school_fine 63)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-65⟧
+from: the first word of the file cut away together with a line that stood above it
+⟦aligned⟧
+⟦missing⟧let ⟦/⟧vowels = ["a"; "e"; "i"; "o"; "u"]
+let is_vowel letter = member letter vowels
+let rec count_vowels letters =
+  if letters = [] then 0
+  else if is_vowel (head letters) then 1 + count_vowels (tail letters)
+  else count_vowels (tail letters)
+let () = print_int (count_vowels ["q"; "u"; "e"; "u"; "e"])⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-66⟧
+from: a word deleted after `fun` together with the spaces on both of its sides
+⟦aligned⟧
+let baskets = [("pears", 4); ("apples", 9); ("figs", 2)]
+let total = sum (map snd baskets)
+let by_count = sort (fun⟦missing⟧ ⟦/⟧left right -> snd left < snd right) baskets
+let fewest = fst (head by_count)
+let () = print_string fewest⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-67⟧
+from: two definitions commented out by hand, and the first of them had a comment at its end, whose `*)` ends the new comment too early
+unsure: the last `*)` could be the added one, with the second definition as a part of the program
+⟦aligned⟧
+let cache_size = 64
+(* let warm_up () = fill cache_size (* entries ⟦added⟧*)⟦/⟧
+let cool_down () = clear cache_size *)
+let lookup key = find key cache_size
+let () = print_int (lookup 7)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-68⟧
+from: an argument copied from the line below and pasted one line too high, right after a `let`
+⟦aligned⟧
+let indent depth = repeat "  " depth
+let rec render depth node =
+  let ⟦added⟧(depth + 1) ⟦/⟧children = snd node in
+  indent depth ^ fst node ^ "\n" ^ render_all (depth + 1) children
+
+let tree = ("root", [("left", []); ("right", [])])
+let () = print_string (render 0 tree)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-69⟧
+from: the `:` of a `::` typed once
+⟦aligned⟧
+let rec keep_even numbers =
+  if numbers = [] then []
+  else if head numbers / 2 * 2 = head numbers then head numbers :⟦missing⟧:⟦/⟧ keep_even (tail numbers)
+  else keep_even (tail numbers)
+
+let evens = keep_even [4; 7; 10; 13]
+let () = print_int (length evens)⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-70⟧
+from: a remark typed above a definition without the `*)` at its end
+⟦aligned⟧
+let attempts = 5
+(* the pause between two attempts, in milliseconds⟦missing⟧ *)⟦/⟧
+let pause = 250
+let longest_wait = attempts * pause
+let () = print_int longest_wait⟦lf⟧
+⟦end⟧
