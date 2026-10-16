@@ -181,6 +181,10 @@ const after = '\nlet cells = width * height\nlet () = print_int cells\n'
   const slip = madeOpinion(`${before}let rows = if height > 40 then 3 ⟦added⟧elif⟦/⟧⟦missing⟧else if⟦/⟧ height > 20 then 2 else 1${after}`).sample
   const elifAt = slip.broken.indexOf('elif')
   expectSame([0, 1, 2, 3].map(offset => [displayKindNames[slip.labelKind[elifAt + offset]!], slip.labelDepth[elifAt + offset], containerNames[slip.labelContainer[elifAt + offset]!]]), [['keyword', 2, 'else'], ['keyword', 2, 'else'], ['keyword', 3, 'if'], ['keyword', 3, 'if']], 'the labels of elif for else if')
+  // Positions count code points: a character outside the Basic Multilingual Plane is one, and so is a carriage return.
+  const wide = madeOpinion(`${before}let mood = "fine" ⟦added⟧🙂 ⟦/⟧^ "!"⟦cr⟧\nlet tab = "⟦tab⟧"${after}`).sample
+  const smileyAt = Array.from(wide.broken).indexOf('🙂')
+  expectSame([wide.codePoints.length, Array.from(wide.broken).length, wide.alignment[smileyAt], wide.alignment[smileyAt + 1], wide.alignment[smileyAt + 2], displayKindNames[wide.labelKind[smileyAt + 2]!], wide.firstErrorPosition], [wide.broken.length - 1, wide.broken.length - 1, -1, -1, smileyAt, 'operator', smileyAt], 'a broken program with a character of two UTF-16 units')
   console.log(`2. A kept code point has the label of its counterpart and an added one has none, and ${sameRepairs.length} repairs give the same sample however they are marked.`)
 }
 

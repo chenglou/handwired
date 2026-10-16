@@ -290,7 +290,13 @@ export function opinionOf(name: Opinion['name'], repair: Pick<RepairEntry, 'alig
   problems.push(...validTextProblems(aligned.repaired).map(problem => `the repaired program: ${problem}`))
   if (problems.length > 0) return {problems}
   const labels = labelsOfValidText(aligned.repaired)
-  const sample = makeSample({id, edits, original: aligned.repaired, broken, alignment: aligned.alignment}, labels)
+  let sample: ReturnType<typeof makeSample>
+  try {
+    sample = makeSample({id, edits, original: aligned.repaired, broken, alignment: aligned.alignment}, labels)
+  } catch (error) {
+    // makeSample throws for an alignment that does not fit the two texts, which an aligned text cannot give.
+    return {problems: [`the tools make no sample of the repair, which is an error of the tools and not of the repair: tell the lead. ${error instanceof Error ? error.message : String(error)}`]}
+  }
   if (typeof sample === 'string') {
     // 'unchanged' cannot come here: the two texts differ.
     const why = sample === 'nothing to score' ? 'no kept code point stands from the parser\'s first error on, so the case has nothing to score. Put the damage where a part of the program comes after it'
