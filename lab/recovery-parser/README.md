@@ -1,4 +1,147 @@
-# Broken JSON for a parser that keeps going
+# Training a strict parser to recover from errors
+
+A parser that gives up at the first error can be turned into one that keeps going, by training the table entries that valid input never reads. Valid input is parsed exactly as before. On JSON the trained parser ended up slightly better than recovery rules written by hand. On TOML and on a parser made by bison, the gradient training alone did not carry over with JSON's settings, and filling the same entries by trial and error did.
+
+This section explains the experiment and its results in plain words. The folders hold the details, and the rest of this file documents the JSON dataset.
+
+## The starting point
+
+The JSON highlighter in `src/json-search/highlighter` is a parser written as lookup tables: "in state X, on character Y, go to state Z". It labels each character as a key, a string, a number and so on.
+
+It is strict. In `{ name: 'get_weather' }` the key has no quotes, so everything after it is shown as an error.
+
+The tables have about 1,560 entries, and valid JSON only ever reads about 240 of them. The other 1,300 are reached only after something has gone wrong.
+
+## The idea
+
+Those 1,300 entries are free. Valid JSON never reads them, so whatever goes into them, valid JSON is parsed exactly as before, and a broken payload is still reported as broken at the same place. Only what is shown after the error changes. Training fills the free entries in:
+
+1. **Soften:** each free entry holds a weighted mix of its possible choices instead of one choice.
+2. **Train:** broken payloads are run through, and gradient descent shifts the weights toward the choices that label them correctly.
+3. **Round:** each entry is set to its strongest choice, which gives an ordinary exact lookup table again. Only that table is scored.
+
+A second way to fill the entries needs no gradients: trial and error, which the folders call "the search". It changes one entry at a time and keeps the change when more characters come out right on the training payloads.
+
+The training runs on a soft copy of the table parser written for this experiment (`learn/soft/`), at about 1,000 payloads per second. One step of that soft parser was also built as a Handwired circuit, and its values and gradients are the same (`learn/soft/README.md`). The whole run as one circuit was not built.
+
+## The training data
+
+Valid payloads are broken with 55 types of realistic mistakes, such as a missing comma, single quotes or a cut-off end. That gives about 40,000 broken payloads. The correct labels come from the payload before it was broken:
+
+```
+before   { "name": "get_weather", "arguments": { "city": "Osaka", "days": 2 } }
+after    { name: 'get_weather', arguments: { city: 'Osaka', days: 2 } }
+answer   pwkkkkpwssssssssssssspwkkkkkkkkkpwpwkkkkpwssssssspwkkkkpwnwpwp
+```
+
+Here `k` is a key, `s` a string, `n` a number, `p` punctuation and `w` white space.
+
+A character counts as right only when its label, its nesting depth and its container (object or array) are all right. Scoring starts at the first error.
+
+## The result on JSON
+
+The same payload under three parsers (`E` is an error, `l` a literal such as `null`):
+
+```
+payload              { name: 'get_weather', arguments: { city: 'Osaka', days: 2 } }
+answer               pwkkkkpwssssssssssssspwkkkkkkkkkpwpwkkkkpwssssssspwkkkkpwnwpwp
+original parser      pwlEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE    0 of 60 right
+hand-written rules   pwlkkkpwssssssssssssspwkkkkkkkkkpwpwkkkkpwssssssspwkkkkpwnwpwp   59 of 60
+trained              pwkkkkpwssssssssssssspwkkkkkkkkkpwpwkkkkpwssssssspwkkkkpwnwpwp   60 of 60
+```
+
+"Hand-written rules" are 35 recovery rules written the way a programmer would write them, in the same free entries.
+
+The final test ran once, on payloads that the training never saw. A cell is characters right / payloads entirely right, in percent, and "trained" is the mean of 5 training runs with gradient descent alone.
+
+| | Familiar types of mistakes (5,306 payloads) | 4 types never trained on (2,029) | Broken payloads written by other agents (215) |
+|---|---|---|---|
+| Original parser | 41.8 / 12.8 | 28.0 / 2.0 | 22.1 / 2.3 |
+| Hand-written rules | 96.6 / 79.6 | 98.9 / 87.2 | 82.7 / 56.7 |
+| Trained | 98.1 / 79.8 | 97.1 / 68.9 | 85.6 / 46.3 |
+
+- **Familiar mistakes:** the trained parser is above the hand-written rules.
+- **Unfamiliar mistakes:** it has about as many characters right and fewer payloads entirely right. It slips by a few characters often, where the hand-written rules slip rarely and then lose most of a payload.
+- **The middle column favours the rules:** their author may have seen those 4 types.
+- **The worst failure:** text in front of the JSON, such as the prefix of a log line. A comma or a colon in the prefix can throw off the nesting of the whole document.
+- **Trial and error without gradients** does as well on familiar mistakes (98.1) and falls to 77.5 on the 4 unseen types.
+
+The record with every row is `learn/final/RESULTS.md`.
+
+## Beyond JSON
+
+### Random damage in place of realistic mistakes
+
+JSON was trained again on random damage only: delete a character, duplicate a line, cut the end off. On validation data the score fell from 98.0 / 80.5 to 82.8 / 61.8. The parser still learns slips such as a missing bracket. It does not learn habits from other languages, which random damage never makes:
+
+```
+payload                  { name: 'get_weather', arguments: { city: 'Osaka', days: 2 } }
+answer                   pwkkkkpwssssssssssssspwkkkkkkkkkpwpwkkkkpwssssssspwkkkkpwnwpwp
+trained, random damage   pwkksspwssssssssssssssssssssssssssssssssssssssssssssssssssssss   17 of 60 right
+```
+
+It reads everything after the first quote as one long string. So the training data has to hold the kinds of mistakes that matter. Details: `learn/arms/neutral-damage/README.md`.
+
+### Another language: TOML
+
+`../recovery-toml/` holds a TOML highlighter in the same table form, about four times larger, and the same procedure with no setting changed. The final test ran once on two sets that nobody on the training side saw.
+
+| | 36 typical TOML mistakes (3,000 payloads) | Broken payloads written by agents (144) |
+|---|---|---|
+| Original parser | 69.3 / 9.5 | 61.7 / 4.9 |
+| One rule: after an error, start anew on the next line | 89.8 / 37.9 | 84.3 / 29.6 |
+| 39 hand-written rules | 98.7 / 81.7 | 94.0 / 60.6 |
+| Gradient descent alone, random damage | 86.6 / 28.6 | 81.8 / 21.0 |
+| Gradient descent, then trial and error, random damage | 92.9 / 50.7 | 89.1 / 43.0 |
+| Trial and error alone, random damage | 93.8 / 46.3 | 89.8 / 43.0 |
+| Gradient descent, then trial and error, with TOML mistakes in the training data | 98.3 / 82.7 | 92.7 / 55.4 |
+
+- **By the rule fixed beforehand the track failed:** gradient descent alone is below the one simple rule on both sets, in every run.
+- **Where it loses:** almost entirely the section headers after an error. It reads `[tasks.clean]` as an array of strings about half the time.
+- **What carries over:** filling the unused entries from data. With trial and error, and with TOML mistakes in the training data, the result is level with the hand-written rules, and valid TOML is parsed as before.
+- **Gradients add nothing to trial and error here** in characters right.
+
+The record is `../recovery-toml/RESULTS.md`.
+
+### Another kind of parser: a table made by bison
+
+The JSON and TOML tables are made by hand. Most parsers in use come from a generator such as yacc, bison or Menhir. `../recovery-lr/` holds a small ML-like language with a parser made by bison: about 3,800 table entries, of which about 2,400 are free.
+
+These numbers are from validation data only, from before the review of the machinery was finished. The final test has not run.
+
+| | Characters right / programs entirely right |
+|---|---|
+| Original parser | 2.0 / 0.0 |
+| Panic mode, the textbook recovery | 60.8 / 27.6 |
+| Panic mode with a hand-picked list of tokens to restart at | 78.7 / 34.6 |
+| yacc error productions, written by hand | 83.1 / 37.1 |
+| Table filled by hand-written rules | 88.0 / 48.7 |
+| Gradient descent alone | 82.9 / 35.9 |
+| Gradient descent, then trial and error | 88.1 / 48.4 |
+| Trial and error alone | 87.4 / 44.5 |
+
+The picture is the same as on TOML: gradient descent alone is above both panic modes, level with yacc error productions and below the hand-written rules, and trial and error brings it level with them. Details: `../recovery-lr/learn/runs/README.md`.
+
+## How to read this
+
+- **JSON is a clear success.** A strict parser became a recovering one with no recovery code written, and valid JSON is unchanged by construction.
+- **The rule for TOML and bison was strict on purpose:** gradient descent alone, every setting frozen as tuned for JSON, and random damage as the training data. A failure by that rule says that the gradient step does not carry over as it is. It does not say that training cannot work there.
+- **What would be fair to the trained parser and is not done, or only started:**
+  - more passes and more data. On the bison table the training had not settled on its choices after its three passes.
+  - one small hand-written rule where a format asks for it, with training for the rest, e.g. the per-line rule on TOML.
+  - training damage for the cases the tests showed, e.g. text in front of a JSON document.
+- **The final tests of JSON and TOML are used up.** A setting that is tuned after looking at them needs new unseen data.
+
+## Where things are
+
+- `lab/recovery-parser/`: the JSON dataset (the rest of this file), the agent-written test in `written/`, and everything about training in `learn/`.
+- `lab/recovery-toml/`: the TOML track.
+- `lab/recovery-lr/`: the bison track.
+- Each track has a folder `held-back/` or `written/` with its tests. Whoever builds training data or a training for a track does not read them.
+
+---
+
+# The JSON dataset: broken JSON for a parser that keeps going
 
 The JSON highlighter in `src/json-search/highlighter` does not recover from an error. After the first error of a text its grammar stays in the state `error`: every key is shown as a plain string, e.g. the `"b"` of `{"a": 1 "b": 2}`, a character that starts no token turns the rest of its line into an error, and the depth is wrong after a bracket that is missing or one too many. This folder makes the data for an experiment that asks whether the same loop, with other tables, can keep labeling the text after the error, e.g. so that the `"b"` is still shown as a key.
 
