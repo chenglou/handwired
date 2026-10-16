@@ -16,7 +16,9 @@ if (folder === undefined) throw new Error('scale/table.ts needs --folder')
 const records = readdirSync(folder).filter(name => name.endsWith('.record.json')).map(name => JSON.parse(readFileSync(join(folder, name), 'utf8')) as ScaleRecord)
 for (const record of records) if (record.format !== 'recovery-lr scale record 1') throw new Error('a file of the folder is no record of scale/run.ts')
 
-const settingOf = (record: ScaleRecord): string => [record.steps === 'training, then the count' ? 0 : 1, record.learningRate, record.startShare, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
+// The rows in the order: the recipe's rate before another rate, the rows with a search last, fewer train samples
+// and fewer passes first.
+const settingOf = (record: ScaleRecord): string => [record.learningRate === 0.05 ? 0 : 1, record.learningRate, record.startShare, record.steps === 'training, then the count' ? 0 : 1, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
 const groups = new Map<string, ScaleRecord[]>()
 for (const record of records) groups.set(settingOf(record), [...(groups.get(settingOf(record)) ?? []), record])
 
