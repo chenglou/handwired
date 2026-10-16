@@ -5,7 +5,10 @@
 // A table has one choice per cell for all samples and one kind per display entry, so a table scores below what
 // this search finds, as long as the beam does not lose the table's own run. The beam keeps the `width` runs with
 // the most code points right after every token (64 unless told otherwise), so its number is what the list can at
-// least do per sample, and no proof of what it cannot do.
+// least do per sample, and no proof of what it cannot do. A wider beam finds more: on 400 validation samples of
+// the stand-in generator, 94.4% of all three with 64 runs and 95.7% with 256, where one output per token allows
+// 97.5%. And a beam of 64 loses the run of searched tables in about 7 of 100 samples, so with `alsoRunsOf` the
+// search takes the better of its own run and the run of given tables, sample by sample.
 //
 // The rules of a run are the exact parser's: frozen cells are followed, a token gets 16 steps and is then skipped,
 // the stack has its limit, and a frozen display entry shows what it shows. `stop` is not tried: in the state
@@ -22,7 +25,7 @@ import {
   type RecoveryTables, argumentOfChoice, baseTables, bison, bisonTerminalCount, choicesOf, droppedOfEndEarly, kindEndEarly, kindInsert, kindOfChoice, kindPop, kindReadAs, kindReduce, kindShift, kindSkip,
   kindStop, loadTablesForReport, maximumStackHeight, maximumStepsPerToken, nonterminalOfEndEarly, withoutEndEarly,
 } from '../recovery-tables.ts'
-import {scoreTables, sharesOf} from '../score.ts'
+import {runSample, scorePack, scoreTables, sharesOf} from '../score.ts'
 
 export const defaultWidth = 64
 
@@ -123,8 +126,9 @@ export function bestOfSample(samples: PackedSamples, sample: number, tables: Rec
 export type PerSampleRequest = {samples: ReturnType<typeof messageOf>, tables: RecoveryTables, share: number, shares: number, width: number}
 export type PerSampleReply = {right: Int32Array}
 
-// The search for every sample, on 4 worker threads: per sample, the most code points right.
-export async function searchPerSample(samples: PackedSamples, layout: RecoveryTables, width: number = defaultWidth, workerCount = 4): Promise<Int32Array> {
+// The search for every sample, on 4 worker threads: per sample, the most code points right. With `alsoRunsOf`,
+// tables of the same layout, a sample has at least what those tables have right.
+export async function searchPerSample(samples: PackedSamples, layout: RecoveryTables, width: number = defaultWidth, alsoRunsOf?: RecoveryTables, workerCount = 4): Promise<Int32Array> {
   refuseOtherTerminals(samples, layout)
   const workers = Array.from({length: workerCount}, () => new Worker(new URL('./per-sample-worker.ts', import.meta.url).href))
   try {
@@ -135,6 +139,7 @@ export async function searchPerSample(samples: PackedSamples, layout: RecoveryTa
     })))
     const right = new Int32Array(samples.sampleCount)
     replies.forEach((reply, share) => reply.right.forEach((count, index) => { right[share + index * workerCount] = count }))
+    if (alsoRunsOf !== undefined) for (let sample = 0; sample < samples.sampleCount; sample++) right[sample] = Math.max(right[sample]!, Math.floor(runSample(samples, sample, alsoRunsOf) / scorePack))
     return right
   } finally {
     for (const worker of workers) worker.terminate()
@@ -161,11 +166,21 @@ if (import.meta.main) {
   const width = numberOf('--width', defaultWidth)
   const samples = loadPacked(split, numberOf('--count', 600), layout)
   const started = performance.now()
-  const shares = sharesOfPerSample(samples, await searchPerSample(samples, layout, width))
+  const best = await searchPerSample(samples, layout, width)
+  const shares = sharesOfPerSample(samples, best)
   console.log(`${samples.sampleCount} ${split} samples, ${layout.endEarly ? 'with' : 'without'} "end an item early", a beam of ${width} runs: a search per sample has all three ${shares.allThree.toFixed(2)}, whole ${shares.whole.toFixed(2)}, in ${((performance.now() - started) / 1000).toFixed(0)} s.`)
   console.log(`One output per token allows ${(100 * samples.boundCodePoints / samples.scoredCodePoints).toFixed(2)}.`)
   if (tablesFile !== undefined) {
     const ofTables = sharesOf(scoreTables(layout, samples).score)
-    console.log(`The tables of ${tablesFile} on the same samples: all three ${ofTables.allThree.toFixed(2)}, whole ${ofTables.whole.toFixed(2)}.`)
+    let below = 0
+    for (let sample = 0; sample < samples.sampleCount; sample++) {
+      const right = Math.floor(runSample(samples, sample, layout) / scorePack)
+      if (right > best[sample]!) {
+        below++
+        best[sample] = right
+      }
+    }
+    const withTables = sharesOfPerSample(samples, best)
+    console.log(`The tables of ${tablesFile} on the same samples: all three ${ofTables.allThree.toFixed(2)}, whole ${ofTables.whole.toFixed(2)}. The beam is below the tables in ${below} samples, and with the tables' own run for those: all three ${withTables.allThree.toFixed(2)}, whole ${withTables.whole.toFixed(2)}.`)
   }
 }
