@@ -1,16 +1,19 @@
 // Every table of README.md and every comparison behind its sentences, from the records and the tables that run.ts
-// and the arms before it saved. It trains nothing.
+// and the arms before it saved, and from the train sets for what the trainer takes from them. It trains nothing.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after run.ts:
 //   bun lab/recovery-parser/learn/arms/neutral-damage/report.ts [--examples 3] [--widest 80]
 // It prints, in this order:
 // - the main table: the rows of the arm and the rows that they are read against, with what the main number hides,
 // - each step of a row: the training alone, the search, the count, today's kinds in the state `error`,
+// - what the trainer takes from each train set: samples, scored code points and steps,
 // - comparisons of two rows with the same seeds: both ranges, whether they overlap, and the difference seed by seed,
+//   also per group of the dataset for the primary row against the row of the standard train set,
 // - all three and whole samples per group of the dataset and per source of the samples,
-// - the rows on the samples with a string or a key without double quotes, and on every other sample,
+// - the rows on the samples with a string or a key without double quotes, on the ones of them with and without
+//   another kind, and on every other sample, with the share of the primary row's loss in each part,
 // - all three per kind of damage, the primary row next to the row of the standard train set, also on the samples
-//   that have the kind alone,
+//   that have the kind alone, there with the range of the seeds,
 // - with --examples, so many validation samples per kind for some kinds, each at most --widest code points long,
 //   see examplesOf.
 import {join} from 'node:path'
@@ -18,6 +21,7 @@ import {codePointKept, codePointKindScored, codePointScored, groupNames, optionO
 import {createTrace} from '../../recovery-parser.ts'
 import {type RecoveryTables, loadTablesOfThisDataset} from '../../recovery-tables.ts'
 import {runOnSample, sharesOf, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../../score.ts'
+import {placesForTwin} from '../../soft/twin-data.ts'
 import {candidates, describeRecipe, reportedSeeds, savedTablesFileOf} from '../combined/combined.ts'
 import {countsOnTooDeepTexts, tooDeepForms} from '../combined/deep-valid.ts'
 import {type ArmRecord, type SettingResult, armFolderOf, baselineTables, baselines, fileNameOf, percentSpread, rowNamed, savedResultOf, spreadOf, validationOfTheStandardSet} from '../harness.ts'
@@ -103,13 +107,28 @@ function printMainTable(rows: readonly ReportRow[]) {
   }
 }
 
+// What the trainer takes from the train set of each row: the broken samples with a scored code point, as trainOn of
+// recipe.ts packs them, in steps of 32 samples, the trainer's default, for each of the recipe's passes. E.g. 40,457
+// samples are 1,265 steps per pass, the last one with 9 samples.
+const samplesPerStep = 32
+function printTrainSets(rows: readonly Row[]) {
+  print('| train set | broken samples | with a scored code point, which the trainer takes | their scored code points | steps per pass | passes | steps |')
+  print('| --- | --- | --- | --- | --- | --- | --- |')
+  for (const {trainSet, recipe} of rows) {
+    const samples = trainSet.samples()
+    const taken = placesForTwin(samples, 'train')
+    const stepsPerPass = Math.ceil(taken.length / samplesPerStep)
+    print(`| ${trainSet.name} | ${samples.firstDamage.filter(position => position !== -1).length} | ${taken.length} | ${taken.reduce((total, place) => total + samples.scored[place]!, 0)} | ${stepsPerPass} | ${recipe.passes} | ${stepsPerPass * recipe.passes} |`)
+  }
+}
+
 function printGroupsAndSources(rows: readonly ReportRow[]) {
   const groups = [...groupNames].reverse()
   const first = asItIs.result.records[0]!
   for (const share of ['allThree', 'whole'] as const) {
-    print(`${share === 'allThree' ? 'All three' : 'Whole samples'} per group of the dataset, with the group's validation samples:`)
+    print(`${share === 'allThree' ? 'All three' : 'Whole samples'} per group of the dataset, with the group's validation samples that have something to recover:`)
     print()
-    print(`| row | ${groups.map(group => `${group}, ${rowNamed(first, `group: ${group}`).samples}`).join(' | ')} |`)
+    print(`| row | ${groups.map(group => `${group}, ${rowNamed(first, `group: ${group}`).samples - rowNamed(first, `group: ${group}`).nothingToRecover}`).join(' | ')} |`)
     print(`| --- | ${groups.map(() => '---').join(' | ')} |`)
     for (const row of rows) print(`| ${row.label} | ${groups.map(group => percents(row, `group: ${group}`, share, 1)).join(' | ')} |`)
     print()
@@ -175,36 +194,50 @@ function scoreOver(row: ReportRow, wanted: (place: number) => boolean) {
 const kindsAt = (place: number) => validation.kindList.subarray(validation.kindStart[place], validation.kindStart[place + 1])
 const meanOf = (values: readonly number[]) => spreadOf(values).mean
 const share = (count: number, of: number, digits = 1) => of === 0 ? '-' : (100 * count / of).toFixed(digits)
+// The counts of the runs of a row as shares of `of`: the mean with the lowest and the highest, e.g. "98.2 (95.9 to 99.3)".
+const shareSpread = (countsOfRuns: readonly number[], of: number, digits = 1) => of === 0 ? '-' : percentSpread(spreadOf(countsOfRuns.map(count => count / of)), digits)
+// Two rows on the same samples, by the counts of their runs: whether the two ranges are apart, e.g. the highest of
+// the first is below the lowest of the second, and in how many seeds the first has the higher count.
+const rangesAreApart = (first: readonly number[], second: readonly number[]) => Math.max(...first) < Math.min(...second) || Math.min(...first) > Math.max(...second)
+const seedsWithFirstAbove = (first: readonly number[], second: readonly number[]) => first.length !== second.length ? '-' : `${first.filter((count, index) => count > second[index]!).length} of ${first.length}`
 
 // All three per kind of damage for two rows, as the mean of the seeds: the kinds from the one in which `first` has
 // the fewest scored code points right against `second` to the one in which it has the most. A sample with two kinds
 // is in the row of each, so a kind's row also holds what its samples lose by their other kinds, e.g. a trailing
-// comma in a text with single quotes. The last columns are the samples that have the kind alone.
+// comma in a text with single quotes. The last columns are the samples that have the kind alone: there each row
+// has the range of its seeds, since a mean alone does not say whether e.g. 98.2 against 100.0 is a loss in every
+// seed.
 function printKinds(first: ReportRow, second: ReportRow, third: ReportRow) {
   const kinds = validation.kindNames.flatMap((kind, kindIndex) => {
     const everySample = [first, second, third].map(row => scoreOver(row, place => kindsAt(place).includes(kindIndex)))
     const alone = [first, second].map(row => scoreOver(row, place => kindsAt(place).length === 1 && kindsAt(place)[0] === kindIndex))
     const [ofFirst, ofSecond, ofThird] = everySample as [ReturnType<typeof scoreOver>, ReturnType<typeof scoreOver>, ReturnType<typeof scoreOver>]
     if (ofFirst.samples === 0) return []
-    const apart = Math.max(...ofFirst.right) < Math.min(...ofSecond.right) || Math.min(...ofFirst.right) > Math.max(...ofSecond.right)
-    return [{kind, ofFirst, ofSecond, ofThird, alone: alone as [ReturnType<typeof scoreOver>, ReturnType<typeof scoreOver>], lost: meanOf(ofSecond.right) - meanOf(ofFirst.right), apart}]
+    return [{kind, ofFirst, ofSecond, ofThird, alone: alone as [ReturnType<typeof scoreOver>, ReturnType<typeof scoreOver>], lost: meanOf(ofSecond.right) - meanOf(ofFirst.right), apart: rangesAreApart(ofFirst.right, ofSecond.right)}]
   }).sort((left, right) => right.lost - left.lost)
-  print(`| kind of damage | samples with something to recover | scored code points | all three, ${first.label} | all three, ${second.label} | difference in points | the ranges of the seeds | scored code points lost, mean of the seeds | all three, ${third.label} | samples with this kind alone | their scored code points | all three on them, the first | all three on them, the second | scored code points lost on them | whole samples of them, the first | whole samples of them, the second |`)
-  print('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+  print(`| kind of damage | samples with something to recover | scored code points | all three, ${first.label} | all three, ${second.label} | difference in points | the ranges of the seeds | scored code points lost, mean of the seeds | all three, ${third.label} | samples with this kind alone | their scored code points | all three on them, the first | all three on them, the second | seeds with the first above on them | the ranges of the seeds on them | scored code points lost on them | whole samples of them, the first | whole samples of them, the second |`)
+  print('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const {kind, ofFirst, ofSecond, ofThird, alone, lost, apart} of kinds) {
     const [aloneFirst, aloneSecond] = alone
-    print(`| ${kind} | ${ofFirst.samples} | ${ofFirst.codePoints} | ${share(meanOf(ofFirst.right), ofFirst.codePoints)} | ${share(meanOf(ofSecond.right), ofFirst.codePoints)} | ${signed(100 * (meanOf(ofFirst.right) - meanOf(ofSecond.right)) / ofFirst.codePoints, 1)} | ${apart ? 'apart' : 'overlap'} | ${lost.toFixed(0)} | ${share(meanOf(ofThird.right), ofFirst.codePoints)} | ${aloneFirst.samples} | ${aloneFirst.codePoints} | ${share(meanOf(aloneFirst.right), aloneFirst.codePoints)} | ${share(meanOf(aloneSecond.right), aloneFirst.codePoints)} | ${(meanOf(aloneSecond.right) - meanOf(aloneFirst.right)).toFixed(0)} | ${share(meanOf(aloneFirst.whole), aloneFirst.samples)} | ${share(meanOf(aloneSecond.whole), aloneFirst.samples)} |`)
+    print(`| ${kind} | ${ofFirst.samples} | ${ofFirst.codePoints} | ${share(meanOf(ofFirst.right), ofFirst.codePoints)} | ${share(meanOf(ofSecond.right), ofFirst.codePoints)} | ${signed(100 * (meanOf(ofFirst.right) - meanOf(ofSecond.right)) / ofFirst.codePoints, 1)} | ${apart ? 'apart' : 'overlap'} | ${lost.toFixed(0)} | ${share(meanOf(ofThird.right), ofFirst.codePoints)} | ${aloneFirst.samples} | ${aloneFirst.codePoints} | ${shareSpread(aloneFirst.right, aloneFirst.codePoints)} | ${shareSpread(aloneSecond.right, aloneFirst.codePoints)} | ${aloneFirst.samples === 0 ? '-' : seedsWithFirstAbove(aloneFirst.right, aloneSecond.right)} | ${aloneFirst.samples === 0 ? '-' : rangesAreApart(aloneFirst.right, aloneSecond.right) ? 'apart' : 'overlap'} | ${(meanOf(aloneSecond.right) - meanOf(aloneFirst.right)).toFixed(0)} | ${share(meanOf(aloneFirst.whole), aloneFirst.samples)} | ${share(meanOf(aloneSecond.whole), aloneFirst.samples)} |`)
   }
   print()
 }
 
-// The kinds of damage that write a string or a key without double quotes.
+// The kinds of damage that write a string or a key without double quotes. The three were put together after the
+// table per kind was read: the group is in no commit from before the runs.
 const kindsWithoutDoubleQuotes = ['singleQuotedString', 'unquotedKey', 'curlyQuotes']
 const holdsOneOf = (place: number, kindNames: readonly string[]) => kindNames.some(kind => kindsAt(place).includes(validation.kindNames.indexOf(kind)))
-// The rows on two parts of the validation split: the samples that hold a kind of `kindNames`, and every other sample.
-function printParts(rows: readonly ReportRow[], kindNames: readonly string[]) {
+const holdsOnly = (place: number, kindNames: readonly string[]) => kindsAt(place).every(kind => kindNames.includes(validation.kindNames[kind]!))
+// The rows on parts of the validation split: the samples that hold a kind of `kindNames`, of those the ones whose
+// kinds are all of `kindNames` and the ones that hold another kind too, and every other sample. Then how much of
+// what `lower` loses against `higher` on the whole split is in each part: a sample with single quotes and a
+// trailing comma loses by both kinds, so the part with another kind says where a loss is and not what it is from.
+function printParts(rows: readonly ReportRow[], kindNames: readonly string[], lower: ReportRow, higher: ReportRow) {
   const parts = [
     {name: `the samples with one of ${kindNames.join(', ')}`, wanted: (place: number) => holdsOneOf(place, kindNames)},
+    {name: 'of those, the samples with no other kind', wanted: (place: number) => holdsOneOf(place, kindNames) && holdsOnly(place, kindNames)},
+    {name: 'of those, the samples with another kind too', wanted: (place: number) => holdsOneOf(place, kindNames) && !holdsOnly(place, kindNames)},
     {name: 'every other sample', wanted: (place: number) => !holdsOneOf(place, kindNames)},
   ]
   const spread = (values: readonly number[], of: number) => percentSpread(spreadOf(values.map(value => value / of)))
@@ -217,6 +250,22 @@ function printParts(rows: readonly ReportRow[], kindNames: readonly string[]) {
     rows.forEach((row, index) => print(`| ${row.label} | ${spread(scores[index]!.right, scores[index]!.codePoints)} | ${spread(scores[index]!.whole, scores[index]!.samples)} | ${meanOf(scores[index]!.right).toFixed(0)} |`))
     print()
   }
+  const lostIn = (wanted: (place: number) => boolean) => meanOf(scoreOver(higher, wanted).right) - meanOf(scoreOver(lower, wanted).right)
+  const lostInAll = lostIn(() => true)
+  print(`What ${JSON.stringify(lower.label)} loses against ${JSON.stringify(higher.label)}, in scored code points right, as the mean of the seeds: ${lostInAll.toFixed(0)} on every validation sample.`)
+  print()
+  for (const {name, wanted} of parts) print(`- ${name}: ${lostIn(wanted).toFixed(0)}, ${share(lostIn(wanted), lostInAll)}% of the loss`)
+  print()
+  const samplesPerOtherKind = new Map<string, number>()
+  for (let place = 0; place < validation.sampleCount; place++) {
+    if (validation.firstDamage[place] === -1 || validation.scored[place] === 0 || !holdsOneOf(place, kindNames) || holdsOnly(place, kindNames)) continue
+    for (const kind of kindsAt(place)) {
+      const otherKind = validation.kindNames[kind]!
+      if (!kindNames.includes(otherKind)) samplesPerOtherKind.set(otherKind, (samplesPerOtherKind.get(otherKind) ?? 0) + 1)
+    }
+  }
+  print(`The other kinds in the samples with another kind too, with the samples that hold each: ${[...samplesPerOtherKind].sort((left, right) => right[1] - left[1]).map(([otherKind, samples]) => `${otherKind} ${samples}`).join(', ')}.`)
+  print()
 }
 
 // Validation samples to read, for one kind of damage: the first ones in the set's order that have the kind alone,
@@ -291,9 +340,17 @@ for (const {row, name} of namedRows) {
 printMainTable([...stepRows.values()])
 print()
 
+print('## What the trainer takes from each train set')
+print()
+printTrainSets([primaryRow, withoutLineEditsRow, standardRow])
+print()
+
 print('## The primary row against the rows that it is read against')
 print()
 for (const other of [standard, standardWithoutClasses, candidateOfCombined, handWritten, handRuleLines, plainPass, asItIs]) printComparisons(primary, other)
+print('## The primary row against the standard train set, per group of the dataset')
+print()
+printComparisons(primary, standard, [...groupNames].reverse().map(group => `group: ${group}`))
 print('## The standard train set with the classes against without them')
 print()
 printComparisons(standard, standardWithoutClasses)
@@ -313,7 +370,7 @@ printGroupsAndSources([asItIs, handRuleLines, handWritten, candidateOfCombined, 
 
 print('## Strings and keys without double quotes, and every other sample')
 print()
-printParts([asItIs, handRuleLines, handWritten, plainPass, candidateOfCombined, standard, standardWithoutClasses, primary, searched, withoutLineEdits], kindsWithoutDoubleQuotes)
+printParts([asItIs, handRuleLines, handWritten, plainPass, candidateOfCombined, standard, standardWithoutClasses, primary, searched, withoutLineEdits], kindsWithoutDoubleQuotes, primary, standard)
 
 print('## By kind of damage: the primary row against the standard train set')
 print()
