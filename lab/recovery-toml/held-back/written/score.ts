@@ -2,13 +2,20 @@
 // points from the first error of the parser as it is on that have a label with a scored value, a code point is right
 // when every scored value is right, and a case is right as a whole when all of its counted code points are.
 //
-// Run from the repo root: bun lab/recovery-toml/held-back/written/score.ts [--set <folder>]
-// It prints the parser as it is, over the cases with full agreement and over the agreed code points of all cases. It
-// prints both again for the parts that kinds.txt makes of the set, i.e. the cases whose damage one to three of the
-// train data's edits make and the cases with other damage, and per writer's file, and the first of them without the
-// cases that a repairer marked as open to another reading. Other code scores its own tables with scoreTables(tables),
-// which returns numbers alone: whoever builds or trains a parser calls it and reads nothing else of this folder.
-import {type ParserTables, defaultTables, runTableParser} from '../../table-parser.ts'
+// Run from the repo root: bun lab/recovery-toml/held-back/written/score.ts [--set <folder>] [--tables <file.json>]
+// It prints the same rows for the parser as it is, then for the one rule without any training that trained tables are
+// read against (after an error, anew at the next line, see ../parsers.ts), then for the tables of each file that
+// --tables names, e.g. the recipe's, which needs the environment variable RECOVERY_FINAL. The rows: the cases with
+// full agreement and the agreed code points of all cases, both again for the parts that kinds.txt makes of the set,
+// i.e. the cases whose damage one to three of the train data's edits make and the cases with other damage, and per
+// writer's file, and the first of them without the cases that a repairer marked as open to another reading.
+//
+// Code of this folder scores tables with scoreTables(tables) for tables of ../../table-parser.ts, with
+// scoreRecoveryTables(tables) for tables of the recovery experiment, and with scoreWith(parser) for anything else
+// that shows a text.
+import type {RecoveryTables} from '../../learn/recovery-tables.ts'
+import {type ParserTables, runTableParser} from '../../table-parser.ts'
+import {type Parser, type Shown, parserOfTables, parsersOfCommand} from '../parsers.ts'
 import {neutralEditsOf} from './neutral-edits.ts'
 import {type WrittenCase, labelsOfWritten, readWritten, setFolderOf} from './written.ts'
 
@@ -30,12 +37,13 @@ export type Score = {
 }
 const noScore = (): Score => ({cases: 0, nothingToRecover: 0, scored: 0, right: 0, kindScored: 0, kindRight: 0, nestingScored: 0, depthRight: 0, containerRight: 0, wholeRight: 0})
 
-// The score of tables over cases. Only agreed code points have a label, so a disputed code point is never counted.
-export function scoreCases(tables: ParserTables, cases: readonly WrittenCase[]): Score {
+// The score over cases of whatever `show` shows for a broken payload. Only agreed code points have a label, so a
+// disputed code point is never counted.
+export function scoreCasesWith(show: (broken: string) => Shown, cases: readonly WrittenCase[]): Score {
   const score = noScore()
   for (const writtenCase of cases) {
     const labels = labelsOfWritten(writtenCase)
-    const trace = runTableParser(writtenCase.broken, tables)
+    const trace = show(writtenCase.broken)
     let scored = 0
     let right = 0
     for (let position = writtenCase.firstErrorPosition; position < labels.length; position++) {
@@ -65,6 +73,9 @@ export function scoreCases(tables: ParserTables, cases: readonly WrittenCase[]):
   return score
 }
 
+// The score of tables of ../../table-parser.ts over cases.
+export const scoreCases = (tables: ParserTables, cases: readonly WrittenCase[]): Score => scoreCasesWith(broken => runTableParser(broken, tables), cases)
+
 // The two ways to count the set:
 // - fullAgreement: the cases without a disputed code point from the first error on. This is the set's main number.
 //   A case with one repair has no disputed code point.
@@ -84,9 +95,9 @@ export type WrittenScore = {fullAgreement: Score, agreedCodePoints: Score}
 // - unmarked: the cases of which no repair is marked as unsure, i.e. without the cases whose agreement rests on a
 //   reading that a repairer called open.
 export type WrittenScores = {all: WrittenScore, perFile: Map<string, WrittenScore>, neutralEdits: WrittenScore, otherDamage: WrittenScore, moreEdits: WrittenScore, unmarked: WrittenScore}
-export function scoreTables(tables: ParserTables, cases: readonly WrittenCase[] = readWritten().cases): WrittenScores {
+export function scoresWith(show: (broken: string) => Shown, cases: readonly WrittenCase[] = readWritten().cases): WrittenScores {
   const scoreOf = (some: readonly WrittenCase[]): WrittenScore =>
-    ({fullAgreement: scoreCases(tables, some.filter(writtenCase => !writtenCase.disputedFromFirstError)), agreedCodePoints: scoreCases(tables, some)})
+    ({fullAgreement: scoreCasesWith(show, some.filter(writtenCase => !writtenCase.disputedFromFirstError)), agreedCodePoints: scoreCasesWith(show, some)})
   const files = [...new Set(cases.map(writtenCase => writtenCase.file))].sort()
   const otherDamage = cases.filter(writtenCase => writtenCase.damage?.other !== undefined)
   return {
@@ -97,34 +108,50 @@ export function scoreTables(tables: ParserTables, cases: readonly WrittenCase[] 
   }
 }
 
+// The scores of tables of ../../table-parser.ts, i.e. tables with today's classes and contexts.
+export const scoreTables = (tables: ParserTables, cases?: readonly WrittenCase[]): WrittenScores => scoresWith(broken => runTableParser(broken, tables), cases)
+
+// The scores of a parser of ../parsers.ts, e.g. the rule "anew at the next line after an error".
+export const scoreWith = (parser: Parser, cases?: readonly WrittenCase[]): WrittenScores => scoresWith(parser.show, cases)
+
+// The scores of tables of the recovery experiment, e.g. the recipe's, which can have added classes and the bit "first
+// on its line". The exact parser of ../../learn/recovery-parser.ts runs them. With asIsTables() the scores are those
+// of scoreTables with today's tables.
+export const scoreRecoveryTables = (tables: RecoveryTables, cases?: readonly WrittenCase[]): WrittenScores => scoreWith(parserOfTables('tables', tables), cases)
+
 if (import.meta.main) {
   const folder = setFolderOf(process.argv.slice(2))
+  // First, so that tables that need RECOVERY_FINAL are refused before anything is printed.
+  const parsers = parsersOfCommand(process.argv.slice(2))
   const {cases, problems} = readWritten(folder)
   // Only the count is printed: a problem's text can quote a case, and this command's output is for every reader.
   if (problems.length > 0) console.log(`${problems.length} problems in the files: the cases and repairs that they name are left out of the numbers below. check.ts prints them.\n`)
-  const scores = scoreTables(defaultTables, cases)
   const percent = (part: number, whole: number) => (whole === 0 ? '-' : (100 * part / whole).toFixed(1)).padStart(6)
   const line = (score: Score, name: string) =>
     `  ${String(score.cases).padStart(5)} ${String(score.nothingToRecover).padStart(7)} ${String(score.scored).padStart(7)}   ${percent(score.right, score.scored)} ${percent(score.wholeRight, score.cases - score.nothingToRecover)}   ${percent(score.kindRight, score.kindScored)} ${percent(score.depthRight, score.nestingScored)} ${percent(score.containerRight, score.nestingScored)}  ${name}`
   const repairedTwice = cases.filter(writtenCase => writtenCase.opinions.length === 2).length
   console.log(`The written set in ${folder}: ${cases.length} cases, ${repairedTwice} with two repairs, ${cases.length - repairedTwice} with the writer's repair alone.`)
-  console.log('A score counts the code points from the first error of the parser as it is on that have a label with a scored value. The numbers are')
-  console.log('those of the parser as it is. Columns: cases, cases with nothing to recover, counted code points, the percentage of code points with every')
-  console.log('scored value right, the percentage of cases with something to recover in which every counted code point is right, and the percentage')
-  console.log('of the scored display kinds, depths and containers that are right.')
-  console.log(`\n  ${'cases'.padStart(5)} ${'nothing'.padStart(7)} ${'points'.padStart(7)}   ${'all 3'.padStart(6)} ${'whole'.padStart(6)}   ${'kind'.padStart(6)} ${'depth'.padStart(6)} ${'cont'.padStart(6)}`)
-  console.log(line(scores.all.fullAgreement, 'cases with full agreement from the first error on'))
-  console.log(line(scores.neutralEdits.fullAgreement, '  of them, the cases whose damage one to three of the ten edits make'))
-  console.log(line(scores.otherDamage.fullAgreement, '  of them, the cases with other damage'))
-  console.log(line(scores.moreEdits.fullAgreement, '    of those, the cases whose damage more than three edits make'))
-  console.log(line(scores.unmarked.fullAgreement, '  of them, the cases of which no repair is marked as unsure'))
-  console.log(line(scores.all.agreedCodePoints, 'all cases, the agreed code points'))
-  console.log(line(scores.neutralEdits.agreedCodePoints, '  of them, the cases whose damage one to three of the ten edits make'))
-  console.log(line(scores.otherDamage.agreedCodePoints, '  of them, the cases with other damage'))
-  console.log(line(scores.moreEdits.agreedCodePoints, '    of those, the cases whose damage more than three edits make'))
-  for (const [file, score] of scores.perFile) {
-    console.log(line(score.fullAgreement, `${file}: cases with full agreement`))
-    console.log(line(score.agreedCodePoints, `${file}: all cases, the agreed code points`))
+  console.log('A score counts the code points from the first error of the parser as it is on that have a label with a scored value. Columns: cases, cases')
+  console.log('with nothing to recover, counted code points, the percentage of code points with every scored value right, the percentage of cases with')
+  console.log('something to recover in which every counted code point is right, and the percentage of the scored display kinds, depths and containers')
+  console.log('that are right.')
+  for (const parser of parsers) {
+    const scores = scoreWith(parser, cases)
+    console.log(`\n${parser.name[0]!.toUpperCase()}${parser.name.slice(1)}`)
+    console.log(`  ${'cases'.padStart(5)} ${'nothing'.padStart(7)} ${'points'.padStart(7)}   ${'all 3'.padStart(6)} ${'whole'.padStart(6)}   ${'kind'.padStart(6)} ${'depth'.padStart(6)} ${'cont'.padStart(6)}`)
+    console.log(line(scores.all.fullAgreement, 'cases with full agreement from the first error on'))
+    console.log(line(scores.neutralEdits.fullAgreement, '  of them, the cases whose damage one to three of the ten edits make'))
+    console.log(line(scores.otherDamage.fullAgreement, '  of them, the cases with other damage'))
+    console.log(line(scores.moreEdits.fullAgreement, '    of those, the cases whose damage more than three edits make'))
+    console.log(line(scores.unmarked.fullAgreement, '  of them, the cases of which no repair is marked as unsure'))
+    console.log(line(scores.all.agreedCodePoints, 'all cases, the agreed code points'))
+    console.log(line(scores.neutralEdits.agreedCodePoints, '  of them, the cases whose damage one to three of the ten edits make'))
+    console.log(line(scores.otherDamage.agreedCodePoints, '  of them, the cases with other damage'))
+    console.log(line(scores.moreEdits.agreedCodePoints, '    of those, the cases whose damage more than three edits make'))
+    for (const [file, score] of scores.perFile) {
+      console.log(line(score.fullAgreement, `${file}: cases with full agreement`))
+      console.log(line(score.agreedCodePoints, `${file}: all cases, the agreed code points`))
+    }
   }
   if (problems.length > 0) process.exitCode = 1
 }

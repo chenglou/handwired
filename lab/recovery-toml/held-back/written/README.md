@@ -174,11 +174,16 @@ A case with a difference is read by a person or an agent with both repairs side 
 
 ## How other code scores its tables
 
-`scoreTables` of `score.ts` takes any `ParserTables` of `lab/recovery-toml/table-parser.ts` and reads the set by itself:
+`score.ts` reads the set by itself and scores three sorts of parser on it:
+
+- `scoreTables(tables)` takes any `ParserTables` of `lab/recovery-toml/table-parser.ts`, i.e. tables with today's classes and contexts.
+- `scoreRecoveryTables(tables)` takes `RecoveryTables` of `lab/recovery-toml/learn/recovery-tables.ts`, which is what a training and the recipe make. Such tables can have added classes and the bit "first on its line", which the plain table parser cannot run, so the exact parser of `learn/recovery-parser.ts` runs them. With `asIsTables()`, and with added structure and no cell changed, it gives the numbers of `scoreTables(defaultTables)`: a test compares every score.
+- `scoreWith(parser)` takes a parser of `../parsers.ts`, e.g. `restartAtNextLine`, the one rule without any training that trained tables are read against.
 
 ```ts
-import {scoreTables} from './score.ts'
-const {all, perFile, neutralEdits, otherDamage, moreEdits, unmarked} = scoreTables(tables)
+import {loadTables} from '../../learn/recovery-tables.ts'
+import {scoreRecoveryTables} from './score.ts'
+const {all, perFile, neutralEdits, otherDamage, moreEdits, unmarked} = scoreRecoveryTables(loadTables(file).tables)
 console.log(all.fullAgreement.right / all.fullAgreement.scored, all.fullAgreement.wholeRight / (all.fullAgreement.cases - all.fullAgreement.nothingToRecover))
 ```
 
@@ -188,7 +193,7 @@ console.log(all.fullAgreement.right / all.fullAgreement.scored, all.fullAgreemen
 - A `WrittenScore` has two scores. `fullAgreement` counts the cases without a disputed code point from the first error on, and it is the set's main number. `agreedCodePoints` counts all cases and leaves the disputed code points out. A case with one repair has no disputed code point.
 - A `Score` has `cases`, `nothingToRecover`, `scored`, `right`, `wholeRight`, and per value `kindScored`, `kindRight`, `nestingScored`, `depthRight` and `containerRight`. A code point is right when every scored value is right, which is the number "all three" of the JSON experiment, and a case is right as a whole when all of its counted code points are, which is "whole".
 
-`bun lab/recovery-toml/held-back/written/score.ts` prints these numbers for the parser as it is. A reader that is no setting of the tables takes what a score needs from `readWritten().cases` of `written.ts`: `broken`, `firstErrorPosition`, and `labelsOfWritten(writtenCase)`, which has one label per code point of the broken payload, or `undefined` for a code point without one.
+`bun lab/recovery-toml/held-back/written/score.ts` prints these numbers for the parser as it is and for the rule. With `--tables <file.json>` it prints them for the tables of a file that `learn/` saved too, e.g. `--tables $RECOVERY_SCRATCH/recipe/seed-1.primary.tables.json`. Tables in which a cell differs from today's are a final number, so the command then asks for the environment variable `RECOVERY_FINAL=yes`, and it refuses a file that was saved with another dataset. A reader that is no setting of the tables takes what a score needs from `readWritten().cases` of `written.ts`: `broken`, `firstErrorPosition`, and `labelsOfWritten(writtenCase)`, which has one label per code point of the broken payload, or `undefined` for a code point without one.
 
 `readWritten()` also returns `problems` and `leftOut`. A case with a problem in its broken payload or in one of its repairs is left out of `cases`, and `leftOut` has its id. So `problems` must be empty before a number of the set is used: `bun lab/recovery-toml/held-back/written/check.ts` prints them.
 
@@ -208,7 +213,7 @@ Every command but `check-overlap.ts` takes `--set <folder>` for another folder o
 
 The set has 150 cases: three writers wrote 50 each, every writer from one cause of broken TOML, and every broken payload was repaired a second time by an agent who saw only the broken payload and `REPAIR.md`. It is used once, at the end of the experiment, to see how far a result on the train data carries over to broken TOML that no generator made. The train data's damage is ten edits that know nothing of TOML, and the writers did not see it. One to three of these edits make the damage of 69 cases, and 81 cases have damage that such edits do not make, see [What the damage is](#what-the-damage-is).
 
-Whoever builds or trains a parser reads nothing in this folder: not the cases, the repairs and `kinds.txt`, and not this page, the tools and the tests either, whose examples describe sorts of damage that only the cases have. Such a reader gets numbers alone, from `scoreTables` of `score.ts`.
+Whoever builds or trains a parser reads nothing in this folder: not the cases, the repairs and `kinds.txt`, and not this page, the tools and the tests either, whose examples describe sorts of damage that only the cases have. Such a reader gets numbers alone, from whoever runs the final scoring with `score.ts`.
 
 The three files are `hand-editing.txt`, `model-and-paste.txt` and `other-notations.txt`. `THEMES.md` calls the first theme `hand-edits`, and its third theme, `programs-and-transport`, was written as `model-and-paste`: what the answer of a language model and a copy from a page or a terminal do to a file, e.g. a code fence, line numbers and typographic quotes. So the set has no merge conflict of a version control tool, no template that was not rendered, no byte order mark and no HTML entity, which the third theme also lists. 12 cases of `other-notations.txt` are files caught in the middle of typing or of a move from another notation, e.g. a key without its value yet.
 
@@ -266,7 +271,7 @@ The line is literal: it follows what the document holds, and not what a person w
 
 ### What the parser as it is gets right
 
-Each row has the percentage of the scored code points with display kind, depth and container right, the percentage of the cases with something to recover in which every scored code point is right, and the percentage of the scored display kinds, depths and containers that are right. `bun lab/recovery-toml/held-back/written/score.ts` prints the same numbers. No recovery rule was written or run on the set.
+Each row has the percentage of the scored code points with display kind, depth and container right, the percentage of the cases with something to recover in which every scored code point is right, and the percentage of the scored display kinds, depths and containers that are right. `bun lab/recovery-toml/held-back/written/score.ts` prints the same numbers. No recovery rule was written for the set. One rule that knows nothing of the set is run on it, see [What one rule without any training gets right](#what-one-rule-without-any-training-gets-right).
 
 | Cases | Count | Nothing to recover | Scored code points | All three | Whole | Kind | Depth | Container |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -285,6 +290,26 @@ Each row has the percentage of the scored code points with display kind, depth a
 The set has something to score: in the cases with full agreement the parser as it is has 7,773 of 20,303 scored code points wrong, and it has every scored code point right in 7 of the 142 cases with something to recover (`hand-editing-06`, `-07`, `-41` and `-45`, `model-and-paste-18` and `-29`, `other-notations-41`). It starts higher than the JSON parser as it is, which shows everything after its first error as an error and had 22.0% of the code points and 2.3% of the cases of the JSON set right. The TOML parser as it is goes on after its first error and gets most of the later lines right, so a recovery has less room to show here.
 
 One thing it never gets right after its first error is a header: all 2,249 scored code points whose label is the name of a header are wrong, which is 29% of the wrong code points. E.g. it shows `[tasks.docs]` as keys inside an array, at depth 1. 1,975 of the wrong code points are shown as an error, and 1,423 of the wrong code points stand on the line of the first error.
+
+### What one rule without any training gets right
+
+The rule: after an error, the parser as it is starts anew at the next line, i.e. the tokenizer is between tokens, the grammar is at the start of a line and no container is open. `lab/recovery-toml/learn/restart-at-next-line.ts` holds it, and it reads no trained table and nothing of this folder. A review of the foundation found that this rule alone gets most of what the parser as it is has wrong, on the train data's validation split and on both held-back sets, so **a trained parser is read by what it adds to these rows**, and not by what it adds to the parser as it is.
+
+| Cases | Count | Nothing to recover | Scored code points | All three | Whole | Kind | Depth | Container |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Cases with full agreement | 144 | 2 | 20,303 | 84.2 | 29.6 | 85.6 | 96.2 | 96.3 |
+| Full agreement, one to three edits make the damage | 69 | 2 | 8,255 | 89.2 | 34.3 | 90.5 | 96.9 | 97.1 |
+| Full agreement, other damage | 75 | 0 | 12,048 | 80.9 | 25.3 | 82.3 | 95.8 | 95.7 |
+| Full agreement, other damage that more than three edits make | 18 | 0 | 2,546 | 85.9 | 0.0 | 86.0 | 99.7 | 99.9 |
+| Full agreement, no repair marked as unsure | 128 | 2 | 18,510 | 83.7 | 28.6 | 85.2 | 95.9 | 95.9 |
+| All cases, the agreed code points | 150 | 2 | 20,986 | 84.0 | 31.1 | 85.3 | 96.3 | 96.4 |
+| Agreed code points, one to three edits make the damage | 69 | 2 | 8,255 | 89.2 | 34.3 | 90.5 | 96.9 | 97.1 |
+| Agreed code points, other damage | 81 | 0 | 12,731 | 80.6 | 28.4 | 81.9 | 96.0 | 96.0 |
+| `hand-editing.txt`, full agreement | 50 | 0 | 6,376 | 89.9 | 32.0 | 90.5 | 97.5 | 97.8 |
+| `model-and-paste.txt`, full agreement | 47 | 1 | 7,044 | 75.4 | 34.8 | 77.7 | 93.9 | 93.8 |
+| `other-notations.txt`, full agreement | 47 | 1 | 6,883 | 88.1 | 21.7 | 89.1 | 97.4 | 97.6 |
+
+In the cases with full agreement the rule has 17,105 of 20,303 scored code points right, where the parser as it is has 12,530, and 42 of the 142 cases with something to recover right as a whole, where the parser as it is has 7. What is left is mostly the display kind: depth and container are right at 96% of the code points. The rule gets the least in `model-and-paste.txt`, whose damage is mostly text around the document.
 
 ### Where the two repairs differ
 

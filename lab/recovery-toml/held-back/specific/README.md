@@ -203,9 +203,75 @@ Per kind. The first two columns count the set's samples with the kind, and those
 
 `twoQuotesCloseMultiLine` is alone in one sample of the set: alone, the parser as it is reports no error before the next three quotes, so most such texts have nothing to score. `unescapedBackslash` and `dateInAnotherForm` have no sample of a held-out template: those templates have no backslash and no date.
 
+## The rows that a result is read against
+
+One rule without any training gets most of what the parser as it is has wrong: after an error, the parser as it is starts anew at the next line, i.e. the tokenizer is between tokens, the grammar is at the start of a line and no container is open. `lab/recovery-toml/learn/restart-at-next-line.ts` holds the rule, and it reads no trained table and nothing of this folder. A review of the foundation found this on the train data's validation split and on both held-back sets, so **a trained parser is read by what it adds to the rule's columns, per kind and in whole samples**, and not by what it adds to the parser as it is.
+
+For the set, as `score.ts --markdown` prints it. A row of a kind counts the set's samples with the kind, alone or with a second mistake, so its numbers differ from those of the table above, which is of samples with the kind alone.
+
+| Row | Samples | Scored code points | The parser as it is: all three | Whole | Anew at the next line after an error: all three | Whole |
+|---|---|---|---|---|---|---|
+| all | 3000 | 488580 | 69.3 | 9.5 | 89.8 | 37.9 |
+| documents of the two held-out templates | 1453 | 232642 | 69.6 | 10.4 | 89.8 | 38.3 |
+| template: deployConfig | 646 | 104418 | 72.1 | 7.4 | 90.5 | 37.5 |
+| template: taskRunner | 807 | 128224 | 67.5 | 12.8 | 89.2 | 39.0 |
+| documents of the 14 templates that the train data has | 1547 | 255938 | 69.0 | 8.6 | 89.8 | 37.5 |
+| one mistake | 2031 | 296279 | 71.3 | 12.7 | 90.6 | 45.2 |
+| two mistakes | 969 | 192301 | 66.1 | 2.7 | 88.6 | 22.6 |
+| group: out of reach | 137 | 19373 | 41.9 | 2.2 | 82.7 | 2.9 |
+| group: needs a nesting fix | 1 | 82 | 0.0 | 0.0 | 89.0 | 0.0 |
+| group: needs a character class | 114 | 23654 | 50.0 | 0.0 | 75.5 | 5.3 |
+| group: needs a line rule | 148 | 26864 | 80.0 | 0.0 | 93.9 | 0.7 |
+| group: within reach of the tables | 2600 | 418607 | 71.0 | 10.8 | 90.7 | 43.3 |
+| `colonForEquals` | 164 | 33064 | 52.7 | 0.0 | 70.6 | 0.0 |
+| `doubledEquals` | 105 | 17616 | 78.9 | 15.2 | 94.1 | 54.3 |
+| `missingEquals` | 98 | 15701 | 86.7 | 20.4 | 97.6 | 77.6 |
+| `missingCommaInArray` | 119 | 18794 | 80.5 | 15.1 | 92.9 | 49.6 |
+| `commaAtLineEnd` | 91 | 14229 | 85.1 | 20.9 | 96.2 | 64.8 |
+| `trailingCommaInInlineTable` | 173 | 26394 | 80.4 | 17.3 | 94.0 | 65.3 |
+| `unquotedString` | 166 | 29436 | 75.1 | 1.2 | 89.2 | 2.4 |
+| `missingClosingQuote` | 175 | 32024 | 68.9 | 0.0 | 94.0 | 0.0 |
+| `missingOpeningQuote` | 61 | 10491 | 79.9 | 0.0 | 92.6 | 0.0 |
+| `typographicQuotes` | 103 | 20041 | 42.0 | 0.0 | 72.4 | 0.0 |
+| `twoQuotesCloseMultiLine` | 25 | 4688 | 50.9 | 0.0 | 71.4 | 0.0 |
+| `lineFeedInString` | 62 | 9687 | 60.3 | 0.0 | 69.4 | 0.0 |
+| `unescapedBackslash` | 50 | 5670 | 63.9 | 0.0 | 71.5 | 2.0 |
+| `missingHeaderBracket` | 104 | 20689 | 49.2 | 7.7 | 94.7 | 49.0 |
+| `unbalancedDoubleBracket` | 134 | 23109 | 45.5 | 9.0 | 95.7 | 39.6 |
+| `missingArrayBracket` | 174 | 26877 | 29.4 | 6.9 | 86.7 | 26.4 |
+| `missingCloseBrace` | 99 | 16654 | 22.7 | 3.0 | 95.8 | 69.7 |
+| `inlineTableOnSeveralLines` | 160 | 25515 | 82.4 | 21.9 | 73.3 | 0.0 |
+| `keyWithSpace` | 98 | 18078 | 77.5 | 7.1 | 93.8 | 54.1 |
+| `valueLeftOut` | 170 | 29629 | 82.4 | 10.6 | 96.5 | 68.8 |
+| `headerWithTrailingDot` | 56 | 9867 | 27.1 | 0.0 | 93.7 | 0.0 |
+| `foreignLiteral` | 148 | 22596 | 80.9 | 23.6 | 97.0 | 73.0 |
+| `numberWithUnit` | 114 | 17223 | 74.0 | 14.0 | 96.6 | 75.4 |
+| `numberInAnotherForm` | 107 | 16316 | 73.7 | 0.9 | 96.5 | 6.5 |
+| `dateInAnotherForm` | 55 | 6479 | 83.8 | 3.6 | 92.7 | 25.5 |
+| `templatePlaceholder` | 49 | 8245 | 79.4 | 10.2 | 94.4 | 59.2 |
+| `jsonPastedIn` | 186 | 31462 | 57.2 | 0.0 | 79.2 | 0.0 |
+| `yamlBlock` | 129 | 26579 | 63.1 | 0.0 | 75.1 | 0.0 |
+| `yamlListItems` | 130 | 18911 | 82.5 | 0.0 | 95.8 | 0.0 |
+| `semicolonComment` | 105 | 18984 | 76.2 | 10.5 | 90.8 | 40.0 |
+| `slashComment` | 117 | 21334 | 79.7 | 8.5 | 92.8 | 45.3 |
+| `cutInTheMiddle` | 66 | 7107 | 63.3 | 10.6 | 92.2 | 37.9 |
+| `conflictMarkers` | 121 | 15708 | 83.1 | 18.2 | 96.0 | 71.9 |
+| `proseAround` | 97 | 22833 | 82.3 | 1.0 | 95.8 | 67.0 |
+| `codeFence` | 105 | 28154 | 82.7 | 0.0 | 97.9 | 72.4 |
+| `invisibleCharacter` | 53 | 10697 | 79.3 | 0.0 | 88.1 | 11.3 |
+
+What the rows say:
+
+- **The rule does not solve every kind.** With it, 11 kinds still have no whole sample: `colonForEquals`, `missingClosingQuote`, `missingOpeningQuote`, `typographicQuotes`, `twoQuotesCloseMultiLine`, `lineFeedInString`, `inlineTableOnSeveralLines`, `headerWithTrailingDot`, `jsonPastedIn`, `yamlBlock` and `yamlListItems`. The rule changes nothing on the line of an error, so a kind that leaves scored code points on that line stays without a whole sample, e.g. the value after a colon, and so does a kind that spans many lines.
+- **One kind gets worse:** `inlineTableOnSeveralLines` falls from 82.4% to 73.3% and from 21.9% of whole samples to none, since the rule cuts a value on several lines at the line of its error.
+- **A parser can only lose in whole samples where the parser as it is already has many.** In 9 kinds the parser as it is has 14% to 24% of the samples whole, e.g. `foreignLiteral` 23.6%.
+- **The documents of the two held-out templates** are not harder than the others for either parser: 69.6% against 69.0% as it is, 89.8% against 89.8% with the rule.
+
 ## How to score tables on the set
 
-`labeledTexts()` of `samples.ts` gives the set in the shape that `samplesOf` of `../../learn/data.ts` takes, so the code that scores tables on the dataset scores them on the set:
+`bun lab/recovery-toml/held-back/specific/score.ts --tables <file.json>` prints the rows above with two more columns, for the tables of a file that `learn/` saved, e.g. `--tables $RECOVERY_SCRATCH/recipe/seed-1.primary.tables.json`. Tables in which a cell differs from today's are a final number, so the command then asks for the environment variable `RECOVERY_FINAL=yes`, and it refuses a file that was saved with another dataset. `scoreWith(parser, samples)` of `score.ts` gives the rows for a parser of `../parsers.ts`.
+
+`labeledTexts()` of `samples.ts` gives the set in the shape that `samplesOf` of `../../learn/data.ts` takes, so the code that scores tables on the dataset scores them on the set too, with every column of its rows, e.g. the display kind, the depth and the container apart:
 
 ```ts
 import {samplesOf} from '../../learn/data.ts'
@@ -224,13 +290,14 @@ From the repo root:
 
 ```sh
 bun lab/recovery-toml/held-back/specific/check.ts [samples] [samples per kind] [seed] [--markdown]   # every check and the numbers, about 15 seconds
+bun lab/recovery-toml/held-back/specific/score.ts [--tables <file.json>] [--markdown]                # the parser as it is, the rule and tables, per kind, group and template
 bun lab/recovery-toml/held-back/specific/dump.ts <folder outside the repo> [seed]                    # samples.txt and per-kind.txt for reading
 bun lab/recovery-toml/held-back/specific/table.ts                                                    # the two tables of the kinds for this page
 ```
 
-`check.ts` ends with "every check passed". Its top lists what it checks: the examples of this page, a second derivation of every label from the tables, that every broken text is invalid and every document is in the test split and in no train or validation sample of the dataset, that the machinery's loader takes the set, and that no file outside `held-back/` imports from it.
+`check.ts` ends with "every check passed". Its top lists what it checks: the examples of this page, a second derivation of every label from the tables, that every broken text is invalid and every document is in the test split and in no train or validation sample of the dataset, that the machinery's loader takes the set, that `score.ts` counts for the parser as it is what the check counts, and that no file outside `held-back/` imports from it.
 
-The dump of the set is in `recovery-scratch/transfer/toml/held-back-specific/`: `samples.txt` has the first 300 samples, and `per-kind.txt` 5 samples of each kind alone. Per sample they show the kinds and their forms, the document and the broken text on one line each, and under the broken text the alignment, the label's display kind, depth and container, and a mark under the first error.
+The dump of the set is in `recovery-scratch/transfer/toml/held-back/held-back-specific/`: `samples.txt` has the first 300 samples, and `per-kind.txt` 5 samples of each kind alone. Per sample they show the kinds and their forms, the document and the broken text on one line each, and under the broken text the alignment, the label's display kind, depth and container, and a mark under the first error.
 
 ## The files
 
@@ -238,6 +305,7 @@ The dump of the set is in `recovery-scratch/transfer/toml/held-back-specific/`: 
 - `mistakes.ts`: the list of the kinds, and how one or two of them are drawn and merged.
 - `mistakes/`: the kinds, one file per family, and `types.ts` with what a kind is.
 - `scan.ts`: the parts of a valid document with their positions, e.g. its entries, strings, arrays and comments, which the kinds pick their places from. It reads the labels of the reference and no grammar of its own.
+- `score.ts`: the rows of a parser on the set, per kind, per group and for the held-out templates apart.
 - `check.ts`, `dump.ts`, `table.ts`: see "Run it".
 
 ## Known limits

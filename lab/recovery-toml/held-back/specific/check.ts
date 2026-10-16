@@ -24,6 +24,9 @@
 //   the same scored code points. The loader has checks of its own, e.g. that a scored depth is the one that the
 //   tables give the counterpart.
 // - README.md holds the two tables of the kinds as table.ts makes them from the kinds' definitions.
+// - score.ts, which runs the exact parser of ../../learn/, counts for the parser as it is what this file counts with
+//   the plain table parser: the samples, the scored code points, the right ones and the whole samples, in the row
+//   "all" and in the row of every kind.
 //
 // With --markdown as the last argument, it also prints the table of numbers per kind that README.md holds.
 import {readFileSync, readdirSync} from 'node:fs'
@@ -36,9 +39,11 @@ import {labelReference} from '../../reference.ts'
 import {defaultSeed as datasetSeed, sampleAt as datasetSampleAt} from '../../samples.ts'
 import {splitKeyOf, splitOf} from '../../splits.ts'
 import {runTableParser} from '../../table-parser.ts'
+import {parserAsItIs} from '../parsers.ts'
 import {type KindDefinition, kinds} from './mistakes.ts'
 import {type Sample, defaultSeed, groupOf, groups, heldOutTemplates, labeledTexts, labelsOf, sampleAt, scoredCodePoints, standardCount, usedTemplates} from './samples.ts'
 import {scan} from './scan.ts'
+import {scoreWith} from './score.ts'
 import {kindsTable, reachTable} from './table.ts'
 
 const numbers = process.argv.slice(2).filter(argument => argument !== '--markdown').map(Number)
@@ -281,6 +286,19 @@ else console.log(`The machinery's loader takes the ${loaded.sampleCount} samples
 const readme = readFileSync(join(import.meta.dir, 'README.md'), 'utf8')
 if (!readme.includes(kindsTable()) || !readme.includes(reachTable())) problem('README.md does not hold the two tables of the kinds as table.ts prints them')
 else console.log('README.md holds the two tables of the kinds as table.ts prints them.')
+
+// score.ts counts what this file counts.
+const sumOf = (values: readonly number[]) => values.reduce((total, value) => total + value, 0)
+const scoreRows = scoreWith(parserAsItIs, drawn)
+let rowsCompared = 0
+for (const [name, row] of [['all', drawnTotal] as const, ...kinds.map(kind => [`kind: ${kind.name}`, drawnRows.get(kind.name)!] as const)]) {
+  const scoreRow = scoreRows.find(candidate => candidate.name === name)
+  rowsCompared++
+  if (scoreRow === undefined || scoreRow.samples !== row.samples || scoreRow.scored !== sumOf(row.scored) || scoreRow.right !== row.asItIsRight || scoreRow.whole !== row.asItIsWhole) {
+    problem(`the row "${name}" of score.ts for the parser as it is has ${scoreRow?.samples} samples, ${scoreRow?.right} of ${scoreRow?.scored} code points right and ${scoreRow?.whole} whole samples, and this check counts ${row.samples}, ${row.asItIsRight} of ${sumOf(row.scored)} and ${row.asItIsWhole}`)
+  }
+}
+console.log(`score.ts counts for the parser as it is what this check counts, in the row "all" and in the ${rowsCompared - 1} rows of the kinds.`)
 
 // The numbers.
 const sortedCopy = (values: readonly number[]) => [...values].sort((left, right) => left - right)

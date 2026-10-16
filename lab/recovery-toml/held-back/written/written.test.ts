@@ -8,12 +8,15 @@ import {expect, test} from 'bun:test'
 import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {displayKind} from '../../kinds.ts'
+import {classesOfTheChecks} from '../../learn/check-texts.ts'
+import {addClasses, addFirstOnLineBit, asIsTables, openDisplayEntries} from '../../learn/recovery-tables.ts'
 import {defaultTables} from '../../table-parser.ts'
+import {parserAsItIs, restartAtNextLine} from '../parsers.ts'
 import {caseNotes, shapeOf} from './check.ts'
 import {differenceLines, differencesOf} from './compare.ts'
 import {type Aligned, alignedOfLines, brokenFileText, linesOfAligned, linesOfText, readBrokenFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
 import {couldComeFromEdits, neutralEditsOf} from './neutral-edits.ts'
-import {scoreCases, scoreTables} from './score.ts'
+import {scoreCases, scoreCasesWith, scoreRecoveryTables, scoreTables, scoreWith} from './score.ts'
 import {describeCase} from './show.ts'
 import {
   alignmentProblems, brokenTextProblems, canStandFor, caseOf, labelsOfWritten, opinionOf, readWritten, readsAsNumberOrLiteral, repairProblems,
@@ -347,6 +350,16 @@ test('the score of made-up cases', () => {
   const scores = scoreTables(defaultTables, [colon, disputed])
   expect([scores.all.fullAgreement.cases, scores.all.agreedCodePoints.cases, scores.perFile.get('made.txt')!.agreedCodePoints.cases, scores.unmarked.fullAgreement.cases]).toEqual([1, 2, 2, 1])
   expect(scores.all.agreedCodePoints.scored).toBe(18 + 11)
+  // The exact parser of learn/ with today's tables counts what the plain table parser counts.
+  const header = madeCase(`${start}port⟦: for =⟧ 80\n[tls]\non = true\n`)
+  expect(scoreCasesWith(parserAsItIs.show, [colon, header, disputed])).toEqual(scoreCases(defaultTables, [colon, header, disputed]))
+  // After its first error the parser as it is counts the `[` of a header as the start of an array, so it has the depth
+  // after the bracket and the three code points of the name wrong. The rule "anew at the next line after an error"
+  // reads the header as one, and changes nothing on the line of the error.
+  const asItIs = scoreCases(defaultTables, [header])
+  const withTheRule = scoreCasesWith(restartAtNextLine.show, [header])
+  expect([asItIs.scored, asItIs.right, withTheRule.scored, withTheRule.right]).toEqual([21, 13, 21, 17])
+  expect(scoreCasesWith(restartAtNextLine.show, [colon])).toEqual(score)
 })
 
 test('what the check asks a writer to look at', () => {
@@ -448,6 +461,15 @@ test('the files of the set have no problem', () => {
   // The numbers of README.md, under "The set as it is".
   expect([cases.length, cases.filter(writtenCase => writtenCase.opinions.length === 2).length, scores.all.fullAgreement.cases, scores.all.fullAgreement.nothingToRecover]).toEqual([150, 150, 144, 2])
   expect([scores.all.fullAgreement.scored, scores.all.agreedCodePoints.scored]).toEqual([20303, 20986])
+  expect([scores.all.fullAgreement.right, scores.all.fullAgreement.wholeRight]).toEqual([12530, 7])
+  // Tables of the recovery experiment, which only the exact parser of learn/ runs, give every score of the plain table
+  // parser: today's tables, and tables with added classes, open display entries and the bit "first on its line" in
+  // which no cell is changed. So the tables of a training are scored with the counts of this page.
+  expect(scoreRecoveryTables(asIsTables(), cases)).toEqual(scores)
+  expect(scoreRecoveryTables(addFirstOnLineBit(openDisplayEntries(addClasses(asIsTables(), classesOfTheChecks))), cases)).toEqual(scores)
+  // The rule "anew at the next line after an error", the row that trained tables are read against.
+  const withTheRule = scoreWith(restartAtNextLine, cases)
+  expect([withTheRule.all.fullAgreement.right, withTheRule.all.fullAgreement.wholeRight, withTheRule.unmarked.fullAgreement.right, withTheRule.unmarked.fullAgreement.wholeRight]).toEqual([17105, 42, 15493, 36])
   // kinds.txt names for every case the edits that neutral-edits.ts derives from the writer's repair, and has a reason
   // after "new:" for the cases whose damage one to three edits do not make.
   const derived = cases.map(writtenCase => neutralEditsOf(writtenCase))
