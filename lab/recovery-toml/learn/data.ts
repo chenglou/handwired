@@ -19,7 +19,7 @@
 // Without --scratch, the folder is the environment variable RECOVERY_SCRATCH. The cache file goes to <folder>/cache.
 import {existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
-import {capacity, containerNone, runTableParser} from '../table-parser.ts'
+import {capacity, containerInlineTable, runTableParser} from '../table-parser.ts'
 import {cacheKey, datasetKey} from './dataset-key.ts'
 import {optionOf, refuseUnknownOptions} from './options.ts'
 import {createTrace, runRecoveryParserInto} from './recovery-parser.ts'
@@ -181,13 +181,16 @@ export type Samples = {
   intendedGrammarAfter: Int8Array
   intendedDepthAfter: Int8Array
   intendedContainerAfter: Int8Array
+  // The stack of open containers after the counterpart in the original, as bits: bit l - 1 is 1 when level l is an
+  // inline table. 0 without a counterpart. Keeping a run of the twin on track needs it, see soft/twin.ts.
+  intendedStack: Uint16Array
 }
 
-type TypedArray = Int32Array | Int8Array | Uint8Array
+type TypedArray = Int32Array | Int8Array | Uint8Array | Uint16Array
 const perSampleFields = ['index', 'firstDamage', 'firstErrorPosition', 'firstErrorKind', 'split', 'source', 'scored'] as const
-const perCodePointFields = ['codePoints', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'intendedLexerAfter', 'intendedEvent', 'intendedGrammarAfter', 'intendedDepthAfter', 'intendedContainerAfter'] as const
+const perCodePointFields = ['codePoints', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'intendedLexerAfter', 'intendedEvent', 'intendedGrammarAfter', 'intendedDepthAfter', 'intendedContainerAfter', 'intendedStack'] as const
 const arrayFields = [...perSampleFields, ...perCodePointFields, 'start', 'kindStart', 'kindList'] as const
-const arrayTypes = {Int32Array, Int8Array, Uint8Array}
+const arrayTypes = {Int32Array, Int8Array, Uint8Array, Uint16Array}
 
 // The dataset's key and the cache's key are in dataset-key.ts: hashes of the source files that decide what the
 // samples are, and what these arrays hold. Every saved file of tables holds the dataset's key.
@@ -217,13 +220,14 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
   const int32 = () => growing(length => new Int32Array(length))
   const int8 = () => growing(length => new Int8Array(length))
   const uint8 = () => growing(length => new Uint8Array(length))
+  const uint16 = () => growing(length => new Uint16Array(length))
   const perSample = {index: int32(), firstDamage: int32(), firstErrorPosition: int32(), firstErrorKind: uint8(), split: uint8(), source: uint8(), scored: int32()}
   const start = int32()
   const kindStart = int32()
   const kindList = uint8()
   const perCodePoint = {
     codePoints: int32(), flags: uint8(), labelKind: int8(), labelDepth: int8(), labelContainer: int8(),
-    intendedLexerAfter: int8(), intendedEvent: int8(), intendedGrammarAfter: int8(), intendedDepthAfter: int8(), intendedContainerAfter: int8(),
+    intendedLexerAfter: int8(), intendedEvent: int8(), intendedGrammarAfter: int8(), intendedDepthAfter: int8(), intendedContainerAfter: int8(), intendedStack: uint16(),
   }
   const sourceNames = ['valid']
   const kindNames: string[] = []
@@ -254,14 +258,25 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
     if (!valid && trace.firstErrorPosition !== -1 && trace.firstErrorPosition < text.firstDamage) throw new Error(`${name}: today's parser has its first error at ${trace.firstErrorPosition}, before the first damage at ${text.firstDamage}`)
     const firstError = trace.firstErrorPosition
     if (text.firstErrorPosition !== undefined && text.firstErrorPosition !== firstError) throw new Error(`${name}: its maker says that the first error is at ${text.firstErrorPosition}, and today's parser has it at ${firstError}`)
-    // The intended states, from today's parser on the original.
+    // The intended states, from today's parser on the original, and the stack after each of its code points: an
+    // opening bracket sets its level's bit by the container after it, and a closing bracket clears its level's bit.
     let intended: ReturnType<typeof runTableParser> | undefined
     let originalLength = 0
+    const stackAfter: number[] = []
     if (text.original !== undefined && text.alignment !== undefined) {
       intended = runTableParser(text.original)
       originalLength = intended.length
       if (!intended.valid) throw new Error(`${name}: today's parser rejects its original at ${intended.firstErrorPosition}`)
       if (text.alignment.length !== brokenCodePoints.length) throw new Error(`${name} has ${brokenCodePoints.length} code points, and its alignment ${text.alignment.length}`)
+      let depth = 0
+      let stack = 0
+      for (let position = 0; position < originalLength; position++) {
+        const depthAfter = intended.depthAfter[position]!
+        if (depthAfter > depth) stack = intended.containerAfter[position] === containerInlineTable ? stack | (1 << (depthAfter - 1)) : stack & ~(1 << (depthAfter - 1))
+        else if (depthAfter < depth) stack &= ~(1 << (depth - 1))
+        depth = depthAfter
+        stackAfter.push(stack)
+      }
     }
     perSample.index.push(text.index)
     perSample.firstDamage.push(text.firstDamage)
@@ -289,6 +304,7 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
       if (firstError !== -1 && position >= firstError && label !== undefined && (label.kind !== undefined || label.depth !== undefined)) scored++
       if (intended === undefined || counterpart === -1) {
         for (const field of ['intendedLexerAfter', 'intendedEvent', 'intendedGrammarAfter', 'intendedDepthAfter', 'intendedContainerAfter'] as const) perCodePoint[field].push(-1)
+        perCodePoint.intendedStack.push(0)
         continue
       }
       // The labels come from the reference labeler and the intended depth and container from the tables' trace on
@@ -301,7 +317,8 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
       perCodePoint.intendedEvent.push(intended.event[counterpart]!)
       perCodePoint.intendedGrammarAfter.push(intended.grammarAfter[counterpart]!)
       perCodePoint.intendedDepthAfter.push(intended.depthAfter[counterpart]!)
-      perCodePoint.intendedContainerAfter.push(intended.containerAfter[counterpart] ?? containerNone)
+      perCodePoint.intendedContainerAfter.push(intended.containerAfter[counterpart]!)
+      perCodePoint.intendedStack.push(stackAfter[counterpart]!)
     }
     perSample.scored.push(scored)
     codePointCount += brokenCodePoints.length
@@ -315,7 +332,7 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
     start: start.done(), kindStart: kindStart.done(), kindList: kindList.done(),
     codePoints: perCodePoint.codePoints.done(), flags: perCodePoint.flags.done(), labelKind: perCodePoint.labelKind.done(), labelDepth: perCodePoint.labelDepth.done(), labelContainer: perCodePoint.labelContainer.done(),
     intendedLexerAfter: perCodePoint.intendedLexerAfter.done(), intendedEvent: perCodePoint.intendedEvent.done(), intendedGrammarAfter: perCodePoint.intendedGrammarAfter.done(),
-    intendedDepthAfter: perCodePoint.intendedDepthAfter.done(), intendedContainerAfter: perCodePoint.intendedContainerAfter.done(),
+    intendedDepthAfter: perCodePoint.intendedDepthAfter.done(), intendedContainerAfter: perCodePoint.intendedContainerAfter.done(), intendedStack: perCodePoint.intendedStack.done(),
   }
 }
 
