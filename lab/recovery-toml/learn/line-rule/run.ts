@@ -1,17 +1,22 @@
-// One hand-written rule for the lines, then the recipe's training on every other cell. The rule: at the top level, a
-// line end after an error starts the next line as a fresh line. README.md says why and what came out.
+// One hand-written rule for the lines, then the recipe's training on every other cell. The rule: after an error, the
+// rest of the line is skipped, and the line end starts the next line as a fresh line with no open container.
+// README.md says why and what came out.
 //
 // The cells of the rule, set on the recipe's base (see lineCellsOn below for each of them):
 // 1. Tokenizer cells of a line end: in every tokenizer state, an open cell of a line feed gives the event `newline`
 //    and leads between tokens, and an open cell of a carriage return gives `newline` and leads into the state
 //    `carriageReturn`. They are the cells of the hand-written rule "a line end ends a token" of
 //    ../handwritten/rules.ts.
-// 2. Grammar cells of a line end: at depth 0, the open cell of the token `newline` leads into the state `lineStart`
-//    in every grammar state but `error`. The hand-written rule "a line end at the top level" names 18 of them.
-// 3. Grammar cells that wait for the line end: at depth 0, an open cell that leads into the state `error` today
-//    stays in its state and changes no depth. Without them the rule does nothing for an error in the middle of a
-//    line: the grammar is in the state `error` at the line end, and the whole row of that state is one of the
-//    recipe's kept settings, since a valid text with a value of more than 16 levels has to be shown as today.
+// 2. Grammar cells of a line end: the open cell of the token `newline` leads into the state `lineStart`, at depth 0
+//    in every grammar state but `error`, and at depth 1 in every state whose cell leads into `error` today, where
+//    the cell also closes the one open container. The hand-written rule "a line end at the top level" names 18 of
+//    the cells of depth 0.
+// 3. Grammar cells that wait for the line end: at depth 0 and at depth 1, an open cell that leads into the state
+//    `error` today stays in its state and changes no depth. Without them the rule does nothing for an error in the
+//    middle of a line: the grammar is in the state `error` at the line end, and the whole row of that state is one
+//    of the recipe's kept settings, since a valid text with a value of more than 16 levels has to be shown as today.
+// A cell can close one container, so an error at depth 2 or more is not covered. With the environment variable
+// LINE_RULE_TOP_ONLY=1 the cells of depth 1 are left out: the first form of the rule, which no training ran with.
 //
 // --waiting-cells says what the training may do with the cells of 3: `fixed` keeps them out of the training as 1 and
 // 2 are, and `trainable` sets them in the base and lets the training change them, from the recipe's share of 0.9 on
@@ -22,12 +27,14 @@
 // second row its search before the count.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
-//   bun lab/recovery-toml/learn/line-rule/run.ts --base                                  # the cells and the base's scores, no training
+//   bun lab/recovery-toml/learn/line-rule/run.ts --base --folder <folder>                # the cells and the base's scores, no training
 //   bun lab/recovery-toml/learn/line-rule/run.ts --seed 1 --waiting-cells fixed          # the training, the count, and the search
 //   bun lab/recovery-toml/learn/line-rule/run.ts --seed 1 --waiting-cells trainable --no-search-after 16:36
 // The files go to <RECOVERY_SCRATCH>/runs/line-rule/waiting-cells-<fixed or trainable>/, or to --folder, with the
 // names and the record of ../runs/run.ts: row-4.seed-1 is the training then the count, row-5.seed-1 the same with
-// the search. So ../runs/check.ts --folder checks them.
+// the search. So ../runs/check.ts --folder checks them. --no-search-after 16:36 leaves the search out when the
+// training ends after that time of the day. --base saves the base's tables as base.tables.json and
+// base-with-count.tables.json.
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {displayKind} from '../../kinds.ts'
@@ -109,7 +116,7 @@ export function lineCellsOn(recipeBase: RecoveryTables): LineCells {
       changed.lexerAtLineEnd.push(`${lexerCellName(base, cell)}: ${before} -> ${lexerChoiceName(base, cell)}`)
     }
   })
-  // 2 and 3. The grammar cells at depth 0.
+  // 2 and 3. The grammar cells at depth 0 and at depth 1.
   const newlineToken = indexIn(tokenNames, 'newline')
   const endToken = indexIn(tokenNames, 'end')
   const lineStart = indexIn(grammarStateNames, 'lineStart')
