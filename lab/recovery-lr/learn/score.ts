@@ -48,6 +48,9 @@ export type RunDetail = {
   steps: number
   mostStepsOfAToken: number
   tokensSkippedByStepLimit: number
+  // Of them, the tokens whose 16 steps all read frozen cells: the grammar's own reductions used the steps up, e.g.
+  // at a token that closes a chain of 16 `else if`, and no choice of an open cell was asked.
+  tokensSkippedOnFrozenCellsOnly: number
   tokensSkippedByStackLimit: number
   insertedTokens: number
   highestStack: number
@@ -60,10 +63,10 @@ export type RunDetail = {
   wantedKinds: Int32Array | null
 }
 export const createDetail = (reads: Int32Array | null = null, wantedKinds: Int32Array | null = null): RunDetail =>
-  ({kindRight: 0, depthRight: 0, containerRight: 0, stackRight: 0, tokens: 0, steps: 0, mostStepsOfAToken: 0, tokensSkippedByStepLimit: 0, tokensSkippedByStackLimit: 0, insertedTokens: 0, highestStack: 0, reductions: [], reads, wantedKinds})
+  ({kindRight: 0, depthRight: 0, containerRight: 0, stackRight: 0, tokens: 0, steps: 0, mostStepsOfAToken: 0, tokensSkippedByStepLimit: 0, tokensSkippedOnFrozenCellsOnly: 0, tokensSkippedByStackLimit: 0, insertedTokens: 0, highestStack: 0, reductions: [], reads, wantedKinds})
 function clearDetail(detail: RunDetail) {
   detail.kindRight = detail.depthRight = detail.containerRight = detail.stackRight = detail.tokens = detail.steps = detail.mostStepsOfAToken = 0
-  detail.tokensSkippedByStepLimit = detail.tokensSkippedByStackLimit = detail.insertedTokens = detail.highestStack = 0
+  detail.tokensSkippedByStepLimit = detail.tokensSkippedOnFrozenCellsOnly = detail.tokensSkippedByStackLimit = detail.insertedTokens = detail.highestStack = 0
   detail.reductions.length = 0
 }
 
@@ -153,6 +156,8 @@ export function runSample(samples: PackedSamples, sample: number, tables: Recove
     }
     const flagOffset = flagged && firstOnLine[at] === 1 ? cellsPerCopy : 0
     let steps = 0
+    // Whether a step of the token has read an open cell.
+    let readOpenCell = false
     // The display entry that the token is shown by, and whether the stack holds the token then.
     let entry = -1
     let taken = false
@@ -161,12 +166,16 @@ export function runSample(samples: PackedSamples, sample: number, tables: Recove
       if (steps === maximumStepsPerToken) {
         // The 17th step is a skip, whatever the cell holds.
         entry = state * terminalCount + terminal
-        if (detail !== null) detail.tokensSkippedByStepLimit++
+        if (detail !== null) {
+          detail.tokensSkippedByStepLimit++
+          if (!readOpenCell) detail.tokensSkippedOnFrozenCellsOnly++
+        }
         break
       }
       steps++
       const cell = flagOffset + state * terminalCount + terminal
       if (open[cell] === 1) {
+        readOpenCell = true
         if (cellsRead !== null) cellsRead[cellsOffset + (cell >> 3)]! |= 1 << (cell & 7)
         if (detail !== null && detail.reads !== null) detail.reads[cell]!++
       }
@@ -274,7 +283,7 @@ export const emptyScore = (): Score => ({
 })
 
 // What the exact loop needed, next to a score of tables.
-export type RunTotals = {tokens: number, steps: number, mostStepsOfAToken: number, tokensSkippedByStepLimit: number, tokensSkippedByStackLimit: number, highestStack: number}
+export type RunTotals = {tokens: number, steps: number, mostStepsOfAToken: number, tokensSkippedByStepLimit: number, tokensSkippedOnFrozenCellsOnly: number, tokensSkippedByStackLimit: number, highestStack: number}
 
 // A score as percentages.
 export function sharesOf(score: Score) {
@@ -352,7 +361,7 @@ export function scoreTables(tables: RecoveryTables, samples: PackedSamples, opti
   checkTables(tables)
   refuseOtherTerminals(samples, tables)
   const score = emptyScore()
-  const totals: RunTotals = {tokens: 0, steps: 0, mostStepsOfAToken: 0, tokensSkippedByStepLimit: 0, tokensSkippedByStackLimit: 0, highestStack: 0}
+  const totals: RunTotals = {tokens: 0, steps: 0, mostStepsOfAToken: 0, tokensSkippedByStepLimit: 0, tokensSkippedOnFrozenCellsOnly: 0, tokensSkippedByStackLimit: 0, highestStack: 0}
   const detail = createDetail(options.reads ?? null, options.wantedKinds ?? null)
   const cellsRead = options.readers === undefined ? null : new Uint8Array(Math.ceil(tables.choice.length / 8))
   for (let sample = 0; sample < samples.sampleCount; sample++) {
@@ -374,6 +383,7 @@ export function scoreTables(tables: RecoveryTables, samples: PackedSamples, opti
     totals.steps += detail.steps
     totals.mostStepsOfAToken = Math.max(totals.mostStepsOfAToken, detail.mostStepsOfAToken)
     totals.tokensSkippedByStepLimit += detail.tokensSkippedByStepLimit
+    totals.tokensSkippedOnFrozenCellsOnly += detail.tokensSkippedOnFrozenCellsOnly
     totals.tokensSkippedByStackLimit += detail.tokensSkippedByStackLimit
     totals.highestStack = Math.max(totals.highestStack, detail.highestStack)
     if (cellsRead !== null) for (let cell = 0; cell < tables.choice.length; cell++) if ((cellsRead[cell >> 3]! & (1 << (cell & 7))) !== 0) options.readers![cell]!++
@@ -491,10 +501,12 @@ export function wrongBeforeFirstError(samples: readonly Sample[]): {kept: number
   return {kept, wrong}
 }
 
-// What a score prints next to its row: the numbers of the samples and of the loop.
+// What a score prints next to its row: the numbers of the samples and of the loop. The inserted tokens and the
+// tokens skipped after 16 steps go together: tables can skip a token by going in a circle, e.g. insert a token and
+// pop it again until the steps are used up, and every round counts as an inserted token.
 export function describeTotals(samples: PackedSamples, score: Score, totals: RunTotals): string {
-  return `${score.samples} samples with ${score.scoredCodePoints} scored code points. One output per token allows ${(100 * samples.boundCodePoints / samples.scoredCodePoints).toFixed(2)}% of all three. `
-    + `${(totals.steps / Math.max(1, totals.tokens)).toFixed(2)} steps per token, at most ${totals.mostStepsOfAToken}. ${totals.tokensSkippedByStepLimit} tokens were skipped after ${maximumStepsPerToken} steps and ${totals.tokensSkippedByStackLimit} at the limit of the stack, whose highest was ${totals.highestStack} states. `
+  return `${score.samples} samples with ${score.scoredCodePoints} scored code points. One output per token allows at most ${(100 * samples.boundCodePoints / samples.scoredCodePoints).toFixed(2)}% of all three. `
+    + `${(totals.steps / Math.max(1, totals.tokens)).toFixed(2)} steps per token, at most ${totals.mostStepsOfAToken}. ${totals.tokensSkippedByStepLimit} tokens were skipped after ${maximumStepsPerToken} steps, ${totals.tokensSkippedOnFrozenCellsOnly} of them after steps at frozen cells only, and ${totals.tokensSkippedByStackLimit} at the limit of the stack, whose highest was ${totals.highestStack} states. `
     + `${score.insertedTokens} tokens inserted, in ${score.samplesWithInsertedTokens} samples.`
 }
 

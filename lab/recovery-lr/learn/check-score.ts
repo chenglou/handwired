@@ -22,10 +22,10 @@ import {type Sample, alignmentOfTexts, makeSample} from '../sample.ts'
 import {commentKind, isTrivia, symbolOf} from '../tables.ts'
 import {kindsOfDroppedTokensByCount, panicMode, popTables, skipTables} from './bars.ts'
 import {packSamples, prefixOf} from './data.ts'
-import {runRecoveryParserOnTokens} from './recovery-parser.ts'
+import {runRecoveryParserOnTokens, shownSkippedByStepLimit} from './recovery-parser.ts'
 import {
-  type RecoveryTables, addFirstOnLineFlag, addTerminals, badCharacter, baseTables, bison, bisonTerminalCount, cellOf, choiceSkip, choicesOf, endEarlyOf, insertOf, randomizeOpenCells, readAs, stateCount,
-  withoutEndEarly,
+  type RecoveryTables, addFirstOnLineFlag, addTerminals, badCharacter, baseTables, bison, bisonTerminalCount, cellOf, choiceSkip, choicesOf, endEarlyOf, insertOf, maximumStepsPerToken, randomizeOpenCells, readAs,
+  stateCount, withoutEndEarly,
 } from './recovery-tables.ts'
 import {type Score, createDetail, runSample, scoreOutputs, scorePack, scoreTables, scoreTablesByExactParser, sharesOf, wrongBeforeFirstError} from './score.ts'
 
@@ -53,7 +53,7 @@ const sameScore = (left: Score, right: Score): boolean => (Object.keys(left) as 
     randomizeOpenCells(tables, createRandom(51, setting))
     settings.push([`random setting ${setting}`, tables])
   }
-  let codePoints = 0, constituents = 0, steps = 0
+  let codePoints = 0, constituents = 0, steps = 0, skippedByStepLimit = 0, skippedOnFrozenCellsOnly = 0
   for (const [name, tables] of settings) {
     const packed = packSamples(samples, tables)
     const {score, totals} = scoreTables(tables, packed)
@@ -62,11 +62,24 @@ const sameScore = (left: Score, right: Score): boolean => (Object.keys(left) as 
     expect(score.samples === samples.length && score.scoredCodePoints === samples.reduce((sum, sample) => sum + sample.scored, 0), () => `${name}: the score is of ${score.samples} samples and ${score.scoredCodePoints} code points`)
     // The loop's own numbers against the exact parser's, sample by sample.
     const detail = createDetail()
-    let stepsOfLoop = 0, stepsOfParser = 0, tokensSkippedByStepLimit = 0, highest = 0
+    let stepsOfLoop = 0, stepsOfParser = 0, tokensSkippedByStepLimit = 0, tokensSkippedOnFrozenCellsOnly = 0, highest = 0
     samples.forEach((sample, place) => {
       runSample(packed, place, tables, null, 0, detail)
       const run = runRecoveryParserOnTokens(sample.codePoints, sample.tokens, tables)
       const stepsOfRun = run.steps.reduce((sum, count) => sum + count, 0) + run.stepsAtEnd
+      // The tokens that the exact parser skips after 16 steps, and the ones of them at which it reads no open
+      // cell. With fewer than 16 steps at the end of input, the end is not one of them.
+      if (run.stepsAtEnd < maximumStepsPerToken) {
+        const tokensWithOpenCell = new Set(run.cellsReadAtToken)
+        let skipped = 0, onFrozenCellsOnly = 0
+        run.shown.forEach((shown, token) => {
+          if (shown !== shownSkippedByStepLimit) return
+          skipped++
+          if (!tokensWithOpenCell.has(token)) onFrozenCellsOnly++
+        })
+        if (detail.tokensSkippedByStepLimit !== skipped || detail.tokensSkippedOnFrozenCellsOnly !== onFrozenCellsOnly) problem(`${name}, sample ${sample.id}: the loop skips ${detail.tokensSkippedByStepLimit} tokens after ${maximumStepsPerToken} steps, ${detail.tokensSkippedOnFrozenCellsOnly} of them at frozen cells only, and the exact parser ${skipped} and ${onFrozenCellsOnly}`)
+      }
+      tokensSkippedOnFrozenCellsOnly += detail.tokensSkippedOnFrozenCellsOnly
       // The exact parser's highest stack is of the whole text, and the loop's from the first error on.
       const loopsHighest = Math.max(detail.highestStack, sample.startStack.length)
       if (detail.steps !== stepsOfRun || detail.insertedTokens !== run.insertedTokens || loopsHighest > run.highestStack) problem(`${name}, sample ${sample.id}: the loop takes ${detail.steps} steps and inserts ${detail.insertedTokens} tokens, and the exact parser ${stepsOfRun} and ${run.insertedTokens}`)
@@ -77,12 +90,14 @@ const sameScore = (left: Score, right: Score): boolean => (Object.keys(left) as 
       tokensSkippedByStepLimit += detail.tokensSkippedByStepLimit
       highest = Math.max(highest, detail.highestStack)
     })
-    expect(stepsOfLoop === totals.steps && stepsOfLoop === stepsOfParser && tokensSkippedByStepLimit === totals.tokensSkippedByStepLimit && highest === totals.highestStack, () => `${name}: the totals of the loop are not the sums of its runs`)
+    expect(stepsOfLoop === totals.steps && stepsOfLoop === stepsOfParser && tokensSkippedByStepLimit === totals.tokensSkippedByStepLimit && tokensSkippedOnFrozenCellsOnly === totals.tokensSkippedOnFrozenCellsOnly && highest === totals.highestStack, () => `${name}: the totals of the loop are not the sums of its runs`)
     codePoints += score.scoredCodePoints
     constituents += score.recoveredConstituents
     steps += totals.steps
+    skippedByStepLimit += totals.tokensSkippedByStepLimit
+    skippedOnFrozenCellsOnly += totals.tokensSkippedOnFrozenCellsOnly
   }
-  console.log(`1. ${settings.length} tables on ${samples.length} samples: the loop of score.ts and the exact parser on whole texts give the same 17 counts, over ${codePoints} scored code points and ${constituents} constituents, and the same steps, ${steps}, inserted tokens and reductions sample by sample.`)
+  console.log(`1. ${settings.length} tables on ${samples.length} samples: the loop of score.ts and the exact parser on whole texts give the same 17 counts, over ${codePoints} scored code points and ${constituents} constituents, and the same steps, ${steps}, inserted tokens and reductions sample by sample. They skip the same ${skippedByStepLimit} tokens after ${maximumStepsPerToken} steps, ${skippedOnFrozenCellsOnly} of them after steps at frozen cells only.`)
 }
 
 // 2. Samples by hand, each repaired by one cell.

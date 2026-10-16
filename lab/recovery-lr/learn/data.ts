@@ -6,9 +6,9 @@
 // packSamples takes the tables whose terminals the samples will be run with: a BADCHAR token of a picked code
 // point is packed as the code point's own terminal, see addTerminals of recovery-tables.ts.
 import {type Split, defaultSeed, sampleAt} from '../dataset.ts'
-import {displayKind} from '../labels.ts'
 import {firstOnLineOf} from '../parser.ts'
 import {type Sample, restrictedConstituents} from '../sample.ts'
+import {scoredOutOfReach} from '../stats.ts'
 import {actionReduce, actionShift, commentKind, isTrivia} from '../tables.ts'
 import {type RecoveryTables, baseTables, bison, bisonTerminalCount, terminalOfToken, terminalsKeyOf} from './recovery-tables.ts'
 
@@ -19,9 +19,12 @@ export type PackedSamples = {
   sampleCount: number
   // A key of the added terminals that the tokens were packed with, see terminalsKeyOf.
   terminalsKey: string
-  // Over all samples: the scored code points, and the most of them that can have all three right when every token
-  // is shown with one kind, one depth and one container. A token can hold kept code points of two tokens of the
-  // original, e.g. the `xy` that is left of `x y`, and white space is always shown as white space.
+  // Over all samples: the scored code points, and the most of them that a parser of the experiment can have right
+  // in all three: the scored code points without scoredOutOfReach of ../stats.ts. Such a parser shows a token with
+  // one kind, shows white space as white space, and shows a token and the white space and comments after it with
+  // one depth and one container. A token can hold kept code points of two tokens of the original, e.g. the `xy`
+  // that is left of `x y`, and the spaces on both sides of a removed `then` are one run of white space with two
+  // containers. It is an upper bound and no more: frozen cells and frozen display entries put more out of reach.
   scoredCodePoints: number
   boundCodePoints: number
   // The tokens of sample s are the entries tokenStart[s] to tokenStart[s + 1] - 1 of the arrays per token: the
@@ -123,16 +126,14 @@ export function createPacker(layout: RecoveryTables): {add: (sample: Sample) => 
     sampleCount++
     const {tokens} = sample
     const flags = firstOnLineOf(tokens)
-    let scoredOfSample = 0, boundOfSample = 0
+    let scoredOfSample = 0
     for (let token = sample.firstErrorToken; token < tokens.count; token++) {
       const kind = tokens.kind[token]!
       const from = tokens.start[token]!, to = from + tokens.length[token]!
       terminal.push(!isTrivia(kind) ? terminalOfToken(layout, kind, sample.codePoints[from]!) : kind === commentKind ? packedComment : packedWhitespace)
       firstOnLine.push(flags[token]!)
-      // The groups of the token, and the most code points that one output can have right.
+      // The groups of the token.
       const groupsFrom = groupKind.length
-      const perOutput = new Map<number, number>()
-      let best = 0
       for (let place = from; place < to; place++) {
         if (sample.alignment[place] === -1) continue
         scoredOfSample++
@@ -147,14 +148,7 @@ export function createPacker(layout: RecoveryTables): {add: (sample: Sample) => 
           groupCount.push(0)
         }
         groupCount[group]!++
-        // White space and comments are shown as what they are, whatever the tables hold.
-        if (isTrivia(kind) && labelKind !== (kind === commentKind ? displayKind.comment : displayKind.whitespace)) continue
-        const output = (labelKind * 1024 + labelDepth) * 16 + labelContainer
-        const count = (perOutput.get(output) ?? 0) + 1
-        perOutput.set(output, count)
-        if (count > best) best = count
       }
-      boundOfSample += best
       groupStart.push(groupKind.length)
     }
     // The end of input: no code point, no label.
@@ -163,6 +157,7 @@ export function createPacker(layout: RecoveryTables): {add: (sample: Sample) => 
     groupStart.push(groupKind.length)
     tokenStart.push(terminal.length)
     if (scoredOfSample !== sample.scored) throw new Error(`sample ${sample.id}: ${scoredOfSample} kept code points from the first error on, and the sample says ${sample.scored}`)
+    const boundOfSample = scoredOfSample - scoredOutOfReach(sample)
     firstErrorToken.push(sample.firstErrorToken)
     scored.push(scoredOfSample)
     bound.push(boundOfSample)

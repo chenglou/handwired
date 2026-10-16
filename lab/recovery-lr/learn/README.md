@@ -103,11 +103,24 @@ The same check repairs five samples by hand with one cell each, e.g. `let x = (1
 
 What a score does not count: the kept code points before the first error that are shown with another label than the original's, 10.7% of them in the validation samples (`bars.ts` prints the count). No tables change them.
 
-One output per token allows 98.07% of all three on the validation samples: a token can hold kept code points of two tokens of the original.
+One output per token allows at most 96.99% of all three on the 5,000 validation samples of the real dataset, and 642 of them cannot be whole. The count is `scoredOutOfReach` of `../stats.ts`, and `packSamples` holds it per sample as `bound`: a parser of the experiment shows a token with one kind, shows white space as white space, and shows a token and the white space after it with one depth and one container. E.g. a token can hold kept code points of two tokens of the original, and the spaces on both sides of a removed `then` are one run of white space with two containers. It is an upper bound and no more: frozen cells are followed after the first error too, and frozen display entries show what they show, so more is out of reach of every table than this count says. The search per sample below is the lower bound of what the list of choices can do.
+
+`describeTotals` prints, next to the inserted tokens, the tokens that were skipped after 16 steps, and how many of them took all 16 steps at frozen cells. The two numbers go together: tables can skip a token by going in a circle, e.g. insert an empty definition and drop it again until the steps are used up, and every round counts as an inserted token. A token whose 16 steps were all at frozen cells is another case: the grammar's own reductions used the steps up, e.g. at a token that closes a chain of 16 `else if`. No token of the originals of the validation samples reads more than 14 cells, and a program with a longer chain has such a token.
 
 ### A parser that is no table
 
 `scoreOutputs(samples, parse)` scores any parser. `parse(sample)` returns a `ParserOutput`: per token of `sample.tokens` the display kind, the depth, the container, the hash of the symbols on the parser's stack (`stackHashOfSymbols` of `../labels.ts`) and whether the token was taken, then every reduction of the parse as (nonterminal, first token, last token), and the number of inserted tokens. `panicMode` in `bars.ts` is an example. For a parser that drops tokens, `kindsOfDroppedTokensByCount(trainSamples, parse)` gives the kind per terminal that the most code points of the dropped tokens want, which is the count that every bar may use.
+
+### Columns for the final table
+
+`columns.ts` holds columns that a review of the foundation asked for next to "all three" and "whole". They are read off a `ParserOutput`, so every row can have them: `columnsOfOutputs(samples, parse)` returns the counts and, per sample, the scored code points with all three right.
+
+- **All three near the damage.** More than half of the scored code points stand in a later definition that the damage did not touch (53.7% on validation), and any recovery that finds the next `let` has them right. `untouchedLaterDefinitions(sample)` marks them: a definition at the top of the original that starts after the first error's position, whose code points all stand side by side in the broken text, with its `let` a token of its own. The column is "all three" over the other scored code points.
+- **Every token right.** The samples in which every scored code point of a token that is no white space and no comment has all three right. White space keeps the original's label, which no table can show after added text, so "whole" alone undercounts the samples that a reader would call right.
+- **Inside open strings and open comments.** The scored code points inside a token that is an open string or an open comment, counted apart: such a token stands over text that had several labels, and a table has one display kind for it.
+- `samplesAhead(left, right)`: for two rows on the same samples, in how many samples each has more right. On a set of 200 cases one point of all three is two or three cases.
+
+`check-columns.ts` checks the marks on programs by hand and the counts against `scoreOutputs`.
 
 ## The bars that need no author
 
@@ -183,9 +196,11 @@ Run from the repo root. `RECOVERY_LR_SCRATCH` is a folder outside the repo. Tabl
 
 ```sh
 export RECOVERY_LR_SCRATCH=<a folder outside the repo>
-bun lab/recovery-lr/learn/check-all.ts                                   # the type check, the lint and 5 checks, about half a minute
+bun lab/recovery-lr/learn/check-all.ts                                   # the type check, the lint and 18 checks, one after another, eight minutes or more
+bun lab/recovery-lr/learn/check-all.ts --only check-score                # one of them
 bun lab/recovery-lr/learn/bars.ts                                        # the bars without an author
 bun lab/recovery-lr/learn/score.ts [--tables <file.json>] [--split train]
+bun lab/recovery-lr/learn/columns.ts [--tables <file.json>] [--split train]   # the columns for the final table
 bun lab/recovery-lr/learn/search/search.ts --passes 4 --count            # search-count.json and .log
 bun lab/recovery-lr/learn/search/search.ts --flag --order 1 --passes 4 --count
 bun lab/recovery-lr/learn/search/search.ts --in-turns                    # until a pass changes nothing, with the count in turns
@@ -203,10 +218,14 @@ Every command takes `--train` or `--validation` or `--count` for the number of s
 - `recovery-parser.ts`: the exact parser on whole texts.
 - `data.ts`: `packSamples`, `loadPacked`, `eachSample`, and `prefixOf`, the reductions and the stack before the first open cell.
 - `score.ts`: the loop `runSample`, `scoreTables`, `scoreOutputs`, `Score`, `sharesOf`, `scoreRow`, `wrongBeforeFirstError`.
+- `columns.ts`: `columnsOfOutputs`, `untouchedLaterDefinitions`, `samplesAhead`, `columnsRow`.
 - `bars.ts`: `skipTables`, `popTables`, `panicMode`, `kindsOfDroppedTokensByCount`.
 - `search/`: `search.ts` with its worker, `count.ts`, `per-sample.ts` with its worker, `check.ts`.
 - `picked-terminals.ts`, `words.ts`, `report.ts`, `options.ts`.
-- `check-tables.ts`, `check-parser.ts`, `check-score.ts`, `check-commands.ts`, `check-all.ts`.
+- `check-tables.ts`, `check-parser.ts`, `check-score.ts`, `check-columns.ts`, `check-commands.ts`, and `check-all.ts`, which also runs the checks of the folders below.
+- `soft/`: the twin for training with 48 exact stacks, the trainer, and `../recipe.ts` next to this page, the frozen recipe as one function. Its README says what the twin is. The decision of the lead stands that row 9 is trained with this twin.
+- `soft-levels/`: the second twin, a mix of states per level of the stack, in two forms. A row that is trained with it is reported apart from row 9, with the note that its form was picked after its validation score was seen.
+- `bars/`: the hand-made bars and the bars that look ahead, each with a README: `yacc/`, `panic/`, `rules/`, `repair/`, `tree-sitter/`.
 
 ## Not settled
 
