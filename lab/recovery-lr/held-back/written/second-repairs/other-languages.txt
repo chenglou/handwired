@@ -1,0 +1,747 @@
+⟦repair other-languages-01⟧
+⟦aligned⟧
+let freezing = 32⟦added⟧;;⟦/⟧
+let to_celsius fahrenheit = (fahrenheit - freezing) * 5 / 9⟦added⟧;;⟦/⟧
+let to_fahrenheit celsius = celsius * 9 / 5 + freezing⟦added⟧;;⟦/⟧
+
+let () = print_int (to_celsius 212)⟦added⟧;;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-02⟧
+⟦aligned⟧
+(* Retry settings for the upload job. *)
+let max_retries = 5
+let base_delay = 200⟦added⟧ in⟦/⟧
+let delay attempt = base_delay * attempt
+
+let rec try_upload attempt =
+  if attempt > max_retries then false
+  else if upload (delay attempt) then true
+  else try_upload (attempt + 1)
+
+let report ok = if ok then "uploaded" else "gave up after " ^ string_of_int max_retries ^ " tries"
+let () = print_string (report (try_upload 1))⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-03⟧
+⟦aligned⟧
+let apply_twice ⟦added⟧(⟦/⟧f⟦added⟧ : int -> int)⟦/⟧ ⟦added⟧(⟦/⟧x⟦added⟧ : int)⟦/⟧ = f (f x)
+let lengths ⟦added⟧(⟦/⟧words⟦added⟧ : string list) : int list⟦/⟧ = map length words
+let bump = apply_twice (fun ⟦added⟧(⟦/⟧n⟦added⟧ : int)⟦/⟧ -> n + 1) 40
+let () = print_int bump⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-04⟧
+⟦aligned⟧
+let describe count =
+⟦added⟧  match count with
+  | 0 -> "none"
+  | 1 -> "one"
+  | _ -> "many"
+⟦/⟧
+⟦missing⟧() ⟦/⟧let plural word count = if count = 1 then word else word ^ "s"
+let summary count = describe count ^ " " ^ plural "item" count
+let () = print_string (summary 3)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-05⟧
+⟦aligned⟧
+(* Helpers for the sign-up sheet. *)
+let max_names = 12
+let trim_all names = map trim names
+
+let rec count = ⟦added⟧function⟦/⟧
+⟦added⟧  | [] -> 0
+  | _ :: rest -> 1 + count rest
+⟦/⟧
+⟦missing⟧() ⟦/⟧let is_long names = count (trim_all names) > max_names
+let warning names = if is_long names then "too many names" else ""⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-06⟧
+⟦aligned⟧
+(* State of the player in the maze game. *)
+let lives_at_start = 3
+let start = (0, 0)
+
+let player = ⟦added⟧{ name = "Ada"; lives = lives_at_start; position = start }⟦/⟧
+⟦missing⟧() ⟦/⟧let is_alive = player⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧lives > 0
+let banner = player⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧name ^ (if is_alive then " is playing" else " is out")
+let () = print_string banner⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-07⟧
+⟦aligned⟧
+(* Ticket numbers for the help desk. *)
+let counter = ref 0
+
+let next_id () =
+  counter ⟦added⟧:⟦/⟧= ⟦added⟧!⟦/⟧counter + 1⟦added⟧;⟦/⟧
+  ⟦added⟧!⟦/⟧counter
+
+let first = next_id ()
+let second = next_id ()
+let label = "ticket-" ^ string_of_int second
+let () = print_string label⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-08⟧
+⟦aligned⟧
+let verbose = true
+
+let warn message =
+  if verbose then ⟦added⟧begin⟦/⟧⟦missing⟧(⟦/⟧
+    print_string "warning: "⟦added⟧;⟦/⟧
+    print_string message
+  ⟦added⟧end⟦/⟧⟦missing⟧)⟦/⟧
+
+let () = warn "disk almost full"⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-09⟧
+⟦aligned⟧
+(* Delivery fees in euros. *)
+let base_fee = 4
+
+let fee express weight =
+  base_fee + ⟦added⟧begin⟦/⟧⟦missing⟧(⟦/⟧ if express then 15 else 0 ⟦added⟧end⟦/⟧⟦missing⟧)⟦/⟧ + weight * 2
+
+let quote = "Shipping: " ^ string_of_int (fee true 3)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-10⟧
+⟦aligned⟧
+(* Yearly interest on a savings account, in cents. *)
+let rate = 0⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧07
+let interest balance = balance *⟦added⟧.⟦/⟧ rate
+let after_year balance = balance + interest balance
+let () = print_int (after_year 100000)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-11⟧
+⟦aligned⟧
+let needs_quotes field = contains field ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧,⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧ || contains field ⟦added⟧'⟦/⟧⟦missing⟧"\⟦/⟧"⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧
+let quote field = if needs_quotes field then "\"" ^ field ^ "\"" else field
+let row = join "," (map quote ["name"; "say \"hi\""; "a,b"])⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-12⟧
+⟦aligned⟧
+(* Splits a bill among friends. *)
+let divide total parts = (total / parts, total - total / parts * parts)
+let ⟦added⟧(share, leftover)⟦/⟧⟦missing⟧_⟦/⟧ = divide 100 7
+let entries = [("each", share); ("left over", leftover)]
+let line = fun ⟦added⟧(name, amount)⟦/⟧⟦missing⟧_⟦/⟧ -> name ^ ": " ^ string_of_int amount
+let report = join ", " (map line entries)
+let () = print_string report⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-13⟧
+⟦aligned⟧
+let defaults = ["--color"; "--jobs"; "4"]
+let extras = if quiet then ["--quiet"] else []
+let arguments = "build" :: defaults ⟦added⟧@⟦/⟧ extras
+
+let command =
+  arguments
+  ⟦added⟧|⟦/⟧> map escape
+  ⟦added⟧|⟦/⟧> join " "
+
+let () = run command⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-14⟧
+⟦aligned⟧
+let columns = 80
+(* Disabled until the wide layout is ready.
+let columns = 120  (* for wide screens ⟦added⟧*)⟦/⟧
+let gutter = 4
+*)
+let usable = columns - 2
+let half = usable / 2
+let () = print_int half⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-15⟧
+⟦aligned⟧
+let names = ["Ada"; "Grace"; "Alan"]
+let greeting = "Hello " ^ String⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧concat ⟦added⟧~sep:⟦/⟧", " names
+let count = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧length names
+let () = print_string (greeting ^ " (" ^ string_of_int count ^ ")")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-16⟧
+⟦aligned⟧
+(* Order totals, in cents. *)
+let prices = [250; 1200; 80]
+let tax_rate = 8
+
+let with_tax amount = amount + amount * tax_rate / 100
+let subtotal = fold_left (⟦added⟧+⟦/⟧) 0 prices
+let total = with_tax subtotal
+let () = print_int total⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-17⟧
+⟦aligned⟧
+(* Where the server listens. *)
+let default_port = 8080
+let host = "localhost"
+
+let parse_port text =
+⟦added⟧  try int_of_string text with Failure _ -> default_port
+⟦/⟧
+⟦missing⟧() ⟦/⟧let port = parse_port (getenv "PORT")
+let address = host ^ ":" ^ string_of_int port
+let () = print_string ("listening on " ^ address)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-18⟧
+⟦aligned⟧
+⟦added⟧type direction = North | East | South | West
+
+⟦/⟧let turn_right direction =
+  if direction = North then East
+  else if direction = East then South
+  else if direction = South then West
+  else North
+
+let facing = turn_right (turn_right North)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-19⟧
+⟦aligned⟧
+let unit = "kg"
+let show weight = string_of_int weight ^ " " ^ unit
+
+let weights = [⟦added⟧|⟦/⟧ 3; 5; 8 ⟦added⟧|⟦/⟧]
+let heaviest = weights⟦added⟧.⟦/⟧(2)
+let lightest = weights⟦added⟧.⟦/⟧(0)
+let spread = heaviest - lightest
+let () = print_string (show spread)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-20⟧
+⟦aligned⟧
+(* Today's lunch menu, printed one dish per line. *)
+let price = 9
+
+let rec print_dishes dishes =
+  if dishes = [] then ()
+  else
+    let () = print_line (head dishes) in
+    print_dishes (tail dishes)
+
+let menu = [
+  "soup";
+  "salad";
+  "bread"⟦added⟧;⟦/⟧
+]
+let total = price * length menu
+let header = "Lunch: " ^ string_of_int total
+let () = print_dishes (header :: menu)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-21⟧
+⟦aligned⟧
+let move point dx dy = (fst point + dx, snd point + dy)
+let scale point factor = (fst point * factor, snd point * factor)
+let origin = ⟦missing⟧(⟦/⟧0, 0
+⟦missing⟧) ⟦/⟧let corner = scale (move origin 3 4) 2
+let () = print_int (fst corner)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-22⟧
+⟦aligned⟧
+let first_letter word = word⟦added⟧.⟦/⟧[0]
+let is_capital word = first_letter word >= ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧A⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧ && first_letter word <= ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧Z⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧
+let title name = if is_capital name then name else capitalize name⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-23⟧
+⟦aligned⟧
+⟦added⟧open Printf
+
+⟦/⟧let percent part whole = part * 100 / whole⟦added⟧;;⟦/⟧
+let () = printf "%d%%\n" (percent 3 8)⟦added⟧;;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-24⟧
+⟦aligned⟧
+let cities = ["Lima"; "Oslo"; "Cairo"]
+let width = 12
+let pad name = name ^ repeat " " (width - length name)
+
+let print_all names =
+⟦added⟧  for name in names do
+    print_string (pad name)
+⟦/⟧
+⟦missing⟧() ⟦/⟧let header = pad "City" ^ "|"
+let () = print_all (header :: cities)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-25⟧
+⟦aligned⟧
+(* Text shown under a rectangle on the worksheet. *)
+let describe_box width height =
+    let area = width * height
+    ⟦missing⟧in ⟦/⟧let border = 2 * (width + height)
+    ⟦missing⟧in ⟦/⟧let ratio = area / border
+    ⟦missing⟧in ⟦/⟧"area " ^ string_of_int area ^ ", ratio " ^ string_of_int ratio
+
+let is_square width height = width = height
+let kind width height = if is_square width height then "square" else "rectangle"
+let () = print_string (kind 6 4 ^ ": " ^ describe_box 6 4)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-26⟧
+⟦aligned⟧
+let grade score =
+    if score >= 90 then "A"
+    el⟦missing⟧se ⟦/⟧if score >= 80 then "B"
+    el⟦missing⟧se ⟦/⟧if score >= 70 then "C"
+    else "F"
+
+let report name score = name ^ ": " ^ grade score
+let () = print_string (report "Ada" 84)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-27⟧
+⟦aligned⟧
+let scores = [64; 78; 93]
+let count = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧length scores
+let best = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧max scores
+let line = ⟦added⟧$⟦/⟧"best of {count}: {best}"
+let () = printfn "%s" line⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-28⟧
+⟦aligned⟧
+let days = [1⟦added⟧..⟦/⟧⟦missing⟧ ⟦/⟧31]
+let is_weekend day = day ⟦added⟧%⟦/⟧ 7 = 6 || day ⟦added⟧%⟦/⟧ 7 = 0
+let weekends = filter is_weekend days
+let () = print_int (length weekends)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-29⟧
+⟦aligned⟧
+let clean = trim >⟦added⟧>⟦/⟧ lowercase
+let shout text = uppercase text ^ "!"
+let () = print_string <⟦added⟧|⟦/⟧ shout (clean "  Hello ")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-30⟧
+⟦aligned⟧
+⟦added⟧[<EntryPoint>]
+⟦/⟧let main arguments =
+    let count = arguments⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧Length
+    ⟦missing⟧in ⟦/⟧print_string (if count = 0 then "no arguments" else string_of_int count)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-31⟧
+⟦aligned⟧
+⟦added⟧module Main where
+
+⟦/⟧⟦missing⟧let ⟦/⟧double x = x * 2
+⟦missing⟧let ⟦/⟧quadruple x = double (double x)
+⟦missing⟧let ⟦/⟧main = print (quadruple 5)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-32⟧
+⟦aligned⟧
+let daysInYear = 365
+⟦added⟧isLeap :: Int -> Bool
+⟦/⟧let isLeap year = mod year 4 ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ 0 && (mod year 100 > 0 || mod year 400 ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ 0)
+let daysIn year = if isLeap year then daysInYear + 1 else daysInYear⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-33⟧
+⟦aligned⟧
+⟦added⟧total : List Int -> Int
+⟦/⟧let total prices = fold (⟦added⟧\⟦/⟧⟦missing⟧fun ⟦/⟧sum price -> sum + price) 0 prices
+
+⟦added⟧average : List Int -> Int
+⟦/⟧let average prices = total prices / length prices
+
+⟦added⟧spread : List Int -> Int
+⟦/⟧let spread prices = maximum prices - minimum prices⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-34⟧
+⟦aligned⟧
+let size = 8
+let squares = size * size
+
+⟦added⟧{- A square is dark if its file and rank
+   add up to an even number. -}
+⟦/⟧let file index = index - index / size * size
+let rank index = index / size
+let is_dark index = (file index + rank index) / 2 * 2 = file index + rank index⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-35⟧
+⟦aligned⟧
+(* Prices in cents. *)
+let tax_rate = 8
+
+let discount price =
+  let threshold = 1000 in
+  if price > threshold then price / 10 else 0
+
+let net price = price - discount price   ⟦added⟧-- discount first then tax⟦/⟧
+let gross price =
+  let base = net price in
+  base + base * tax_rate / 100
+
+let () = print_int (gross 1200)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-36⟧
+⟦aligned⟧
+let allowed = ["png"⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ "jpg"⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ "gif"]
+let is_image extension = member extension allowed
+let check name = if extension name ⟦added⟧/=⟦/⟧⟦missing⟧<>⟦/⟧ "" && is_image (extension name) then "ok" else "skipped"⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-37⟧
+⟦aligned⟧
+let backup name = name ⟦added⟧++⟦/⟧⟦missing⟧^⟦/⟧ ".bak"
+let shout = upper ⟦added⟧.⟦/⟧ backup
+let main = print ⟦added⟧$⟦/⟧ shout "notes.txt"⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-38⟧
+⟦aligned⟧
+(* Tic-tac-toe: 0 is an empty cell, 1 and 2 are the players. *)
+let size = 3
+let line = repeat "-" (2 * size - 1)
+
+let symbol player = ⟦added⟧case player of⟦/⟧
+⟦added⟧  1 -> "X"
+  2 -> "O"
+  _ -> " "
+⟦/⟧
+⟦missing⟧() ⟦/⟧let row a b c = symbol a ^ "|" ^ symbol b ^ "|" ^ symbol c
+let board = [row 1 0 2; line; row 0 1 0; line; row 2 0 1]⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-39⟧
+unsure: the three guards could be added as a whole with `()` in their place, as an expression that miniml lacks, or the last guard `| otherwise =` could stand for a plain `else`
+⟦aligned⟧
+let step = 5
+
+let sign n
+  ⟦missing⟧= ⟦/⟧⟦added⟧|⟦/⟧⟦missing⟧if⟦/⟧ n < 0 ⟦added⟧=⟦/⟧⟦missing⟧then⟦/⟧ -1
+  ⟦added⟧|⟦/⟧⟦missing⟧else if⟦/⟧ n ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ 0 ⟦added⟧=⟦/⟧⟦missing⟧then⟦/⟧ 0
+  ⟦added⟧|⟦/⟧⟦missing⟧else if⟦/⟧ otherwise ⟦added⟧=⟦/⟧⟦missing⟧then⟦/⟧ 1
+
+let towards target position = position + step * sign (target - position)
+let next = towards 40 12⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-40⟧
+⟦aligned⟧
+let primes =
+    [ 2
+    ⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ 3
+    ⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ 5
+    ⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ 7
+    ]
+
+let largest = last primes
+let count = length primes⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-41⟧
+unsure: the `where` clause could be added as a whole, since miniml has no definition after the expression that uses it
+⟦aligned⟧
+⟦missing⟧let ⟦/⟧hypotenuse a b = sqrt (square a + square b)
+  ⟦added⟧where⟦/⟧⟦missing⟧let⟦/⟧ square x = x * x
+
+⟦missing⟧let ⟦/⟧main = print (hypotenuse 3 4)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-42⟧
+⟦aligned⟧
+let rec digits n = if n < 10 then [n] else (n ⟦added⟧`⟦/⟧mod⟦added⟧`⟦/⟧ 10) ⟦added⟧:⟦/⟧⟦missing⟧::⟦/⟧ digits (n ⟦added⟧`⟦/⟧div⟦added⟧`⟦/⟧ 10)
+let digit_sum n = sum (digits n)
+let lucky = digit_sum 777 = 21⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-43⟧
+note: the section `(*2)` is read by rule 3 as an operation whose left side is missing, so the `*` and the `2` stay. Other readings add the section as a whole with `()` in its place, or take it for `(fun n -> n * 2)`, which puts the `*2` inside a function.
+⟦aligned⟧
+(* Width of the photo strip, in pixels. *)
+let gutter = 10
+let widths = [120; 80; 45]
+let retina = sum (map (⟦missing⟧()⟦/⟧*2) widths) (* twice as dense *) + gutter
+let fits = retina < screen_width
+let () = print_string (if fits then "one row" else "two rows")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-44⟧
+note: the operator in brackets is read by rule 3 as an operation whose two sides are missing, so the `*` stays as an operator. Another reading adds the `*`, which leaves `()` with one changed code point.
+⟦aligned⟧
+let factors = [2; 3; 7]
+let product = fold_left (⟦missing⟧()⟦/⟧*⟦missing⟧()⟦/⟧) 1 factors
+let cells = [ product (* per row *); 10; 4 ]
+let grid_size = fold_left max 0 cells⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-45⟧
+⟦aligned⟧
+let names = ["north"; "east"; "south"; "west"]
+let opposite index = names ⟦added⟧!!⟦/⟧ rem (index + 2) 4
+let label index = names ⟦added⟧!!⟦/⟧ index ⟦added⟧++⟦/⟧⟦missing⟧^⟦/⟧ " / " ⟦added⟧++⟦/⟧⟦missing⟧^⟦/⟧ opposite index⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-46⟧
+⟦aligned⟧
+(* Distances for the running log. *)
+let lap = 400
+let laps = 12
+
+⟦added⟧def⟦/⟧⟦missing⟧let⟦/⟧ to_miles⟦added⟧(⟦/⟧⟦missing⟧ ⟦/⟧meters⟦added⟧):⟦/⟧⟦missing⟧ =⟦/⟧
+    ⟦added⟧return⟦/⟧ meters * 621 / 1000000
+
+let distance = lap * laps
+let () = print_int(to_miles(distance))⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-47⟧
+⟦aligned⟧
+(* The lights of a crossing, one step at a time. *)
+let start = "red"
+let steps = 4
+
+let next_light color =
+    if color = "green"⟦added⟧:⟦/⟧⟦missing⟧ then⟦/⟧
+        "yellow"
+    ⟦added⟧elif⟦/⟧⟦missing⟧else if⟦/⟧ color = "yellow"⟦added⟧:⟦/⟧⟦missing⟧ then⟦/⟧
+        "red"
+    else⟦added⟧:⟦/⟧
+        "green"
+
+let rec after count color = if count = 0 then color else after (count - 1) (next_light color)
+let () = print_string (after steps start)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-48⟧
+⟦aligned⟧
+⟦added⟧#!/usr/bin/env miniml
+# Greetings shown on the start page.
+⟦/⟧let greeting = "Welcome back"
+let farewell = ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧See you soon⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧   ⟦added⟧# shown on logout⟦/⟧
+let banner name = greeting ^ ", " ^ name
+let () = print_string (banner "Ada" ^ " / " ^ farewell)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-49⟧
+⟦aligned⟧
+let numbers = range(1, 6)
+let total = sum(numbers)
+let square = ⟦added⟧lambda⟦/⟧⟦missing⟧fun⟦/⟧ n⟦added⟧:⟦/⟧⟦missing⟧ ->⟦/⟧ n *⟦added⟧*⟦/⟧ 2
+let squares = map(square, numbers)
+let () = print_int(sum(squares) - total)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-50⟧
+⟦aligned⟧
+let pages items per_page = (items + per_page - 1) ⟦added⟧//⟦/⟧⟦missing⟧/⟦/⟧ per_page
+let has_next page items per_page = page ⟦added⟧!=⟦/⟧⟦missing⟧<>⟦/⟧ pages items per_page
+let last = pages 95 10⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-51⟧
+⟦aligned⟧
+let slugify title =
+⟦added⟧    """Lower-case the title and
+    put dashes between its words."""
+⟦/⟧    join "-" (words (lowercase title))
+
+let url title = "/posts/" ^ slugify title
+let link title = "<a href=\"" ^ url title ^ "\">" ^ title ^ "</a>"⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-52⟧
+unsure: `not in` could be added as one operator of two words, where this repair keeps `not` as a name and adds the `in` alone
+⟦aligned⟧
+(* Greets a visitor by whether the name was seen before. *)
+let seen = ["ada"; "grace"]
+let normalize name = lowercase (trim name)
+let greet prefix name = prefix ^ ", " ^ name ^ "!"
+
+let is_new name = normalize name not ⟦added⟧in⟦/⟧ seen
+let welcome name = if is_new name then greet "Welcome" name else greet "Welcome back" name⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-53⟧
+⟦aligned⟧
+let rates = [
+    ("standard", 20)⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧
+    ("reduced", 5)⟦added⟧,⟦/⟧
+]
+let rate_of name = lookup name rates
+let vat amount = amount * rate_of "standard" / 100⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-54⟧
+⟦aligned⟧
+let rec total prices = if prices ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ [] then 0 else prices[0] + total(prices[1⟦added⟧:⟦/⟧])
+let average prices = total(prices) / len(prices)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-55⟧
+⟦aligned⟧
+(* Floor plan helpers. *)
+let unit = "m2"
+let rooms = [(4, 5); (3, 3)]
+
+⟦added⟧function⟦/⟧⟦missing⟧let⟦/⟧ area⟦added⟧(⟦/⟧⟦missing⟧ ⟦/⟧width⟦added⟧,⟦/⟧ height⟦added⟧)⟦/⟧ ⟦added⟧{⟦/⟧⟦missing⟧=⟦/⟧
+  ⟦added⟧return⟦/⟧ width * height
+⟦added⟧}
+⟦/⟧
+let first = area(4, 5)
+let label = "Area: " ^ string_of_int first ^ " " ^ unit⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-56⟧
+⟦aligned⟧
+let limit = 3⟦added⟧;⟦/⟧
+⟦added⟧const⟦/⟧⟦missing⟧let⟦/⟧ double = ⟦missing⟧fun ⟦/⟧x ⟦added⟧=>⟦/⟧⟦missing⟧->⟦/⟧ x * 2⟦added⟧;⟦/⟧
+let result = double(limit) + 1⟦added⟧;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-57⟧
+⟦aligned⟧
+let items = ["pen"; "ink"]
+let count = length items
+let noun = ⟦missing⟧if ⟦/⟧count ⟦added⟧===⟦/⟧⟦missing⟧=⟦/⟧ 1 ⟦added⟧?⟦/⟧⟦missing⟧then⟦/⟧ "item" ⟦added⟧:⟦/⟧⟦missing⟧else⟦/⟧ "items"
+let message = string_of_int count ^ " " ^ noun ^ " in your basket"
+let () = print_string message⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-58⟧
+⟦aligned⟧
+⟦added⟧/* Layout constants for the sidebar. */
+⟦/⟧let width = 240⟦added⟧;⟦/⟧
+let padding = 16⟦added⟧;⟦/⟧ ⟦added⟧// on both sides⟦/⟧
+let inner = width - 2 * padding⟦added⟧;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-59⟧
+unsure: the text between the backticks could be meant as `"/users/" ^ user ^ "/posts"`, with `user` as a name, where this repair keeps it as one string
+⟦aligned⟧
+let user = "ada"
+let page = 2
+let path = ⟦added⟧`⟦/⟧⟦missing⟧"⟦/⟧/users/${user}/posts⟦added⟧`⟦/⟧⟦missing⟧"⟦/⟧
+let is_first = ⟦added⟧!⟦/⟧(page > 1)
+let link = if is_first then path else path ^ "?page=" ^ string_of_int page⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-60⟧
+⟦aligned⟧
+let abs_diff a b = if (a > b) ⟦missing⟧then ⟦/⟧a - b else b - a
+let closer target a b = if (abs_diff target a <= abs_diff target b) ⟦missing⟧then ⟦/⟧a else b
+let pick = closer 10 7 14⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-61⟧
+⟦aligned⟧
+let server = make_server(
+    "localhost",
+    8080,
+    true⟦added⟧,⟦/⟧
+)
+let url = "http://" ^ host(server) ^ ":" ^ string_of_int(port(server))
+let () = print_string(url)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-62⟧
+⟦aligned⟧
+let words = ["tea"; "coffee"; "water"; "lemonade"]
+let long_words = words⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧filter(⟦missing⟧fun ⟦/⟧w ⟦added⟧=>⟦/⟧⟦missing⟧->⟦/⟧ length w > 5)⟦added⟧.⟦/⟧map(⟦missing⟧fun ⟦/⟧w ⟦added⟧=>⟦/⟧⟦missing⟧->⟦/⟧ uppercase w)
+let headline = join ", " long_words
+let () = print_string headline⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-63⟧
+unsure: the two braces could stand for `(` and `)` around the body, as `begin` and `end` do, which puts the body one bracket deeper
+⟦aligned⟧
+(* Length of a playlist. *)
+let tracks = [215; 187; 242]
+
+let minutes seconds = ⟦added⟧{⟦/⟧
+    let per_minute = 60⟦added⟧;⟦/⟧⟦missing⟧ in⟦/⟧
+    seconds / per_minute
+⟦added⟧}
+⟦/⟧
+let total = minutes (sum tracks)
+let () = print_string (string_of_int total ^ " min")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-64⟧
+⟦aligned⟧
+(* Who may enter the late show. *)
+let adult_age = 18
+
+⟦added⟧fn⟦/⟧⟦missing⟧let⟦/⟧ is_adult⟦added⟧(⟦/⟧⟦missing⟧ ⟦/⟧age⟦added⟧: u32) -> bool⟦/⟧ ⟦added⟧{⟦/⟧⟦missing⟧=⟦/⟧
+    age >= adult_age
+⟦added⟧}
+⟦/⟧
+let visitors = [12; 34; 17; 60]
+let adults = filter is_adult visitors
+let report = string_of_int (length adults) ^ " of " ^ string_of_int (length visitors) ^ " are adults"
+let () = print_string report⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-65⟧
+⟦aligned⟧
+let ⟦added⟧mut ⟦/⟧lives = 3⟦added⟧;⟦/⟧
+let max_lives⟦added⟧: u8⟦/⟧ = 5⟦added⟧;⟦/⟧
+let can_heal = lives < max_lives⟦added⟧;⟦/⟧
+let () = print_int lives⟦added⟧;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-66⟧
+unsure: the braces around the two branches could stand for `(` and `)`, which puts each branch one bracket deeper
+⟦aligned⟧
+let max_lives = 3
+let hearts lives = repeat "<3 " lives ^ repeat "-- " (max_lives - lives)
+let status lives = if lives > 0 ⟦added⟧{⟦/⟧⟦missing⟧then⟦/⟧ "playing" ⟦added⟧}⟦/⟧ else ⟦added⟧{⟦/⟧ "game over" ⟦added⟧}⟦/⟧
+let bonus = ⟦added⟧|⟦/⟧⟦missing⟧fun ⟦/⟧score⟦added⟧|⟦/⟧⟦missing⟧ ->⟦/⟧ score / 10
+let final_score base = base + bonus base⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-67⟧
+⟦aligned⟧
+let prices = [250; 1200; 80]
+let total = sum(⟦added⟧&⟦/⟧prices)
+let line = format⟦added⟧!⟦/⟧("total: {}", total)
+let () = println⟦added⟧!⟦/⟧("{}", line)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-68⟧
+⟦aligned⟧
+⟦added⟧val⟦/⟧⟦missing⟧let⟦/⟧ ceiling = 255
+⟦added⟧fun⟦/⟧⟦missing⟧let⟦/⟧ double x = x * 2
+⟦added⟧fun⟦/⟧⟦missing⟧let⟦/⟧ clamp x = if x > ceiling then ceiling else x
+⟦added⟧val⟦/⟧⟦missing⟧let⟦/⟧ result = clamp (double 200)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-69⟧
+⟦aligned⟧
+let compose f g x = f (g x)
+let increment n = n + 1
+let twice = ⟦added⟧fn⟦/⟧⟦missing⟧fun⟦/⟧ f ⟦added⟧=>⟦/⟧⟦missing⟧->⟦/⟧ ⟦added⟧fn⟦/⟧⟦missing⟧fun⟦/⟧ x ⟦added⟧=>⟦/⟧⟦missing⟧->⟦/⟧ f (f x)
+let add_two = twice increment
+let seven = compose add_two increment 4⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-70⟧
+⟦aligned⟧
+let total = 100
+⟦missing⟧let ⟦/⟧used ⟦added⟧:=⟦/⟧⟦missing⟧=⟦/⟧ 64
+⟦missing⟧let ⟦/⟧free ⟦added⟧:=⟦/⟧⟦missing⟧=⟦/⟧ total - used
+let warning = if free < 10 then "almost full" else ""⟦lf⟧
+⟦end⟧

@@ -1,0 +1,721 @@
+⟦repair model-and-paste-01⟧
+⟦aligned⟧
+⟦added⟧Here is the corrected version:
+
+```ocaml
+⟦/⟧let freezing = 32
+let to_celsius fahrenheit = (fahrenheit - freezing) * 5 / 9
+let to_fahrenheit celsius = celsius * 9 / 5 + freezing
+let () = print_int (to_celsius 212)⟦added⟧
+```
+
+Let me know if you want it to round instead of truncating.⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-02⟧
+⟦aligned⟧
+let rec count_item target items =
+  if items = [] then 0
+  else (if head items = target then 1 else 0) + count_item target (tail items)
+⟦added⟧```
+
+Then use it to pick the most common vote:
+
+```ocaml
+⟦/⟧let rec most_common candidates votes best =
+  if candidates = [] then best
+  else
+    let candidate = head candidates in
+    let winner = if count_item candidate votes > count_item best votes then candidate else best in
+    most_common (tail candidates) votes winner⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-03⟧
+⟦aligned⟧
+let rec join separator parts =
+  if parts = [] then ""
+  else if tail parts = [] then head parts
+  else head parts ^ separator ^ join separator (tail parts)
+
+let csv_line fields = join "," (map quote
+⟦added⟧```
+
+Continuing from where I left off:
+
+```ocaml
+⟦/⟧fields) ^ "\n"
+let header = csv_line ["name"; "score"; "rank"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-04⟧
+⟦aligned⟧
+let tax_percent = 8
+let with_tax amount = amount + amount * tax_percent / 100
+⟦added⟧Next, the receipt line for one item:
+⟦/⟧let receipt_line name amount = name ^ ": " ^ string_of_int (with_tax amount) ^ "\n"
+⟦added⟧Finally, print both lines:
+⟦/⟧let () = print_string (receipt_line "tea" 350 ^ receipt_line "scone" 280)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-05⟧
+⟦aligned⟧
+let rec length items = if items = [] then 0 else 1 + length (tail items)
+⟦added⟧The base case comes first. If the list is empty we stop, and in every other case we take one step and recurse.
+⟦/⟧let rec nth items index = if index = 0 then head items else nth (tail items) (index - 1)
+let third = nth ["a"; "b"; "c"; "d"] 2
+⟦end⟧
+
+⟦repair model-and-paste-06⟧
+⟦aligned⟧
+⟦added⟧ocaml
+Copy code
+⟦/⟧let lives = 3
+let rec play remaining = if remaining = 0 then "game over" else play (remaining - 1)
+let () = print_string (play lives)
+⟦end⟧
+
+⟦repair model-and-paste-07⟧
+⟦aligned⟧
+let base_delay = 200
+let max_delay = 5000
+let rec delay_for attempt = if attempt = 0 then base_delay else 2 * delay_for (attempt - 1)
+let capped attempt = if delay_for attempt > max_delay then max_delay else delay_for attempt
+let max_retries = ⟦added⟧**⟦/⟧5⟦added⟧**⟦/⟧
+let should_retry attempt = attempt < max_retries
+let () = if should_retry 2 then sleep (capped 2) else ()⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-08⟧
+⟦aligned⟧
+let room_length_m = 17
+let wall_count = 2
+let speed_of_sound = 343 ⟦added⟧【4†source】⟦/⟧
+let echo_delay_ms distance_m = distance_m * wall_count * 1000 / speed_of_sound
+let () = print_int (echo_delay_ms room_length_m)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-09⟧
+⟦aligned⟧
+⟦added⟧> ⟦/⟧let rows = 6
+⟦added⟧> ⟦/⟧let columns = 7
+⟦added⟧> ⟦/⟧let cells = rows * columns
+⟦end⟧
+
+⟦repair model-and-paste-10⟧
+⟦aligned⟧
+let items_per_row = 4
+let page_rows = 5
+let page_size = items_per_row * page_rows  ⟦added⟧// was hard-coded to 20⟦/⟧
+let page_count total = (total + page_size - 1) / page_size
+let last_page total = page_count total - 1⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-11⟧
+⟦aligned⟧
+let rec take count items =
+  if count = 0 || items = [] then [] else head items :: take (count - 1) (tail items)
+
+let rec drop count items = ⟦added⟧...⟦/⟧
+
+⟦missing⟧() ⟦/⟧let page number size items = take size (drop (number * size) items)
+let first_page = page 0 10⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-12⟧
+⟦aligned⟧
+let admins = [("ada", "Ada Lovelace"); ("alan", "Alan Turing")]
+let rec find_user name users =
+  if users = [] then "nobody"
+  else if fst (head users) = name then snd (head users)
+  else ⟦added⟧…⟦/⟧
+
+⟦missing⟧() ⟦/⟧let () = print_string (find_user "ada" admins)
+⟦end⟧
+
+⟦repair model-and-paste-13⟧
+⟦aligned⟧
+let is_weekend day = day = "sat" || day = "sun"
+let rec working days =
+  if days = [] then []
+  else if is_weekend (head days) then working (tail days)
+  else head days :: working (tail days)
+let week = ["mon"; "tue"; ⟦added⟧...⟦/⟧⟦missing⟧()⟦/⟧; "sun"]
+let free_days = length week - length (working week)
+let () = print_int free_days
+⟦end⟧
+
+⟦repair model-and-paste-14⟧
+⟦aligned⟧
+let board_size = 8
+let empty_board = make_board board_size
+⟦added⟧...
+⟦/⟧let rec place_queens row board =
+  if row = board_size then [board]
+  else concat (map (fun column -> place_queens (row + 1) (put row column board)) (safe_columns row board))
+let solutions = place_queens 0 empty_board
+let () = print_string ("solutions: " ^ string_of_int (length solutions) ^ "\n")⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-15⟧
+⟦aligned⟧
+let rec insert item sorted = (* unchanged *)
+
+⟦missing⟧() ⟦/⟧let rec sort items =
+  if items = [] then [] else insert (head items) (sort (tail items))
+
+let smallest items = head (sort items)
+let largest items = head (reverse (sort items))
+let () = print_int (largest [31; 4; 15] - smallest [31; 4; 15])⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-16⟧
+⟦aligned⟧
+let shipping weight =
+  if weight <= 1 then 4
+  else if weight <= 5 then 9
+  else (* heavier parcels: same table as before *)
+
+⟦missing⟧() ⟦/⟧let total price weight = price + shipping weight
+let free_shipping price = price >= 50
+let () = print_int (total 20 3)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-17⟧
+⟦aligned⟧
+let rec find_route name table =
+  if table = [] then show_missing
+  else if fst (head table) = name then snd (head table)
+  else find_route name (tail table)
+let routes = [
+  ("home", show_home);
+⟦added⟧  // ... other routes unchanged ...
+⟦/⟧  ("help", show_help)
+]
+let start = find_route "home" routes⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-18⟧
+⟦aligned⟧
+let name = "tally"
+let version = "1.4.2"
+let flags = ["--total"; "--sort"]
+let usage = "usage: tally [--total] [--sort] FILE  reads one score per l⟦missing⟧"⟦/⟧
+let show_version () = print_string (name ^ " " ^ version ^ "\n")
+let main arguments = if arguments = [] then usage else show_version ()⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-19⟧
+⟦aligned⟧
+let rec fit weights capacity =
+  if weights = [] then true
+  else if head weights > capacity then false else fit (tail weights) (capacity -
+⟦missing⟧()) ⟦/⟧let small_bag = 10
+let large_bag = 4 * small_bag
+let both = fit [3; 4; 2] small_bag && fit [30; 9] large_bag⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-20⟧
+⟦aligned⟧
+(* Counts the words of a line: one more than its spaces. *)
+let rec count_words text position =
+  if position >= length text then 0
+⟦added⟧  else if char_at text position = " " then 1 + count_words text (pos
+⟦/⟧  else if char_at text position = " " then 1 + count_words text (position + 1)
+  else count_words text (position + 1)
+
+let words_in text = 1 + count_words text 0
+let () = print_int (words_in "the quick brown fox")⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-21⟧
+⟦aligned⟧
+(* Sorts a list of numbers. *)
+let rec quicksort items =
+  if items = [] then []
+  else
+    let pivot = head items in
+    let smaller = filter (fun item -> item < pivot) (tail items) in
+    let larger = filter (fun item -> item >= pivot) (tail
+⟦missing⟧) in () ⟦/⟧let rec take count items =
+  if count = 0 then [] else head items :: take (count - 1) (tail items)
+let top_three = take 3 [9; 4; 7; 1]
+let () = print_list top_three⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-22⟧
+⟦aligned⟧
+let page_width = 40
+let rule = make_string page_width "-"
+let footer = rule⟦missing⟧
+⟦/⟧let rec shorten text width = if length text > width then shorten (drop_last text) width else text
+let center text width =
+  let padding = (width - length text) / 2 in
+  make_string padding " " ^ shorten text width
+let title = center "Totals" page_width⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-23⟧
+⟦aligned⟧
+⟦added⟧::::::::::::::
+shapes.ml
+::::::::::::::
+⟦/⟧let square side = side * side
+let rectangle width height = width * height
+⟦added⟧::::::::::::::
+main.ml
+::::::::::::::
+⟦/⟧let () = print_int (square 4 + rectangle 2 5)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-24⟧
+⟦aligned⟧
+let rec power base exponent = if exponent = 0 then 1 else base * power base (exponent - 1)
+let kilobyte = power 2 10⟦added⟧<|endoftext|>⟦/⟧let rec digits number = if number < 10 then 1 else 1 + digits (number / 10)
+let () = print_int (digits kilobyte)
+⟦end⟧
+
+⟦repair model-and-paste-25⟧
+⟦aligned⟧
+let seconds_per_minute = 60
+let minutes_per_hour = 60
+let seconds_per_hour = ⟦added⟧let seconds_per_hour = ⟦/⟧seconds_per_minute * minutes_per_hour
+let hours seconds = seconds / seconds_per_hour
+let minutes seconds = remainder seconds seconds_per_hour / seconds_per_minute
+let clock seconds = string_of_int (hours seconds) ^ ":" ^ string_of_int (minutes seconds)
+let () = print_string (clock 7265)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-26⟧
+⟦aligned⟧
+⟦added⟧1⟦/⟧let rec sum_to n = if n = 0 then 0 else n + sum_to (n - 1)
+⟦added⟧2⟦/⟧let triangle rows = sum_to rows
+⟦added⟧3⟦/⟧let () = print_int (triangle 4)
+⟦end⟧
+
+⟦repair model-and-paste-27⟧
+⟦aligned⟧
+let is_even number = remainder number 2 = 0
+let rec collatz steps number =
+⟦added⟧3-⟦/⟧  if number = 1 then steps
+⟦added⟧4:⟦/⟧  else if is_even number then collatz (steps + 1) (number / 2)
+⟦added⟧5-⟦/⟧  else collatz (steps + 1) (3 * number + 1)
+let longest = collatz 0 27⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-28⟧
+⟦aligned⟧
+let tick = 250
+let frames_per_second = 1000 / tick
+let rec wait frames = if frames = 0 then () else wait (frames - 1)
+⟦added⟧clock.ml:14:⟦/⟧let frames elapsed = elapsed / tick
+⟦added⟧clock.ml:22:⟦/⟧let is_keyframe frame = remainder frame 12 = 0
+let () = wait (frames 3000)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-29⟧
+⟦aligned⟧
+⟦added⟧# ⟦/⟧let rate = 15
+  let tip bill = bill * rate / 100⟦added⟧;;⟦/⟧
+⟦added⟧val rate : int = 15
+val tip : int -> int = <fun>
+# ⟦/⟧let () = print_int (tip 80)⟦added⟧;;
+12⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-30⟧
+⟦aligned⟧
+⟦added⟧$ head -2 stock.ml
+⟦/⟧let crates = 12
+let per_crate = 24
+⟦added⟧$ tail -2 stock.ml
+⟦/⟧let bottles = crates * per_crate
+let () = print_int bottles⟦added⟧
+$ miniml stock.ml
+288⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-31⟧
+⟦aligned⟧
+let welcome name = "Welcome back, " ^ name ^ "."
+let () = print_string (welcome "Ada")
+⟦added⟧Welcome back, Ada.
+⟦/⟧let shout text = uppercase text ^ "!!"
+let () = print_string (shout (welcome "Grace"))
+⟦added⟧WELCOME BACK, GRACE.!!
+⟦/⟧let whisper text = lowercase text ^ "..."⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-32⟧
+⟦aligned⟧
+let rec range low high = if low > high then [] else low :: range (low + 1) high
+let pace distance minutes = minutes / distance
+⟦added⟧Warning: line 2: `distance` can be 0 here
+⟦/⟧let split_times distance minutes = map (fun lap -> lap * pace distance minutes) (range 1 distance)
+let () = print_list (split_times 5 30)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-33⟧
+⟦aligned⟧
+⟦added⟧In [1]:
+⟦/⟧let principal = 1000
+let yearly_percent = 5
+⟦added⟧In [2]:
+⟦/⟧let interest years = principal * yearly_percent * years / 100
+let () = print_int (interest 3)⟦added⟧
+150⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-34⟧
+⟦aligned⟧
+let rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)
+⟦added⟧Dana Kim  10:43 AM
+⟦/⟧let memo = map fib (range 0 20)
+⟦added⟧Dana Kim  10:45 AM
+⟦/⟧let () = print_int (nth memo 20)
+⟦end⟧
+
+⟦repair model-and-paste-35⟧
+⟦aligned⟧
+⟦added⟧--- /dev/null
++++ b/discount.ml
+@@ -0,0 +1,3 @@
++⟦/⟧let threshold = 100
+⟦added⟧+⟦/⟧let discount total = if total >= threshold then total / 10 else 0
+⟦added⟧+⟦/⟧let () = print_int (discount 250)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-36⟧
+note: rule 9 would keep the first of the two versions of the line, the one that the diff takes away. This repair keeps the line with `+`, since a diff says which of the two its author wants.
+⟦aligned⟧
+let column_width = 12
+let separator = "|"
+⟦added⟧@@ -3,3 +3,3 @@
+ ⟦/⟧let rec pad text width =
+⟦added⟧-  if length text > width then text
++⟦/⟧  if length text >= width then text
+⟦added⟧ ⟦/⟧  else pad (text ^ " ") width
+let cell text = pad text column_width ^ separator
+let header = concat (map cell ["Name"; "Score"; "Rank"])⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-37⟧
+⟦aligned⟧
+(* Statistics for the class report. *)
+⟦added⟧+⟦/⟧let median items = nth (sort items) (length items / 2)
+⟦added⟧+⟦/⟧let spread items = maximum items - minimum items
+let summary items = (median items, spread items)
+let () = print_pair (summary [4; 8; 15; 16])⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-38⟧
+note: rule 9 would keep the first of the two numbers, the one that the word diff takes away. This repair keeps the number between `{+` and `+}`, since a diff says which of the two its author wants.
+⟦aligned⟧
+let host = "localhost"
+let port = 8080
+let address = host ^ ":" ^ string_of_int port
+let rec backoff failures = if failures = 0 then 1 else 2 * backoff (failures - 1)
+let timeout_seconds = ⟦added⟧[-30-]{+⟦/⟧45⟦added⟧+}⟦/⟧
+let retry_after failures = timeout_seconds * backoff failures⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-39⟧
+⟦aligned⟧
+let page_height = 792
+let margin = 72
+let text_height = page_height - 2 * margin
+let font_size = ⟦added⟧~~12~~⟦/⟧ 14
+let line_height = font_size * 3 / 2
+let lines_per_page = text_height / line_height⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-40⟧
+⟦aligned⟧
+let rec color_at index colors = if index = 0 then head colors else color_at (index - 1) (tail colors)
+let palette = [
+  "red";
+⟦added⟧<<<<<<< HEAD
+⟦/⟧  "green";
+⟦added⟧=======
+  "lime";
+>>>>>>> theme-update
+⟦/⟧  "blue"
+]
+let accent = color_at 1 palette⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-41⟧
+⟦aligned⟧
+(* The fee of a transfer, by its amount. *)
+let minimum_fee = 5
+let percent_of amount percent = amount * percent / 100
+let fee amount =
+  if amount < 100 then minimum_fee
+⟦added⟧<<<<<<< ours
+⟦/⟧  else if amount < 1000 then percent_of amount 2
+⟦added⟧||||||| base
+  else if amount < 1000 then 10
+=======
+  else if amount < 500 then 10
+>>>>>>> theirs
+⟦/⟧  else 20
+let total amount = amount + fee amount
+let both = total 250 + total 1200
+let () = print_int both⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-42⟧
+⟦aligned⟧
+let max_width = 100
+let margin = "  "
+let rec indent depth text =
+  if depth = 0 then text else indent (depth - 1) (margin ^ text)
+let wrap text = if length text > max_width then take max_width text else text
+⟦added⟧>>>>>>> origin/main
+⟦/⟧let block depth text = indent depth (wrap text)
+let () = print_string (block 2 "done")⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-43⟧
+⟦aligned⟧
+let attempts = 3
+let pin_length = 4
+let valid entry = length entry = pin_length && all_digits entry
+let prompt = ⟦added⟧“⟦/⟧⟦missing⟧"⟦/⟧Enter your PIN: ⟦added⟧”⟦/⟧⟦missing⟧"⟦/⟧
+let rec ask remaining = if remaining = 0 then false else if valid (read_line prompt) then true else ask (remaining - 1)
+let unlocked = ask attempts⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-44⟧
+⟦aligned⟧
+let opening_hour = 9
+let closing_hour = 18
+let is_open hour = hour >= opening_hour && hour < closing_hour
+let closed_sign = ⟦added⟧„⟦/⟧⟦missing⟧"⟦/⟧Wir haben geschlossen⟦added⟧“⟦/⟧⟦missing⟧"⟦/⟧
+let () = if is_open 12 then () else print_string closed_sign⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-45⟧
+⟦aligned⟧
+let rec countdown from = if from = 0 then [0] else from :: countdown (from ⟦added⟧–⟦/⟧⟦missing⟧-⟦/⟧ 1)
+let launch = countdown 10
+let seconds_left now = head launch ⟦added⟧–⟦/⟧⟦missing⟧-⟦/⟧ now
+let rec total numbers = if numbers = [] then 0 else head numbers + total (tail numbers)
+let () = print_int (total launch / length launch)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-46⟧
+⟦aligned⟧
+let deadline = 280
+let days_left today = deadline ⟦added⟧−⟦/⟧⟦missing⟧-⟦/⟧ today
+let weeks_left today = days_left today / 7
+let hours_left today = days_left today ⟦added⟧∗⟦/⟧⟦missing⟧*⟦/⟧ 24 ⟦added⟧−⟦/⟧⟦missing⟧-⟦/⟧ hours_gone today
+⟦end⟧
+
+⟦repair model-and-paste-47⟧
+⟦aligned⟧
+let temperatures = [18; 21; 25]
+let in_fahrenheit = map (fun celsius ⟦added⟧→⟦/⟧⟦missing⟧->⟦/⟧ celsius * 9 / 5 + 32) temperatures
+let warm = filter (fun degrees ⟦added⟧→⟦/⟧⟦missing⟧->⟦/⟧ degrees > 69) in_fahrenheit
+let rec total values = if values = [] then 0 else head values + total (tail values)
+let () = print_int (total warm / length warm)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-48⟧
+⟦aligned⟧
+let rec is_sorted items =
+  if items = [] || tail items = [] then true
+  else head items ⟦added⟧≤⟦/⟧⟦missing⟧<=⟦/⟧ head (tail items) && is_sorted (tail items)
+let differs left right = left ⟦added⟧≠⟦/⟧⟦missing⟧<>⟦/⟧ right
+let check = is_sorted [1; 2; 2; 5] && differs 1 2⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-49⟧
+⟦aligned⟧
+let start_height = 200
+let bounce height =
+  let height⟦added⟧’⟦/⟧⟦missing⟧'⟦/⟧ = height * 3 / 4 in
+  if height⟦added⟧’⟦/⟧⟦missing⟧'⟦/⟧ < 1 then 0 else height⟦added⟧’⟦/⟧⟦missing⟧'⟦/⟧
+let rec bounces height = if height = 0 then 0 else 1 + bounces (bounce height)
+let () = print_int (bounces start_height)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-50⟧
+⟦aligned⟧
+let rec stars count =
+⟦added⟧⟦nbsp⟧⟦nbsp⟧⟦/⟧⟦missing⟧  ⟦/⟧if count = 0 then ""
+⟦added⟧⟦nbsp⟧⟦nbsp⟧⟦/⟧⟦missing⟧  ⟦/⟧else "*" ^ stars (count - 1)
+let row = stars 5
+let () = print_string row⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-51⟧
+⟦aligned⟧
+⟦added⟧L⟦/⟧⟦missing⟧l⟦/⟧et dozen = 12
+let eggs boxes = boxes * dozen
+let () = print_int (eggs 3)
+⟦end⟧
+
+⟦repair model-and-paste-52⟧
+⟦aligned⟧
+⟦added⟧L⟦/⟧⟦missing⟧l⟦/⟧et grade score = if score >= 90 then top
+⟦added⟧E⟦/⟧⟦missing⟧e⟦/⟧lse if score >= 60 then pass else fail
+⟦added⟧L⟦/⟧⟦missing⟧l⟦/⟧et _ = map grade [95; 40; 72]
+⟦end⟧
+
+⟦repair model-and-paste-53⟧
+⟦aligned⟧
+let is_digit c = member c digit_characters
+let rec count_digits text index =
+  if index = length text then 0
+  else
+    let c = char_at text index in
+    (if is_digit⟦added⟧©⟦/⟧⟦missing⟧(c)⟦/⟧ then 1 else 0) + count_digits text (index + 1)
+let digits_of text = count_digits text 0
+let longest = maximum (map digits_of plates)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-54⟧
+⟦aligned⟧
+let price = 480
+let tax amount = amount * 8 / 100
+let half amount = amount * ⟦added⟧½⟦/⟧⟦missing⟧1/2⟦/⟧
+let quarter amount = amount * ⟦added⟧¼⟦/⟧⟦missing⟧1/4⟦/⟧
+let deposit = half price + quarter (tax price)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-55⟧
+⟦aligned⟧
+let distance x y = abs(x) + abs⟦added⟧👍⟦/⟧⟦missing⟧(y)⟦/⟧
+let near x y = distance x y < 3
+let () = print_int (distance 4 7)
+⟦end⟧
+
+⟦repair model-and-paste-56⟧
+⟦aligned⟧
+let rec row_of board index = if index = 0 then head board else row_of (tail board) (index - 1)
+let corner board = head (head board)
+let board = make_grid (8, ⟦added⟧😎⟦/⟧⟦missing⟧8)⟦/⟧
+let last_row = row_of board 7
+let () = print_cell (corner board)
+⟦end⟧
+
+⟦repair model-and-paste-57⟧
+⟦aligned⟧
+let move point dx dy = (fst point + dx, snd point + dy)
+let rec walk point steps = if steps = 0 then point else walk (move point 1 2) (steps - 1)
+let origin = ⟦added⟧（⟦/⟧⟦missing⟧(⟦/⟧0⟦added⟧，⟦/⟧⟦missing⟧,⟦/⟧0⟦added⟧）⟦/⟧⟦missing⟧)⟦/⟧
+let target = walk origin 3
+let () = print_int (fst target + snd target)⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-58⟧
+⟦aligned⟧
+let maxi⟦added⟧⟦U+00AD⟧⟦/⟧mum_length = 72
+let ellipsis = "..."
+let fits text = length text <= maxi⟦added⟧⟦U+00AD⟧⟦/⟧mum_length
+let clip text = if fits text then text else take (maxi⟦added⟧⟦U+00AD⟧⟦/⟧mum_length - length ellipsis) text ^ ellipsis
+let () = print_string (clip "a very long heading that goes on and on")⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-59⟧
+⟦aligned⟧
+let attempts = 4
+let rec total_wait interval tries = if tries = 0 then 0 else interval + total_wait interval (tries - 1)
+let interval = 30 ⟦added⟧(in seconds)⟦/⟧
+let worst_case = total_wait interval attempts
+let () = print_int worst_case
+⟦end⟧
+
+⟦repair model-and-paste-60⟧
+⟦aligned⟧
+let volume width height depth =
+  width
+  ⟦added⟧•⟦/⟧⟦missing⟧*⟦/⟧ height
+  ⟦added⟧•⟦/⟧⟦missing⟧*⟦/⟧ depth
+let crate = volume 3 4 5
+⟦end⟧
+
+⟦repair model-and-paste-61⟧
+⟦aligned⟧
+let constant value = fun ⟦added⟧\⟦/⟧_ -> value
+let ⟦added⟧\⟦/⟧_ = map (constant 0) [1; 2; 3]
+let () = iter (fun ⟦added⟧\⟦/⟧_ -> print_string ".") [1; 2; 3]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-62⟧
+⟦aligned⟧
+let width = 12
+let height = 8
+let area = width ⟦added⟧\⟦/⟧* height
+let volume depth = area ⟦added⟧\⟦/⟧* depth
+⟦end⟧
+
+⟦repair model-and-paste-63⟧
+⟦aligned⟧
+let rec last items = if length items = 1 then head items else last (tail items)
+let primes = ⟦added⟧\⟦/⟧[2; 3; 5; 7⟦added⟧\⟦/⟧]
+let largest = last primes⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-64⟧
+⟦aligned⟧
+let rec ⟦added⟧ﬁ⟦/⟧⟦missing⟧fi⟦/⟧lter keep items =
+  if items = [] then []
+  else append (if keep (head items) then [head items] else []) (⟦added⟧ﬁ⟦/⟧⟦missing⟧fi⟦/⟧lter keep (tail items))
+let small = ⟦added⟧ﬁ⟦/⟧⟦missing⟧fi⟦/⟧lter (fun number -> number < 5) [3; 8; 1; 12]
+let () = print_int (length small)
+⟦end⟧
+
+⟦repair model-and-paste-65⟧
+⟦aligned⟧
+let rec merge left right =
+  if left = [] then right
+  else if right = [] then left
+⟦added⟧42        CHAPTER 3. SORTING
+⟦/⟧  else if head left < head right then head left :: merge (tail left) right
+  else head right :: merge left (tail right)
+let rec merge_sort items =
+  if length items < 2 then items
+  else merge (merge_sort (left_half items)) (merge_sort (right_half items))
+let sorted = merge_sort [5; 1; 4; 2]
+⟦end⟧
+
+⟦repair model-and-paste-66⟧
+⟦aligned⟧
+let prompt = "> "
+let help = "Commands: add <name>, remove <name>, list, quit. Names are case sens⟦added⟧
+⟦/⟧itive."
+let is_command word = member word ["add"; "remove"; "list"; "quit"]
+let rec loop () = if is_command (read_line prompt) then loop () else help⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-67⟧
+⟦aligned⟧
+let minimum_order = 20
+let fee cart = if total_of cart > 100 then 0 else 4
+let can_checkout cart = length (items_of cart) > 0 && total_of cart + fee cart >⟦added⟧
+⟦/⟧= minimum_order
+let message cart = if can_checkout cart then "ready" else "add more"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-68⟧
+⟦aligned⟧
+let base = 16⟦added⟧\n⟦/⟧⟦missing⟧
+⟦/⟧let rec to_digits number = if number < base then [number] else remainder number base :: to_digits (number / base)⟦added⟧\n⟦/⟧⟦missing⟧
+⟦/⟧let () = print_list (to_digits 255)
+⟦end⟧
+
+⟦repair model-and-paste-69⟧
+⟦aligned⟧
+let rec climb steps =⟦added⟧\n\t⟦/⟧⟦missing⟧
+⟦tab⟧⟦/⟧if steps <= 1 then 1⟦added⟧\n\t⟦/⟧⟦missing⟧
+⟦tab⟧⟦/⟧else climb (steps - 1) + climb (steps - 2)⟦added⟧\n⟦/⟧⟦missing⟧
+⟦/⟧let ways = climb 10
+⟦end⟧
+
+⟦repair model-and-paste-70⟧
+⟦aligned⟧
+let cache_minutes = 15 ⟦added⟧\⟦/⟧
+let cache_seconds = cache_minutes * 60 ⟦added⟧\⟦/⟧
+let expired age = age > cache_seconds
+⟦end⟧

@@ -1,0 +1,739 @@
+⟦case other-languages-01⟧
+⟦broken⟧
+let freezing = 32;;
+let to_celsius fahrenheit = (fahrenheit - freezing) * 5 / 9;;
+let to_fahrenheit celsius = celsius * 9 / 5 + freezing;;
+
+let () = print_int (to_celsius 212);;⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-02⟧
+⟦broken⟧
+(* Retry settings for the upload job. *)
+let max_retries = 5
+let base_delay = 200 in
+let delay attempt = base_delay * attempt
+
+let rec try_upload attempt =
+  if attempt > max_retries then false
+  else if upload (delay attempt) then true
+  else try_upload (attempt + 1)
+
+let report ok = if ok then "uploaded" else "gave up after " ^ string_of_int max_retries ^ " tries"
+let () = print_string (report (try_upload 1))⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-03⟧
+⟦broken⟧
+let apply_twice (f : int -> int) (x : int) = f (f x)
+let lengths (words : string list) : int list = map length words
+let bump = apply_twice (fun (n : int) -> n + 1) 40
+let () = print_int bump⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-04⟧
+⟦broken⟧
+let describe count =
+  match count with
+  | 0 -> "none"
+  | 1 -> "one"
+  | _ -> "many"
+
+let plural word count = if count = 1 then word else word ^ "s"
+let summary count = describe count ^ " " ^ plural "item" count
+let () = print_string (summary 3)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-05⟧
+⟦broken⟧
+(* Helpers for the sign-up sheet. *)
+let max_names = 12
+let trim_all names = map trim names
+
+let rec count = function
+  | [] -> 0
+  | _ :: rest -> 1 + count rest
+
+let is_long names = count (trim_all names) > max_names
+let warning names = if is_long names then "too many names" else ""⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-06⟧
+⟦broken⟧
+(* State of the player in the maze game. *)
+let lives_at_start = 3
+let start = (0, 0)
+
+let player = { name = "Ada"; lives = lives_at_start; position = start }
+let is_alive = player.lives > 0
+let banner = player.name ^ (if is_alive then " is playing" else " is out")
+let () = print_string banner⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-07⟧
+⟦broken⟧
+(* Ticket numbers for the help desk. *)
+let counter = ref 0
+
+let next_id () =
+  counter := !counter + 1;
+  !counter
+
+let first = next_id ()
+let second = next_id ()
+let label = "ticket-" ^ string_of_int second
+let () = print_string label⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-08⟧
+⟦broken⟧
+let verbose = true
+
+let warn message =
+  if verbose then begin
+    print_string "warning: ";
+    print_string message
+  end
+
+let () = warn "disk almost full"⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-09⟧
+⟦broken⟧
+(* Delivery fees in euros. *)
+let base_fee = 4
+
+let fee express weight =
+  base_fee + begin if express then 15 else 0 end + weight * 2
+
+let quote = "Shipping: " ^ string_of_int (fee true 3)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-10⟧
+⟦broken⟧
+(* Yearly interest on a savings account, in cents. *)
+let rate = 0.07
+let interest balance = balance *. rate
+let after_year balance = balance + interest balance
+let () = print_int (after_year 100000)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-11⟧
+⟦broken⟧
+let needs_quotes field = contains field ',' || contains field '"'
+let quote field = if needs_quotes field then "\"" ^ field ^ "\"" else field
+let row = join "," (map quote ["name"; "say \"hi\""; "a,b"])⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-12⟧
+⟦broken⟧
+(* Splits a bill among friends. *)
+let divide total parts = (total / parts, total - total / parts * parts)
+let (share, leftover) = divide 100 7
+let entries = [("each", share); ("left over", leftover)]
+let line = fun (name, amount) -> name ^ ": " ^ string_of_int amount
+let report = join ", " (map line entries)
+let () = print_string report⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-13⟧
+⟦broken⟧
+let defaults = ["--color"; "--jobs"; "4"]
+let extras = if quiet then ["--quiet"] else []
+let arguments = "build" :: defaults @ extras
+
+let command =
+  arguments
+  |> map escape
+  |> join " "
+
+let () = run command⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-14⟧
+⟦broken⟧
+let columns = 80
+(* Disabled until the wide layout is ready.
+let columns = 120  (* for wide screens *)
+let gutter = 4
+*)
+let usable = columns - 2
+let half = usable / 2
+let () = print_int half⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-15⟧
+⟦broken⟧
+let names = ["Ada"; "Grace"; "Alan"]
+let greeting = "Hello " ^ String.concat ~sep:", " names
+let count = List.length names
+let () = print_string (greeting ^ " (" ^ string_of_int count ^ ")")⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-16⟧
+⟦broken⟧
+(* Order totals, in cents. *)
+let prices = [250; 1200; 80]
+let tax_rate = 8
+
+let with_tax amount = amount + amount * tax_rate / 100
+let subtotal = fold_left (+) 0 prices
+let total = with_tax subtotal
+let () = print_int total⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-17⟧
+⟦broken⟧
+(* Where the server listens. *)
+let default_port = 8080
+let host = "localhost"
+
+let parse_port text =
+  try int_of_string text with Failure _ -> default_port
+
+let port = parse_port (getenv "PORT")
+let address = host ^ ":" ^ string_of_int port
+let () = print_string ("listening on " ^ address)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-18⟧
+⟦broken⟧
+type direction = North | East | South | West
+
+let turn_right direction =
+  if direction = North then East
+  else if direction = East then South
+  else if direction = South then West
+  else North
+
+let facing = turn_right (turn_right North)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-19⟧
+⟦broken⟧
+let unit = "kg"
+let show weight = string_of_int weight ^ " " ^ unit
+
+let weights = [| 3; 5; 8 |]
+let heaviest = weights.(2)
+let lightest = weights.(0)
+let spread = heaviest - lightest
+let () = print_string (show spread)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-20⟧
+⟦broken⟧
+(* Today's lunch menu, printed one dish per line. *)
+let price = 9
+
+let rec print_dishes dishes =
+  if dishes = [] then ()
+  else
+    let () = print_line (head dishes) in
+    print_dishes (tail dishes)
+
+let menu = [
+  "soup";
+  "salad";
+  "bread";
+]
+let total = price * length menu
+let header = "Lunch: " ^ string_of_int total
+let () = print_dishes (header :: menu)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-21⟧
+⟦broken⟧
+let move point dx dy = (fst point + dx, snd point + dy)
+let scale point factor = (fst point * factor, snd point * factor)
+let origin = 0, 0
+let corner = scale (move origin 3 4) 2
+let () = print_int (fst corner)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-22⟧
+⟦broken⟧
+let first_letter word = word.[0]
+let is_capital word = first_letter word >= 'A' && first_letter word <= 'Z'
+let title name = if is_capital name then name else capitalize name⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-23⟧
+⟦broken⟧
+open Printf
+
+let percent part whole = part * 100 / whole;;
+let () = printf "%d%%\n" (percent 3 8);;⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-24⟧
+⟦broken⟧
+let cities = ["Lima"; "Oslo"; "Cairo"]
+let width = 12
+let pad name = name ^ repeat " " (width - length name)
+
+let print_all names =
+  for name in names do
+    print_string (pad name)
+
+let header = pad "City" ^ "|"
+let () = print_all (header :: cities)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-25⟧
+⟦broken⟧
+(* Text shown under a rectangle on the worksheet. *)
+let describe_box width height =
+    let area = width * height
+    let border = 2 * (width + height)
+    let ratio = area / border
+    "area " ^ string_of_int area ^ ", ratio " ^ string_of_int ratio
+
+let is_square width height = width = height
+let kind width height = if is_square width height then "square" else "rectangle"
+let () = print_string (kind 6 4 ^ ": " ^ describe_box 6 4)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-26⟧
+⟦broken⟧
+let grade score =
+    if score >= 90 then "A"
+    elif score >= 80 then "B"
+    elif score >= 70 then "C"
+    else "F"
+
+let report name score = name ^ ": " ^ grade score
+let () = print_string (report "Ada" 84)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-27⟧
+⟦broken⟧
+let scores = [64; 78; 93]
+let count = List.length scores
+let best = List.max scores
+let line = $"best of {count}: {best}"
+let () = printfn "%s" line⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-28⟧
+⟦broken⟧
+let days = [1..31]
+let is_weekend day = day % 7 = 6 || day % 7 = 0
+let weekends = filter is_weekend days
+let () = print_int (length weekends)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-29⟧
+⟦broken⟧
+let clean = trim >> lowercase
+let shout text = uppercase text ^ "!"
+let () = print_string <| shout (clean "  Hello ")⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-30⟧
+⟦broken⟧
+[<EntryPoint>]
+let main arguments =
+    let count = arguments.Length
+    print_string (if count = 0 then "no arguments" else string_of_int count)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-31⟧
+⟦broken⟧
+module Main where
+
+double x = x * 2
+quadruple x = double (double x)
+main = print (quadruple 5)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-32⟧
+⟦broken⟧
+let daysInYear = 365
+isLeap :: Int -> Bool
+let isLeap year = mod year 4 == 0 && (mod year 100 > 0 || mod year 400 == 0)
+let daysIn year = if isLeap year then daysInYear + 1 else daysInYear⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-33⟧
+⟦broken⟧
+total : List Int -> Int
+let total prices = fold (\sum price -> sum + price) 0 prices
+
+average : List Int -> Int
+let average prices = total prices / length prices
+
+spread : List Int -> Int
+let spread prices = maximum prices - minimum prices⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-34⟧
+⟦broken⟧
+let size = 8
+let squares = size * size
+
+{- A square is dark if its file and rank
+   add up to an even number. -}
+let file index = index - index / size * size
+let rank index = index / size
+let is_dark index = (file index + rank index) / 2 * 2 = file index + rank index⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-35⟧
+⟦broken⟧
+(* Prices in cents. *)
+let tax_rate = 8
+
+let discount price =
+  let threshold = 1000 in
+  if price > threshold then price / 10 else 0
+
+let net price = price - discount price   -- discount first then tax
+let gross price =
+  let base = net price in
+  base + base * tax_rate / 100
+
+let () = print_int (gross 1200)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-36⟧
+⟦broken⟧
+let allowed = ["png", "jpg", "gif"]
+let is_image extension = member extension allowed
+let check name = if extension name /= "" && is_image (extension name) then "ok" else "skipped"⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-37⟧
+⟦broken⟧
+let backup name = name ++ ".bak"
+let shout = upper . backup
+let main = print $ shout "notes.txt"⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-38⟧
+⟦broken⟧
+(* Tic-tac-toe: 0 is an empty cell, 1 and 2 are the players. *)
+let size = 3
+let line = repeat "-" (2 * size - 1)
+
+let symbol player = case player of
+  1 -> "X"
+  2 -> "O"
+  _ -> " "
+
+let row a b c = symbol a ^ "|" ^ symbol b ^ "|" ^ symbol c
+let board = [row 1 0 2; line; row 0 1 0; line; row 2 0 1]⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-39⟧
+⟦broken⟧
+let step = 5
+
+let sign n
+  | n < 0 = -1
+  | n == 0 = 0
+  | otherwise = 1
+
+let towards target position = position + step * sign (target - position)
+let next = towards 40 12⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-40⟧
+⟦broken⟧
+let primes =
+    [ 2
+    , 3
+    , 5
+    , 7
+    ]
+
+let largest = last primes
+let count = length primes⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-41⟧
+⟦broken⟧
+hypotenuse a b = sqrt (square a + square b)
+  where square x = x * x
+
+main = print (hypotenuse 3 4)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-42⟧
+⟦broken⟧
+let rec digits n = if n < 10 then [n] else (n `mod` 10) : digits (n `div` 10)
+let digit_sum n = sum (digits n)
+let lucky = digit_sum 777 = 21⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-43⟧
+⟦broken⟧
+(* Width of the photo strip, in pixels. *)
+let gutter = 10
+let widths = [120; 80; 45]
+let retina = sum (map (*2) widths) (* twice as dense *) + gutter
+let fits = retina < screen_width
+let () = print_string (if fits then "one row" else "two rows")⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-44⟧
+⟦broken⟧
+let factors = [2; 3; 7]
+let product = fold_left (*) 1 factors
+let cells = [ product (* per row *); 10; 4 ]
+let grid_size = fold_left max 0 cells⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-45⟧
+⟦broken⟧
+let names = ["north"; "east"; "south"; "west"]
+let opposite index = names !! rem (index + 2) 4
+let label index = names !! index ++ " / " ++ opposite index⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-46⟧
+⟦broken⟧
+(* Distances for the running log. *)
+let lap = 400
+let laps = 12
+
+def to_miles(meters):
+    return meters * 621 / 1000000
+
+let distance = lap * laps
+let () = print_int(to_miles(distance))⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-47⟧
+⟦broken⟧
+(* The lights of a crossing, one step at a time. *)
+let start = "red"
+let steps = 4
+
+let next_light color =
+    if color = "green":
+        "yellow"
+    elif color = "yellow":
+        "red"
+    else:
+        "green"
+
+let rec after count color = if count = 0 then color else after (count - 1) (next_light color)
+let () = print_string (after steps start)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-48⟧
+⟦broken⟧
+#!/usr/bin/env miniml
+# Greetings shown on the start page.
+let greeting = "Welcome back"
+let farewell = 'See you soon'   # shown on logout
+let banner name = greeting ^ ", " ^ name
+let () = print_string (banner "Ada" ^ " / " ^ farewell)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-49⟧
+⟦broken⟧
+let numbers = range(1, 6)
+let total = sum(numbers)
+let square = lambda n: n ** 2
+let squares = map(square, numbers)
+let () = print_int(sum(squares) - total)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-50⟧
+⟦broken⟧
+let pages items per_page = (items + per_page - 1) // per_page
+let has_next page items per_page = page != pages items per_page
+let last = pages 95 10⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-51⟧
+⟦broken⟧
+let slugify title =
+    """Lower-case the title and
+    put dashes between its words."""
+    join "-" (words (lowercase title))
+
+let url title = "/posts/" ^ slugify title
+let link title = "<a href=\"" ^ url title ^ "\">" ^ title ^ "</a>"⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-52⟧
+⟦broken⟧
+(* Greets a visitor by whether the name was seen before. *)
+let seen = ["ada"; "grace"]
+let normalize name = lowercase (trim name)
+let greet prefix name = prefix ^ ", " ^ name ^ "!"
+
+let is_new name = normalize name not in seen
+let welcome name = if is_new name then greet "Welcome" name else greet "Welcome back" name⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-53⟧
+⟦broken⟧
+let rates = [
+    ("standard", 20),
+    ("reduced", 5),
+]
+let rate_of name = lookup name rates
+let vat amount = amount * rate_of "standard" / 100⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-54⟧
+⟦broken⟧
+let rec total prices = if prices == [] then 0 else prices[0] + total(prices[1:])
+let average prices = total(prices) / len(prices)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-55⟧
+⟦broken⟧
+(* Floor plan helpers. *)
+let unit = "m2"
+let rooms = [(4, 5); (3, 3)]
+
+function area(width, height) {
+  return width * height
+}
+
+let first = area(4, 5)
+let label = "Area: " ^ string_of_int first ^ " " ^ unit⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-56⟧
+⟦broken⟧
+let limit = 3;
+const double = x => x * 2;
+let result = double(limit) + 1;⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-57⟧
+⟦broken⟧
+let items = ["pen"; "ink"]
+let count = length items
+let noun = count === 1 ? "item" : "items"
+let message = string_of_int count ^ " " ^ noun ^ " in your basket"
+let () = print_string message⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-58⟧
+⟦broken⟧
+/* Layout constants for the sidebar. */
+let width = 240;
+let padding = 16; // on both sides
+let inner = width - 2 * padding;⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-59⟧
+⟦broken⟧
+let user = "ada"
+let page = 2
+let path = `/users/${user}/posts`
+let is_first = !(page > 1)
+let link = if is_first then path else path ^ "?page=" ^ string_of_int page⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-60⟧
+⟦broken⟧
+let abs_diff a b = if (a > b) a - b else b - a
+let closer target a b = if (abs_diff target a <= abs_diff target b) a else b
+let pick = closer 10 7 14⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-61⟧
+⟦broken⟧
+let server = make_server(
+    "localhost",
+    8080,
+    true,
+)
+let url = "http://" ^ host(server) ^ ":" ^ string_of_int(port(server))
+let () = print_string(url)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-62⟧
+⟦broken⟧
+let words = ["tea"; "coffee"; "water"; "lemonade"]
+let long_words = words.filter(w => length w > 5).map(w => uppercase w)
+let headline = join ", " long_words
+let () = print_string headline⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-63⟧
+⟦broken⟧
+(* Length of a playlist. *)
+let tracks = [215; 187; 242]
+
+let minutes seconds = {
+    let per_minute = 60;
+    seconds / per_minute
+}
+
+let total = minutes (sum tracks)
+let () = print_string (string_of_int total ^ " min")⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-64⟧
+⟦broken⟧
+(* Who may enter the late show. *)
+let adult_age = 18
+
+fn is_adult(age: u32) -> bool {
+    age >= adult_age
+}
+
+let visitors = [12; 34; 17; 60]
+let adults = filter is_adult visitors
+let report = string_of_int (length adults) ^ " of " ^ string_of_int (length visitors) ^ " are adults"
+let () = print_string report⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-65⟧
+⟦broken⟧
+let mut lives = 3;
+let max_lives: u8 = 5;
+let can_heal = lives < max_lives;
+let () = print_int lives;⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-66⟧
+⟦broken⟧
+let max_lives = 3
+let hearts lives = repeat "<3 " lives ^ repeat "-- " (max_lives - lives)
+let status lives = if lives > 0 { "playing" } else { "game over" }
+let bonus = |score| score / 10
+let final_score base = base + bonus base⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-67⟧
+⟦broken⟧
+let prices = [250; 1200; 80]
+let total = sum(&prices)
+let line = format!("total: {}", total)
+let () = println!("{}", line)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-68⟧
+⟦broken⟧
+val ceiling = 255
+fun double x = x * 2
+fun clamp x = if x > ceiling then ceiling else x
+val result = clamp (double 200)⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-69⟧
+⟦broken⟧
+let compose f g x = f (g x)
+let increment n = n + 1
+let twice = fn f => fn x => f (f x)
+let add_two = twice increment
+let seven = compose add_two increment 4⟦lf⟧
+⟦end⟧
+
+⟦case other-languages-70⟧
+⟦broken⟧
+let total = 100
+used := 64
+free := total - used
+let warning = if free < 10 then "almost full" else ""⟦lf⟧
+⟦end⟧
