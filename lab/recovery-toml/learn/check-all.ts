@@ -1,0 +1,65 @@
+// One command for everything that has to hold in learn/: the type check and the lint of this folder, and its check
+// scripts. It is lab/recovery-parser/learn/check-all.ts for TOML.
+//
+// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL:
+//   bun lab/recovery-toml/learn/check-all.ts [--only <part of a name>]
+//
+// It takes about a minute and a half on an 18 core machine with a few other jobs running (91 s in one run). Up to 4 commands run at a time, and
+// three of the checks use 4 worker threads each, soft/check-train.ts, search/check.ts and check-recipe.ts, so the
+// command stays within 13 threads. check-data.ts and check-restart-at-next-line.ts run on the dataset when
+// ../samples.ts is there, and say so when it is not.
+//
+// The type check is of this folder and of the files that it imports. The folder's own tsconfig.json keeps it from
+// failing for a file that another part of lab/recovery-toml/ is still writing.
+//
+// A check passes when it ends with the exit code 0 and its last line is "Every check passed.". The output of every
+// command goes to <RECOVERY_SCRATCH>/check-all/<name>.txt. The last line of this command says whether all passed.
+import {mkdirSync, writeFileSync} from 'node:fs'
+import {join, relative, resolve} from 'node:path'
+import {optionOf, refuseUnknownOptions} from './options.ts'
+
+const root = resolve(import.meta.dir, '../../..')
+const here = relative(root, import.meta.dir)
+// check-recipe.ts takes the longest, so it comes first and the other checks run next to it.
+const checks = ['check-recipe.ts', 'soft/check-twin.ts', 'check-tables.ts', 'soft/check-gradient.ts', 'soft/check-train.ts', 'check-parser.ts', 'search/check.ts', 'check-data.ts', 'check-restart-at-next-line.ts']
+const commands: {name: string, command: string[], isCheck: boolean}[] = [
+  {name: 'tsc', command: ['bunx', 'tsc', '-p', here], isCheck: false},
+  {name: 'oxlint', command: ['bunx', 'oxlint', '--type-aware', here], isCheck: false},
+  ...checks.map(check => ({name: check, command: ['bun', join(here, check)], isCheck: true})),
+]
+refuseUnknownOptions('check-all.ts', ['--only'])
+const only = optionOf('--only')
+const chosen = only === undefined ? commands : commands.filter(({name}) => name.includes(only))
+if (chosen.length === 0) throw new Error(`--only ${only} names none of: ${commands.map(({name}) => name).join(', ')}`)
+
+const scratch = process.env['RECOVERY_SCRATCH']
+if (scratch === undefined || scratch === '') throw new Error('set RECOVERY_SCRATCH to a folder outside the repo: the outputs of the checks go there')
+if (process.env['RECOVERY_FINAL'] !== undefined) throw new Error('run check-all.ts without the environment variable RECOVERY_FINAL: the checks do not read the test split')
+const outputFolder = join(scratch, 'check-all')
+mkdirSync(outputFolder, {recursive: true})
+
+const started = performance.now()
+const results: {name: string, passed: boolean, seconds: number, why: string}[] = []
+let next = 0
+async function runNext() {
+  while (next < chosen.length) {
+    const {name, command, isCheck} = chosen[next++]!
+    const commandStarted = performance.now()
+    const child = Bun.spawn(command, {cwd: root, stdout: 'pipe', stderr: 'pipe'})
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const output = `${stdout}${stderr}`
+    writeFileSync(join(outputFolder, `${name.replaceAll('/', '-').replace(/\.ts$/, '')}.txt`), `${command.join(' ')}\n${output}\nexit code ${exitCode}\n`)
+    const lastLine = stdout.trimEnd().split('\n').at(-1) ?? ''
+    const why = exitCode !== 0 ? `exit code ${exitCode}` : isCheck && lastLine !== 'Every check passed.' ? `its last line is ${JSON.stringify(lastLine.slice(0, 120))}` : ''
+    const result = {name, passed: why === '', seconds: (performance.now() - commandStarted) / 1000, why}
+    results.push(result)
+    console.log(`${result.passed ? 'passed' : 'FAILED'}  ${result.seconds.toFixed(0).padStart(4)} s  ${command.join(' ')}${result.passed ? '' : `  (${why})`}`)
+    if (!result.passed) console.log(output.trimEnd().split('\n').slice(-12).map(line => `    ${line.slice(0, 400)}`).join('\n'))
+  }
+}
+await Promise.all(Array.from({length: 4}, runNext))
+
+const failed = results.filter(result => !result.passed)
+console.log(`${results.length} commands in ${((performance.now() - started) / 1000).toFixed(0)} s. Their outputs are in ${outputFolder}.`)
+console.log(failed.length === 0 ? 'Every check passed.' : `${failed.length} of ${results.length} commands FAILED: ${failed.map(result => result.name).join(', ')}.`)
+if (failed.length > 0) process.exitCode = 1

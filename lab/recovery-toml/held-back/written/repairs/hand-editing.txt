@@ -1,0 +1,880 @@
+⟦repair hand-editing-01⟧
+from: a starship.toml in which someone added a module to the end of the format string and typed the closing quote without the shift key, so that an apostrophe came out
+⟦aligned⟧
+# ~/.config/starship.toml
+format = "$directory$git_branch$git_status$character⟦' for "⟧
+add_newline = false
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+symbol = "on "
+style = "bold purple"
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[x](bold red)"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-02⟧
+from: a pyproject.toml in which someone changed the Python version of a classifier from 3.11 to 3.12 and deleted the quote after it with the old digits
+⟦aligned⟧
+[project]
+name = "riverstage"
+version = "0.9.2"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12⟦missing⟧"⟦/⟧,
+    "Topic :: Scientific/Engineering :: Hydrology",
+]
+
+[project.scripts]
+riverstage = "riverstage.cli:main"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-03⟧
+from: the Cargo.toml of a workspace in which someone typed a new crate into the list of members and left out its opening quote
+⟦aligned⟧
+[workspace]
+resolver = "2"
+members = ["crates/core", ⟦missing⟧"⟦/⟧crates/cli", "xtask"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.74"
+
+[workspace.dependencies]
+thiserror = "1.0"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-04⟧
+from: a taplo.toml in which someone turned the one pattern of include into a list, typed the second pattern and the closing bracket, and forgot the opening bracket
+⟦aligned⟧
+include = ⟦missing⟧[⟦/⟧"**/*.toml", "docs/**/*.md"]
+exclude = ["target/**"]
+
+[formatting]
+align_entries = false
+column_width = 100
+reorder_keys = false
+
+[[rule]]
+include = ["**/Cargo.toml"]
+
+[rule.formatting]
+reorder_keys = true⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-05⟧
+from: a pyproject.toml in which someone removed the last dependency and selected one line too many, so that the closing bracket of the list went with it
+⟦aligned⟧
+[project]
+name = "harbor-sync"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+⟦missing⟧]⟦/⟧
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-06⟧
+from: a ruff.toml in which someone moved the last rule of the select list two lines up, and that line had no comma at its end
+⟦aligned⟧
+line-length = 100
+target-version = "py311"
+
+[format]
+quote-style = "double"
+
+[lint]
+ignore = ["E501"]
+select = [
+    "E",
+    "F",
+    "UP"⟦missing⟧,⟦/⟧
+    "I",
+    "B",
+]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-07⟧
+from: an alacritty.toml in which someone added a key binding under the last one of the list, which had no comma at its end
+⟦aligned⟧
+[window]
+opacity = 0.95
+padding = { x = 8, y = 6 }
+
+[font]
+size = 12.5
+
+[colors.primary]
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+
+[keyboard]
+bindings = [
+  { key = "V", mods = "Control|Shift", action = "Paste" },
+  { key = "N", mods = "Control|Shift", action = "SpawnNewInstance" }⟦missing⟧,⟦/⟧
+  { key = "Plus", mods = "Control", action = "IncreaseFontSize" },
+]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-08⟧
+from: a pants.toml in which someone deleted the middle backend of a list of three and left both of its commas
+⟦aligned⟧
+[GLOBAL]
+pants_version = "2.20.0"
+backend_packages = ["pants.backend.python", ⟦extra⟧,⟦/⟧ "pants.backend.shell"]
+
+[python]
+interpreter_constraints = [">=3.10,<3.13"]
+enable_resolves = true
+
+[pytest]
+args = ["-q", "--no-header"]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-09⟧
+from: a rustfmt.toml in which someone typed a new setting and left out the equals sign
+⟦aligned⟧
+edition = "2021"
+max_width ⟦missing⟧=⟦/⟧100
+use_small_heuristics = "Max"
+imports_granularity = "Crate"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-10⟧
+from: the settings of a game server in which someone switched pvp on and typed the equals sign twice, as in the comparison of a programming language
+⟦aligned⟧
+[server]
+name = "Tidewater Survival"
+max_players = 24  # the host has 8 GB
+motd = "Restarts daily at 04:00 UTC"
+
+[world]
+seed = 884213
+difficulty = "hard"
+pvp =⟦extra⟧=⟦/⟧ true
+keep_inventory = false
+next_wipe = 2024-06-01T04:00:00Z
+
+[backup]
+interval_minutes = 30
+keep = 12⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-11⟧
+from: a wrangler.toml in which someone deleted the old compatibility date to type a new one, and the editor saved the file before the new date was typed
+⟦aligned⟧
+name = "orders-edge"
+main = "src/index.ts"
+compatibility_date = ⟦missing⟧""⟦/⟧
+workers_dev = false
+
+[vars]
+API_BASE = "https://api.orders.example.com"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "4f0c8d2e9b1a4c6f8e7d5a3b2c1d0e9f"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-12⟧
+from: the config.toml of the Helix editor in which someone typed the name of a setting, went to look up its values, and saved the file as it was
+⟦aligned⟧
+theme = "catppuccin_mocha"
+
+[editor]
+line-number = "relative"
+bufferline⟦missing⟧=""⟦/⟧
+mouse = false
+cursorline = true
+
+[editor.cursor-shape]
+insert = "bar"
+normal = "block"
+
+[editor.file-picker]
+hidden = false⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-13⟧
+from: the config.toml of a GitLab runner in which someone typed the header of the docker settings by hand and left out its closing bracket
+⟦aligned⟧
+concurrent = 4
+check_interval = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "docker-runner-01"
+  url = "https://gitlab.example.com/"
+  executor = "docker"
+  [runners.docker⟦missing⟧]⟦/⟧
+    image = "alpine:3.19"
+    privileged = false
+    volumes = ["/cache"]
+    shm_size = 0
+  [runners.cache]
+    Type = "s3"
+    Shared = true
+    [runners.cache.s3]
+      ServerAddress = "minio.example.com:9000"
+      BucketName = "runner-cache"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-14⟧
+from: a Cargo.toml in which someone added a second binary and typed its header with one closing bracket
+⟦aligned⟧
+[package]
+name = "pebble-db"
+version = "0.7.2"
+edition = "2021"
+
+[[bin]⟦missing⟧]⟦/⟧
+name = "pebble"
+path = "src/bin/pebble.rs"
+
+[[bin]]
+name = "pebble-import"
+path = "src/bin/import.rs"
+
+[lib]
+name = "pebble_db"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-15⟧
+from: a samconfig.toml in which someone renamed the stack, the editor closed the quote by itself, and the person typed the closing quote again
+⟦aligned⟧
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "orders-api-staging"⟦extra⟧"⟦/⟧
+region = "eu-west-1"
+s3_prefix = "orders-api"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Stage=staging LogLevel=info"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-16⟧
+from: the settings of a service in which someone ran a search and replace with a pattern over three lines to put quotes around their values, and two of the values already had quotes
+⟦aligned⟧
+[app]
+name = "ledger"
+debug = false
+
+[database]
+host = "⟦extra⟧"⟦/⟧db.internal"⟦extra⟧"⟦/⟧
+user = "ledger_rw"
+sslmode = "⟦extra⟧"⟦/⟧verify-full"⟦extra⟧"⟦/⟧
+pool_size = 10
+connect_timeout = 5.0⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-17⟧
+from: the events.toml of a club's website, a data file kept by hand, in which someone typed the date of a new event without the zeros before the month and the day
+⟦aligned⟧
+[[event]]
+name = "Spring tide walk"
+date = 2024-⟦missing⟧0⟦/⟧6-⟦missing⟧0⟦/⟧1
+guide = "Maren Holt"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-18⟧
+from: the config.toml of a Zola site in which someone selected the old address of the site together with its quotes and pasted the new address over the selection
+⟦aligned⟧
+base_url = ⟦missing⟧"⟦/⟧https://saltmarsh.example.org⟦missing⟧"⟦/⟧
+title = "Saltmarsh Field Notes"
+compile_sass = true
+build_search_index = false
+
+[markdown]
+highlight_code = true
+highlight_theme = "base16-ocean-dark"
+
+[extra]
+author = "Ines Varga"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-19⟧
+from: a Pipfile in which someone fixed the versions of two packages by pasting them from the output of pip freeze over the "*"
+⟦aligned⟧
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+requests = ⟦missing⟧"⟦/⟧==2.31.0⟦missing⟧"⟦/⟧
+gunicorn = ⟦missing⟧"⟦/⟧==21.2.0⟦missing⟧"⟦/⟧
+
+[dev-packages]
+pytest = "*"
+
+[requires]
+python_version = "3.11"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-20⟧
+from: a pyproject.toml in which someone added a path pattern to the per-file ignores of ruff and left out the quotes that a key with a slash and a star needs
+⟦aligned⟧
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "S", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+⟦missing⟧"⟦/⟧tests/*.py⟦missing⟧"⟦/⟧ = ["S101", "B011"]
+"scripts/*" = ["T201"]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-21⟧
+from: the settings of a self-hosted photo gallery, written by a French speaker who named three settings with accented letters, which a key without quotes cannot hold
+⟦aligned⟧
+[serveur]
+adresse = "0.0.0.0"
+port = 8080
+
+[galerie]
+titre = "Photos de famille"
+⟦missing⟧"⟦/⟧répertoire⟦missing⟧"⟦/⟧ = "/srv/photos"
+vignettes = 240
+tri = "date"
+
+[⟦missing⟧"⟦/⟧accès⟦missing⟧"⟦/⟧]
+⟦missing⟧"⟦/⟧invités⟦missing⟧"⟦/⟧ = false
+⟦end⟧
+
+⟦repair hand-editing-22⟧
+from: a Cargo.toml in which someone typed the header of the dependencies for Unix and left out the quotes around the cfg expression
+⟦aligned⟧
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+
+[target.⟦missing⟧"⟦/⟧cfg(unix)⟦missing⟧"⟦/⟧.dependencies]
+nix = { version = "0.28", features = ["signal"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = "0.52"
+
+[dev-dependencies]
+tempfile = "3.10"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-23⟧
+from: a book.toml in which someone pressed J in vim on the line of a header, which joined the next line to it
+⟦aligned⟧
+[book]
+title = "Sailing by the Tide Tables"
+authors = ["Ines Varga"]
+language = "en"
+src = "src"
+
+[output.html]⟦sp for lf⟧default-theme = "navy"
+git-repository-url = "https://github.com/saltmarsh/tide-book"
+edit-url-template = "https://github.com/saltmarsh/tide-book/edit/main/{path}"
+
+[output.html.search]
+limit-results = 20⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-24⟧
+from: a vector.toml in which someone deleted a setting and the empty line under it and pressed the delete key once more, which joined the next header to the line before
+⟦aligned⟧
+[sources.app_logs]
+type = "file"
+include = ["/var/log/orders/*.log"]⟦missing⟧
+⟦/⟧[transforms.parse]
+type = "remap"
+inputs = ["app_logs"]
+source = ". = parse_json!(.message)"
+
+[sinks.console]
+type = "console"
+inputs = ["parse"]
+encoding.codec = "json"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-25⟧
+from: a pixi.toml in which someone selected the name of a package from the start of its line to rename it, selected too far, and deleted the start of the line up to the middle of the word version
+⟦aligned⟧
+[project]
+name = "tide-analysis"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = ">=3.11"
+⟦missing⟧numpy = { ver⟦/⟧sion = ">=1.26", channel = "conda-forge" }
+pandas = ">=2.2"
+
+[tasks]
+test = "pytest -q"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-26⟧
+from: a typos.toml in which someone deleted a list of several lines and left the line with its closing bracket
+⟦aligned⟧
+[files]
+extend-exclude = ["*.lock", "vendor/", "testdata/"]
+
+[default]
+locale = "en-us"
+⟦extra⟧]
+⟦/⟧
+[default.extend-words]
+flate = "flate"
+ser = "ser"
+
+[type.py]
+extend-glob = ["*.pyi"]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-27⟧
+from: the Project.toml of a Julia package in which someone typed the new version in front of the old one and deleted only the opening quote of the old one
+⟦aligned⟧
+name = "TideTables"
+uuid = "7c1f2a34-9b0e-4d6a-8f21-3e5a9c0b7d12"
+version = "0.5.0"⟦extra⟧0.4.1"⟦/⟧
+
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+
+[compat]
+HTTP = "1.10"
+julia = "1.9"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-28⟧
+from: the profiles.toml of a backup tool on Windows in which someone typed two paths between double quotes with single backslashes
+⟦aligned⟧
+[default]⟦cr⟧
+repository = "D:\⟦missing⟧\⟦/⟧Backups\⟦missing⟧\⟦/⟧laptop"⟦cr⟧
+password-file = "restic-key.txt"⟦cr⟧
+⟦cr⟧
+[default.backup]⟦cr⟧
+source = ["C:\⟦missing⟧\⟦/⟧Users\⟦missing⟧\⟦/⟧zoe\⟦missing⟧\⟦/⟧Documents"]⟦cr⟧
+exclude = ["*.tmp", "Thumbs.db"]⟦cr⟧
+schedule = "daily"⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-29⟧
+from: a mise.toml in which someone pasted a git command with its own double quotes between the quotes of a task
+⟦aligned⟧
+[tools]
+node = "20"
+python = "3.12"
+
+[env]
+NODE_ENV = "development"
+
+[tasks.release]
+description = "Tag and push a release"
+run = "git tag -a ⟦missing⟧\⟦/⟧"v$VERSION⟦missing⟧\⟦/⟧" -m ⟦missing⟧\⟦/⟧"release $VERSION⟦missing⟧\⟦/⟧""
+
+[tasks.lint]
+run = "ruff check ."⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-30⟧
+from: a cliff.toml in which someone started the header text of several lines with two quotes where three are needed
+⟦aligned⟧
+[changelog]
+header = ""⟦missing⟧"⟦/⟧
+# Changelog
+
+All notable changes to this project are listed here.
+"""
+trim = true
+
+[git]
+conventional_commits = true
+tag_pattern = "v[0-9]*"
+sort_commits = "oldest"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-31⟧
+from: a gitleaks.toml in which someone made the pattern of a rule longer and typed over the closing apostrophe
+⟦aligned⟧
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "orders-api-key"
+description = "Orders API key"
+regex = 'ord_(live|test)_[a-z0-9]{32}⟦missing⟧'⟦/⟧
+keywords = ["ord_live", "ord_test"]
+
+[[rules]]
+id = "private-key-file"
+description = "Private key"
+regex = '''-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----'''
+
+[allowlist]
+paths = ['''testdata/.*''', '''docs/examples/.*''']⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-32⟧
+from: a traefik.toml in which someone typed a remark and did not hold the shift key for the comment sign, so that a 3 came out
+unsure: the 3 could be extra, as the key that was meant as the comment sign. This repair keeps it as the first character of the remark, which changes one code point less
+⟦aligned⟧
+[global]
+⟦tab⟧checkNewVersion = false
+⟦tab⟧sendAnonymousUsage = false
+
+[entryPoints]
+⟦tab⟧[entryPoints.web]
+⟦tab⟧⟦tab⟧address = ":80"
+⟦tab⟧⟦missing⟧#⟦/⟧3 redirect everything to https below
+⟦tab⟧[entryPoints.websecure]
+⟦tab⟧⟦tab⟧address = ":443"
+
+[providers.docker]
+⟦tab⟧exposedByDefault = false⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-33⟧
+from: a dnscrypt-proxy.toml in which someone removed the comment signs of a whole example block to switch it on, and the block held a line of explanation
+⟦aligned⟧
+listen_addresses = ['127.0.0.1:53']
+max_clients = 250
+ipv4_servers = true
+require_dnssec = true
+
+[query_log]
+⟦missing⟧#⟦/⟧Path to the query log file (absolute, or relative to this file)
+file = '/var/log/dnscrypt-proxy/query.log'
+format = 'tsv'
+
+[sources.public-resolvers]
+urls = ['https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md']
+cache_file = 'public-resolvers.md'
+refresh_delay = 72⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-34⟧
+from: a foundry.toml in which someone typed a new header and still held the shift key at its closing bracket
+⟦aligned⟧
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+
+[rpc_endpoints⟦} for ]⟧
+mainnet = "${MAINNET_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[fmt]
+line_length = 100⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-35⟧
+from: a fly.toml in which someone typed the header of a sub-table and hit the comma key, which is next to the dot key
+⟦aligned⟧
+app = "orders-api"
+primary_region = "ams"
+
+[build]
+dockerfile = "Dockerfile"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = true
+min_machines_running = 1
+
+[http_service⟦extra⟧,⟦/⟧⟦missing⟧.⟦/⟧concurrency]
+type = "requests"
+soft_limit = 200
+hard_limit = 250⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-36⟧
+from: a Rocket.toml edited in vim, where the command to save and quit was typed while the editor was still in insert mode
+⟦aligned⟧
+[default]
+address = "127.0.0.1"
+port = 8000
+workers = 4
+log_level = "normal"
+
+[release]
+address = "0.0.0.0"⟦extra⟧:wq⟦/⟧
+port = 8080
+log_level = "critical"
+keep_alive = 5
+
+[default.limits]
+form = "64 kB"
+json = "1 MiB"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-37⟧
+from: a Cargo.toml edited in vim, where a substitute command was typed with the enter key while the editor was still in insert mode, so that the command became a line of the file
+⟦aligned⟧
+[package]
+name = "kestrel"
+version = "0.3.0"
+⟦extra⟧:%s/2021/2024/g
+⟦/⟧edition = "2021"
+license = "MIT"
+description = """
+A small HTTP load tester \
+for staging servers."""
+
+[dependencies]
+hyper = { version = "1.3", features = ["client", "http1"] }
+tokio = { version = "1.37", features = ["full"] }⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-38⟧
+from: a .cargo/config.toml in which someone switched off the last flag of a list with the editor's comment command and selected one line too many, so that the closing bracket became a comment too
+⟦aligned⟧
+[build]
+jobs = 8
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+#    "-C", "target-cpu=native",
+⟦extra⟧#⟦/⟧]
+
+[alias]
+xt = "run --package xtask --"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-39⟧
+from: a Cargo.toml in which someone switched off the features of a dependency by typing a comment sign in the middle of its line, which also hid the closing brace
+unsure: the comment sign could be extra, with the features as a part of the inline table again. Both readings change one code point
+⟦aligned⟧
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0" ⟦missing⟧}⟦/⟧#, features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+insta = { version = "1.38", features = ["yaml"] }⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-40⟧
+from: the settings of a music server at home in which someone typed a remark about two addresses in front of the closing bracket of their list
+⟦aligned⟧
+[server]
+bind = "0.0.0.0"
+port = 4533
+trusted_proxies = ["10.0.0.1", "192.168.1.20"⟦missing⟧]⟦/⟧ # router, nas]
+base_url = "/music"
+
+[library]
+music_folder = "/srv/music"
+scan_schedule = "@every 1h"
+umask = 0o022
+
+[transcoding]
+enabled = true
+max_bitrate = 192⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-41⟧
+from: a clippy.toml in which someone typed a new setting on a new line while the cursor still stood above the closing bracket of a list
+⟦aligned⟧
+disallowed-names = [
+    "tmp",
+    "stuff",⟦missing⟧]⟦/⟧
+    msrv = "1.74"
+⟦extra⟧]
+⟦/⟧doc-valid-idents = ["GitLab"]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-42⟧
+from: a telegraf.conf in which someone moved the last address of a list down with the editor's command for moving a line and pressed the key once too often, so that the line went past the closing bracket
+⟦aligned⟧
+[agent]
+  interval = "10s"
+  flush_interval = "10s"
+
+[[inputs.cpu]]
+  percpu = true
+  totalcpu = true
+
+[[inputs.ping]]
+  urls = [
+    "192.168.1.1",
+    "1.1.1.1",
+⟦extra⟧  ]
+⟦/⟧    "nas.local",⟦missing⟧]⟦/⟧
+  count = 3
+  timeout = 2.0
+
+[[outputs.influxdb_v2]]
+  urls = ["http://127.0.0.1:8086"]
+  organization = "home"
+  bucket = "sensors"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-43⟧
+from: the config.toml of a Hugo site in which someone cut a table to move it to the end of the file and started the selection one character too late, so that the opening bracket of the header stayed behind
+⟦aligned⟧
+baseURL = "https://lowtide.example.net/"
+title = "Low Tide Journal"
+languageCode = "en-gb"
+
+⟦extra⟧[
+⟦/⟧
+[params]
+author = "Tomas Brandt"
+showReadingTime = true
+launched = 2023-11-04
+
+⟦missing⟧[⟦/⟧markup.highlight]
+style = "monokai"
+lineNos = true
+
+[taxonomies]
+tag = "tags"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-44⟧
+from: a pyproject.toml of Poetry in which someone began to turn a dependency written as an inline table into a table of its own: the header is typed and the start of the old line is deleted, and the comma and the closing brace are still there
+⟦aligned⟧
+[tool.poetry]
+name = "orders-api"
+version = "1.4.0"
+description = "Order intake service"
+authors = ["Dana Whitfield <dana@orders.example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.110"
+
+[tool.poetry.dependencies.uvicorn]
+version = "^0.29"⟦extra⟧,⟦/⟧⟦sp for lf⟧extras = ["standard"] ⟦extra⟧}⟦/⟧
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-45⟧
+from: a Trunk.toml in which someone added a folder to the ignore list and typed the comma before the closing quote
+unsure: the comma inside the first string could be extra, as the comma that is missing after the string, typed one place too early. This repair keeps it as a part of the string, which changes one code point less
+⟦aligned⟧
+[build]
+target = "index.html"
+dist = "dist"
+release = false
+
+[serve]
+address = "127.0.0.1"
+port = 8080
+open = false
+
+[watch]
+ignore = ["dist,"⟦missing⟧,⟦/⟧ "target", "node_modules"]⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-46⟧
+from: a netlify.toml in which someone pasted an address without quotes, selected it with a double click and typed a quote so that the editor would put quotes around the selection, and the double click had selected only the first word
+⟦aligned⟧
+[build]
+command = "npm run build"
+publish = "dist"
+
+[[redirects]]
+from = "/api/*"
+to = "https⟦extra⟧"⟦/⟧://api.saltmarsh.example.org/:splat⟦missing⟧"⟦/⟧
+status = 200
+force = true
+
+[[headers]]
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-47⟧
+from: a pyproject.toml in which someone pressed the enter key inside a long description to keep the line short, and the editor indented the second half
+⟦aligned⟧
+[project]
+name = "lumen-cache"
+version = "2.1.0"
+description = "A read-through cache for slow HTTP APIs,⟦lf for sp⟧  with per-route expiry and a small admin page"
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.urls]
+Source = "https://github.com/lumen-cache/lumen-cache"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-48⟧
+from: the conduit.toml of a Matrix server in which someone switched registration on and typed two letters of true in the wrong order
+unsure: by rule 5 the word could become the string "ture", which also changes two code points
+⟦aligned⟧
+[global]
+server_name = "matrix.saltmarsh.example.org"
+database_backend = "rocksdb"
+database_path = "/var/lib/matrix-conduit/"
+port = 6167
+max_request_size = 20_000_000
+allow_registration = t⟦extra⟧u⟦/⟧r⟦missing⟧u⟦/⟧e
+allow_federation = true
+trusted_servers = ["matrix.org"]
+address = "127.0.0.1"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-49⟧
+from: the config.toml of containerd in which someone typed a long header by hand and hit the dot key twice
+⟦aligned⟧
+version = 2
+
+[plugins."io.containerd.grpc.v1.cri"]
+  sandbox_image = "registry.k8s.io/pause:3.9"
+
+[plugins."io.containerd.grpc.v1.cri".⟦extra⟧.⟦/⟧containerd]
+  snapshotter = "overlayfs"
+  default_runtime_name = "runc"
+
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = "/etc/containerd/certs.d"⟦lf⟧
+⟦end⟧
+
+⟦repair hand-editing-50⟧
+from: the languages.toml of the Helix editor in which someone added an argument to the formatter of a language and typed over the closing brace
+⟦aligned⟧
+[[language]]
+name = "python"
+auto-format = true
+formatter = { command = "black", args = ["--quiet", "-"]⟦missing⟧}⟦/⟧
+language-servers = ["pyright", "ruff"]
+
+[[language]]
+name = "toml"
+formatter = { command = "taplo", args = ["fmt", "-"] }⟦lf⟧
+⟦end⟧
