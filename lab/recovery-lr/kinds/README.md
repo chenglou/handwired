@@ -159,6 +159,55 @@ The runs one by one, from their records:
 | 10 | 4 | 91.93 | 86.49 | 96.12 | 87.00 | 93.20 | 2360 | 2276 | 49 | 30 | cb420a7 | 211caab628d3773d |
 | 10 | 5 | 92.14 | 86.76 | 96.28 | 87.22 | 93.26 | 2377 | 2220 | 55 | 31 | cb420a7 | 3c4bbb75a8b3326c |
 
+### Per kind
+
+`bun lab/recovery-lr/kinds/runs/by-kind.ts --mixed <folder> --neutral <folder>` scores row 10 and two bars on the validation samples of each kind alone. The sets are small, 8 to 151 samples, so a line with few samples says little.
+
+The samples of the mixed validation split that have one kind alone, and in the last line the ones with two kinds. Row 10 of the recipe, 5 seeds trained on the dataset's train split and 5 on the mixed train split: the mean with the lowest and the highest. Every number but the first two columns is the percentage of the scored code points with all three right.
+
+| kind | samples | scored code points | bar: yacc error productions | bar: hand-written rules | row 10 trained on the dataset's train split | row 10 trained on the mixed train split |
+| --- | --- | --- | --- | --- | --- | --- |
+| doubleSemicolon | 151 | 22662 | 97.9 | 97.9 | 22.6 (21.0 to 24.4) | 97.6 (96.7 to 97.9) |
+| inAfterTopDefinition | 108 | 15363 | 51.0 | 51.0 | 77.9 (50.9 to 97.6) | 97.4 (97.3 to 97.6) |
+| sequenceSemicolon | 8 | 985 | 72.0 | 72.0 | 84.2 (82.4 to 84.8) | 76.9 (71.9 to 92.7) |
+| typeAnnotation | 137 | 17447 | 96.4 | 100.0 | 97.7 (97.3 to 98.3) | 100.0 (100.0 to 100.0) |
+| patternParameters | 84 | 15183 | 94.8 | 99.0 | 95.8 (95.8 to 95.8) | 100.0 (100.0 to 100.0) |
+| floatNumber | 109 | 12440 | 100.0 | 100.0 | 97.6 (92.6 to 100.0) | 100.0 (99.9 to 100.0) |
+| openLine | 57 | 14966 | 100.0 | 98.1 | 98.1 (98.1 to 98.1) | 99.6 (98.1 to 100.0) |
+| doubleEquals | 72 | 14950 | 100.0 | 100.0 | 100.0 (100.0 to 100.0) | 100.0 (100.0 to 100.0) |
+| bangEquals | 15 | 2753 | 100.0 | 100.0 | 98.6 (97.2 to 100.0) | 99.7 (98.8 to 100.0) |
+| wordOperatorAsSign | 17 | 2551 | 100.0 | 100.0 | 99.1 (96.4 to 100.0) | 98.3 (92.9 to 99.9) |
+| arrowFunction | 22 | 2697 | 91.7 | 95.0 | 83.2 (82.0 to 84.7) | 99.2 (97.5 to 100.0) |
+| otherFunKeyword | 30 | 5799 | 90.6 | 99.5 | 98.8 (97.3 to 99.5) | 98.9 (97.5 to 99.6) |
+| elif | 30 | 4108 | 49.7 | 49.7 | 50.1 (49.7 to 51.3) | 50.6 (49.8 to 51.6) |
+| conditionWithoutThen | 63 | 7915 | 96.7 | 96.5 | 96.4 (95.9 to 96.6) | 98.2 (97.4 to 98.9) |
+| otherDefinitionKeyword | 110 | 24588 | 75.5 | 64.1 | 87.6 (85.9 to 88.8) | 96.2 (95.5 to 97.9) |
+| semicolonAfterDefinition | 129 | 20368 | 97.1 | 97.1 | 32.1 (15.5 to 95.8) | 97.0 (96.3 to 97.2) |
+| bracesAroundBody | 71 | 10372 | 95.5 | 100.0 | 92.5 (90.0 to 94.3) | 99.3 (99.1 to 99.6) |
+| singleQuoteString | 40 | 6449 | 94.2 | 94.3 | 90.9 (89.7 to 91.5) | 97.3 (96.5 to 97.9) |
+| otherComment | 68 | 14599 | 95.3 | 91.2 | 90.0 (85.6 to 91.9) | 95.1 (94.7 to 95.4) |
+| haskellOperator | 17 | 2660 | 100.0 | 99.5 | 99.6 (99.5 to 99.8) | 99.5 (99.3 to 100.0) |
+| commaInList | 29 | 3973 | 100.0 | 100.0 | 85.4 (78.4 to 90.7) | 100.0 (100.0 to 100.0) |
+| semicolonInTuple | 23 | 3410 | 83.5 | 83.5 | 86.4 (85.7 to 86.8) | 100.0 (99.8 to 100.0) |
+| trailingSeparator | 51 | 6020 | 100.0 | 100.0 | 100.0 (100.0 to 100.0) | 100.0 (100.0 to 100.0) |
+| tupleWithoutBrackets | 15 | 2767 | 88.0 | 97.8 | 97.8 (97.8 to 97.9) | 96.3 (93.6 to 97.8) |
+| missingClosingBracket | 94 | 14097 | 100.0 | 100.0 | 100.0 (100.0 to 100.0) | 99.8 (99.8 to 100.0) |
+| extraClosingBracket | 92 | 9798 | 85.3 | 91.7 | 96.6 (96.4 to 97.0) | 94.5 (93.7 to 95.2) |
+| wrongClosingBracket | 64 | 6300 | 90.4 | 93.3 | 91.2 (88.9 to 92.9) | 99.0 (98.9 to 99.3) |
+| missingIn | 20 | 4301 | 80.9 | 80.9 | 81.7 (80.0 to 84.3) | 82.3 (80.9 to 84.3) |
+| unbracketedArgument | 20 | 3850 | 78.8 | 81.2 | 80.6 (78.8 to 81.9) | 88.0 (83.4 to 90.7) |
+| unclosedString | 41 | 6026 | 82.3 | 82.3 | 82.0 (81.4 to 82.3) | 81.7 (81.4 to 82.0) |
+| unfinishedDefinition | 52 | 7022 | 100.0 | 100.0 | 98.9 (97.5 to 100.0) | 100.0 (100.0 to 100.0) |
+| codeFence | 89 | 21793 | 100.0 | 97.7 | 97.7 (96.8 to 98.4) | 100.0 (100.0 to 100.0) |
+| mergeConflictMarkers | 36 | 6444 | 99.2 | 99.0 | 99.0 (99.0 to 99.0) | 99.1 (99.0 to 99.2) |
+| toplevelPrompt | 72 | 19001 | 97.3 | 97.3 | 24.7 (23.4 to 26.3) | 97.0 (96.0 to 97.4) |
+| two kinds | 464 | 103476 | 86.7 | 87.3 | 76.8 (73.4 to 79.5) | 93.3 (93.2 to 93.4) |
+
+- Most of the gap between the two train sets comes from one mistake in four kinds: a `;`, a `;;` or an `in` after a definition at the top (`doubleSemicolon` 22.6% against 97.6%, `toplevelPrompt` 24.7% against 97.0%, `semicolonAfterDefinition` 32.1% against 97.0%, `inAfterTopDefinition` 77.9% against 97.4%). The tables trained on the dataset alone lose the rest of the program there, and in two of these kinds one seed of the five happens to get it right (95.8% and 97.6%). Both hand-made bars handle the `;` and not the `in`.
+- Most other kinds are already above 90% with the dataset's damage alone, and the mixed train set adds a few points: `commaInList`, `semicolonInTuple`, `arrowFunction`, `bracesAroundBody`, `wrongClosingBracket`, `singleQuoteString`, `otherDefinitionKeyword`.
+- Some kinds stay low for every parser here, the bars included: `elif` at 50%, `missingIn`, `unclosedString` and `unbracketedArgument` near 80%. For `elif` and `unclosedString` part of the labels is out of every parser's reach (see "Known limits"); for the others this README does not know why.
+- On three kinds the tables trained on the mixed set are a little below the ones trained on the dataset alone: `extraClosingBracket` (94.5% against 96.6%), `tupleWithoutBrackets` and `sequenceSemicolon`, the last two on 15 and 8 samples.
+
 Notes on the runs:
 
 - The seeds 1 to 3 ran at the commit 44e74e6 and the seeds 4 and 5 at cb420a7. Between the two, another agent added the folder `../learn/scale/` and changed no file that the recipe or this folder reads. The folder `runs/` itself was not committed yet when the runs started, which is why every record lists it among the files that differ from the commit.
