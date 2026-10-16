@@ -304,7 +304,7 @@ bun lab/recovery-parser/learn/arms/holes/tune.ts --name temperature --passes 3 -
 bun lab/recovery-parser/learn/arms/holes/tune.ts --name sharpness-cost --passes 3 --start uniform --sharpness-cost 0.01,0.1
 ```
 
-Every run gives the same tables when it is made again: the 13 tuned settings and every trained setting were run a second time from an empty scratch folder, and every number of the first version of this README that they stand behind came out the same, to the printed digit.
+Every run was made a second time, from an empty scratch folder: the 13 tuned settings, every trained setting and the search with the most read cells first gave every number of the first version of this README that they stand behind again, to the printed digit.
 
 ## Files
 
