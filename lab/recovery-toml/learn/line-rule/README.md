@@ -27,7 +27,7 @@ No other hand-written rule is in: no class is chosen by hand, no display entry i
 The cells of a line end, 142 of the tokenizer and 71 of the grammar, are kept out of the training and of the search, the way the recipe keeps its 378 kept grammar cells: they are not trainable and hold the base's choice. For the 1,408 cells that wait there are two variants, `--waiting-cells` of `run.ts`:
 
 - **fixed**: they are kept out too. This is the variant that was asked for, "keep the cells of the rule fixed". The training has 3,664 of the 3,806 open tokenizer cells, 3,765 of the 5,622 open grammar cells and every open display entry. The grammar cells that are left to it are those of depth 2 and more and those that do not lead into `error` today, so at depth 0 and 1 the training can change what the tokenizer says and what is shown, but not where the grammar goes after an error.
-- **trainable**: they are set in the base and the training may change them, from the recipe's share of 0.9 on the base's choice, as it may change every other open cell. The training has 5,173 of the 5,622 open grammar cells. This variant was added because the fixed variant leaves the training little of the grammar. One seed only, see below.
+- **trainable**: they are set in the base and the training may change them, from the recipe's share of 0.9 on the base's choice, as it may change every other open cell. The training has 5,173 of the 5,622 open grammar cells. This variant was not asked for. It was added because the fixed variant leaves the training little of the grammar at depth 0 and 1, so a low number of the fixed variant could be read as "the training had nothing left to set". One seed only, see below.
 
 Everything else is the recipe's, called from `../recipe.ts`: the classes of its rule, its kept cells, no events of a text's end in a trained tokenizer cell, 3 passes over the 42,082 train samples of the dataset as it is, batches of 32, learning rate 0.05, 4 worker threads, then the count and today's kinds in the state `error`. Row (c) has the recipe's search of four passes before the count, over the same cells that the training may change.
 
@@ -53,7 +53,8 @@ On the validation split. "Header names after an error" is the share of the 50,45
 ## What ran and what did not
 
 - Ran: `run.ts --base`, which scored row (a), and `../runs/check.ts --tables` on the two files of tables of row (a): every check passed (frozen cells hold today's, 48,909 valid texts get today's trace at every position, 48,247 broken texts keep today's trace up to their first error, and valid texts with a value of more than 16 levels are shown as today).
-- Started at 16:13 and not finished when this was written: the variant "fixed" with the seeds 1, 2 and 3, and at 16:14 the variant "trainable" with the seed 1, all four at the same time. The machine was running seven other trainings of other work then (a load of 40 to 50 on 18 cores), so a training takes far longer than the 12 minutes that it took alone.
+- Started at 16:13 and not finished when this was written: the variant "fixed" with the seeds 1 and 2, and at 16:14 the variant "trainable" with the seed 1, at the same time. The machine was running seven to ten trainings of other work then (a load of 40 to 60 on 18 cores), so each of these trainings got about 1.4 cores for its 4 worker threads and takes far longer than the 12 minutes that a training took alone.
+- Stopped by hand: the variant "fixed" with the seed 3 started at 16:13 with the others and was stopped at 16:21, before its training ended, to leave the other three more of the machine. It has no number.
 
 ## What the numbers say
 
