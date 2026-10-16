@@ -1,10 +1,16 @@
-// Checks of what the arm "combined" adds to the recipes of round 1, in five parts:
-// 1. The cells of too deep valid JSON for a changed layout. For today's tables the mask is the one of
+// Checks of what the arm "combined" adds to the recipes of round 1, in six parts:
+// 1. Valid JSON of more than 16 levels. For today's tables the mask of the kept cells is the one of
 //    ../generic/generic.ts. For the bases of the arm's three lines, tables with the base's choice in the cells of
-//    the mask and a random choice in every other open cell and open display entry give valid JSON of more than 16
-//    levels the depth and the container of the base at every code point, in four forms: the two of
-//    ../../check-deep.ts, texts with a container after their deepest part, and texts with a line feed after every
-//    bracket, comma and colon. Without the mask, random open cells give other depths.
+//    the mask and a random choice in every other open cell and open display entry give such texts the depth and
+//    the container of the base at every code point, in five forms: the four of deep-valid.ts and texts with a
+//    container after their deepest part. Without the mask, random open cells give other depths. Such random tables
+//    show other display kinds than the base, and with today's kinds in the display entries of the state `error`,
+//    the third kept setting, they show the base's kinds at every code point when the base holds today's cells.
+//    The two bases of today's tables have no wrong depth on those texts. The hand-written base is checked to fail
+//    in the form with members and small containers on both sides, as README.md says it does: the base itself has
+//    wrong depths there, and its mask, which is made from chains of containers, does not keep what the base does.
+//    And the display kinds of a valid text that deep-valid.ts scans are the reference highlighter's on texts that
+//    the reference accepts.
 // 2. The events of a text's end with added classes and spare states: after ruleOutEndEvents no trainable tokenizer
 //    cell that a code point reads has a share for such an event, and random weights never snap to one.
 // 3. The search that counts whole samples first, on 2,000 train samples and 60 cells: its steps add up to a run of
@@ -13,14 +19,18 @@
 //    hold the base's choice, and no tokenizer cell that a code point reads holds an event of a text's end.
 // 5. The recipe without the arm's new parts, bestOfExtraFacts, gives the tables that ../extra-facts/run.ts saved
 //    for its best row and the seed 11, so that row is the control of the arm's line with the classes chosen by hand.
+// 6. The saved tables of the candidates, when run.ts saved them: the two from today's tables have the depth, the
+//    container and the display kind of today's tables at every code point of the too deep valid texts.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after
 // `../extra-facts/run.ts --trainer three-base --settings all --seeds 11,12,13,14,15`. About 3 minutes, most of it
 // the training of the fifth part, with 4 worker threads. check-all.ts does not run it:
 //   bun lab/recovery-parser/learn/arms/combined/check.ts
 import {existsSync} from 'node:fs'
+import {labelsOfValidText} from '../../../labels.ts'
 import {createRandom} from '../../../random.ts'
-import {deepTexts, deepTextsWithMembersAfter} from '../../check-deep.ts'
+import {deepTexts} from '../../check-deep.ts'
+import {validText, validTextOfDepth} from '../../check-texts.ts'
 import {refuseUnknownOptions, selectSamples, standardRange} from '../../data.ts'
 import {codePointsOf, runRecoveryParser} from '../../recovery-parser.ts'
 import {type RecoveryTables, asIsTables, classNames, copyTables, eventNames, loadTablesOfThisDataset, randomizeOpenCells, tablesToJson} from '../../recovery-tables.ts'
@@ -29,7 +39,11 @@ import {createCellArrays, mixesInto, snappedTables} from '../../soft/twin.ts'
 import {armNameOf, confirmationSeeds as seedsOfExtraFactsConfirmation, savedTablesOf, settingOfKey} from '../extra-facts/facts.ts'
 import {cellsOfTooDeepValidJson as cellsOfTooDeepValidJsonOfGeneric} from '../generic/generic.ts'
 import {trainPartOfTheStandardSet} from '../harness.ts'
-import {baseOf, bestOfExtraFacts, buildRecipe, cellsOfTooDeepValidJson, fromHandWritten, generic, modelOf, recipeWith, savedTablesFileOf, searchedCellsOf, spreadOverLines, tuningSeeds, withHandClasses} from './combined.ts'
+import {
+  baseOf, bestOfExtraFacts, buildRecipe, candidates, cellsOfTooDeepValidJson, fromHandWritten, generic, modelOf, recipeWith, reportedSeeds, savedTablesFileOf, searchedCellsOf, tuningSeeds, withHandClasses,
+  withTodaysKindsInErrorState,
+} from './combined.ts'
+import {countsOnTooDeepTexts, kindsOfValidText, tooDeepForms} from './deep-valid.ts'
 import {searchForWholeSamples} from './whole-search.ts'
 
 refuseUnknownOptions('arms/combined/check.ts', [])
@@ -43,20 +57,21 @@ const check = (holds: boolean, sentence: string) => {
 const sameMask = (left: Uint8Array, right: Uint8Array) => left.length === right.length && left.every((kept, cell) => kept === right[cell])
 const countOf = (mask: Uint8Array) => mask.reduce((total, kept) => total + kept, 0)
 check(sameMask(cellsOfTooDeepValidJson(asIsTables()), cellsOfTooDeepValidJsonOfGeneric()), `for today's tables the mask is the one of ../generic/generic.ts, ${countOf(cellsOfTooDeepValidJson(asIsTables()))} cells`)
-const withAContainerAfter = deepTexts(300).filter(text => Array.from(text).length <= 460).map(text => `[${text}, {"after": [1, {"inner": [true]}]}, [null]]`)
-const overLines = [...deepTexts(300), ...deepTextsWithMembersAfter(300)].map(spreadOverLines).filter(text => Array.from(text).length <= 512)
-const deepForms = [
-  {name: 'nothing after the nested containers', texts: deepTexts(300)}, {name: 'members after them', texts: deepTextsWithMembersAfter(300)},
-  {name: 'a container after the deepest part', texts: withAContainerAfter}, {name: 'a line feed after every bracket, comma and colon', texts: overLines},
-]
-// At how many code points of the texts `tables` give another depth or container than `base`.
+const deepForms = [...tooDeepForms, {name: 'a container after the deepest part', texts: deepTexts(300).filter(text => Array.from(text).length <= 460).map(text => `[${text}, {"after": [1, {"inner": [true]}]}, [null]]`)}]
+// The form in which the hand-written base loses the depth, see deep-valid.ts.
+const formOfAnyShape = tooDeepForms[3]!
+// At how many code points of the texts `tables` give another depth or container than `base`, and at how many
+// another display kind.
 function differencesFrom(base: RecoveryTables, tables: RecoveryTables, texts: readonly string[]) {
-  let differences = 0
+  const differences = {nesting: 0, kinds: 0}
   for (const text of texts) {
     const {codePoints, truncated} = codePointsOf(text)
     const expected = runRecoveryParser(codePoints, truncated, base)
     const trace = runRecoveryParser(codePoints, truncated, tables)
-    for (let position = 0; position < codePoints.length; position++) if (trace.depthAfter[position] !== expected.depthAfter[position] || trace.containerAfter[position] !== expected.containerAfter[position]) differences++
+    for (let position = 0; position < codePoints.length; position++) {
+      if (trace.depthAfter[position] !== expected.depthAfter[position] || trace.containerAfter[position] !== expected.containerAfter[position]) differences.nesting++
+      if (trace.displayKind[position] !== expected.displayKind[position]) differences.kinds++
+    }
   }
   return differences
 }
@@ -65,21 +80,41 @@ for (const {name, recipe} of [{name: 'the generic recipe', recipe: generic}, {na
   const base = baseOf(recipe)
   const kept = cellsOfTooDeepValidJson(base)
   for (const form of deepForms) {
-    let withTheMask = 0
+    const withTheMask = {nesting: 0, kinds: 0, kindsWithTodaysInErrorState: 0}
     let withoutTheMask = 0
     for (let setting = 0; setting < randomSettings; setting++) {
       const random = copyTables(base)
       randomizeOpenCells(random, createRandom(standardRange.seed, 100 + setting))
-      withoutTheMask += differencesFrom(base, random, form.texts)
+      withoutTheMask += differencesFrom(base, random, form.texts).nesting
       for (let cell = 0; cell < kept.length; cell++) {
         if (kept[cell] === 0) continue
         random.grammarNext[cell] = base.grammarNext[cell]!
         random.grammarAction[cell] = base.grammarAction[cell]!
       }
-      withTheMask += differencesFrom(base, random, form.texts)
+      const differences = differencesFrom(base, random, form.texts)
+      withTheMask.nesting += differences.nesting
+      withTheMask.kinds += differences.kinds
+      withTheMask.kindsWithTodaysInErrorState += differencesFrom(base, withTodaysKindsInErrorState(random), form.texts).kinds
     }
-    check(withTheMask === 0 && withoutTheMask > 0, `${name}, ${countOf(kept)} kept cells, ${form.texts.length} too deep valid texts with ${form.name}, ${randomSettings} random settings of the other open cells: ${withTheMask} code points have another depth or container than with the base, and ${withoutTheMask} without the mask`)
+    const maskShouldHold = recipe.start === 'today' || form !== formOfAnyShape
+    check((withTheMask.nesting === 0) === maskShouldHold && withoutTheMask > 0, `${name}, ${countOf(kept)} kept cells, ${form.texts.length} too deep valid texts with ${form.name}, ${randomSettings} random settings of the other open cells: ${withTheMask.nesting} code points have another depth or container than with the base${maskShouldHold ? '' : ', since these texts read cells that the mask of this base does not hold'}, and ${withoutTheMask} without the mask`)
+    if (recipe.start === 'today') check(withTheMask.kinds > 0 && withTheMask.kindsWithTodaysInErrorState === 0, `the same tables with the mask: ${withTheMask.kinds} code points are shown otherwise than with the base, and ${withTheMask.kindsWithTodaysInErrorState} with today's kinds in the display entries of the state error`)
   }
+  const wrongDepthsOfBase = deepForms.map(form => countsOnTooDeepTexts(base, form.texts).wrongDepths)
+  check(wrongDepthsOfBase.every((count, form) => (count === 0) === (recipe.start === 'today' || deepForms[form] !== formOfAnyShape)), `${name}: the base has ${wrongDepthsOfBase.join(', ')} wrong depths on the too deep valid texts of the five forms`)
+}
+{
+  const random = createRandom(standardRange.seed, 400)
+  let codePoints = 0
+  let differences = 0
+  for (let text = 0; text < 3000; text++) {
+    const valid = text % 3 === 0 ? validTextOfDepth(random, 16) : validText(random)
+    const labels = labelsOfValidText(valid)
+    const kinds = kindsOfValidText(valid)
+    codePoints += labels.length
+    differences += kinds.length === labels.length ? labels.filter((label, position) => label.kind !== kinds[position]).length : labels.length
+  }
+  check(differences === 0, `the display kinds that deep-valid.ts scans differ from the reference highlighter's at ${differences} of the ${codePoints} code points of 3,000 valid texts that the reference accepts, 1,000 of them with 16 levels`)
 }
 
 // Part 2.
@@ -150,6 +185,20 @@ for (const {name, recipe} of [{name: 'the generic recipe', recipe: generic}, {na
   const saved = savedTablesOf(armNameOf('three-base', seedsOfExtraFactsConfirmation), settingOfKey('all').name, seed)
   const built = await buildRecipe(bestOfExtraFacts, seed, 'combined-check')
   check(tablesToJson(built.tables) === tablesToJson(saved), `the recipe without the arm's new parts gives the tables that ../extra-facts/run.ts saved for its best row and the seed ${seed}`)
+}
+
+// Part 6.
+for (const candidate of candidates) {
+  const files = reportedSeeds.map(seed => savedTablesFileOf('combined', candidate.recipe, seed))
+  if (!files.every(file => existsSync(file))) {
+    console.log(`skipped: the saved tables of the candidate ${JSON.stringify(candidate.name)} are not there`)
+    continue
+  }
+  const counts = files.map(file => deepForms.map(form => countsOnTooDeepTexts(loadTablesOfThisDataset(file).tables, form.texts)))
+  const total = (count: 'wrongDepths' | 'kindsOtherThanTodays') => counts.flat().reduce((sum, ofForm) => sum + ofForm[count], 0)
+  const sentence = `the saved tables of the candidate ${JSON.stringify(candidate.name)}, seeds ${reportedSeeds.join(', ')}, on the too deep valid texts of the five forms: ${total('wrongDepths')} wrong depths, and ${total('kindsOtherThanTodays')} code points shown otherwise than by today's tables`
+  if (candidate.recipe.start === 'today') check(total('wrongDepths') === 0 && total('kindsOtherThanTodays') === 0, sentence)
+  else console.log(`not a check, since this candidate keeps what the hand-written tables do: ${sentence}`)
 }
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)

@@ -4,15 +4,16 @@
 //
 // A recipe has a start (today's tables, or the 35 hand-written rules), additions to the layout (character classes,
 // open display entries, the bit "first on its line", spare states), a training from the base's choices, two settings
-// that keep what no sample asks for, and steps after the training (a search, a count of the display entries).
+// that keep what no sample asks for, and steps after the training: a search, a count of the display entries, and
+// a third kept setting, today's kinds in the display entries of the grammar state `error`.
 import {existsSync} from 'node:fs'
 import {join} from 'node:path'
 import {createRandom} from '../../../random.ts'
 import {tooDeepText, tooDeepTextWithMembersAfter} from '../../check-texts.ts'
 import {standardRange} from '../../data.ts'
 import {handwrittenTables} from '../../handwritten/rules.ts'
-import {codePointsOf, createTrace, runRecoveryParserInto, runRecoveryParserOnText} from '../../recovery-parser.ts'
-import {type AddedClass, type RecoveryTables, actionCount, addClasses, addFirstOnLineBit, addStates, asIsTables, eventNames, loadTablesOfThisDataset, openDisplayEntries, today} from '../../recovery-tables.ts'
+import {codePointsOf, createTrace, runRecoveryParserInto} from '../../recovery-parser.ts'
+import {type AddedClass, type RecoveryTables, actionCount, addClasses, addFirstOnLineBit, addStates, asIsTables, copyTables, displayEntryOf, loadTablesOfThisDataset, openDisplayEntries, tablesToJson, today} from '../../recovery-tables.ts'
 import {type RunSamples, prepareSamples} from '../../search/sample-runs.ts'
 import {train} from '../../soft/train.ts'
 import {type TwinData, type TwinModel, createModel} from '../../soft/twin.ts'
@@ -56,16 +57,23 @@ export type Recipe = {
   // The most passes of the search over its cells. Undefined is a search that ends by a pass that changes nothing,
   // which took 9 to 19 passes from trained tables.
   searchPasses: number | undefined
-  // True sets every open display entry by a count over the train samples as the last step, see
+  // True sets every open display entry by a count over the train samples after the search, see
   // displayEntriesByCount of ../extra-facts/facts.ts.
   displayByCount: boolean
+  // True goes on after the count with the recipe's search and the count in turns, until a count changes no display
+  // entry, see roundsInTurns. The search reads the display table and changes no entry of it, so one search and one
+  // count leave cells that were chosen with other entries than the tables end with.
+  inTurns: boolean
+  // True gives the display entries of the grammar state `error` today's kinds again as the last step, see
+  // withTodaysKindsInErrorState.
+  todaysKindsInErrorState: boolean
 }
 
 // The best row of ../extra-facts/: the 15 classes chosen by hand, open display entries and the bit, three passes
 // from the base's choices. Every recipe of the arm is named by what it has otherwise.
 export const bestOfExtraFacts: Recipe = {
   start: 'today', classes: 'hand', displayEntries: true, firstOnLineBit: true, spareTokenizerStates: 0, spareGrammarStates: 0, passes: 3, tooDeepCells: 'trained', endEvents: 'allowed',
-  errorTargetShare: 0, searchOrder: undefined, searchCounts: 'code points', searchPasses: undefined, displayByCount: false,
+  errorTargetShare: 0, searchOrder: undefined, searchCounts: 'code points', searchPasses: undefined, displayByCount: false, inTurns: false, todaysKindsInErrorState: false,
 }
 export const recipeWith = (changes: Partial<Recipe>, from: Recipe): Recipe => ({...from, ...changes})
 
@@ -88,6 +96,8 @@ export function describeRecipe(recipe: Recipe): string {
   if (recipe.errorTargetShare > 0) parts.push(`added code points as an error at the weight ${recipe.errorTargetShare}`)
   if (recipe.searchOrder !== undefined) parts.push(`then searched${recipe.searchCounts === 'whole samples' ? ' for whole samples' : ''}, order ${recipe.searchOrder}${passesOfSearch(recipe)}`)
   if (recipe.displayByCount) parts.push('then the display entries by a count')
+  if (recipe.inTurns) parts.push('then the search and the count in turns')
+  if (recipe.todaysKindsInErrorState) parts.push('then today\'s kinds in the state error')
   return parts.join(', ')
 }
 
@@ -109,6 +119,8 @@ export function shortNameOf(recipe: Recipe): string {
   if (recipe.errorTargetShare > 0) parts.push(`added code points as an error at the weight ${recipe.errorTargetShare}`)
   if (recipe.searchOrder !== undefined) parts.push(`then searched${recipe.searchCounts === 'whole samples' ? ' for whole samples' : ''}, order ${recipe.searchOrder}${passesOfSearch(recipe)}`)
   if (recipe.displayByCount) parts.push('then the display entries by a count')
+  if (recipe.inTurns) parts.push('then the search and the count in turns')
+  if (recipe.todaysKindsInErrorState) parts.push('then today\'s kinds in the state error')
   return parts.join(', ')
 }
 
@@ -140,11 +152,20 @@ export function baseOf(recipe: Recipe): RecoveryTables {
 // - the whole row of the state `error`, which a too deep text of another form reads,
 // - for tables with the bit "first on its line", the copy of each such cell with the other value of the bit: the
 //   texts above have no line feed, and a text that is spread over lines reads the copies with the bit.
-// Tables that hold the base's choice in these cells give each of those 4,000 texts the trace of `base`. When `base`
-// holds today's choices there, as every base of today's tables does, that is today's trace for every too deep valid
-// text: its first error leads into the state `error`, the row of that state leads nowhere else, and its tokenizer
-// cells are the ones of valid JSON, which are frozen, also for an added class. For the hand-written tables as the
-// base nothing closes the argument for texts of another form, so check.ts tries such texts.
+// Tables that hold the base's choice in these cells give each of those 4,000 texts the grammar states, the depths
+// and the containers of `base`. When `base` holds today's choices there, as every base of today's tables does, those
+// are today's for every too deep valid text: its first error leads into the state `error`, the row of that state
+// leads nowhere else, and its tokenizer cells are the ones of valid JSON, which are frozen, also for an added class.
+// What such a text is shown as is not kept by these cells: from its 17th bracket on it reads the display entries of
+// the state `error`, which are open, see withTodaysKindsInErrorState.
+//
+// For the hand-written tables as the base the mask keeps what the base does on chains of nested containers, in
+// the four such forms that check.ts tries, and not on every too deep valid text: the rules go on after the 17th
+// bracket in other states than `error`, so a text of another shape, e.g. with a small container beside the nested
+// one, reads cells outside the mask. And the base itself loses the depth of some such texts, e.g. of
+// `{"a": {"a": []}, "b": 1}` inside 14 objects. The rule for `[` at depth 16 goes on to the state `valueOrClose`,
+// the `]` then reads a cell that no rule set and that leads into `error`, and the rule for a comma in the state
+// `error` inside an object pops a level, here one that is still open. check.ts counts both.
 export function cellsOfTooDeepValidJson(base: RecoveryTables): Uint8Array {
   const cells = new Uint8Array(base.grammarNext.length)
   const trace = createTrace()
@@ -169,13 +190,18 @@ export function cellsOfTooDeepValidJson(base: RecoveryTables): Uint8Array {
   return cells
 }
 
-// A valid JSON text with a line feed after every bracket, comma and colon, so that the next token is the first on
-// its line: what the texts of ../../check-deep.ts lack. The tokenizer's events say which characters are such
-// punctuation and not part of a string.
-const punctuationEvents = new Set((['openObject', 'openArray', 'closeObject', 'closeArray', 'colon', 'comma'] as const).map(name => eventNames.indexOf(name)))
-export function spreadOverLines(validText: string): string {
-  const trace = runRecoveryParserOnText(validText, asIsTables())
-  return Array.from(validText, (character, position) => punctuationEvents.has(trace.event[position]!) ? `${character}\n` : character).join('')
+// A copy of `tables` with today's kinds in the display entries of the grammar state `error`: the third kept
+// setting. A valid JSON text of more than 16 levels is in that state from its 17th bracket on when the kept cells
+// hold today's choices, so these entries are what the rest of it is shown by, e.g. (closeArray, error) for every `]`.
+// They are open, and a training or a count sets them from the few broken train code points that end in that state:
+// two of ten seeds of the generic recipe then show every such `]` as a string. With today's kinds there, a too deep
+// valid text is shown as today at every code point, for every base of today's tables. The line from the
+// hand-written tables does not have the setting: there it costs up to 1.09 points of all three in one seed, and the
+// base's own rules already change what a too deep valid text is shown as, see README.md.
+export function withTodaysKindsInErrorState(tables: RecoveryTables): RecoveryTables {
+  const result = copyTables(tables)
+  for (let event = 0; event < tables.eventCount; event++) result.display[displayEntryOf(tables, event, today.errorState)] = today.display[event * today.grammarStateCount + today.errorState]!
+  return result
 }
 
 // The mask of the grammar cells that a recipe may change, by its training and by its search: every open one,
@@ -267,31 +293,52 @@ export function searchedCellsOf(recipe: Recipe, base: RecoveryTables): Cell[] {
   return cells
 }
 
-// The tables of a recipe for a seed, by its last step: the count of the display entries, then the search, then the
-// training, whose tables are the last ones of the trainer's run. A step starts from the tables of the recipe
-// without it: the ones that an earlier command saved under `armName`, when there are such, since a seed gives the
-// same tables every time, and otherwise they are made here. The search runs on the train split of the standard set,
-// in a random order that is drawn anew for every pass from a seed that the run's seed and the recipe's order number
-// make, e.g. 113 for seed 11 and order 3. For a recipe without a training the seed only draws that order. A search
-// with a limit of passes stops after them, at the same step on every run.
+// A recipe's search from the tables `start`, on the train split of the standard set, in a random order that is
+// drawn anew for every pass from a seed that the run's seed and the recipe's order number make, e.g. 113 for seed 11
+// and order 3. A search with a limit of passes stops after them, at the same step on every run.
+async function searchFrom(start: RecoveryTables, recipe: Recipe, searchOrder: number, seed: number): Promise<RecoveryTables> {
+  const base = baseOf(recipe)
+  const started = performance.now()
+  const search = recipe.searchCounts === 'whole samples' ? searchForWholeSamples : searchCells
+  const result = await search(start, searchedCellsOf(recipe, base), searchSamplesOf(base), seed * 10 + searchOrder, recipe.searchPasses ?? 200)
+  if (recipe.searchPasses === undefined && !result.lastPassChangedNothing) throw new Error(`the search of ${JSON.stringify(describeRecipe(recipe))} did not end in ${result.passes} passes`)
+  console.log(`The search ended ${result.lastPassChangedNothing ? `when pass ${result.passes} changed nothing` : `after its ${result.passes} passes`}, after ${result.changes} changes of a cell and ${(result.runs / 1e6).toFixed(1)} million runs of a sample, in ${((performance.now() - started) / 1000).toFixed(0)} s.`)
+  return result.tables
+}
+
+// The most rounds of a search and a count that a recipe with `inTurns` adds. A round whose count changes no display
+// entry ends the turns: the search before it ended with those entries, so the next one would change no cell.
+const roundsInTurns = 8
+
+// The tables of a recipe for a seed, by its last step: today's kinds in the state `error`, then the search and the
+// count in turns, then the count of the display entries, then the search, then the training, whose tables are the
+// last ones of the trainer's run. A step starts from the tables of the recipe without it: the ones that an earlier
+// command saved under `armName`, when there are such, since a seed gives the same tables every time, and otherwise
+// they are made here. For a recipe without a training the seed only draws the order of the search.
 async function tablesOf(recipe: Recipe, seed: number, armName: string): Promise<RecoveryTables> {
   const savedOrMade = (earlier: Recipe) => {
     const file = savedTablesFileOf(armName, earlier, seed)
     return existsSync(file) ? loadTablesOfThisDataset(file).tables : tablesOf(earlier, seed, armName)
+  }
+  if (recipe.todaysKindsInErrorState) return withTodaysKindsInErrorState(await savedOrMade(recipeWith({todaysKindsInErrorState: false}, recipe)))
+  if (recipe.inTurns) {
+    if (recipe.searchOrder === undefined || !recipe.displayByCount) throw new Error('a recipe with the search and the count in turns needs a search and a count')
+    let tables = await savedOrMade(recipeWith({inTurns: false}, recipe))
+    for (let round = 1; round <= roundsInTurns; round++) {
+      const searchedTables = await searchFrom(tables, recipe, recipe.searchOrder, seed)
+      tables = displayEntriesByCount(searchedTables, trainPartOfTheStandardSet())
+      const entriesChanged = tablesToJson(tables) !== tablesToJson(searchedTables)
+      console.log(`Round ${round} of the turns: the count after the search ${entriesChanged ? 'changed' : 'did not change'} the display entries.`)
+      if (!entriesChanged) break
+    }
+    return tables
   }
   if (recipe.displayByCount) {
     if (!recipe.displayEntries) throw new Error('a recipe that sets the display entries by a count needs open display entries')
     return displayEntriesByCount(await savedOrMade(recipeWith({displayByCount: false}, recipe)), trainPartOfTheStandardSet())
   }
   if (recipe.searchOrder === undefined) return trainRecipe(recipe, seed)
-  const base = baseOf(recipe)
-  const start = await savedOrMade(recipeWith({searchOrder: undefined, searchCounts: 'code points', searchPasses: undefined}, recipe))
-  const started = performance.now()
-  const search = recipe.searchCounts === 'whole samples' ? searchForWholeSamples : searchCells
-  const result = await search(start, searchedCellsOf(recipe, base), searchSamplesOf(base), seed * 10 + recipe.searchOrder, recipe.searchPasses ?? 200)
-  if (recipe.searchPasses === undefined && !result.lastPassChangedNothing) throw new Error(`the search of ${JSON.stringify(describeRecipe(recipe))} did not end in ${result.passes} passes`)
-  console.log(`The search ended ${result.lastPassChangedNothing ? `when pass ${result.passes} changed nothing` : `after its ${result.passes} passes`}, after ${result.changes} changes of a cell and ${(result.runs / 1e6).toFixed(1)} million runs of a sample, in ${((performance.now() - started) / 1000).toFixed(0)} s.`)
-  return result.tables
+  return searchFrom(await savedOrMade(recipeWith({searchOrder: undefined, searchCounts: 'code points', searchPasses: undefined}, recipe)), recipe, recipe.searchOrder, seed)
 }
 export const buildRecipe = async (recipe: Recipe, seed: number, armName: string): Promise<Built> => ({tables: await tablesOf(recipe, seed, armName), base: baseOf(recipe)})
 
@@ -309,6 +356,12 @@ export const searchOrders = [1, 2, 3]
 export const passesOfTheSearch = 4
 export const searched = (recipe: Recipe) => (searchOrder: number) => recipeWith({searchOrder, searchPasses: passesOfTheSearch}, recipe)
 const counted = (recipe: Recipe) => recipeWith({displayByCount: true}, recipe)
+const shownAsToday = (recipe: Recipe) => recipeWith({todaysKindsInErrorState: true}, recipe)
+// The same search until a pass changes nothing, in its first order, and that search with the count after it and
+// then both in turns.
+const searchedToTheEnd = (recipe: Recipe) => recipeWith({searchOrder: searchOrders[0]!}, recipe)
+const searchedAndCountedInTurns = (recipe: Recipe) => recipeWith({inTurns: true}, counted(searchedToTheEnd(recipe)))
+const untrained = recipeWith({passes: 0}, generic)
 
 // A step of the arm: recipes that are read next to each other, the first one the control of the others unless
 // report.ts says otherwise. The tuning steps run with the seeds 11, 12 and 13 and save under "combined-tuning". The
@@ -334,39 +387,58 @@ export const tuningSteps: Record<string, Step> = {
   // 5. A search after the training. First how many passes it needs: the search of the first order until a pass
   // changes nothing, against the same search stopped after 2 and after 4 passes. Then the search with the limit of
   // passes that this chose, in three orders per seed, with the count of the display entries after the first order.
-  // And the search without the training, with the limit of passes and until a pass changes nothing: its seed only
-  // draws the order, which is the order of the search after the training of the same seed, so the three runs of
-  // each are three orders.
-  'search-passes': tuning([generic, recipeWith({searchOrder: searchOrders[0]!}, generic), ...[2, 4].map(searchPasses => recipeWith({searchOrder: searchOrders[0]!, searchPasses}, generic))]),
+  'search-passes': tuning([generic, searchedToTheEnd(generic), ...[2, 4].map(searchPasses => recipeWith({searchOrder: searchOrders[0]!, searchPasses}, generic))]),
   'then-search': tuning([generic, ...searchOrders.map(searched(generic)), counted(searched(generic)(searchOrders[0]!))]),
-  'search-alone': tuning([searched(recipeWith({passes: 0}, generic))(searchOrders[0]!), recipeWith({passes: 0, searchOrder: searchOrders[0]!}, generic)]),
+  // The search without the training, with the limit of passes and until a pass changes nothing: its seed only draws
+  // the order, which is the order of the search after the training of the same seed, so the three runs of each are
+  // three orders. The search sets no display entry, so the tables of the first two recipes hold today's display
+  // table, where trained tables hold trained entries. The next three set the entries without gradients: the count
+  // after each of the two searches, and the search and the count in turns. The last two are the rows with the
+  // training that the controls until a pass changes nothing are read against, with the same steps after it.
+  'search-alone': tuning([
+    searched(untrained)(searchOrders[0]!), searchedToTheEnd(untrained),
+    counted(searched(untrained)(searchOrders[0]!)), counted(searchedToTheEnd(untrained)), searchedAndCountedInTurns(untrained),
+    counted(searchedToTheEnd(generic)), searchedAndCountedInTurns(generic),
+  ]),
   // 6. The remedy for whole samples: the same search with whole train samples counted first.
   'whole-samples': tuning([generic, ...searchOrders.map(searchOrder => recipeWith({searchCounts: 'whole samples'}, searched(generic)(searchOrder)))]),
   // 7. The hand-written tables as the base, against the same recipe from today's tables.
   'hand-written': tuning([withHandClasses, fromHandWritten, recipeWith({passes: 1}, fromHandWritten), recipeWith({passes: 0}, fromHandWritten)]),
+  // 8. The third kept setting as the last step of the generic recipe with its search and its count, against the
+  // same recipe without it.
+  'shown-as-today': tuning([counted(searched(generic)(searchOrders[0]!)), shownAsToday(counted(searched(generic)(searchOrders[0]!)))]),
 }
 
 // The candidates for the final scoring, chosen on the tuning seeds: the best recipe of each line. Each is the
-// line's training, then the search in its first order, then the display entries set by a count.
+// line's training, then the search in its first order, then the display entries set by a count. The two from
+// today's tables then get today's kinds in the display entries of the state `error`, which a review of the arm asked
+// for after their first scores: without it they show valid JSON deeper than 16 levels otherwise than today.
 export type Candidate = {name: string, description: string, recipe: Recipe}
 const afterTheTraining = `then ${passesOfTheSearch} passes of a greedy search over the same cells on the train samples, then every open display entry set by a count over the train samples`
 export const candidates: readonly Candidate[] = [
   {
-    name: 'generic', recipe: counted(searched(generic)(searchOrders[0]!)),
-    description: `Today's tables with the classes that a rule picks from the train samples, open display entries and the bit "first on its line", every open cell trained in three passes from today's choices, with the cells of too deep valid JSON kept and no event of a text's end, ${afterTheTraining}.`,
+    name: 'generic', recipe: shownAsToday(counted(searched(generic)(searchOrders[0]!))),
+    description: `Today's tables with the classes that a rule picks from the train samples, open display entries and the bit "first on its line", every open cell trained in three passes from today's choices, with the cells of too deep valid JSON kept and no event of a text's end, ${afterTheTraining}, then today's kinds in the display entries of the grammar state error, so that valid JSON deeper than 16 levels is shown as today.`,
   },
-  {name: 'with the classes chosen by hand', recipe: counted(searched(withHandClasses)(searchOrders[0]!)), description: 'The generic recipe with the 15 classes chosen by hand in place of the rule\'s.'},
-  {name: 'from the hand-written tables', recipe: counted(searched(fromHandWritten)(searchOrders[0]!)), description: 'The recipe with the classes chosen by hand, started from the 35 hand-written rules in place of today\'s tables.'},
+  {name: 'with the classes chosen by hand', recipe: shownAsToday(counted(searched(withHandClasses)(searchOrders[0]!))), description: 'The generic recipe with the 15 classes chosen by hand in place of the rule\'s.'},
+  {
+    name: 'from the hand-written tables', recipe: counted(searched(fromHandWritten)(searchOrders[0]!)),
+    description: 'The recipe with the classes chosen by hand, started from the 35 hand-written rules in place of today\'s tables, and without its last step: the display entries of the grammar state error stay as the count set them.',
+  },
 ]
-// A candidate without its count, and without its search and its count: the controls of those two steps.
-export const searchOfCandidate = (candidate: Candidate) => recipeWith({displayByCount: false}, candidate.recipe)
+// A candidate's recipe up to its count, up to its search, and its training alone: the controls of the steps after
+// each. And every line with the third kept setting after its count, which is the candidate for two of the lines and
+// says what the setting would cost the third.
+export const countOfCandidate = (candidate: Candidate) => recipeWith({todaysKindsInErrorState: false}, candidate.recipe)
+export const searchOfCandidate = (candidate: Candidate) => recipeWith({displayByCount: false}, countOfCandidate(candidate))
 export const trainingOfCandidate = (candidate: Candidate) => recipeWith({searchOrder: undefined, searchPasses: undefined}, searchOfCandidate(candidate))
-const candidateRecipes = [...candidates.map(trainingOfCandidate), ...candidates.map(searchOfCandidate), ...candidates.map(({recipe}) => recipe)]
+export const shownAsTodayOfCandidate = (candidate: Candidate) => shownAsToday(countOfCandidate(candidate))
+const candidateRecipes = [trainingOfCandidate, searchOfCandidate, countOfCandidate, shownAsTodayOfCandidate].flatMap(step => candidates.map(step))
 
 export const reportedSteps: Record<string, Step> = {
   'candidates': {armName: 'combined', seeds: reportedSeeds, recipes: candidateRecipes},
   'confirmation': {armName: 'combined-confirmation', seeds: confirmationSeeds, recipes: candidateRecipes},
-  // 8. The target that shows the added code points as an error, at the weight 0.1, on the first candidate: its
+  // 9. The target that shows the added code points as an error, at the weight 0.1, on the first candidate: its
   // training with the target, and that training with the candidate's search after it. Neither has the count as its
   // last step: the count gives every display entry the kind of a label, which is never an error.
   'error-target': {armName: 'combined', seeds: reportedSeeds, recipes: [trainingOfCandidate(candidates[0]!), searchOfCandidate(candidates[0]!)].map(recipe => recipeWith({errorTargetShare: 0.1}, recipe))},
