@@ -1,5 +1,5 @@
 /* miniml with error productions, for bison 2.3, for the bar "yacc error productions": ../../../grammar/miniml.y
-   with 26 rules added by hand, and the 3 rules of `binding` a second time as `local_binding`. The tokens and the
+   with 27 rules added by hand, and the 3 rules of `binding` a second time as `local_binding`. The tokens and the
    precedences are the base grammar's, so every terminal has the number that it has there. README.md says what the
    rules are for and how they were chosen.
 
@@ -17,7 +17,7 @@
    own, the end of a definition at the top and the end of a local one are two states, with two sets of tokens that
    may follow: a stray `)` after a definition at the top is passed over, and after a local one it ends the `let`.
 
-   bison counts 155 shift/reduce conflicts, all between a shift and a reduction by a rule that can now be followed
+   bison counts 157 shift/reduce conflicts, all between a shift and a reduction by a rule that can now be followed
    by more tokens than in the base grammar. Each is settled as a shift, which is bison's default and what the base
    grammar does in the same place: check.ts walks both automata and finds the base parser's action wherever a
    valid program can be. */
@@ -43,7 +43,7 @@ void yyerror(const char *message);
 %left STAR SLASH
 %nonassoc UMINUS
 
-%expect 155
+%expect 157
 
 %%
 
@@ -119,6 +119,7 @@ expr
   | expr error THEN expr                %prec LOWEST   /* repair: the `if` is missing, e.g. `x > 0 then 1 else 2` */
   | expr error THEN expr ELSE expr      %prec LOWEST
   | expr error ELSE expr                %prec LOWEST   /* repair: `if condition then` is missing, e.g. `1 else 2` */
+  | expr error IN expr                  %prec LOWEST   /* repair: the `let` of a local definition is missing, e.g. `y = 1 in y` */
   | LET local_binding                   %prec LOWEST   /* unfinished: a local definition without `in` */
   | LET REC local_binding               %prec LOWEST
   | IF expr                             %prec LOWEST   /* unfinished: an `if` without `then` */

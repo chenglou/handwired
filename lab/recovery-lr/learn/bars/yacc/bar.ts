@@ -20,9 +20,11 @@
 // - As inserted tokens the bar counts the terminals that the `error` of a reduced rule stands for, e.g. one for a
 //   reduction by `binding: IDENT parameters error expr`, whose `error` stands for a missing `=`.
 //
-//   bun lab/recovery-lr/learn/bars/yacc/bar.ts [--train <samples for the count>] [--validation <samples>] [--write]
+//   yaccBarOf(form)                the same for the bar with one thing taken out, see YaccForm of yacc-parser.ts
+//
+//   bun lab/recovery-lr/learn/bars/yacc/bar.ts [--train <samples for the count>] [--validation <samples>] [--write] [--forms]
 // prints the bar's scores on the validation samples with the count made on the train samples. With --write it
-// writes the count to display-kinds.json.
+// writes the count to display-kinds.json. With --forms it also prints a row for each other form of the bar.
 import {existsSync, readFileSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {defaultSeed, loadSamples} from '../../../dataset.ts'
@@ -32,7 +34,7 @@ import {commentKind, isTrivia} from '../../../tables.ts'
 import {eachSample} from '../../data.ts'
 import {numberOf, refuseUnknownOptions, standardTrainCount, standardValidationCount} from '../../options.ts'
 import {type ParserOutput, scoreHeader, scoreOutputs, scoreRow} from '../../score.ts'
-import {type YaccRun, type YaccTables, runYacc, shownShifted, yaccTables} from './yacc-parser.ts'
+import {type YaccForm, type YaccRun, type YaccTables, formOfTheBar, nameOfForm, runYacc, shownShifted, yaccTables, yaccTablesOf} from './yacc-parser.ts'
 
 // The display table of the bar: [(0 for a shifted token, stateCount for a discarded one) + state) × terminalCount +
 // terminal] is a display kind, or -1 for an entry that the count did not set.
@@ -135,8 +137,21 @@ export function yaccDisplay(): YaccDisplay {
 // The bar: what bison's parser for miniml-errors.y, with its own recovery, says of a sample's broken text.
 export const yaccErrorProductions = (sample: Sample): ParserOutput => outputOfYaccRun(sample, runYacc(sample.tokens), yaccDisplay())
 
+// The bar in another form: the grammar without the rule for a missing local `let`, or the stack read without
+// `error` as a symbol above its expression. Its display kinds are counted on the train samples at the first call,
+// which takes about 10 s: only the bar itself has its count in a committed file.
+export function yaccBarOf(form: YaccForm, trainCount: number = standardTrainCount): (sample: Sample) => ParserOutput {
+  if (form.inRule && form.errorAboveItsExpression && trainCount === standardTrainCount) return yaccErrorProductions
+  const tables = yaccTablesOf(form)
+  let display: YaccDisplay | undefined
+  return sample => {
+    display ??= displayByCount(eachSample('train', trainCount), tables)
+    return outputOfYaccRun(sample, runYacc(sample.tokens, tables), display, tables)
+  }
+}
+
 if (import.meta.main) {
-  refuseUnknownOptions('bar.ts', ['--train', '--validation'], ['--write'])
+  refuseUnknownOptions('bar.ts', ['--train', '--validation'], ['--write', '--forms'])
   const trainCount = numberOf('--train', standardTrainCount)
   const display = displayByCount(eachSample('train', trainCount))
   if (process.argv.includes('--write')) {
@@ -149,4 +164,7 @@ if (import.meta.main) {
   console.log(scoreHeader)
   console.log(scoreRow('yacc error productions, discarded tokens shown as errors', scoreOutputs(validation, sample => outputOfYaccRun(sample, runYacc(sample.tokens), withoutCount))))
   console.log(scoreRow('yacc error productions, with the count', scoreOutputs(validation, sample => outputOfYaccRun(sample, runYacc(sample.tokens), display))))
+  if (process.argv.includes('--forms')) {
+    for (const form of [{...formOfTheBar, inRule: false}, {...formOfTheBar, errorAboveItsExpression: false}, {inRule: false, errorAboveItsExpression: false}]) console.log(scoreRow(`${nameOfForm(form)}, with the count`, scoreOutputs(validation, yaccBarOf(form, trainCount))))
+  }
 }

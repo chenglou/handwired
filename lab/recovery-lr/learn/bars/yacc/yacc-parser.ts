@@ -31,6 +31,8 @@ import {type Tables, type ToolDump, buildTables, isTrivia, itemDot, itemRule, re
 export type YaccDump = Pick<ToolDump, 'YYFINAL' | 'YYLAST' | 'YYNTOKENS' | 'YYNNTS' | 'YYNRULES' | 'YYNSTATES' | 'YYPACT_NINF' | 'YYTABLE_NINF' | 'yypact' | 'yydefact' | 'yypgoto' | 'yydefgoto' | 'yytable' | 'yycheck' | 'yyr1' | 'yyr2' | 'yystos' | 'yyprhs' | 'yyrhs' | 'yytname'> & {YYTERROR: number}
 
 export const tablesPath = join(import.meta.dir, 'tables.json')
+// The arrays for the grammar without the rule `expr: expr error IN expr`, see yaccTablesOf.
+export const tablesWithoutInRulePath = join(import.meta.dir, 'tables-without-in-rule.json')
 export const readYaccDump = (path = tablesPath): YaccDump => JSON.parse(readFileSync(path, 'utf8')) as YaccDump
 
 export type YaccTables = {
@@ -87,10 +89,20 @@ export const errorStandsFor: Readonly<Record<string, readonly string[]>> = {
   'expr: expr error THEN expr': ['IF'],
   'expr: expr error THEN expr ELSE expr': ['IF'],
   'expr: expr error ELSE expr': ['IF'],
+  // A local definition whose `let` is missing, e.g. `y = 1 in y`: the expression before `error` is what is left of
+  // `let y = 1`. One state holds this rule and the three above, and the `error` of a state counts as one thing, so
+  // the missing `let` is written as the `if` of those rules: both open one level, and after the `in` the
+  // container is the `in` either way. The stack's hash is not the original's, as in the three rules above.
+  'expr: expr error IN expr': ['IF'],
   // A `fun` whose parameters are unreadable, and one whose `->` is missing.
   'expr: FUN error ARROW expr': ['parameter', 'parameters'],
   'expr: FUN parameter parameters error expr': ['ARROW'],
 }
+
+// The rules in which `error` counts as a symbol that stands above its expression on the stack, where the symbol
+// that is missing would stand below it. Whether a bar may read its stack so is a decision of whoever reads the
+// final table, so the bar can also be run without this reading, see yaccTablesOf.
+export const rulesWithErrorAboveItsExpression: readonly string[] = ['expr: expr error THEN expr', 'expr: expr error THEN expr ELSE expr', 'expr: expr error ELSE expr', 'expr: expr error IN expr']
 
 // What a token counts as on the stack where an added rule reads it as another token: per rule, the place of the
 // token in the right side, and the symbol of the base grammar that stands there in the rule of the base grammar.
@@ -101,7 +113,8 @@ export const symbolCountsAs: Readonly<Record<string, Readonly<Record<number, rea
   'elements: elements COMMA expr': {1: ['SEMI']},
 }
 
-export function buildYaccTables(dump: YaccDump): YaccTables {
+// `standsFor` says what `error` counts as, per rule that holds it: errorStandsFor, or another reading of the stack.
+export function buildYaccTables(dump: YaccDump, standsFor: Readonly<Record<string, readonly string[]>> = errorStandsFor): YaccTables {
   // The scanner is the base grammar's, so its arrays complete the dump for buildTables.
   const automaton = buildTables({...readDump(), ...dump})
   const {stateCount, terminalCount, ruleCount, symbolNames, symbolCount} = automaton
@@ -126,9 +139,9 @@ export function buildYaccTables(dump: YaccDump): YaccTables {
       continue
     }
     isErrorRule[rule] = 1
-    const standsFor = errorStandsFor[ruleText(rule, -1, automaton)]
-    if (standsFor === undefined) throw new Error(`errorStandsFor does not say what error stands for in the rule ${ruleText(rule, -1, automaton)}`)
-    inPlaceOfError.push(standsFor.map(name => symbolOf(name)))
+    const symbolsOfError = standsFor[ruleText(rule, -1, automaton)]
+    if (symbolsOfError === undefined) throw new Error(`errorStandsFor does not say what error stands for in the rule ${ruleText(rule, -1, automaton)}`)
+    inPlaceOfError.push(symbolsOfError.map(name => symbolOf(name)))
     terminalsInPlaceOfError[rule] = inPlaceOfError[rule]!.filter(symbol => symbol < baseTables.terminalCount).length
   }
   if (new Set(Array.from(ruleInBase).filter(rule => rule !== -1)).size !== baseTables.ruleCount) throw new Error('the grammar with error productions does not hold every rule of the base grammar')
@@ -190,6 +203,28 @@ export function buildYaccTables(dump: YaccDump): YaccTables {
 
 // The tables of the committed tables.json.
 export const yaccTables: YaccTables = buildYaccTables(readYaccDump())
+
+// The forms of the bar that the final table can show next to it. Each takes one thing out:
+// - `inRule: false`: the grammar without `expr: expr error IN expr`, which is the bar as it was before the review
+//   of the foundation. The rule adds 1.4 points of all three on the validation samples, and it reads an `in` after
+//   a definition at the top as the `in` of a local definition, which costs 44 points on that one mistake of the
+//   author's own list, see README.md.
+// - `errorAboveItsExpression: false`: `error` stands for nothing in rulesWithErrorAboveItsExpression.
+export type YaccForm = {inRule: boolean, errorAboveItsExpression: boolean}
+export const formOfTheBar: YaccForm = {inRule: true, errorAboveItsExpression: true}
+export const nameOfForm = (form: YaccForm): string => `yacc error productions${form.inRule ? '' : ', without the rule for a missing local let'}${form.errorAboveItsExpression ? '' : ', without error as a symbol above its expression'}`
+const tablesOfForms = new Map<string, YaccTables>()
+export function yaccTablesOf(form: YaccForm): YaccTables {
+  if (form.inRule && form.errorAboveItsExpression) return yaccTables
+  const key = `${form.inRule} ${form.errorAboveItsExpression}`
+  let tables = tablesOfForms.get(key)
+  if (tables === undefined) {
+    const standsFor = form.errorAboveItsExpression ? errorStandsFor : {...errorStandsFor, ...Object.fromEntries(rulesWithErrorAboveItsExpression.map(rule => [rule, []]))}
+    tables = buildYaccTables(readYaccDump(form.inRule ? tablesPath : tablesWithoutInRulePath), standsFor)
+    tablesOfForms.set(key, tables)
+  }
+  return tables
+}
 
 // How a token came to be shown.
 export const shownAsTrivia = 0, shownShifted = 1, shownDiscarded = 2, shownNotRead = 3
