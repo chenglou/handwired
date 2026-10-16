@@ -18,7 +18,7 @@ for (const record of records) if (record.format !== 'recovery-lr scale record 1'
 
 // The rows in the order: the recipe's rate before another rate, the rows with a search last, fewer train samples
 // and fewer passes first.
-const settingOf = (record: ScaleRecord): string => [record.learningRate === 0.05 && record.startShare === 0.9 ? 0 : 1, record.learningRate, record.startShare, record.steps === 'training, then the count' ? 0 : 1, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
+const settingOf = (record: ScaleRecord): string => [record.learningRate === 0.05 && record.startShare === 0.9 ? 0 : 1, record.learningRate, record.startShare, record.steps === 'training, then the count' ? 0 : record.passes === 0 ? 2 : 1, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
 const groups = new Map<string, ScaleRecord[]>()
 for (const record of records) groups.set(settingOf(record), [...(groups.get(settingOf(record)) ?? []), record])
 
@@ -36,5 +36,5 @@ for (const key of [...groups.keys()].sort()) {
   const group = groups.get(key)!.sort((left, right) => left.seed - right.seed)
   const first = group[0]!
   const of = (value: (record: ScaleRecord) => number, digits = 2): string => describeSpread(group.map(value), digits)
-  console.log(`| ${first.steps} | ${first.trainSamples} | ${first.passes} | ${first.gradientSteps} | ${first.learningRate} | ${first.startShare} | ${group.map(record => record.seed).join(', ')} | ${of(record => sharesOf(record.validation).allThree)} | ${of(record => sharesOf(record.validation).whole)} | ${of(record => sharesOf(record.validation).stack)} | ${of(record => record.meanLargestShare, 3)} | ${of(record => record.validationTotals.tokensSkippedByStepLimit, 0)} | ${of(record => sharesOf(record.train).allThree)} | ${of(record => sharesOf(record.train).whole)} | ${of(record => record.cellsChanged, 0)} | ${of(record => record.seconds.training, 0)} | ${of(record => record.seconds.search, 0)} |`)
+  console.log(`| ${first.steps} | ${first.trainSamples} | ${first.passes} | ${first.gradientSteps} | ${first.learningRate} | ${first.startShare} | ${group.map(record => record.seed).join(', ')} | ${of(record => sharesOf(record.validation).allThree)} | ${of(record => sharesOf(record.validation).whole)} | ${of(record => sharesOf(record.validation).stack)} | ${first.passes === 0 ? '' : of(record => record.meanLargestShare, 3)} | ${of(record => record.validationTotals.tokensSkippedByStepLimit, 0)} | ${of(record => sharesOf(record.train).allThree)} | ${of(record => sharesOf(record.train).whole)} | ${of(record => record.cellsChanged, 0)} | ${of(record => record.seconds.training, 0)} | ${of(record => record.seconds.search, 0)} |`)
 }

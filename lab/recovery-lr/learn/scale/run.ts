@@ -14,6 +14,7 @@
 //   bun lab/recovery-lr/learn/scale/run.ts --seed 1 --train 40000 --passes 30 --at 1,2,3,5,10,20,30 --search --folder <folder>
 //   bun lab/recovery-lr/learn/scale/run.ts --seed 1 --train 400000 --passes 3 --at 1,2,3 --folder <folder>
 //   [--learning-rate 0.05] [--start-share 0.9] [--validation 5000]
+//   bun lab/recovery-lr/learn/scale/run.ts --seed 1 --train 400000 --passes 0 --search --folder <folder>    # the search without training
 //
 // The train samples are the first --train samples of the train split. The added terminals are always picked from
 // the first 40,000 train samples, as in the recipe's runs, so that every run trains the same cells whatever its
@@ -72,7 +73,7 @@ if (import.meta.main) {
   const seed = numberOf('--seed', 1)
   const trainSamples = numberOf('--train', standardTrainCount)
   const passes = numberOf('--passes', recipeSettings.passes)
-  const at = (optionOf('--at') ?? String(passes)).split(',').map(Number)
+  const at = passes === 0 ? [] : (optionOf('--at') ?? String(passes)).split(',').map(Number)
   for (const pass of at) if (!Number.isInteger(pass) || pass < 1 || pass > passes) throw new Error(`--at names passes from 1 to ${passes}, and got ${pass}`)
   const learningRate = Number(optionOf('--learning-rate') ?? recipeSettings.learningRate)
   const startShare = Number(optionOf('--start-share') ?? recipeSettings.startShare)
@@ -96,7 +97,8 @@ if (import.meta.main) {
   const model = createModel(base, {start: 'base', startShare})
   const shares = new Float64Array(model.layout.logitCount)
   const points: {pass: number, tables: RecoveryTables, meanLargestShare: number, trainerLine: string}[] = []
-  const training = await train(model, trainPacked, {
+  // With --passes 0 nothing is trained: --search then starts from the parser as it is, as row 11 of the recipe does.
+  const training = passes === 0 ? {secondsPerPass: [] as number[], samplesPerSecond: 0} : await train(model, trainPacked, {
     seed, epochs: passes, learningRate, batchSize: recipeSettings.batchSize, workers: 4, twin: referenceTwin, logEverySamples: trainPacked.sampleCount, validation,
     log: line => {
       console.log(line)
@@ -134,13 +136,13 @@ if (import.meta.main) {
   for (const point of points) save(point.pass, displayEntriesByCount(point.tables, trainPacked).tables, 'training, then the count', false, 0, point.meanLargestShare, point.trainerLine)
 
   if (flagOf('--search')) {
-    const last = points.find(point => point.pass === passes)
+    const last = passes === 0 ? {tables: base, meanLargestShare: NaN, trainerLine: ''} : points.find(point => point.pass === passes)
     if (last === undefined) throw new Error('--search needs the last pass in --at')
     const searchStarted = performance.now()
     const result = await searchCells(last.tables, changeableCellsOf(base), trainPacked, {orderSeed: seed * 10 + recipeSettings.searchOrder, maximumPasses: recipeSettings.searchPasses})
     const searchSeconds = (performance.now() - searchStarted) / 1000
     console.log(`The search ended ${result.lastPassChangedNothing ? `when pass ${result.passes} changed nothing` : `after its ${result.passes} passes`}, after ${result.changes} changes of a cell, in ${searchSeconds.toFixed(0)} s.`)
-    save(passes, displayEntriesByCount(result.tables, trainPacked).tables, 'training, then the search, then the count', true, searchSeconds, last.meanLargestShare, last.trainerLine)
+    save(passes, displayEntriesByCount(result.tables, trainPacked).tables, passes === 0 ? 'the search and the count, without training' : 'training, then the search, then the count', true, searchSeconds, last.meanLargestShare, last.trainerLine)
   }
   console.log(`The command took ${((performance.now() - commandStarted) / 1000).toFixed(0)} s.`)
 }
