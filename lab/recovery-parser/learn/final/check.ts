@@ -32,8 +32,9 @@
 //    prints and every line of its report is marked as a dry run. A row is the mean, the lowest and the highest that
 //    the check works out from scores of its own. The baselines come first. The four parts by made-up held-out bits
 //    hold the samples that one score of the relabeled samples puts into the four rows of ../arms/final.ts, and add
-//    up to the validation split. On the written set only the five tables have numbers. The log of the final runs
-//    and the cache folder are as before the run. Without --dry-run the command refuses by its own first line, and a
+//    up to the validation split. On the written set only the five tables have numbers. The report that a final run
+//    words from the same counts has the same tables and names no dry run. The log of the final runs and the cache
+//    folder are as before the run. Without --dry-run the command refuses by its own first line, and a
 //    list with a file of another dataset, with an unknown field, with one name twice, with one file twice or
 //    without tables is refused. The line that a final run appends to the log is written to a log in a folder that
 //    is made up here.
@@ -55,7 +56,7 @@ import {handwrittenTables} from '../handwritten/rules.ts'
 import {codePointsOf, runRecoveryParser} from '../recovery-parser.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, copyTables, grammarStateNames, openDisplayEntries, randomizeOpenCells, saveTables, today} from '../recovery-tables.ts'
 import {type ScoreRow, heldOutRowNames, scoreTables, sharesOf} from '../score.ts'
-import {type TablesCounts, appendToTheLogOfFinalRuns, dryRunMark, wholeSplit} from './run.ts'
+import {type RowCounts, appendToTheLogOfFinalRuns, describeReport, dryRunMark, wholeSplit} from './run.ts'
 import {
   type ReaderOfTheSet, type Score, type WrittenScore, type WrittenScores, countText, exactParserWith, readersOfTheSet, scoreWritten, scoreWrittenWith, scoredOnTheSetAlready, sharesOfWritten, tablesOfReader,
   writtenCases,
@@ -371,7 +372,7 @@ const rowNamed = (rows: readonly ScoreRow[], name: string) => rows.find(row => r
   check(wrongValidationRows === 0 && /^\d+\.\d\d \(\d+\.\d\d to \d+\.\d\d\)$/.test(threeHandRules[0] ?? '') && cellsOf(validationSection, baselines[0]!.name)[0] === '42.69', `${wrongValidationRows} rows of the dry run's validation table are not the mean, the lowest and the highest of scoreTables for the row's tables. The row of the three hand rules is ${JSON.stringify(threeHandRules)}`)
 
   // Every count, from the file of counts.
-  const counts = existsSync(countsFile) ? JSON.parse(readFileSync(countsFile, 'utf8')) as {dryRun: boolean, datasetKey: string, rows: {name: string, tables: TablesCounts[]}[]} : {dryRun: false, datasetKey: '', rows: []}
+  const counts = existsSync(countsFile) ? JSON.parse(readFileSync(countsFile, 'utf8')) as {dryRun: boolean, datasetKey: string, rows: RowCounts[]} : {dryRun: false, datasetKey: '', rows: []}
   check(counts.dryRun && counts.datasetKey === datasetKey() && counts.rows.map(row => row.name).join('; ') === rowNames.join('; ') && counts.rows.every((row, at) => row.tables.length === rowsOfTheReport[at]!.tables.length), 'the file of counts of the dry run does not say that it is a dry run, or does not hold the rows of the report with one entry per tables')
   check(counts.rows.slice(6).every(row => row.tables.every(ofTables => ofTables.file !== null && ofTables.file.startsWith(folder) && ofTables.hash === Bun.hash(readFileSync(ofTables.file)).toString(16))) && counts.rows.slice(0, 6).every(row => row.tables[0]!.file === null), 'the file of counts does not hold the path and the hash of every file of tables')
   // The validation samples with the held-out bits of a dry run, made here by the rule that run.ts states: of every
@@ -438,7 +439,13 @@ const rowNamed = (rows: readonly ScoreRow[], name: string) => rows.find(row => r
   }
   check(wrongWrittenCounts === 0, `the file of counts holds other counts of the written set than scoreWritten for ${wrongWrittenCounts} tables, or counts for tables that a dry run may not score there`)
   check(stateOfTheScratchFolder() === stateBefore, `the dry run changed the log of the final runs or the cache folder: ${stateBefore} before, ${stateOfTheScratchFolder()} after`)
-  console.log(`5. run.ts --dry-run on a list of toy tables: ${printed.length} lines, each marked as a dry run, and the same lines in the report file. The ${baselines.length} baselines come first. The row of three hand rules as seeds is ${threeHandRules.join(' | ')} on the validation split, as worked out here, and the ${rowNames.length} rows of the validation table and of the written set's table are the numbers of scoreTables and of scoreWritten. The four parts by made-up held-out bits hold ${brokenWith.join(', ')} broken samples, as one score of the relabeled samples counts them for ${comparedRows / 4} tables, and the whole split is the validation split, row for row. On the written set ${scoredRows.length} rows have numbers and ${rowNames.length - scoredRows.length} say "left for the final run". The log of the final runs and the cache folder are as before.`)
+  // The report as a final run words it, made here from the dry run's counts: the same tables, and no word of a dry
+  // run. Only the lines that say what was scored differ.
+  const asAFinalRun = counts.rows.length === 0 ? [] : describeReport(counts.rows, {dryRun: false, time: new Date(), listFile, countsFile})
+  const tableLines = (ofReport: readonly string[]) => ofReport.filter(line => line.startsWith('| ') || line.startsWith('#')).slice(1)
+  check(asAFinalRun[0] === '# The final scores of the recovery experiment' && !asAFinalRun.some(line => line.toLowerCase().includes('dry run')) && tableLines(asAFinalRun).length > 50 && tableLines(asAFinalRun).join('\n') === tableLines(lines).join('\n'),
+    'the report that describeReport words as a final run names a dry run, or does not hold the tables of the dry run\'s report')
+  console.log(`5. run.ts --dry-run on a list of toy tables: ${printed.length} lines, each marked as a dry run, and the same lines in the report file. Worded as a final run, the report of the same counts has the same ${tableLines(asAFinalRun).length} lines of tables and headings and names no dry run. The ${baselines.length} baselines come first. The row of three hand rules as seeds is ${threeHandRules.join(' | ')} on the validation split, as worked out here, and the ${rowNames.length} rows of the validation table and of the written set's table are the numbers of scoreTables and of scoreWritten. The four parts by made-up held-out bits hold ${brokenWith.join(', ')} broken samples, as one score of the relabeled samples counts them for ${comparedRows / 4} tables, and the whole split is the validation split, row for row. On the written set ${scoredRows.length} rows have numbers and ${rowNames.length - scoredRows.length} say "left for the final run". The log of the final runs and the cache folder are as before.`)
 
   // What run.ts refuses.
   const withoutDryRun = run('run.ts', [listFile])
