@@ -1,7 +1,7 @@
 // The report of the saved runs of a folder, on the validation split: rows 1 and 2, which are scored here, next to the
-// saved rows 4, 5 and 6. For all samples, per number of edits, per family of edit and per kind of edit. Then how the
-// damage itself is shown, what the search changes, and whole samples of row 4 against row 2, with samples of each
-// side.
+// saved rows 4, 5 and 6. For all samples, per number of edits, per family of edit, per kind of edit and per display
+// kind of the label. Then how the damage itself is shown, what the search changes, and whole samples of row 4
+// against row 2, with samples of each side.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-toml/learn/runs/report.ts [--folder <folder>] [--samples 3] [--longest 160]
@@ -12,10 +12,10 @@
 import {describeSample} from '../../dump.ts'
 import {containerNames, kindLetters} from '../../kinds.ts'
 import type {Sample} from '../../samples.ts'
-import {type Samples, allowedSampleAt, datasetKey, loadSamples, validationPart} from '../data.ts'
+import {type Samples, allowedSampleAt, codePointKindScored, codePointScored, datasetKey, loadSamples, validationPart} from '../data.ts'
 import {optionOf, refuseUnknownOptions} from '../options.ts'
 import {type RecoveryTrace, createTrace} from '../recovery-parser.ts'
-import {type RecoveryTables, asIsTables, differencesOf, loadTablesOfThisDataset} from '../recovery-tables.ts'
+import {type RecoveryTables, asIsTables, differencesOf, displayKindNames, loadTablesOfThisDataset} from '../recovery-tables.ts'
 import {type ScoreRow, cellsReadBy, countCells, isRead, sharesOf, wrongContainer, wrongDepth, wrongKind, wrongLabelsAt} from '../score.ts'
 import {type Parser, type RunRow, describeSpread, familyRowNames, oneEditFamilyRowNames, parserOfTables, restartAtNextLine, rowNamed, runRows, runsFolderOf, savedRunsOf, scoreRowsOf} from './runs.ts'
 
@@ -90,6 +90,42 @@ breakdown('Per number of edits', 'A sample has one, two or three edits, each app
 breakdown('Per family of edit, samples with one edit', 'The samples with one edit, by the family of that edit. No sample has a cut of the tail alone, which leaves nothing to score.', oneEditFamilyRowNames)
 breakdown('Per family of edit, every sample', 'Every sample with an edit of the family. A sample with edits of two families is in both columns, so a column also shows what the other edits of its samples do.', familyRowNames)
 breakdown('Per kind of edit, every sample', 'Every sample with an edit of the kind, as the rows of score.ts have them.', validation.kindNames.map(name => `kind: ${name}`))
+
+// Per display kind of the label: of the scored code points whose label has that kind, the share with every scored
+// value right. The records hold no such row, so the saved tables are run here.
+{
+  const names = [...displayKindNames, 'no scored kind']
+  const countsOf = (parser: Parser) => {
+    const run = parser(validation)
+    const trace = createTrace()
+    const scored = new Float64Array(names.length)
+    const right = new Float64Array(names.length)
+    for (let place = 0; place < validation.sampleCount; place++) {
+      const start = validation.start[place]!
+      const length = validation.start[place + 1]! - start
+      run(place, trace)
+      for (let position = validation.firstErrorPosition[place]!; position < length; position++) {
+        if ((validation.flags[start + position]! & codePointScored) === 0) continue
+        const kind = (validation.flags[start + position]! & codePointKindScored) === 0 ? names.length - 1 : validation.labelKind[start + position]!
+        scored[kind]!++
+        if (wrongLabelsAt(validation, start + position, trace, position) === 0) right[kind]!++
+      }
+    }
+    return {scored, right}
+  }
+  const countsOfLine = [
+    [countsOf(parserOfTables(asIsTables()))], [countsOf(restartAtNextLine)],
+    ...runRows.filter(row => runsOfRow(row).length > 0).map(row => runsOfRow(row).map(({tablesFile}) => countsOf(parserOfTables(loadTablesOfThisDataset(tablesFile).tables)))),
+  ]
+  const present = names.map((_, kind) => kind).filter(kind => countsOfLine[0]![0]!.scored[kind]! > 0)
+  print('## Per display kind of the label')
+  print()
+  print('Of the scored code points whose label has the display kind, the share with every scored value right, i.e. the kind, the depth and the container. "No scored kind" are the code points of which only the depth and the container are scored.')
+  print()
+  tableOf(['', ...present.map(kind => `${names[kind]}: ${countsOfLine[0]![0]!.scored[kind]} code points`)], lines.map((line, lineAt) => [
+    line.name, ...present.map(kind => describeSpread(countsOfLine[lineAt]!.map(counts => percent(counts.right[kind]! / counts.scored[kind]!)))),
+  ]))
+}
 
 print('## How the damage itself is shown')
 print()
