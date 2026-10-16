@@ -4,7 +4,7 @@ The question: the TOML track held the recipe's training against one rule that ta
 
 **The idea came after the track's final scoring.** Every number here is on the validation split of the standard set, 5,382 samples with 709,413 scored code points, for a new variant that was thought of after the test split had been scored once. They are not a result on unseen data, and nothing here read the test split, the folder `held-back/` or `RESULTS.md`.
 
-**State of this file: written on October 16, 2026 while the trainings were still running, under a deadline of 17:00.** The rows (b) and (c) of the table below say "not finished" until a later commit fills them in. If no later commit did, the trainings did not finish in time.
+**State of this file: written on October 16, 2026 under a deadline of 17:00.** The variant with fixed waiting cells has the seeds 1 and 2, the variant with trainable waiting cells has the seed 1. The seeds 2 and 3 of the trainable variant were started at 16:33 and are in the table only if a later commit added them.
 
 ## The rule, as cells
 
@@ -45,23 +45,34 @@ On the validation split. "Header names after an error" is the share of the 50,45
 | row 6: the search and the count without the training | 11, 12, 13 | 95.82 (95.62 to 95.94) | 51.14 (48.42 to 53.34) | 96.88 (96.62 to 97.32) |
 | (a) the base with the cells of the line rule, no training | no training | 88.71 | 43.74 | 89.56 |
 | (a) with the count | no training | 89.81 | 43.53 | 89.59 |
-| (b) the line rule, the training, then the count; waiting cells fixed | not finished | - | - | - |
-| (c) the same with the search before the count; waiting cells fixed | not finished | - | - | - |
-| (b) the line rule, the training, then the count; waiting cells trainable | not finished | - | - | - |
-| (c) the same with the search before the count; waiting cells trainable | not finished | - | - | - |
+| (b) the line rule, the training, then the count; waiting cells fixed | 1, 2 | 94.17 (94.16 to 94.18) | 45.95 (45.39 to 46.51) | 94.56 (94.51 to 94.62) |
+| (c) the same with the search before the count; waiting cells fixed | 1, 2 | 94.22 (94.15 to 94.28) | 47.13 (46.66 to 47.60) | 95.32 (95.12 to 95.52) |
+| (b) the line rule, the training, then the count; waiting cells trainable | 1 | 95.90 | 53.05 | 95.30 |
+| (c) the same with the search before the count; waiting cells trainable | 1 | 96.44 | 57.79 | 96.98 |
+
+On the train split, row (b) has 94.65 and 94.67 in the fixed variant and 96.23 in the trainable one, so neither is far from its validation number.
 
 ## What ran and what did not
 
-- Ran: `run.ts --base`, which scored row (a), and `../runs/check.ts --tables` on the two files of tables of row (a): every check passed (frozen cells hold today's, 48,909 valid texts get today's trace at every position, 48,247 broken texts keep today's trace up to their first error, and valid texts with a value of more than 16 levels are shown as today).
-- Started at 16:13 and not finished when this was written: the variant "fixed" with the seeds 1 and 2, and at 16:14 the variant "trainable" with the seed 1, at the same time. The machine was running seven to ten trainings of other work then (a load of 40 to 60 on 18 cores), so each of these trainings got about 1.4 cores for its 4 worker threads and takes far longer than the 12 minutes that a training took alone.
-- Stopped by hand: the variant "fixed" with the seed 3 started at 16:13 with the others and was stopped at 16:21, before its training ended, to leave the other three more of the machine. It has no number.
+All times are local, October 16, 2026. The machine was running seven to ten trainings of other work the whole time (a load of 40 to 60 on 18 cores), so a training took about 17 minutes where it took 12 alone.
+
+- `run.ts --base` scored row (a).
+- The fixed variant, seeds 1 and 2: started at 16:13, trainings of 1,021 and 1,025 seconds, row (b) saved at 16:30. That was before 16:35, so the search ran too: 82 and 81 seconds, four passes, row (c) saved at 16:32.
+- The trainable variant, seed 1: started at 16:14, a training of 1,105 seconds, row (b) saved at 16:33, the search of 35 seconds, row (c) saved at 16:33.
+- The fixed variant, seed 3, has no number. It started at 16:13 with the others and was stopped by hand at 16:21, when the load made it look as if four trainings would not end before the deadline. It was started again at 16:31 and stopped at 16:33, to give the machine to the seeds 2 and 3 of the trainable variant, whose first seed had come out far above the fixed variant.
+- The trainable variant, seeds 2 and 3: started at 16:33, without the search. Not finished when this was written.
+- The checks of `../runs/check.ts` ran on all eight saved files of tables, the two of row (a) with `--tables` and the six of rows (b) and (c) with `--folder`: every check passed. Frozen cells hold today's, 48,909 valid texts get today's trace at every position, 48,247 broken texts keep today's trace up to their first error, and 2,000 valid texts with a value of more than 16 levels are shown as today. In every saved file the cells that the training may not change hold the rule's choice.
+- `run.ts` is committed as the trainings read it: its sha256 in every record is the one of the file in the commit `fb17b0c`. The records say that the file was not committed, since the trainings started a minute before that commit.
 
 ## What the numbers say
 
-So far, from row (a) alone:
+- **With the lines set by hand, the gradient training alone is above the one rule, which it was not without them.** The fixed variant has 94.17 in all three and 45.95 in whole samples, against 91.45 and 36.03 for the one rule and 90.70 and 33.64 for row 4. The trainable variant, on one seed, has 95.90 and 53.05. Header names after an error are right at 94.6% and 95.3%, against 49.5% in row 4: that loss is gone.
+- **Against the 39 hand-written rules (94.87 and 50.67), the two variants fall on the two sides.** The fixed variant is 0.70 points of all three and 4.7 points of whole samples below them. The trainable variant is 1.03 and 2.4 above them, without a search, and at the level of row 6, the search without a training (95.82 and 51.14). That is one seed, and the five seeds of row 4 were 2.5 points apart, so "above the hand-written rules" needs the seeds 2 and 3 before anybody leans on it.
+- **Keeping the 1,408 waiting cells fixed holds the result down.** With them fixed, the grammar at depth 0 and 1 can only skip to the line end, and the search adds nothing on top: 94.22 and 47.13, below row 6, which has no hand-set cell at all. Left trainable, the training changed 845 of the 1,408 cells, none of them back into the state `error`, and gained 1.7 points of all three and 7 points of whole samples over the fixed variant. So what helps is the rule as the place where the training starts, with the cells of a line end fixed. Keeping the waiting cells out of the training as well costs more than it gives.
+- **After the search the rule makes no difference that one seed can show.** The trainable variant with the search has 96.44 and 57.79, and row 5, the recipe's training and search without any hand-set cell, has 96.51 (96.37 to 96.63) and 55.59 (54.31 to 57.30). The search finds the lines by itself, as row 6 already said.
+- **The rule alone, as cells, is not the one rule.** Row (a) has 88.71 in all three, 2.74 below the one rule, since a cell cannot set the depth to 0 from depth 2 or more, and 43.74 in whole samples, 7.7 above it. And the rule is one sentence but 1,621 cells, of which 1,408 are only there because the recipe keeps the row of the state `error`.
 
-- The hand-set rule without any training has 88.71 in all three and 43.74 in whole samples. That is 2.74 points of all three below the one rule (91.45), which sets the depth to 0 from any depth, and 7.71 points of whole samples above it (36.03). It is 1.99 points of all three below row 4, the recipe's training without the rule (90.70), and 10.1 points of whole samples above it (33.64).
-- Header names after an error are right at 89.56% with the rule set by hand, against 49.50% for row 4 and 94.82% for the one rule. So the rule as cells gives back most of what the training alone lost.
+What these numbers are not: a result on unseen data. The variant was thought of after the track's final scoring, the split is the validation split, and the choice between the two variants was made after seeing both on it.
 
 ## Files
 
