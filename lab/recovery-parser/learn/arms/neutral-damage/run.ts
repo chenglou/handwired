@@ -10,9 +10,9 @@
 // seeds 1 to 5, one seed after the other, and the tables and the records of a step go to
 // <RECOVERY_SCRATCH>/arms/neutral-damage/<the step's name>/. A step starts from the tables that the step before it
 // saved. A step that was saved with these seeds before is not run again, e.g. the training that two rows share,
-// unless --again is given, and neither is a step that ../combined/run.ts saved. About 35 minutes for every row, with
-// 4 worker threads: 15 trainings of about 100 s and 5 searches of about 80 s. report.ts then makes the tables of the
-// README from the saved runs.
+// unless --again is given, and neither is a step that ../combined/run.ts saved. About 25 minutes for every row, with
+// 4 worker threads: 15 trainings of 70 to 110 s each and 5 searches of about 15 s. report.ts then makes the tables
+// of the README from the saved runs.
 import {optionOf, refuseUnknownOptions} from '../../data.ts'
 import {runArm, savedResultOf} from '../harness.ts'
 import {type Row, armName, buildRow, fileSavedByCombined, rowsByName, seeds, settingNameOf, stepsOf} from './recipe.ts'

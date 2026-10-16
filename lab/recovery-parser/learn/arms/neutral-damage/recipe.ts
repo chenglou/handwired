@@ -1,6 +1,6 @@
 // The frozen recipe of the candidate "generic" of ../combined/, with a train set of the caller's choice in the place
 // of the train split of the standard set, and the rows that run.ts trains with it. README.md says what the rows are
-// for.
+// for and what came out.
 //
 // combined.ts builds a recipe's tables with functions that read the standard train set: the rule that picks
 // character classes, the training, the search and the count of the display entries. Here each of those four steps
@@ -178,7 +178,7 @@ export const buildRow = async (row: Row, seed: number): Promise<Built> =>
 // count, and today's kinds in the state `error`. And the same without the search, which is the recipe of the
 // primary row.
 export const withTheSearch = candidates[0]!.recipe
-export const withoutTheSearch = recipeWith({searchOrder: undefined, searchPasses: undefined}, withTheSearch)
+const withoutTheSearch = recipeWith({searchOrder: undefined, searchPasses: undefined}, withTheSearch)
 const withoutTheClasses = (recipe: Recipe) => recipeWith({classes: 'none'}, recipe)
 
 // A recipe step by step, the training alone first: each is the recipe that the next one starts from.

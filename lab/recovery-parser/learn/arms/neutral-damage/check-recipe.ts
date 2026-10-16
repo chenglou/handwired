@@ -13,7 +13,7 @@
 //    display entries of the state `error` hold today's kinds, no tokenizer cell that a code point reads holds an
 //    event of a text's end, and the record says that the ground rules hold on the harness's fixed texts.
 //
-// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after run.ts. About 7 minutes with
+// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after run.ts. About 6 minutes with
 // 4 worker threads: two trainings and two searches. --only-saved runs the parts 2 and 4 alone, in a few seconds.
 //   bun lab/recovery-parser/learn/arms/neutral-damage/check-recipe.ts [--only-saved]
 import {existsSync} from 'node:fs'
@@ -117,9 +117,13 @@ if (!onlySaved) {
     }
     return counts
   }
+  // Each step once: two rows on one train set share their training.
+  const checkedSteps = new Set<string>()
   for (const row of Object.values(rowsByName)) {
     for (const recipe of stepsOf(row.recipe)) {
       const step: Row = {trainSet: row.trainSet, recipe}
+      if (checkedSteps.has(settingNameOf(step))) continue
+      checkedSteps.add(settingNameOf(step))
       // A step that ../combined/run.ts saved is not saved here, e.g. the training alone on the standard train set
       // with the rule's classes: the check of that arm reads it.
       if (seeds.every(seed => fileSavedByCombined(step, seed) !== undefined)) continue
@@ -144,7 +148,7 @@ if (!onlySaved) {
       const records = savedResultOf(armName, settingNameOf(step)).records
       const groundRulesHold = records.length === seeds.length && records.every(record => record.groundRules.hold)
       check(totals.changedFrozen === 0 && totals.problems === 0 && totals.changedKept === 0 && totals.otherKindsInErrorState === 0 && totals.endEvents === 0 && groundRulesHold,
-        `${settingNameOf(step)}, seeds ${seeds.join(', ')}: ${totals.changedFrozen} of ${totals.frozen} frozen cells and entries hold something else than today's, checkTables names ${totals.problems} problems, ${totals.changedKept} kept cells of too deep valid JSON are changed, ${recipe.todaysKindsInErrorState ? `${totals.otherKindsInErrorState} display entries of the state error hold another kind than today's, ` : ''}${totals.endEvents} tokenizer cells that a code point reads hold an event of a text's end, and the ground rules ${groundRulesHold ? 'hold' : 'do NOT hold'} on the fixed texts of every record`)
+        `${settingNameOf(step)}, seeds ${seeds.join(', ')}: of the ${totals.frozen / files.length} frozen cells and entries of each of the ${files.length} tables, ${totals.changedFrozen} hold something else than today's, checkTables names ${totals.problems} problems, ${totals.changedKept} kept cells of too deep valid JSON are changed, ${recipe.todaysKindsInErrorState ? `${totals.otherKindsInErrorState} display entries of the state error hold another kind than today's, ` : ''}${totals.endEvents} tokenizer cells that a code point reads hold an event of a text's end, and the ground rules ${groundRulesHold ? 'hold' : 'do NOT hold'} on the fixed texts of every record`)
     }
   }
 }
