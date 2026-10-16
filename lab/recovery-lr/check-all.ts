@@ -21,6 +21,7 @@ const checks: {name: string, arguments?: string[]}[] = [
   {name: 'check-cells.ts'},
   {name: 'check-samples.ts'},
   {name: 'check-language.ts'},
+  {name: 'check-guard.ts'},
   {name: 'check-tools.ts', arguments: ['--skip-without-tools']},
   {name: 'check-changed.ts', arguments: ['--skip-without-tools']},
 ]

@@ -19,7 +19,7 @@ import {
 } from './labels.ts'
 import {codePointsOf, firstOnLineOf, maximumCodePoints, parse, scan} from './parser.ts'
 import {createRandom} from './random.ts'
-import {type Sample, canonicalAlignment, constituentCounts, constituentOfKey, makeSample, restrictedConstituents} from './sample.ts'
+import {type Sample, alignmentOfTexts, canonicalAlignment, constituentCounts, constituentOfKey, makeSample, restrictedConstituents} from './sample.ts'
 import {actionReduce, actionShift, commentKind, isTrivia, symbolOf, tables} from './tables.ts'
 
 const problems: string[] = []
@@ -394,6 +394,20 @@ function checkSample(sample: Sample, name: string) {
   else expect(Array.from(addedBracket.alignment).join() === '0,1,2,3,4,5,6,7,8,-1,9,10,11,12,13,14,15,16,17,18,19,20', () => `let x = ((f) let y = 3: the alignment is ${Array.from(addedBracket.alignment).join()}`)
   // A text whose error is at its end has nothing to score.
   expect(make('let x = f ((1)) 2', 'let x = f ((1) 2', identity('let x = f ((1)) 2').filter(place => place !== 14)) === 'nothing to score', () => 'let x = f ((1) 2 has its error at the end and is a sample')
+  // An alignment from the two texts alone: it keeps as many code points as the damage's own, and for a text with
+  // one edit it is the sample's alignment.
+  let alignedLikeSample = 0, singleEdits = 0
+  for (const sample of train.slice(0, 600)) {
+    const aligned = alignmentOfTexts(sample.original, sample.broken)
+    const keptBy = (alignment: ArrayLike<number>): number => Array.from(alignment).filter(counterpart => counterpart !== -1).length
+    expect(keptBy(aligned) >= keptBy(sample.alignment), () => `sample ${sample.id}: the shortest edit script keeps fewer code points than the damage`)
+    expect(Array.from(canonicalAlignment(codePointsOf(sample.original), sample.codePoints, aligned)).join() === Array.from(aligned).join(), () => `sample ${sample.id}: the alignment of the two texts is not in its canonical form`)
+    if (sample.edits.length !== 1) continue
+    singleEdits++
+    if (Array.from(aligned).join() === Array.from(sample.alignment).join()) alignedLikeSample++
+  }
+  expect(Array.from(alignmentOfTexts('let x = (1, 2)', 'let x = (1; 2)')).join() === '0,1,2,3,4,5,6,7,8,9,-1,11,12,13', () => 'the alignment of let x = (1; 2)')
+  expect(alignedLikeSample >= 0.95 * singleEdits, () => `of ${singleEdits} samples with one edit, the shortest edit script gives the sample's alignment in ${alignedLikeSample}`)
   // What makeSample refuses, and what it throws on.
   expect(make('let x = 1', 'let x = 1', identity('let x = 1')) === 'unchanged', () => 'an unchanged text is a sample')
   expect(make('let x = 1', 'let x = 12', [...identity('let x = 1'), -1]) === 'still valid', () => 'a valid text is a sample')
@@ -410,7 +424,7 @@ function checkSample(sample: Sample, name: string) {
   expect(throws(() => make('let x = 1', 'let y = 1', identity('let x = 1'))), () => 'a kept code point that differs from its counterpart is taken')
   expect(throws(() => make('let x = 12', 'let x = 21', [0, 1, 2, 3, 4, 5, 6, 7, 9, 8])), () => 'an alignment that does not rise is taken')
   expect(throws(() => make('let x = 1', 'let x = ', [0, 1, 2, 3, 4, 5, 6])), () => 'an alignment of another length is taken')
-  console.log('   Pairs by hand give the samples that are written out in this file, and makeSample refuses or throws where it says.')
+  console.log(`   Pairs by hand give the samples that are written out in this file, and makeSample refuses or throws where it says. A shortest edit script of the two texts gives the sample's alignment for ${alignedLikeSample} of ${singleEdits} samples with one edit.`)
 }
 
 // 6. The dataset.

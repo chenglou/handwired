@@ -46,7 +46,11 @@ White space and comments have their own kinds, and the other three values as the
 
 ## Samples
 
-`makeSample` in `sample.ts` makes a sample from a valid original, a broken text and the alignment, which says for every code point of the broken text which code point of the original it is, or -1 for an added one. A kept code point has the labels of its counterpart. An added one has none and is never scored. Scores count the kept code points from the first error's token on. `dataset.ts` gives the train and validation samples: `loadSamples('train', seed, count)`. A sample is one program of `generate.ts`, which is a stand-in for the experiment's generator, with the language-neutral damage of `damage.ts`, which is fixed. Programs are split by a hash of their tokens, 8 of 9 into train.
+`makeSample` in `sample.ts` makes a sample from a valid original, a broken text and the alignment, which says for every code point of the broken text which code point of the original it is, or -1 for an added one. A kept code point has the labels of its counterpart. An added one has none and is never scored. Scores count the kept code points from the first error's token on. Where two alignments give the same broken text, the sample has the one that keeps the earlier code point, e.g. of `))` with one bracket removed, the first bracket is the one that is left. `alignmentOfTexts` gives an alignment for a pair of texts that comes without one.
+
+For the column "constituents", a sample also says which of its tokens are kept tokens, i.e. have exactly the code points of one token of the original, and holds the original's constituents restricted to them: for every reduction the nonterminal, and the first and the last kept token that it covers.
+
+`dataset.ts` gives the train and validation samples: `loadSamples('train', seed, count)`. A sample is one program of `generate.ts`, which is a stand-in for the experiment's generator, with the language-neutral damage of `damage.ts`, which is fixed. Programs are split by a hash of their tokens, 8 of 9 into train.
 
 ## Build and check
 
@@ -63,6 +67,16 @@ bun lab/recovery-lr/check-all.ts           # the type check, the lint and every 
 - `check-cells.ts`: the sizes; the lookahead sets derived a second way, from the canonical LR(1) automaton (727 states); no valid start of up to 10 tokens reads an open cell (214 million starts, as 322,362 distinct stacks); every frozen cell is read by a valid program; no valid program of 512 code points reaches the stack limit.
 - `check-samples.ts`: the labels derived a second way, from the tree; what every edit of the damage does; what `sample.ts` promises of every field of a sample; the dataset gives the same samples twice, and no validation program has the tokens of a train program.
 - `check-language.ts`: every example of LANGUAGE.md.
+- `check-guard.ts`: no code outside `held-back/` names that folder, and none names the skeptic's probe of hand-written mistakes.
+
+## Where this differs from the measured prototype
+
+- The places of the kept code points rise. A swap of two neighbours keeps the code point that now comes first and adds the other one, where the prototype kept both.
+- An alignment is brought into one form, see above. The prototype took the damage's own.
+- Every code point also has the hash of the stack's symbols, and a sample has the kept tokens and the constituents.
+- The goto table has -1 where the automaton has no transition. bison's compressed table gives some state for every pair.
+- The scanner reads U+0000 as flex does, as a byte of the class that no rule names. The prototype turned it into the byte 0x80 before the C program saw it.
+- `grammar/tables.json` holds what every rule of the scanner returns, so nothing reads `miniml.l` when the tables are loaded.
 
 ## Files
 

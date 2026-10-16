@@ -181,6 +181,62 @@ export function canonicalAlignment(original: ArrayLike<number>, broken: ArrayLik
   throw new Error('the alignment does not settle')
 }
 
+// An alignment for a pair of texts that comes without one, e.g. a broken program that a person wrote next to the
+// program that was meant. It is a shortest edit script: it keeps as many code points as any alignment can. Among
+// the scripts of that length it is one with the fewest edits, where an edit is a run of removed and added code
+// points between two kept ones. Without that, a duplicated line would be read as many small additions, since
+// every code point of the copy is also somewhere in the text after it.
+export function alignmentOfTexts(original: string, broken: string): Int32Array {
+  const from = codePointsOf(original), to = codePointsOf(broken)
+  const width = to.length + 1
+  // The cost of a way to turn original[0..i) into broken[0..j): 4096 per removed or added code point, and 1 per
+  // edit, so that the number of edits only decides between ways with the same number of code points.
+  const perCodePoint = 4096, unreachable = 0x3fffffff
+  // lastKept[i × width + j] is the lowest cost of the ways whose last step kept a code point, or that made no step.
+  // lastEdited is the same for the ways whose last step removed or added one.
+  const lastKept = new Int32Array((from.length + 1) * width).fill(unreachable), lastEdited = new Int32Array((from.length + 1) * width).fill(unreachable)
+  lastKept[0] = 0
+  for (let i = 0; i <= from.length; i++) {
+    for (let j = 0; j <= to.length; j++) {
+      const at = i * width + j
+      const best = Math.min(lastKept[at]!, lastEdited[at]!)
+      if (best >= unreachable) continue
+      if (i < from.length && j < to.length && from[i] === to[j]) lastKept[at + width + 1] = Math.min(lastKept[at + width + 1]!, best)
+      const edited = Math.min(lastKept[at]! + 1, lastEdited[at]!) + perCodePoint
+      if (i < from.length) lastEdited[at + width] = Math.min(lastEdited[at + width]!, edited)
+      if (j < to.length) lastEdited[at + 1] = Math.min(lastEdited[at + 1]!, edited)
+    }
+  }
+  // Back from the end along one of the cheapest ways.
+  const alignment = new Int32Array(to.length).fill(-1)
+  let i = from.length, j = to.length
+  let inEdit = lastEdited[i * width + j]! <= lastKept[i * width + j]!
+  while (i > 0 || j > 0) {
+    const at = i * width + j
+    if (!inEdit) {
+      alignment[j - 1] = i - 1
+      i--
+      j--
+      inEdit = lastEdited[i * width + j]! <= lastKept[i * width + j]!
+      continue
+    }
+    const cost = lastEdited[at]! - perCodePoint
+    // The last step added broken[j - 1] or removed original[i - 1], and went on in an edit or opened one. Where
+    // both are as cheap, the added code point is the later one, so that the earlier one is kept, e.g. of `hten`
+    // for `then` the h is kept and the t after it is added, as damage.ts says of a swap.
+    if (j > 0 && lastEdited[at - 1] === cost) j--
+    else if (i > 0 && lastEdited[at - width] === cost) i--
+    else if (j > 0 && lastKept[at - 1]! + 1 === cost) {
+      j--
+      inEdit = false
+    } else {
+      i--
+      inEdit = false
+    }
+  }
+  return canonicalAlignment(from, to, alignment)
+}
+
 // A constituent as one number: nonterminal × 2^20 + first token × 2^10 + last token. A text has at most 512 tokens.
 export const constituentKey = (nonterminal: number, firstToken: number, lastToken: number): number => (nonterminal * 1024 + firstToken) * 1024 + lastToken
 export const constituentOfKey = (key: number): {nonterminal: number, firstToken: number, lastToken: number} => ({nonterminal: key >> 20, firstToken: (key >> 10) & 1023, lastToken: key & 1023})

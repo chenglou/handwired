@@ -1,7 +1,8 @@
 // A STAND-IN generator of valid miniml programs, good enough for the checks of this folder: programs with line
-// breaks and indentation as a person would write them, about 80 tokens each. It is not the generator of the
-// experiment: it does not write every construct, e.g. no `let` as a right operand without brackets, and its
-// programs read 1,280 of the 1,391 frozen cells. The real generator replaces this file behind the same export.
+// breaks and indentation as a person would write them, 60 tokens and 267 code points on average. It is not the
+// generator of the experiment: it does not write every construct, e.g. no `let` as a right operand without
+// brackets, and 20,000 of its programs read 1,281 of the 1,391 frozen cells. The real generator replaces this file
+// behind the same export.
 //
 // generateProgram(seed, index) must return a valid program of at most 512 code points, and the same one for the
 // same seed and index. dataset.ts checks both for every program that it hands out.
