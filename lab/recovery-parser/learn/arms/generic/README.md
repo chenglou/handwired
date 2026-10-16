@@ -26,7 +26,7 @@ Two words, besides the ones of `../../README.md`:
 
 ## What keeps a sample from being whole
 
-The plain pass has 73.2% of whole samples where the hand-written rules have 80.4%, and no recipe below closes that. `whole-samples.ts` counts why, here for the best recipe, see [The best recipe](#the-best-recipe), as the mean of the seeds 11, 12 and 13, next to the hand-written tables:
+The plain pass has 73.2% of whole samples where the hand-written rules have 80.4%, and no recipe below closes that. `whole-samples.ts` counts why, here for the best recipe without its search, see [The best recipe](#the-best-recipe), as the mean of the seeds 11, 12 and 13, next to the hand-written tables:
 
 | wrong code points in a sample | the recipe, % of the samples | hand-written, % of the samples |
 | --- | --- | --- |
