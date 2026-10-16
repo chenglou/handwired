@@ -3,7 +3,7 @@
 // its threads. With a thread left alive it would not end, and check-train.ts would stop it after a minute and fail.
 //
 // Run from the repo root: bun lab/recovery-toml/learn/soft/error-inside-train.ts
-import {checkSamples} from '../check-samples.ts'
+import {checkSamples} from '../check-set.ts'
 import {asIsTables} from '../recovery-tables.ts'
 import {train} from './train.ts'
 import {packForTwin, placesForTwin} from './twin-data.ts'

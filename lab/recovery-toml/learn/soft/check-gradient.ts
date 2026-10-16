@@ -1,5 +1,5 @@
 // Checks the twin's hand-written backward pass against finite differences, on random mixes. It is
-// lab/recovery-parser/learn/soft/check-gradient.ts for TOML, on samples of ../check-samples.ts.
+// lab/recovery-parser/learn/soft/check-gradient.ts for TOML, on samples of ../check-set.ts.
 //
 // Run from the repo root:
 //   bun lab/recovery-toml/learn/soft/check-gradient.ts [samples, default 8] [single weights per group and setting, default 24]
@@ -30,7 +30,7 @@
 // an error of 1e-10 in the term, so a difference of the objective is only good to about 1e-12 / h. Along a direction
 // the gradients add up to much more than that. A single small gradient does not, so for single weights the check
 // reports the relative difference of the gradients of at least 1e-4, and the absolute difference of all.
-import {checkSamples} from '../check-samples.ts'
+import {checkSamples} from '../check-set.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {refuseUnknownOptions} from '../options.ts'
 import {createRandom} from '../random.ts'

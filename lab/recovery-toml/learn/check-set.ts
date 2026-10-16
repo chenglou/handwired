@@ -4,13 +4,15 @@
 //
 // A sample is a document with one of four kinds of damage: one code point removed, one added, one replaced by
 // another, or a few code points in a row removed. A kept code point has the label of its counterpart in the document,
-// from ../reference.ts, with every value scored. An added or a replaced code point has no label. One sample in 20 is
-// a document without damage. A damaged text can still be valid, e.g. a comment that lost a letter: the set keeps it,
-// as a sample with nothing to recover.
+// from ../reference.ts. From the first error on every value of a label is scored. Before it, a value that today's
+// parser does not give is not scored, as in the dataset: up to its first error a text is the start of a valid text,
+// e.g. in `name = tiny"`, where the value lost its opening quote, the `t` is read as the start of `true`. An added
+// or a replaced code point has no label. One sample in 20 is a document without damage. A damaged text can still be
+// valid, e.g. a comment that lost a letter: the set keeps it, as a sample with nothing to recover.
 import {validDocument} from '../check-texts.ts'
 import {labelReference} from '../reference.ts'
-import {capacity} from '../table-parser.ts'
-import {type LabeledText, type Samples, samplesOf} from './data.ts'
+import {capacity, runTableParser} from '../table-parser.ts'
+import {type Label, type LabeledText, type Samples, samplesOf} from './data.ts'
 import {createRandom} from './random.ts'
 
 // Short documents written by hand, next to the generated ones of ../check-texts.ts, which have up to 512 code points.
@@ -62,7 +64,17 @@ export function checkSampleAt(seed: number, index: number): LabeledText {
     broken = [...codePoints.slice(0, at), ...codePoints.slice(at + count)]
     alignment = [...everyPosition.slice(0, at), ...everyPosition.slice(at + count)]
   }
-  return {index, split, source: 'damage', kinds: [kind], broken: broken.join(''), labels: alignment.map(counterpart => counterpart === -1 ? undefined : reference.labels[counterpart]!), firstDamage: at, original, alignment}
+  // The labels, without the values that today's parser does not give before its first error.
+  const trace = runTableParser(broken.join(''))
+  const firstError = trace.firstErrorPosition === -1 ? broken.length : trace.firstErrorPosition
+  const labels = alignment.map((counterpart, position): Label | undefined => {
+    if (counterpart === -1) return undefined
+    const label = reference.labels[counterpart]!
+    if (position >= firstError) return label
+    const nestingGiven = trace.depthAfter[position] === label.depth && trace.containerAfter[position] === label.container
+    return {kind: trace.displayKind[position] === label.kind ? label.kind : undefined, depth: nestingGiven ? label.depth : undefined, container: nestingGiven ? label.container : undefined}
+  })
+  return {index, split, source: 'damage', kinds: [kind], broken: broken.join(''), labels, firstDamage: at, original, alignment}
 }
 
 // The check set: the texts 0 to count - 1 of a seed, a tenth of them in the validation split and none in the test split.

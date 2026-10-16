@@ -1,5 +1,5 @@
 // Checks the trainer's parts around the twin: worker threads, seeds, trainable cells and snapping. It is
-// lab/recovery-parser/learn/soft/check-train.ts for TOML, on the samples of ../check-samples.ts, with one more part at
+// lab/recovery-parser/learn/soft/check-train.ts for TOML, on the samples of ../check-set.ts, with one more part at
 // its end: a short training on a small set.
 //
 // Run from the repo root:
@@ -36,7 +36,7 @@
 //    which is a weight of 6.9 for a tokenizer cell's next state, and a step of Adam moves a weight by about 0.05.
 import {mkdirSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
-import {checkSamples} from '../check-samples.ts'
+import {checkSamples} from '../check-set.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {trainPart, validationPart} from '../data.ts'
 import {refuseUnknownOptions} from '../options.ts'

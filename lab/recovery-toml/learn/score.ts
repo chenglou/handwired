@@ -16,8 +16,10 @@
 //   tokenizer cell can hold one of the three events of a text's end, and a code point that reads the cell is then
 //   shown so.
 //
-// Not here, against the JSON file: the rows of the dataset's six groups, e.g. "within reach of the tables", and the
-// bound of the plain table parser. Both come from proofs about broken JSON in lab/recovery-parser/limits.ts.
+// Not here, against the JSON file: the bound of the plain table parser. Today's TOML parser already has a stack
+// action per grammar cell, so the dataset's bound is nearly always every code point, see ../limits.ts. The rows of
+// the groups are here, and a group of the TOML dataset is the number of a sample's edits, where the JSON groups say
+// what it takes to label a sample, e.g. "within reach of the tables".
 //
 // Run from the repo root:
 //   bun lab/recovery-toml/learn/score.ts [--tables <file.json>] [--base <file.json>] [--split validation] [--cells]
@@ -96,16 +98,19 @@ const rowsOfSamples = new WeakMap<Samples, Rows>()
 function rowsOf(samples: Samples): Rows {
   const known = rowsOfSamples.get(samples)
   if (known !== undefined) return known
-  const names = ['all', ...splitNames.map(name => `split: ${name}`), ...samples.sourceNames.map(name => `source: ${name}`), ...samples.kindNames.map(name => `kind: ${name}`)]
+  const names = ['all', ...splitNames.map(name => `split: ${name}`), ...samples.sourceNames.map(name => `source: ${name}`), ...samples.groupNames.map(name => `group: ${name}`), ...samples.kindNames.map(name => `kind: ${name}`)]
   const split = names.indexOf('split: train')
   const source = split + splitNames.length
-  const kind = source + samples.sourceNames.length
+  const group = source + samples.sourceNames.length
+  const kind = group + samples.groupNames.length
   const start = new Int32Array(samples.sampleCount + 1)
   const list: number[] = []
   for (let place = 0; place < samples.sampleCount; place++) {
     // A valid sample is in no row.
     if (samples.firstDamage[place] !== -1) {
       list.push(0, split + samples.split[place]!, source + samples.source[place]!)
+      // The group 0 is "no group", which has no row.
+      if (samples.group[place] !== 0) list.push(group + samples.group[place]!)
       for (let at = samples.kindStart[place]!; at < samples.kindStart[place + 1]!; at++) list.push(kind + samples.kindList[at]!)
     }
     start[place + 1] = list.length

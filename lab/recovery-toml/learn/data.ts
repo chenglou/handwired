@@ -40,8 +40,11 @@ export type LabeledText = {
   split: Split
   // 'valid' for a text without damage, and otherwise what made the broken text, e.g. 'damage'.
   source: string
-  // The kinds of damage in the text, e.g. ['deletedCodePoint'].
+  // The kinds of damage in the text, e.g. ['deleteCodePoint'].
   kinds: readonly string[]
+  // The one group that reports put the text into, e.g. 'two edits' for the number of its edits. Without it the text
+  // is in no group's row.
+  group?: string
   // The broken text, of at most 512 code points.
   broken: string
   // One entry per code point of the broken text: its label, or undefined for a code point that the damage added.
@@ -72,6 +75,8 @@ export type Dataset = {
   defaultSeed: number
   sampleAt: (seed: number, index: number) => DatasetSample
   labelsOf: (sample: DatasetSample) => (Label | undefined)[]
+  // The group of a broken sample: the number of its edits, e.g. 'two edits'.
+  groupOf: (sample: DatasetSample) => string
 }
 
 // The dataset, loaded when a function first asks for it. It is no import at the top of this file because the dataset
@@ -82,12 +87,12 @@ export const datasetFile = join(import.meta.dir, '..', 'samples.ts')
 export const datasetExists = () => existsSync(datasetFile)
 export function dataset(): Dataset {
   if (knownDataset !== undefined) return knownDataset
-  if (!datasetExists()) throw new Error(`the dataset is not there yet: ${datasetFile} has to export defaultSeed, sampleAt(seed, index) and labelsOf(sample), see the type Dataset in learn/data.ts`)
+  if (!datasetExists()) throw new Error(`the dataset is not there: ${datasetFile} has to export defaultSeed, sampleAt(seed, index), labelsOf(sample) and groupOf(sample), see the type Dataset in learn/data.ts`)
   const loaded = import.meta.require(datasetFile) as Partial<Dataset>
-  if (typeof loaded.defaultSeed !== 'number' || typeof loaded.sampleAt !== 'function' || typeof loaded.labelsOf !== 'function') {
-    throw new Error(`${datasetFile} does not export defaultSeed, sampleAt(seed, index) and labelsOf(sample), see the type Dataset in learn/data.ts`)
+  if (typeof loaded.defaultSeed !== 'number' || typeof loaded.sampleAt !== 'function' || typeof loaded.labelsOf !== 'function' || typeof loaded.groupOf !== 'function') {
+    throw new Error(`${datasetFile} does not export defaultSeed, sampleAt(seed, index), labelsOf(sample) and groupOf(sample), see the type Dataset in learn/data.ts`)
   }
-  knownDataset = {defaultSeed: loaded.defaultSeed, sampleAt: loaded.sampleAt, labelsOf: loaded.labelsOf}
+  knownDataset = {defaultSeed: loaded.defaultSeed, sampleAt: loaded.sampleAt, labelsOf: loaded.labelsOf, groupOf: loaded.groupOf}
   return knownDataset
 }
 
@@ -133,9 +138,11 @@ export type Samples = {
   withTest: boolean
   sampleCount: number
   codePointCount: number
-  // The sources and the kinds of damage of the set, as numbers: Samples.source holds indexes into sourceNames, where
-  // 'valid' is 0, and Samples.kindList holds indexes into kindNames.
+  // The sources, the groups and the kinds of damage of the set, as numbers: Samples.source holds indexes into
+  // sourceNames, where 'valid' is 0, Samples.group into groupNames, where 0 is "no group", and Samples.kindList into
+  // kindNames.
   sourceNames: string[]
+  groupNames: string[]
   kindNames: string[]
 
   // One entry per sample. A sample's place is its entry in these arrays, which is not its index in the dataset, since
@@ -151,9 +158,10 @@ export type Samples = {
   // damaged text that today's parser accepts. Scores count the code points from this position on.
   firstErrorPosition: Int32Array
   firstErrorKind: Uint8Array
-  // Indexes into splitNames (train, validation, test) and sourceNames.
+  // Indexes into splitNames (train, validation, test), sourceNames and groupNames.
   split: Uint8Array
   source: Uint8Array
+  group: Uint8Array
   // How many code points a score counts in the sample: the ones from the first error on whose label has a scored
   // value. 0 means that nothing is left to recover.
   scored: Int32Array
@@ -187,7 +195,7 @@ export type Samples = {
 }
 
 type TypedArray = Int32Array | Int8Array | Uint8Array | Uint16Array
-const perSampleFields = ['index', 'firstDamage', 'firstErrorPosition', 'firstErrorKind', 'split', 'source', 'scored'] as const
+const perSampleFields = ['index', 'firstDamage', 'firstErrorPosition', 'firstErrorKind', 'split', 'source', 'group', 'scored'] as const
 const perCodePointFields = ['codePoints', 'flags', 'labelKind', 'labelDepth', 'labelContainer', 'intendedLexerAfter', 'intendedEvent', 'intendedGrammarAfter', 'intendedDepthAfter', 'intendedContainerAfter', 'intendedStack'] as const
 const arrayFields = [...perSampleFields, ...perCodePointFields, 'start', 'kindStart', 'kindList'] as const
 const arrayTypes = {Int32Array, Int8Array, Uint8Array, Uint16Array}
@@ -221,7 +229,7 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
   const int8 = () => growing(length => new Int8Array(length))
   const uint8 = () => growing(length => new Uint8Array(length))
   const uint16 = () => growing(length => new Uint16Array(length))
-  const perSample = {index: int32(), firstDamage: int32(), firstErrorPosition: int32(), firstErrorKind: uint8(), split: uint8(), source: uint8(), scored: int32()}
+  const perSample = {index: int32(), firstDamage: int32(), firstErrorPosition: int32(), firstErrorKind: uint8(), split: uint8(), source: uint8(), group: uint8(), scored: int32()}
   const start = int32()
   const kindStart = int32()
   const kindList = uint8()
@@ -230,6 +238,7 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
     intendedLexerAfter: int8(), intendedEvent: int8(), intendedGrammarAfter: int8(), intendedDepthAfter: int8(), intendedContainerAfter: int8(), intendedStack: uint16(),
   }
   const sourceNames = ['valid']
+  const groupNames = ['']
   const kindNames: string[] = []
   const numberOf = (names: string[], name: string) => {
     let number = names.indexOf(name)
@@ -284,6 +293,7 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
     perSample.firstErrorKind.push(trace.firstErrorKind)
     perSample.split.push(splitNames.indexOf(text.split))
     perSample.source.push(numberOf(sourceNames, text.source))
+    perSample.group.push(numberOf(groupNames, text.group ?? ''))
     for (const kind of text.kinds) {
       kindList.push(numberOf(kindNames, kind))
       kindCount++
@@ -326,9 +336,9 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
     sampleCount++
   }
   return {
-    seed, datasetKey: datasetKey(), withTest, sampleCount, codePointCount, sourceNames, kindNames,
+    seed, datasetKey: datasetKey(), withTest, sampleCount, codePointCount, sourceNames, groupNames, kindNames,
     index: perSample.index.done(), firstDamage: perSample.firstDamage.done(), firstErrorPosition: perSample.firstErrorPosition.done(), firstErrorKind: perSample.firstErrorKind.done(),
-    split: perSample.split.done(), source: perSample.source.done(), scored: perSample.scored.done(),
+    split: perSample.split.done(), source: perSample.source.done(), group: perSample.group.done(), scored: perSample.scored.done(),
     start: start.done(), kindStart: kindStart.done(), kindList: kindList.done(),
     codePoints: perCodePoint.codePoints.done(), flags: perCodePoint.flags.done(), labelKind: perCodePoint.labelKind.done(), labelDepth: perCodePoint.labelDepth.done(), labelContainer: perCodePoint.labelContainer.done(),
     intendedLexerAfter: perCodePoint.intendedLexerAfter.done(), intendedEvent: perCodePoint.intendedEvent.done(), intendedGrammarAfter: perCodePoint.intendedGrammarAfter.done(),
@@ -340,12 +350,13 @@ export function samplesOf(texts: Iterable<LabeledText>, seed = 0): Samples {
 // when `withTest` is true, which needs RECOVERY_FINAL.
 export function makeSamples(seed: number, from: number, to: number, withTest = false): Samples {
   if (withTest) requireFinal('makeSamples with the test split')
-  const {sampleAt, labelsOf} = dataset()
+  const {sampleAt, labelsOf, groupOf} = dataset()
   function* texts(): Generator<LabeledText> {
     for (let index = from; index < to; index++) {
       const sample = sampleAt(seed, index)
       if (sample.split === 'test' && !withTest) continue
-      yield {...sample, index, labels: labelsOf(sample)}
+      const {source, kinds, broken, firstDamage, original, alignment, replaced, firstErrorPosition, split} = sample
+      yield {index, split, source, kinds, broken, labels: labelsOf(sample), firstDamage, original, alignment, firstErrorPosition, ...(replaced === undefined ? {} : {replaced}), ...(source === 'valid' ? {} : {group: groupOf(sample)})}
     }
   }
   return {...samplesOf(texts(), seed), withTest}
@@ -416,7 +427,7 @@ export function kindsOf(samples: Samples, place: number) {
 
 type CacheHeader = {
   format: string, cacheKey: string, datasetKey: string, withTest: boolean, seed: number, from: number, to: number, sampleCount: number, codePointCount: number,
-  sourceNames: string[], kindNames: string[], sections: {field: string, type: string, length: number, offset: number}[],
+  sourceNames: string[], groupNames: string[], kindNames: string[], sections: {field: string, type: string, length: number, offset: number}[],
 }
 const cacheFormat = 'recovery samples for TOML 1'
 const align = (offset: number) => Math.ceil(offset / 8) * 8
@@ -424,7 +435,7 @@ const align = (offset: number) => Math.ceil(offset / 8) * 8
 function writeCache(path: string, samples: Samples, from: number, to: number) {
   const header: CacheHeader = {
     format: cacheFormat, cacheKey: cacheKey(), datasetKey: samples.datasetKey, withTest: samples.withTest, seed: samples.seed, from, to, sampleCount: samples.sampleCount, codePointCount: samples.codePointCount,
-    sourceNames: samples.sourceNames, kindNames: samples.kindNames, sections: [],
+    sourceNames: samples.sourceNames, groupNames: samples.groupNames, kindNames: samples.kindNames, sections: [],
   }
   // The sections' offsets count from the end of the header, so that they don't depend on the header's length.
   let offset = 0
@@ -466,7 +477,7 @@ function readCache(path: string, withTest: boolean): {samples: Samples, from: nu
   if (arrayFields.some(field => arrays[field] === undefined)) return undefined
   const samples = {
     seed: header.seed, datasetKey: header.datasetKey, withTest: header.withTest, sampleCount: header.sampleCount, codePointCount: header.codePointCount,
-    sourceNames: header.sourceNames, kindNames: header.kindNames, ...arrays,
+    sourceNames: header.sourceNames, groupNames: header.groupNames, kindNames: header.kindNames, ...arrays,
   } as unknown as Samples
   return {samples, from: header.from, to: header.to}
 }
@@ -544,6 +555,7 @@ if (import.meta.main) {
   console.log(`Dataset ${samples.datasetKey}, seed ${seed}, the samples with the indexes ${from} to ${to - 1} that are not in the test split: ${samples.sampleCount} samples and ${samples.codePointCount} code points in ${seconds} s${cacheFolder === null ? ', without a cache' : `, cache in ${cacheFolder}`}`)
   console.log(`splits: ${tally(samples.split, splitNames)}`)
   console.log(`sources: ${tally(samples.source, samples.sourceNames)}`)
+  console.log(`groups of the ${brokenCount} broken samples: ${tally(samples.group, samples.groupNames, broken)}`)
   console.log(`Of the ${brokenCount} broken samples, ${samples.firstErrorPosition.reduce((total, position, place) => total + Number(broken(place) && position === -1), 0)} are valid for today's parser, and ${samples.scored.reduce((total, count, place) => total + Number(broken(place) && count === 0), 0)} have nothing to recover. The others have ${scored} scored code points.`)
   // A sample has the split of its original document, so two documents of two splits can end as the same broken text.
   const train = splitNames.indexOf('train')

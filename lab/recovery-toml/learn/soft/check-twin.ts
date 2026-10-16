@@ -1,6 +1,6 @@
 // Checks the invariant that ties the twin to the parser: with exact tables, every share of the twin is exactly 0 or
 // 1, and at every position from the first error on the twin has the exact parser's trace. It is
-// lab/recovery-parser/learn/soft/check-twin.ts for TOML, on the samples of ../check-samples.ts.
+// lab/recovery-parser/learn/soft/check-twin.ts for TOML, on the samples of ../check-set.ts.
 //
 // Run from the repo root:
 //   bun lab/recovery-toml/learn/soft/check-twin.ts [broken samples, default 2500] [random settings, default 20]
@@ -25,7 +25,7 @@
 // Samples that were packed for tables with other classes, or without the bit, have to be refused.
 //
 // It also checks the intended stacks of ../data.ts against the exact parser on the originals of 2,000 samples.
-import {checkSampleAt, checkSamples} from '../check-samples.ts'
+import {checkSampleAt, checkSamples} from '../check-set.ts'
 import {classesOfTheChecks} from '../check-texts.ts'
 import {codePointKept} from '../data.ts'
 import {refuseUnknownOptions} from '../options.ts'
