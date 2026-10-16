@@ -1,0 +1,593 @@
+⟦case merges-and-tools-01⟧
+from: a file of interface texts after a git merge with the diff3 conflict style, where both branches changed the same line and the markers are still in the file
+note: the line of the other branch is as good a choice as the line of HEAD
+debatable
+⟦intended⟧
+{
+  "nav.home": "Home",
+  "nav.pricing": "Pricing",
+  "cart.empty": "Your cart is empty",
+  "cart.checkout": "Check out"
+}
+⟦broken⟧
+{
+  "nav.home": "Home",
+  "nav.pricing": "Pricing",
+<<<<<<< HEAD
+  "cart.empty": "Your cart is empty",
+||||||| 4f1c2ab
+  "cart.empty": "Cart is empty",
+=======
+  "cart.empty": "Nothing in your cart yet",
+>>>>>>> feature/checkout-copy
+  "cart.checkout": "Check out"
+}
+⟦end⟧
+
+⟦case merges-and-tools-02⟧
+from: a package.json during a git rebase, where both branches added a dependency after the same line
+note: each branch added another entry, so both entries stay and the first one lacks its comma
+⟦intended⟧
+{
+  "name": "storefront",
+  "dependencies": {
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "zod": "^3.23.8"
+  }
+}
+⟦broken⟧
+{
+  "name": "storefront",
+  "dependencies": {
+    "express": "^4.19.2",
+<<<<<<< HEAD
+    "helmet": "^7.1.0"
+=======
+    "zod": "^3.23.8"
+>>>>>>> 3f2a1bc (Validate request bodies with zod)
+  }
+}
+⟦end⟧
+
+⟦case merges-and-tools-03⟧
+from: a file of histogram limits after a merge conflict was resolved by hand and the last marker line stayed in
+⟦intended⟧
+[
+  0.005,
+  0.01,
+  0.025,
+  0.05,
+  0.1,
+  0.25,
+  0.5,
+  1
+]⟦lf⟧
+⟦broken⟧
+[
+  0.005,
+  0.01,
+  0.025,
+  0.05,
+>>>>>>> origin/main
+  0.1,
+  0.25,
+  0.5,
+  1
+]⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-04⟧
+from: a .prettierrc of one line after `git stash pop` ran into a conflict, with both versions of the line between the markers
+note: the document of the stashed changes, after the line of equal signs, is as good a choice
+debatable
+⟦intended⟧
+{"semi": false, "singleQuote": true, "printWidth": 100}
+⟦broken⟧
+<<<<<<< Updated upstream
+{"semi": false, "singleQuote": true, "printWidth": 100}
+=======
+{"semi": false, "singleQuote": true, "printWidth": 120, "trailingComma": "all"}
+>>>>>>> Stashed changes⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-05⟧
+from: a tsconfig.json from Windows after a merge conflict was resolved by hand, with the closing line of both sides left in
+⟦intended⟧
+{⟦cr⟧
+  "compilerOptions": {⟦cr⟧
+    "target": "ES2022",⟦cr⟧
+    "module": "NodeNext",⟦cr⟧
+    "strict": true,⟦cr⟧
+    "outDir": "dist"⟦cr⟧
+  },⟦cr⟧
+  "include": ["src/**/*.ts"],⟦cr⟧
+  "exclude": ["node_modules", "dist"]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦broken⟧
+{⟦cr⟧
+  "compilerOptions": {⟦cr⟧
+    "target": "ES2022",⟦cr⟧
+    "module": "NodeNext",⟦cr⟧
+    "strict": true,⟦cr⟧
+    "outDir": "dist"⟦cr⟧
+  },⟦cr⟧
+  },⟦cr⟧
+  "include": ["src/**/*.ts"],⟦cr⟧
+  "exclude": ["node_modules", "dist"]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-06⟧
+from: the output of `git diff` for a settings file, saved in the place of the file
+note: the diff has a space before every unchanged line, which the check reports as white space that differs
+⟦intended⟧
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Error"
+    }
+  }
+}⟦lf⟧
+⟦broken⟧
+diff --git a/appsettings.json b/appsettings.json
+index 6a845cf..def9159 100644
+--- a/appsettings.json
++++ b/appsettings.json
+@@ -1,8 +1,8 @@
+ {
+   "Logging": {
+     "LogLevel": {
+-      "Default": "Information",
+-      "Microsoft.AspNetCore": "Warning"
++      "Default": "Warning",
++      "Microsoft.AspNetCore": "Error"
+     }
+   }
+ }⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-07⟧
+from: the manifest.json of a browser extension where a new last line was copied out of a diff view with its plus sign, and the line before it did not get a comma
+⟦intended⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Tidy",
+  "version": "0.9.2",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["https://*.example.org/*"]
+}⟦lf⟧
+⟦broken⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Tidy",
+  "version": "0.9.2",
+  "permissions": ["tabs", "storage"]
++  "host_permissions": ["https://*.example.org/*"]
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-08⟧
+from: the output of `git diff --cached --color` for a new file, saved from a terminal with the color codes in it
+⟦intended⟧
+{
+  "buckets_ms": [5, 10, 25, 50, 100, 250, 500, 1000],
+  "quantiles": [0.5, 0.9, 0.99],
+  "window_seconds": 60
+}
+⟦broken⟧
+⟦esc⟧[1mdiff --git a/config/metrics.json b/config/metrics.json⟦esc⟧[m
+⟦esc⟧[1mnew file mode 100644⟦esc⟧[m
+⟦esc⟧[1mindex 0000000..017ab25⟦esc⟧[m
+⟦esc⟧[1m--- /dev/null⟦esc⟧[m
+⟦esc⟧[1m+++ b/config/metrics.json⟦esc⟧[m
+⟦esc⟧[36m@@ -0,0 +1,5 @@⟦esc⟧[m
+⟦esc⟧[32m+⟦esc⟧[m⟦esc⟧[32m{⟦esc⟧[m
+⟦esc⟧[32m+⟦esc⟧[m⟦esc⟧[32m  "buckets_ms": [5, 10, 25, 50, 100, 250, 500, 1000],⟦esc⟧[m
+⟦esc⟧[32m+⟦esc⟧[m⟦esc⟧[32m  "quantiles": [0.5, 0.9, 0.99],⟦esc⟧[m
+⟦esc⟧[32m+⟦esc⟧[m⟦esc⟧[32m  "window_seconds": 60⟦esc⟧[m
+⟦esc⟧[32m+⟦esc⟧[m⟦esc⟧[32m}⟦esc⟧[m
+\ No newline at end of file⟦esc⟧[m⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-09⟧
+from: a line of `git diff --word-diff`, which puts the old words between [- and -] and the new words between {+ and +}
+⟦intended⟧
+{"service": "search-api", "image": "registry.example.com/search-api:1.8.3", "replicas": 4, "canary": false}
+⟦broken⟧
+{"service": "search-api", "image": [-"registry.example.com/search-api:1.8.2",-]{+"registry.example.com/search-api:1.8.3",+} "replicas": [-2,-]{+4,+} "canary": false}
+⟦end⟧
+
+⟦case merges-and-tools-10⟧
+from: a JavaScript object turned into JSON by a search and replace that puts quotes around every word before a colon, which also hit the address and the time inside the strings
+⟦intended⟧
+{"name": "status-page", "url": "https://status.example.com", "checkEvery": "00:05:00", "notify": true}
+⟦broken⟧
+{"name": "status-page", "url": ""https"://status.example.com", "checkEvery": ""00":"05":00", "notify": true}
+⟦end⟧
+
+⟦case merges-and-tools-11⟧
+from: the output of `cat -n settings.json | head -5`, as pasted into a bug report
+⟦intended⟧
+{
+  "theme": "solarized-dark",
+  "fontSize": 13,
+  "tabs": [
+    {"path": "src/index.ts", "pinned": true},
+    {"path": "README.md", "pinned": false}
+  ]
+}⟦lf⟧
+⟦broken⟧
+     1⟦tab⟧{
+     2⟦tab⟧  "theme": "solarized-dark",
+     3⟦tab⟧  "fontSize": 13,
+     4⟦tab⟧  "tabs": [
+     5⟦tab⟧    {"path": "src/index.ts", "pinned": true},⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-12⟧
+from: a file of messages that had single quotes around most strings, after a search and replace of every ' by "
+note: the tools take each " in the place of an apostrophe as added and the apostrophe as removed, so these two code points have no values
+⟦intended⟧
+{"error.network": "Can't reach the server", "error.auth": "That password isn't right", "action.retry": "Try again"}
+⟦broken⟧
+{"error.network": "Can"t reach the server", "error.auth": "That password isn"t right", "action.retry": "Try again"}
+⟦end⟧
+
+⟦case merges-and-tools-13⟧
+from: a log line after a script replaced the values of the secret keys, quotes included, by [REDACTED]
+⟦intended⟧
+{"event": "login.failed", "actor": {"user": "svc-billing", "password": "[REDACTED]"}, "headers": {"authorization": "[REDACTED]", "x-request-id": "b1f4c2"}}
+⟦broken⟧
+{"event": "login.failed", "actor": {"user": "svc-billing", "password": [REDACTED]}, "headers": {"authorization": [REDACTED], "x-request-id": "b1f4c2"}}
+⟦end⟧
+
+⟦case merges-and-tools-14⟧
+from: a config file after `sed 's|//.*||'`, which was meant to remove comments and also cut the two addresses
+⟦intended⟧
+{
+  "apiBase": "https://api.example.com/v2",
+  "timeoutMs": 8000,
+  "docs": "https://docs.example.com/guide",
+  "retry": {"max": 3, "backoffMs": 250}
+}⟦lf⟧
+⟦broken⟧
+{
+  "apiBase": "https:
+  "timeoutMs": 8000,
+  "docs": "https:
+  "retry": {"max": 3, "backoffMs": 250}
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-15⟧
+from: a document copied out of a string of a source file, where every quote still has its backslash
+⟦intended⟧
+{"event": "order.shipped", "data": {"orderId": "A-20931", "carrier": "DHL", "items": 3}}
+⟦broken⟧
+{\"event\": \"order.shipped\", \"data\": {\"orderId\": \"A-20931\", \"carrier\": \"DHL\", \"items\": 3}}
+⟦end⟧
+
+⟦case merges-and-tools-16⟧
+from: a file after `sed 's/,$//'`, which was meant to remove one comma before a closing brace and removed the comma at the end of every line
+⟦intended⟧
+{
+⟦tab⟧"id": "cus_8842",
+⟦tab⟧"email": "lena.fischer@example.com",
+⟦tab⟧"address": {
+⟦tab⟧⟦tab⟧"street": "Hauptstr. 12",
+⟦tab⟧⟦tab⟧"city": "Leipzig",
+⟦tab⟧⟦tab⟧"zip": "04109"
+⟦tab⟧},
+⟦tab⟧"newsletter": false
+}⟦lf⟧
+⟦broken⟧
+{
+⟦tab⟧"id": "cus_8842"
+⟦tab⟧"email": "lena.fischer@example.com"
+⟦tab⟧"address": {
+⟦tab⟧⟦tab⟧"street": "Hauptstr. 12"
+⟦tab⟧⟦tab⟧"city": "Leipzig"
+⟦tab⟧⟦tab⟧"zip": "04109"
+⟦tab⟧}
+⟦tab⟧"newsletter": false
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-17⟧
+from: a package.json of one line after a release script wrote the new version with sed and left out the quotes
+⟦intended⟧
+{"name": "pdf-export", "version": "3.12.0", "engines": {"node": ">=18"}, "license": "MIT"}
+⟦broken⟧
+{"name": "pdf-export", "version": 3.12.0, "engines": {"node": ">=18"}, "license": "MIT"}
+⟦end⟧
+
+⟦case merges-and-tools-18⟧
+from: a config line after `sed -E 's/"debug": (true|false)//'` took out one entry and left its comma
+⟦intended⟧
+{"host": "0.0.0.0", "port": 8443, "workers": 4, "tls": {"cert": "/etc/ssl/api.pem", "minVersion": "1.2"}}
+⟦broken⟧
+{"host": "0.0.0.0", "port": 8443, , "workers": 4, "tls": {"cert": "/etc/ssl/api.pem", "minVersion": "1.2"}}
+⟦end⟧
+
+⟦case merges-and-tools-19⟧
+from: a package.json after `grep -v scripts`, which removed the line that opens the object of scripts and left its entries
+note: the two entries could also belong to the outer object, and then the brace after them is one too many
+debatable
+⟦intended⟧
+{
+  "name": "notes-sync",
+  "version": "0.3.0",
+  "scripts": {
+    "start": "node server.js",
+    "test": "jest --coverage"
+  },
+  "license": "ISC"
+}⟦lf⟧
+⟦broken⟧
+{
+  "name": "notes-sync",
+  "version": "0.3.0",
+    "start": "node server.js",
+    "test": "jest --coverage"
+  },
+  "license": "ISC"
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-20⟧
+from: a list of issues after `cut -c1-64`, which cuts every line at 64 characters
+⟦intended⟧
+[
+  {"id": 1, "title": "Fix login redirect loop", "labels": ["bug", "auth"], "open": true},
+  {"id": 2, "title": "Add CSV export", "labels": [], "open": false},
+  {"id": 3, "title": "Drop the old polyfills", "labels": ["chore"], "open": true}
+]⟦lf⟧
+⟦broken⟧
+[
+  {"id": 1, "title": "Fix login redirect loop", "labels": ["bug"
+  {"id": 2, "title": "Add CSV export", "labels": [], "open": fal
+  {"id": 3, "title": "Drop the old polyfills", "labels": ["chore
+]⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-21⟧
+from: a public key kept as one JSON string, after a script printed it with `echo -e`, which turns every \n into a real line feed
+note: the check reports white space that differs: these line feeds are the damage
+⟦intended⟧
+"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq3vT8mXw1ZpL0cR5\nyN7dUeGh2KbJ4sFoA9tWxV6iPzQ1rMnC3lHkEaBu8YgDf0Sj\n-----END PUBLIC KEY-----\n"
+⟦broken⟧
+"-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq3vT8mXw1ZpL0cR5
+yN7dUeGh2KbJ4sFoA9tWxV6iPzQ1rMnC3lHkEaBu8YgDf0Sj
+-----END PUBLIC KEY-----
+"
+⟦end⟧
+
+⟦case merges-and-tools-22⟧
+from: a request body that a shell script builds by putting an error message between quotes, without escaping the quotes and the backslashes of the message
+⟦intended⟧
+{"build": 5312, "status": "failed", "log": "error: cannot find module \"left-pad\" in C:\\agent\\work\\src"}
+⟦broken⟧
+{"build": 5312, "status": "failed", "log": "error: cannot find module "left-pad" in C:\agent\work\src"}
+⟦end⟧
+
+⟦case merges-and-tools-23⟧
+from: a document passed to curl.exe from PowerShell, which takes the double quotes out of an argument
+⟦intended⟧
+{"name": "nightly backup", "schedule": "0 3 * * *", "targets": ["db-primary", "media"], "compress": true}
+⟦broken⟧
+{name: nightly backup, schedule: 0 3 * * *, targets: [db-primary, media], compress: true}
+⟦end⟧
+
+⟦case merges-and-tools-24⟧
+from: a request body that a CI script builds from shell variables, two of which were empty
+⟦intended⟧
+{"repo": "acme/web", "pr": null, "labels": [], "sha": "9f3c2e7", "run_attempt": 1}
+⟦broken⟧
+{"repo": "acme/web", "pr": , "labels": [], "sha": "9f3c2e7", "run_attempt": }
+⟦end⟧
+
+⟦case merges-and-tools-25⟧
+from: a line that an awk script prints for each name space of a list, where the print statement lacks the quote that opens the value
+⟦intended⟧
+{"namespace": "staging", "replicas": 3, "wait": true}
+⟦broken⟧
+{"namespace": staging", "replicas": 3, "wait": true}
+⟦end⟧
+
+⟦case merges-and-tools-26⟧
+from: a config line after a sed replacement whose new text lacks the closing quote
+⟦intended⟧
+{"env": "production", "db": {"host": "pg-main.internal", "pool": 20}, "features": ["beta-search", "sso"]}
+⟦broken⟧
+{"env": "production, "db": {"host": "pg-main.internal", "pool": 20}, "features": ["beta-search", "sso"]}
+⟦end⟧
+
+⟦case merges-and-tools-27⟧
+from: a line of a Helm template before it is rendered, with two placeholders that stand for whole values
+⟦intended⟧
+{"replicas": 2, "region": "eu-central-1", "image": "{{ .Values.image.repository }}:{{ .Values.image.tag }}"}
+⟦broken⟧
+{"replicas": {{ .Values.replicaCount }}, "region": {{ .Values.region | quote }}, "image": "{{ .Values.image.repository }}:{{ .Values.image.tag }}"}
+⟦end⟧
+
+⟦case merges-and-tools-28⟧
+from: a Jinja template of an Ansible role before it is rendered, with the lines of its loop
+⟦intended⟧
+{
+  "upstream": "app_servers",
+  "servers": [
+    {"address": "{{ host }}", "port": 8000, "weight": 1}
+  ]
+}⟦lf⟧
+⟦broken⟧
+{
+  "upstream": "app_servers",
+  "servers": [
+{% for host in groups['app'] %}
+    {"address": "{{ host }}", "port": 8000, "weight": 1}{% if not loop.last %},{% endif %}
+{% endfor %}
+  ]
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-29⟧
+from: the format string of a Go fmt.Sprintf call that builds a document, before the values are filled in
+⟦intended⟧
+{"user_id": 48213, "email": "%s", "score": 87.50, "verified": false}
+⟦broken⟧
+{"user_id": %d, "email": "%s", "score": %.2f, "verified": %t}
+⟦end⟧
+
+⟦case merges-and-tools-30⟧
+from: the body of a saved Postman request, where the placeholders of two strings have no quotes around them
+note: each placeholder could also stand for a whole value of another kind, e.g. null, and then nothing of the placeholder is kept
+debatable
+⟦intended⟧
+{"to": "{{recipient_email}}", "template": "welcome", "locale": "pt-BR", "vars": {"first_name": "{{first_name}}"}}
+⟦broken⟧
+{"to": {{recipient_email}}, "template": "welcome", "locale": "pt-BR", "vars": {"first_name": {{first_name}}}}
+⟦end⟧
+
+⟦case merges-and-tools-31⟧
+from: an ECS task definition that is a template for envsubst, before envsubst has run
+⟦intended⟧
+{
+  "family": "orders-worker",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "${ECR_REPO}:${IMAGE_TAG}",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "environment": [
+        {"name": "QUEUE_URL", "value": "${QUEUE_URL}"},
+        {"name": "LOG_LEVEL", "value": "info"}
+      ]
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"]
+}⟦lf⟧
+⟦broken⟧
+{
+  "family": "orders-worker",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "${ECR_REPO}:${IMAGE_TAG}",
+      "cpu": ${TASK_CPU},
+      "memory": ${TASK_MEMORY},
+      "essential": true,
+      "environment": [
+        {"name": "QUEUE_URL", "value": "${QUEUE_URL}"},
+        {"name": "LOG_LEVEL", "value": "info"}
+      ]
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"]
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-32⟧
+from: the template string of a Python str.format call, where every brace of the document stands twice and a name between single braces stands for a value
+⟦intended⟧
+{"query": "{search_term}", "page": 1, "per_page": 50, "filters": {"in_stock": true}}
+⟦broken⟧
+{{"query": "{search_term}", "page": {page}, "per_page": 50, "filters": {{"in_stock": true}}}}
+⟦end⟧
+
+⟦case merges-and-tools-33⟧
+from: an object copied into .eslintrc.json from an .eslintrc.js that Prettier formats with single quotes and trailing commas
+⟦intended⟧
+{
+  "root": true,
+  "extends": ["eslint:recommended", "prettier"],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "always"]
+  }
+}⟦lf⟧
+⟦broken⟧
+{
+  root: true,
+  extends: ['eslint:recommended', 'prettier'],
+  parserOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'module',
+  },
+  rules: {
+    'no-console': 'warn',
+    eqeqeq: ['error', 'always'],
+  },
+}⟦lf⟧
+⟦end⟧
+
+⟦case merges-and-tools-34⟧
+from: a document in the text of an email whose client wraps lines at 72 columns, so that a space inside a string became a line feed
+⟦intended⟧
+{"id": "INC-2291", "severity": "high", "summary": "Checkout latency above 2s for customers in the EU region since 09:40 UTC", "ack": false}
+⟦broken⟧
+{"id": "INC-2291", "severity": "high", "summary": "Checkout latency
+above 2s for customers in the EU region since 09:40 UTC", "ack": false}
+⟦end⟧
+
+⟦case merges-and-tools-35⟧
+from: a document pasted into a Markdown page without a code fence, whose renderer turns straight quotes into curly ones, two hyphens into a dash and three dots into one character
+⟦intended⟧
+{"command": "npm run build -- --watch", "description": "Rebuilds on change...", "shortcut": "Ctrl+B"}
+⟦broken⟧
+{“command”: “npm run build – –watch”, “description”: “Rebuilds on change…”, “shortcut”: “Ctrl+B”}
+⟦end⟧
+
+⟦case merges-and-tools-36⟧
+from: a document that a Django template put into a page without the safe filter, so that every quote and ampersand is an HTML entity
+note: the tools do not keep the colon and the space, or the comma and the space, between two entities, so these code points have no values
+⟦intended⟧
+{"account": "Priya & Sons Ltd", "plan_ids": [3, 7], "csrf": "b7e1f0", "next": "/billing?tab=invoices&year=2024"}
+⟦broken⟧
+{&quot;account&quot;: &quot;Priya &amp; Sons Ltd&quot;, &quot;plan_ids&quot;: [3, 7], &quot;csrf&quot;: &quot;b7e1f0&quot;, &quot;next&quot;: &quot;/billing?tab=invoices&amp;year=2024&quot;}
+⟦end⟧
+
+⟦case merges-and-tools-37⟧
+from: a row of a CSV export whose last column holds a document: the export doubles every quote of the field and puts quotes around it
+⟦intended⟧
+{"sku": "TS-0042", "title": "T-shirt \"Classic\"", "sizes": ["S", "M", "L"], "price": 19.9}
+⟦broken⟧
+1042,2024-05-17,"{""sku"": ""TS-0042"", ""title"": ""T-shirt \""Classic\"""", ""sizes"": [""S"", ""M"", ""L""], ""price"": 19.9}"
+⟦end⟧
+
+⟦case merges-and-tools-38⟧
+from: a row that a spreadsheet formula joins from cells as the sheet shows them: the price with its currency sign, and TRUE and FALSE for the two check boxes
+⟦intended⟧
+{"id": 1002, "name": "Sea salt 500g", "price": 2.15, "organic": true, "stock": 140, "discontinued": false}
+⟦broken⟧
+{"id": 1002, "name": "Sea salt 500g", "price": $2.15, "organic": TRUE, "stock": 140, "discontinued": FALSE}
+⟦end⟧
+
+⟦case merges-and-tools-39⟧
+from: a document that a formula of a German Excel sheet joins from cells, where a decimal has a comma
+⟦intended⟧
+{"invoice": "2024-0193", "lines": [{"sku": "A-113", "qty": 2, "price": 12.5}, {"sku": "B-204", "qty": 1, "price": 99.95}], "vat_rate": 0.19}
+⟦broken⟧
+{"invoice": "2024-0193", "lines": [{"sku": "A-113", "qty": 2, "price": 12,5}, {"sku": "B-204", "qty": 1, "price": 99,95}], "vat_rate": 0,19}
+⟦end⟧
+
+⟦case merges-and-tools-40⟧
+from: a document that a spreadsheet formula joins from cells, one of which shows its number with a separator
+note: the comma could also be a decimal comma, and then the price is 1.299 and the number as it stands is not kept
+debatable
+⟦intended⟧
+{"product": "Standing desk", "price": 1299, "stock": 37}
+⟦broken⟧
+{"product": "Standing desk", "price": 1,299, "stock": 37}
+⟦end⟧
+

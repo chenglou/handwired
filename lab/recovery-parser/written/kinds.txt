@@ -1,0 +1,248 @@
+# For every case: the generator's kinds that describe its damage, by the names of the table of kinds in the dataset's README, and after "new:" the damage that no kind makes, in a few words. README.md says how the line between the two was drawn, under "What the damage is".
+# A line: the id of the case, the names of the kinds, each after a space, and for a case with damage that no kind makes " new: " and that damage.
+
+documents-and-web-01 curlyQuotes
+documents-and-web-02 curlyQuotes
+documents-and-web-03 typingSlip
+documents-and-web-04 new: the true minus sign of typesetting before every negative number
+documents-and-web-05 curlyQuotes new: a long dash in the place of two hyphens inside a string
+documents-and-web-06 curlyQuotes
+documents-and-web-07 nonBreakingSpace
+documents-and-web-08 new: a zero width space after every comma
+documents-and-web-09 nonBreakingSpace
+documents-and-web-10 htmlEntities
+documents-and-web-11 htmlEntities new: a tag of HTML in the place of every line end
+documents-and-web-12 logPrefix textAfterEnd
+documents-and-web-13 new: the tag of a link around an address inside a string, with quotes of its own
+documents-and-web-14 statementWrapper
+documents-and-web-15 logPrefix new: a percent code in the place of every quote, as an address has it
+documents-and-web-16 proseAround codeFence
+documents-and-web-17 new: the marks of bold text in markdown around a line
+documents-and-web-18 unescapedBackslash new: a backslash before every square bracket of the document, as a converter to markdown writes it
+documents-and-web-19 logPrefix textAfterEnd unescapedBackslash
+documents-and-web-20 unescapedBackslash
+documents-and-web-21 rawLineFeedInString new: the mark of a quoted line of a mail before every line
+documents-and-web-22 rawLineFeedInString
+documents-and-web-23 new: the quoted-printable encoding of a mail, with an equals sign at a line's end and codes for some characters
+documents-and-web-24 cutOff
+documents-and-web-25 proseAround
+documents-and-web-26 new: a line number before every line
+documents-and-web-27 proseAround
+documents-and-web-28 statementWrapper new: the continuation prompt of a shell before every line
+documents-and-web-29 new: the marks of a diff, with its first line and the lines of the old side
+documents-and-web-30 missingComma new: a line number and a bar before every line, and a line with a caret under the error
+documents-and-web-31 templatePlaceholder
+documents-and-web-32 ellipsis
+documents-and-web-33 templatePlaceholder
+documents-and-web-34 unquotedKey curlyQuotes
+documents-and-web-35 logPrefix quotedDocument new: every quote stands twice, as in a cell of a CSV file
+documents-and-web-36 numberFormat
+documents-and-web-37 numberFormat
+documents-and-web-38 rawLineFeedInString new: the number and the header of a page in the middle of the document
+documents-and-web-39 numberFormat foreignLiteral
+documents-and-web-40 codeFence
+
+hand-editing-01 trailingComma
+hand-editing-02 missingComma
+hand-editing-03 openStringAtLineEnd
+hand-editing-04 partialLiteral
+hand-editing-05 colonWithoutValue
+hand-editing-06 strayCloser
+hand-editing-07 cutOff
+hand-editing-08 missingOpeningQuote
+hand-editing-09 openStringMidLine
+hand-editing-10 unescapedQuote
+hand-editing-11 templatePlaceholder
+hand-editing-12 missingComma trailingComma
+hand-editing-13 openStringMidLine
+hand-editing-14 openStringMidLine
+hand-editing-15 unquotedKey singleQuotedString
+hand-editing-16 new: a closing brace and an opening brace in the place of a comma, from a snippet that was pasted with its own braces
+hand-editing-17 extraComma
+hand-editing-18 middleCutOut
+hand-editing-19 missingColon
+hand-editing-20 typingSlip
+hand-editing-21 unescapedBackslash
+hand-editing-22 rawLineFeedInString
+hand-editing-23 unquotedValue numberFormat
+hand-editing-24 keyWithoutColon
+hand-editing-25 cutOff
+hand-editing-26 lineComment trailingComma
+hand-editing-27 hashComment
+hand-editing-28 blockComment singleQuotedString
+hand-editing-29 curlyQuotes missingComma
+hand-editing-30 unescapedBackslash missingComma
+hand-editing-31 middleCutOut
+hand-editing-32 missingCloser
+hand-editing-33 doubledQuote foreignLiteral
+hand-editing-34 unquotedKey foreignKeySeparator unquotedValue
+hand-editing-35 stringConcatenation
+hand-editing-36 unquotedValue middleCutOut
+hand-editing-37 numberFormat
+hand-editing-38 middleCutOut
+hand-editing-39 wrongCloser unquotedKey
+hand-editing-40 new: a line of a shell command that was pasted into the middle of the document
+
+logs-and-transport-01 logPrefix cutOff
+logs-and-transport-02 logPrefix new: #012 in the place of every line feed, as a system log writes it
+logs-and-transport-03 logPrefix textAfterEnd
+logs-and-transport-04 proseAround
+logs-and-transport-05 statementWrapper
+logs-and-transport-06 statementWrapper
+logs-and-transport-07 proseAround
+logs-and-transport-08 proseAround textAfterEnd
+logs-and-transport-09 logPrefix
+logs-and-transport-10 ansiColorCodes new: the name of the service and a bar before every line of the document
+logs-and-transport-11 ansiColorCodes
+logs-and-transport-12 logPrefix ansiColorCodes
+logs-and-transport-13 byteOrderMark
+logs-and-transport-14 byteOrderMark new: a NUL after every character, from UTF-16 that was read as bytes
+logs-and-transport-15 logPrefix cutOff
+logs-and-transport-16 logPrefix backslashEscapedDocument cutOff
+logs-and-transport-17 cutOff
+logs-and-transport-18 cutOff
+logs-and-transport-19 headMissing cutOff
+logs-and-transport-20 headMissing
+logs-and-transport-21 middleCutOut
+logs-and-transport-22 headMissing concatenated
+logs-and-transport-23 new: a whole second document and a line feed in the middle of the first
+logs-and-transport-24 cutOff concatenated
+logs-and-transport-25 new: the size of a chunk of an HTTP body on a line of its own before every chunk
+logs-and-transport-26 new: a line feed at every 80th column, also inside a number
+logs-and-transport-27 new: the quoted-printable encoding of a mail, with an equals sign at a line's end and codes for some characters
+logs-and-transport-28 logPrefix textAfterEnd
+logs-and-transport-29 textAfterEnd
+logs-and-transport-30 proseAround quotedDocument backslashEscapedDocument
+logs-and-transport-31 quotedDocument unescapedBackslash
+logs-and-transport-32 logPrefix quotedDocument new: every quote stands twice, as in a cell of a CSV file
+logs-and-transport-33 logPrefix new: \x22 in the place of every quote, as the log of a web server writes it
+logs-and-transport-34 unescapedQuote
+logs-and-transport-35 unquotedKey unquotedValue
+logs-and-transport-36 rawLineFeedInString rawTabInString
+logs-and-transport-37 unescapedBackslash
+logs-and-transport-38 colonWithoutValue
+logs-and-transport-39 ansiColorCodes logPrefix missingOpeningQuote
+logs-and-transport-40 nonBreakingSpace
+
+merges-and-tools-01 conflictMarkers
+merges-and-tools-02 conflictMarkers missingComma
+merges-and-tools-03 conflictMarkers
+merges-and-tools-04 conflictMarkers
+merges-and-tools-05 strayCloser
+merges-and-tools-06 new: the marks of a diff, with its first lines and the lines of the old side
+merges-and-tools-07 missingComma new: the plus sign of a diff before a line
+merges-and-tools-08 ansiColorCodes new: the marks of a diff, with its first lines
+merges-and-tools-09 new: the marks of a word diff around the old words and the new words
+merges-and-tools-10 doubledQuote unescapedQuote
+merges-and-tools-11 cutOff new: a line number and a tab before every line
+merges-and-tools-12 unescapedQuote
+merges-and-tools-13 templatePlaceholder
+merges-and-tools-14 openStringAtLineEnd
+merges-and-tools-15 backslashEscapedDocument
+merges-and-tools-16 missingComma
+merges-and-tools-17 unquotedValue
+merges-and-tools-18 extraComma
+merges-and-tools-19 middleCutOut
+merges-and-tools-20 middleCutOut
+merges-and-tools-21 rawLineFeedInString
+merges-and-tools-22 unescapedQuote unescapedBackslash
+merges-and-tools-23 unquotedKey unquotedValue
+merges-and-tools-24 colonWithoutValue
+merges-and-tools-25 missingOpeningQuote
+merges-and-tools-26 openStringMidLine
+merges-and-tools-27 templatePlaceholder
+merges-and-tools-28 new: the tags of a template's loop on lines of their own and after an entry
+merges-and-tools-29 templatePlaceholder
+merges-and-tools-30 templatePlaceholder
+merges-and-tools-31 templatePlaceholder
+merges-and-tools-32 templatePlaceholder new: every brace of the document stands twice, as a format string needs it
+merges-and-tools-33 unquotedKey singleQuotedString trailingComma
+merges-and-tools-34 rawLineFeedInString
+merges-and-tools-35 curlyQuotes new: a dash in the place of two hyphens and one character in the place of three dots, inside strings
+merges-and-tools-36 htmlEntities
+merges-and-tools-37 logPrefix quotedDocument new: every quote stands twice, as in a cell of a CSV file
+merges-and-tools-38 numberFormat foreignLiteral
+merges-and-tools-39 numberFormat
+merges-and-tools-40 numberFormat
+
+model-output-01 proseAround codeFence
+model-output-02 unescapedQuote
+model-output-03 trailingComma
+model-output-04 codeFence cutOff
+model-output-05 tuple foreignLiteral
+model-output-06 new: a remark in round brackets after a number
+model-output-07 trailingComma lineComment
+model-output-08 missingCloser middleCutOut
+model-output-09 new: every brace of the document stands twice, as in a template that the model copied
+model-output-10 missingComma
+model-output-11 unescapedBackslash
+model-output-12 ellipsis
+model-output-13 unquotedKey singleQuotedString trailingComma
+model-output-14 rawLineFeedInString
+model-output-15 numberFormat
+model-output-16 strayCloser
+model-output-17 proseAround
+model-output-18 cutOff newlineDelimited
+model-output-19 hashComment
+model-output-20 unescapedBackslash
+model-output-21 wrongCloser
+model-output-22 codeFence missingCloser
+model-output-23 new: a number as the expression of JavaScript that computes it
+model-output-24 unescapedQuote
+model-output-25 templatePlaceholder
+model-output-26 unescapedBackslash
+model-output-27 proseAround textAfterEnd
+model-output-28 stringConcatenation
+model-output-29 numberFormat
+model-output-30 singleQuotedString foreignLiteral
+model-output-31 typingSlip codeFence
+model-output-32 unquotedValue
+model-output-33 backslashEscapedDocument
+model-output-34 openStringMidLine
+model-output-35 rawLineFeedInString unescapedQuote new: three quotes at each end of a string, as Python writes a string of several lines
+model-output-36 ellipsis
+model-output-37 proseAround cutOff
+model-output-38 colonWithoutValue
+model-output-39 numberFormat
+model-output-40 unescapedQuote
+
+other-notations-01 singleQuotedString
+other-notations-02 singleQuotedString unescapedQuote
+other-notations-03 singleQuotedString stringConcatenation foreignLiteral
+other-notations-04 quotedDocument
+other-notations-05 statementWrapper unquotedKey
+other-notations-06 singleQuotedString callWrapper nonFiniteNumber
+other-notations-07 singleQuotedString callWrapper numberFormat
+other-notations-08 singleQuotedString callWrapper
+other-notations-09 singleQuotedString tuple foreignLiteral new: braces around the items of a set, where an array is meant
+other-notations-10 singleQuotedString
+other-notations-11 unquotedKey singleQuotedString unquotedValue
+other-notations-12 unquotedKey singleQuotedString ellipsis
+other-notations-13 logPrefix unquotedKey singleQuotedString
+other-notations-14 unquotedKey singleQuotedString stringConcatenation
+other-notations-15 foreignLiteral
+other-notations-16 foreignKeySeparator unquotedKey unquotedValue foreignLiteral
+other-notations-17 logPrefix foreignKeySeparator
+other-notations-18 singleQuotedString foreignKeySeparator trailingComma new: the word array and round brackets around an object, as PHP writes it
+other-notations-19 logPrefix unquotedKey unquotedValue missingComma
+other-notations-20 statementWrapper unquotedKey foreignLiteral new: the name of a type and braces around the items of a list, as Go writes them
+other-notations-21 statementWrapper unquotedKey unquotedValue trailingComma callWrapper foreignLiteral
+other-notations-22 new: an escape with braces around its digits, as Rust writes it
+other-notations-23 blockComment lineComment trailingComma
+other-notations-24 lineComment unquotedKey singleQuotedString trailingComma
+other-notations-25 unquotedKey unquotedValue foreignLiteral
+other-notations-26 hashComment
+other-notations-27 unquotedValue
+other-notations-28 nonFiniteNumber
+other-notations-29 numberFormat
+other-notations-30 unquotedValue numberFormat
+other-notations-31 numberFormat
+other-notations-32 numberFormat
+other-notations-33 unquotedValue numberFormat
+other-notations-34 numberFormat
+other-notations-35 unquotedValue
+other-notations-36 logPrefix unquotedKey foreignKeySeparator unquotedValue
+other-notations-37 callWrapper foreignLiteral new: square brackets around a dictionary, where an object is meant
+other-notations-38 unquotedKey unquotedValue foreignKeySeparator tuple new: a semicolon after every member, in the place of a comma and after the last member
+other-notations-39 unquotedKey singleQuotedString callWrapper
+other-notations-40 statementWrapper

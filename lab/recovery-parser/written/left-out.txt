@@ -1,0 +1,1 @@
+a-part-3 03400e4a keeps the line feed after the last color code, and REPAIR.md asks for a repair that ends with the document's last character where text after the document is removed

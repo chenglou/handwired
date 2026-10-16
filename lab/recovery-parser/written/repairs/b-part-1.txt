@@ -1,0 +1,552 @@
+⟦repair c78e043f⟧
+⟦repaired⟧
+[
+  {"id": 1, "title": "Fix login redirect loop", "labels": ["bug"]},
+  {"id": 2, "title": "Add CSV export", "labels": [], "open": false},
+  {"id": 3, "title": "Drop the old polyfills", "labels": ["chore"]}
+]⟦lf⟧
+⟦end⟧
+
+⟦repair 1edc012e⟧
+⟦repaired⟧
+{"env": "production", "db": {"host": "pg-main.internal", "pool": 20}, "features": ["beta-search", "sso"]}
+⟦end⟧
+
+⟦repair bba5a971⟧
+⟦repaired⟧
+{"python.defaultInterpreterPath": "C:\\Users\\dana\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "python.terminal.activateEnvironment": true}
+⟦end⟧
+
+⟦repair 345dfff7⟧
+unsure: the two en dashes could stand for -- and the … for ..., changed by the same autocorrection that changed the quote marks
+⟦repaired⟧
+{"command": "npm run build – –watch", "description": "Rebuilds on change…", "shortcut": "Ctrl+B"}
+⟦end⟧
+
+⟦repair 4eb51bf9⟧
+⟦repaired⟧
+{"replicas": "{{ .Values.replicaCount }}", "region": "{{ .Values.region | quote }}", "image": "{{ .Values.image.repository }}:{{ .Values.image.tag }}"}
+⟦end⟧
+
+⟦repair 39ed01ce⟧
+⟦repaired⟧
+[{"day": "2026-10-01", "open": "09:00", "close": "18:30"}, {"day": "2026-10-02", "open": "09:00", "close": "13:00"}]
+⟦end⟧
+
+⟦repair 4bd178fa⟧
+unsure: "hostname" could be the key that is too many, with "host" as the key that stays, or "hostname" could be a key of its own that lacks a value
+⟦repaired⟧
+{"hostname": "db-replica-2.internal", "port": 5432, "pool": {"min": 2, "max": 10}}
+⟦end⟧
+
+⟦repair f73947b0⟧
+⟦repaired⟧
+{"job": "backup-nightly", "source": "C:\\Users\\svc_backup\\Documents", "match": "^report_\\d{4}\\.xlsx$", "keep": 14}
+⟦end⟧
+
+⟦repair 0967d5ee⟧
+⟦repaired⟧
+{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[13.37, 52.51], [13.41, 52.51], [13.41, 52.53], [13.37, 52.51]]]}, "properties": {"name": "Tiergarten"}}
+⟦end⟧
+
+⟦repair f5596e9f⟧
+⟦repaired⟧
+{"statusCode": 201, "headers": {"Content-Type": "application/json"}, "body": "{\"message\": \"created\", \"id\": 7}"}
+⟦end⟧
+
+⟦repair bd6491a6⟧
+⟦repaired⟧
+{
+  "name": "storefront",
+  "dependencies": {
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "zod": "^3.23.8"
+  }
+}
+⟦end⟧
+
+⟦repair d7dd1b99⟧
+⟦repaired⟧
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Error"
+    }
+  }
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 3fa9f756⟧
+⟦repaired⟧
+{
+  "buckets_ms": [5, 10, 25, 50, 100, 250, 500, 1000],
+  "quantiles": [0.5, 0.9, 0.99],
+  "window_seconds": 60
+}
+⟦end⟧
+
+⟦repair 86b559bc⟧
+⟦repaired⟧
+{"id": 4411, "name": "Zoë Keller", "city": "Malmö", "tags": ["vip", "newsletter"], "balance": -12.5}
+⟦end⟧
+
+⟦repair dc429ac9⟧
+⟦repaired⟧
+[{"key": "baseUrl", "value": "https://staging.api.example.com", "enabled": true}, {"key": "apiVersion", "value": "v2", "enabled": true}]
+⟦end⟧
+
+⟦repair 1b9fc232⟧
+⟦repaired⟧
+[-4.5, -6.1, -2.0, 0.3, -1.8, 2.4, -0.7]
+⟦end⟧
+
+⟦repair b0ed4da9⟧
+⟦repaired⟧
+{"invoice": "2024-0193", "lines": [{"sku": "A-113", "qty": 2, "price": 12.5}, {"sku": "B-204", "qty": 1, "price": 99.95}], "vat_rate": 0.19}
+⟦end⟧
+
+⟦repair 7fb6a228⟧
+unsure: yes could stand for true, as YAML 1.1 reads the word, and not for the string "yes"
+⟦repaired⟧
+{"name": "deploy-api", "image": "registry.example.com/api:1.8.2", "replicas": 3, "ports": [8080, 9090], "tls": "yes"}
+⟦end⟧
+
+⟦repair ff8ef5bc⟧
+⟦repaired⟧
+{"customers":[{"name":"Zoë Keller","city":"Köln","orders":3},{"name":"João Pires","city":"Porto","orders":11}]}
+⟦end⟧
+
+⟦repair 694a3077⟧
+⟦repaired⟧
+"2.14.0-rc.3+build.871"
+⟦end⟧
+
+⟦repair 6c461791⟧
+⟦repaired⟧
+{"items":[{"id":"a1","title":"Inbox","unread":12},{"id":"b7","title":"Sent","unread":0}],"nextPageToken":null}
+⟦end⟧
+
+⟦repair 353749c2⟧
+⟦repaired⟧
+{"id":731, "email":"kofi@example.com", "roles":["admin", "billing"], "locked_at":null}
+⟦end⟧
+
+⟦repair 6a41cb4b⟧
+⟦repaired⟧
+{"month": "2026-09", "weeklyVisits": [12400, 9850, 11320, 10675], "newSignups": 1204, "churned": 87}
+⟦end⟧
+
+⟦repair c638507c⟧
+⟦repaired⟧
+[{"drug": "Amoxicillin", "dose": "500 mg", "notes": "N/A"}, {"drug": "Ibuprofen", "dose": "400 mg", "notes": "take with food"}]
+⟦end⟧
+
+⟦repair f70b1e80⟧
+⟦repaired⟧
+[
+  {"ts":"2026-10-14T22:01:07Z","host":"edge-3","status":502,"ms":3004},
+  {"ts":"2026-10-14T22:01:09Z","host":"edge-"},  {"ts":"2026-10-14T22:01:12Z","host":"edge-1","status":200,"ms":41}
+]
+⟦end⟧
+
+⟦repair 19558a74⟧
+⟦repaired⟧
+{
+  "name": "open-orders",
+  "query": "SELECT id, total FROM orders WHERE status = 'open' ORDER BY created_at",
+  "refreshSeconds": 300
+}
+⟦end⟧
+
+⟦repair 4460118b⟧
+⟦repaired⟧
+{
+  "query": "wireless headphones",
+  "max_price": 150,
+  "in_stock_only": true
+}
+⟦end⟧
+
+⟦repair 6229fd35⟧
+⟦repaired⟧
+{"subject": "Planned maintenance on 21 October", "body": "The customer portal will be read-only from 22:00 to 23:30 UTC.\nNo action is needed on your side.", "audience": "all-customers"}
+⟦end⟧
+
+⟦repair 5d3356fa⟧
+⟦repaired⟧
+{
+  "greeting": [
+    {"lang": "fr", "text": "Bienvenue"},
+    {"lang": "ja", "text": "ようこそ"},
+    {"lang": "de", "text": "Willkommen"}
+  ]
+}
+⟦end⟧
+
+⟦repair 4ebc0b94⟧
+⟦repaired⟧
+{"customer": "Renée Dubois", "resetLink": "https://accounts.example.com/reset?token=8f3a1c&lang=fr", "expiresInMinutes": 30, "sentBy": "support@example.com"}
+⟦end⟧
+
+⟦repair 66035d0b⟧
+⟦repaired⟧
+{"orderId": "{{order_id}}", "status": "shipped", "carrier": "{{carrier}}", "notifyCustomer": true}
+⟦end⟧
+
+⟦repair 96d98375⟧
+⟦repaired⟧
+{
+  "apiBase": "https:",
+  "timeoutMs": 8000,
+  "docs": "https:",
+  "retry": {"max": 3, "backoffMs": 250}
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 1fbc1985⟧
+⟦repaired⟧
+{
+  "kunde": {"name": "Jürgen Weiß", "ort": "Köln"},
+  "rechnungsnummer": "2026-0114",
+  "betrag": 249.9,
+  "bezahlt": true
+}
+⟦end⟧
+
+⟦repair 64a5383b⟧
+⟦repaired⟧
+{"confirm.title": "Delete file", "confirm.body": "Delete \"{name}\"?\nThis can't be undone.", "confirm.ok": "Delete"}
+⟦end⟧
+
+⟦repair c3ae6498⟧
+⟦repaired⟧
+{"status":"degraded","regions":["eu-west-1","us-east-2"],"unhealthy":["ap-south-1"],"checked_at":1760479283}
+⟦end⟧
+
+⟦repair ca052128⟧
+unsure: the two amounts could be numbers, 249.00 and 47.31, with the quote marks inside Decimal(…) removed too
+⟦repaired⟧
+{"invoice": "INV-2026-0412", "currency": "EUR", "net": "249.00", "vat": "47.31"}
+⟦end⟧
+
+⟦repair f1d47abf⟧
+unsure: [REDACTED] could be a marker that is removed, with null as the value that is missing
+⟦repaired⟧
+{"event": "login.failed", "actor": {"user": "svc-billing", "password": "[REDACTED]"}, "headers": {"authorization": "[REDACTED]", "x-request-id": "b1f4c2"}}
+⟦end⟧
+
+⟦repair 7f2784de⟧
+⟦repaired⟧
+{"city": "Paris", "country": "France", "population": 2102650, "timezone": "Europe/Paris"}
+⟦end⟧
+
+⟦repair f56d2994⟧
+⟦repaired⟧
+{"field": "invoice_date", "pattern": "\\b\\d{4}-\\d{2}-\\d{2}\\b", "example": "2024-03-15"}
+⟦end⟧
+
+⟦repair 35ea8fc5⟧
+unsure: the � could be what is left of a character that the cut went through, and then the � is no part of the string
+⟦repaired⟧
+{"id":"esp-7f3a","fw":"1.8.2","rssi":-67,"uptime_s":864120,"temp_c":21.4,"hum_pct":48,"batt_mv":3712,"window":"shut","room":"G�"}
+⟦end⟧
+
+⟦repair baa4503a⟧
+⟦repaired⟧
+{"language": "python", "code": "def greet(name):\n    return \"Hello, \" + name\n", "runs": true}
+⟦end⟧
+
+⟦repair 020f654d⟧
+⟦repaired⟧
+{"name": "thumbnail", "size": [320, 180], "formats": ["jpeg", "webp"], "crop": null}
+⟦end⟧
+
+⟦repair a45342d7⟧
+⟦repaired⟧
+{"greeting": "Welcome back, Sam!", "cta": "View your dashboard", "show_banner": false}
+⟦end⟧
+
+⟦repair 60e3ba8f⟧
+⟦repaired⟧
+{"killSwitch": false, "rollout": {"percent": 25, "regions": ["eu-west-1", "us-east-1"]}}
+⟦end⟧
+
+⟦repair 640bc98c⟧
+⟦repaired⟧
+{
+  "name": "orders-worker",
+  "instances": 2,
+  "env": {
+    "NODE_ENV": "production",
+    "DATABASE_URL":"postgres://app:s3cret@db.internal:5432/orders"
+  }
+}
+⟦end⟧
+
+⟦repair 182ef41e⟧
+⟦repaired⟧
+{"title": "Clean a CSV file with pandas", "tags": ["python", "pandas", "csv"], "difficulty": "easy", "minutes": 20}
+⟦end⟧
+
+⟦repair 8e1451ad⟧
+⟦repaired⟧
+{"service": "search-api", "image": "registry.example.com/search-api:1.8.3", "replicas": 4, "canary": false}
+⟦end⟧
+
+⟦repair 339d045e⟧
+⟦repaired⟧
+{"id": "stn-0417", "lat": 59.3293, "lon": 18.0686, "name": "Stockholm Observatory", "elevationM": 44}
+⟦end⟧
+
+⟦repair 153f6a61⟧
+⟦repaired⟧
+{"namespace": "staging", "replicas": 3, "wait": true}
+⟦end⟧
+
+⟦repair 6e066fc6⟧
+⟦repaired⟧
+{
+  "name": "@acme/design-tokens",
+  "version": "3.2.0",
+  "private": false,
+  "sideEffects": false,
+  "dependencies": {
+    "style-dictionary": "^4.1.0",
+    "tinycolor2": "^1.6.0"
+  }
+}
+⟦end⟧
+
+⟦repair f02a2906⟧
+⟦repaired⟧
+[0.0132,-0.0471,0.0089,0.1204,-0.0033,0.0518,-0.0907,0.0246,0.0071,-0.0655,0.0312,0.0984,-0.0127,0.0463,-0.0298,0.0841,0.0059,-0.0716,0.0195,0.0627,-0.0384,0.0102,0.0773,-0.0549,0.0268]
+⟦end⟧
+
+⟦repair 5c6c8124⟧
+⟦repaired⟧
+{"query": {"bool": {"must": [{"match": {"title": "espresso machine"}}], "filter": [{"range": {"price": {"lte": 400}}}]}}, "size": 20}
+⟦end⟧
+
+⟦repair 7a82f9c4⟧
+⟦repaired⟧
+{
+  "method": "POST",
+  "headers": {"Content-Type": "application/json"},
+  "timeout": 5000,
+  "retries": 3
+}
+⟦end⟧
+
+⟦repair c50007a2⟧
+⟦repaired⟧
+{"name": "date-utils", "version": "2.4.1", "repository": {"type": "git", "url": "https://git.example.org/libs/date-utils"}, "license": "MIT"}
+⟦end⟧
+
+⟦repair fe88d54e⟧
+⟦repaired⟧
+{"metric":"signups","week":"2026-W41","byCountry":{"DE":412,"FR":388,"GB":295,"U":null}}
+⟦end⟧
+
+⟦repair 98261990⟧
+⟦repaired⟧
+{
+  "name": "notes-sync",
+  "version": "0.3.0",
+  "scripts": {
+    "start": "node server.js",
+    "test": "jest --coverage"
+  },
+  "license": "ISC"
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 8d361e2a⟧
+⟦repaired⟧
+{"status":"open","assignee":"m.okafor","labels":["bug","p1"],"limit":25}
+⟦end⟧
+
+⟦repair 8c601c38⟧
+⟦repaired⟧
+{"detections": [{"label": "dog", "bbox": [34, 120, 208, 365], "occluded": false}, {"label": "frisbee", "bbox": [190, 80, 244, 131], "occluded": true}], "caption": null}
+⟦end⟧
+
+⟦repair cb78c4c6⟧
+⟦repaired⟧
+{
+  "alert": "DiskSpaceLow",
+  "host": "db-replica-2",
+  "owner": "José Araújo",
+  "used_pct": 93.4,
+  "runbook": "https://wiki.example.com/runbooks/disk?host=db-replica-2&sev=2&from=alertmanager",
+  "silenced": false
+}
+⟦end⟧
+
+⟦repair a7994b86⟧
+⟦repaired⟧
+[
+  {"ticket": 8841, "priority": "high"},
+  {"ticket": 8842, "priority": "low"}
+]
+⟦end⟧
+
+⟦repair 0ddc2a9d⟧
+⟦repaired⟧
+{"theme": "dark", "fontSize": 13, "lineNumbers": true, "wordWrap": "on", "tabSize": 4}
+⟦end⟧
+
+⟦repair e6577a47⟧
+⟦repaired⟧
+{"id": 1002, "name": "Sea salt 500g", "price": 2.15, "organic": true, "stock": 140, "discontinued": false}
+⟦end⟧
+
+⟦repair ba36b385⟧
+⟦repaired⟧
+{"Addr":":8080", "ReadTimeout":5000000000, "AllowedOrigins":["https://app.example.com", "https://admin.example.com"], "TLS":null}
+⟦end⟧
+
+⟦repair c8657b20⟧
+⟦repaired⟧
+"Elle a dit \"à demain\" et elle est partie."
+⟦end⟧
+
+⟦repair f91bc8e4⟧
+⟦repaired⟧
+{
+  "level": "error",
+  "message": "Unhandled rejection: connect ECONNREFUSED 10.0.3.17:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)",
+  "pid": 4127
+}
+⟦end⟧
+
+⟦repair edafb363⟧
+⟦repaired⟧
+{"label": "bicycle", "score": 0.93, "bbox": [ 12.5,  48.0 , 130.0 , 220.5]}
+⟦end⟧
+
+⟦repair 98d8dfeb⟧
+⟦repaired⟧
+{
+    "name": "northwind/invoice-api",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "monolog/monolog": "^3.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Northwind\\Invoice\\": "src/"
+        }
+    }
+}
+⟦end⟧
+
+⟦repair e8dec2e3⟧
+⟦repaired⟧
+{
+    "name": "nightly-backup",
+    "schedule": "0 3 * * *",
+    "destination": {
+        "bucket": "acme-backups",
+        "prefix": "postgres/"
+    },
+    "keepDays": 30,
+    "enabled": true
+}
+⟦end⟧
+
+⟦repair e4a701f6⟧
+⟦repaired⟧
+{"store": "Corner Market", "items": [{"name": "Oat milk", "price": 3.49}, {"name": "Sourdough loaf", "price": 5.25}], "total": 8.74}
+⟦end⟧
+
+⟦repair 9f97b1ad⟧
+⟦repaired⟧
+{"id":"evt_1Qx8","type":"charge.refunded","data":{"charge":"ch_3Nf2","amount":1250,"currency":"eur","reason":null},"livemode":false}
+⟦end⟧
+
+⟦repair 95624280⟧
+⟦repaired⟧
+{
+⟦tab⟧"listen": "0.0.0.0:8443",
+⟦tab⟧"log": {
+⟦tab⟧⟦tab⟧"level": "info"
+⟦tab⟧},
+⟦tab⟧"upstreams": ["10.0.4.11:8080", "10.0.4.12:8080"]
+}
+⟦end⟧
+
+⟦repair 7ef67ad6⟧
+⟦repaired⟧
+{"pid":8123,"ready":true,"port":null}
+⟦end⟧
+
+⟦repair 27986db2⟧
+⟦repaired⟧
+{"allowedOrigins": ["https://app.harborlight.example", "https://admin.harborlight.example"], "maxAgeSeconds": 600}
+⟦end⟧
+
+⟦repair 63235219⟧
+⟦repaired⟧
+{
+  "repository": "acme/storefront",
+  "default_branch": "main",
+  "releases": [
+    {
+      "tag": "v4.2.0",
+      "assets": [
+        {
+          "name": "storefront-linux-amd64.tar.gz",
+          "size": 187}]}]}
+⟦end⟧
+
+⟦repair 23c0352d⟧
+⟦repaired⟧
+{
+  "status": {
+    "ready": 2,
+    "conditions": ["Progressing"]
+  },
+  "updatedAt": "2026-10-14T22:01:17Z"
+}
+⟦end⟧
+
+⟦repair 5d9e0280⟧
+⟦repaired⟧
+{ "id": 4172, "name": "Lena Fischer", "plan": "team", "seats": 12, "trial": false }
+⟦end⟧
+
+⟦repair 3a7ab64b⟧
+⟦repaired⟧
+{"id": "INC-2291", "severity": "high", "summary": "Checkout latency above 2s for customers in the EU region since 09:40 UTC", "ack": false}
+⟦end⟧
+
+⟦repair 281d04ad⟧
+⟦repaired⟧
+{"to": "team@example.com", "subject": "Sync moved to Thursday", "body": "Hi all,\n\nthe weekly sync moves to Thursday at 10:00.\n\nBest,\nPriya"}
+⟦end⟧
+
+⟦repair 0e83f99f⟧
+⟦repaired⟧
+{"host": "0.0.0.0", "port": 8443, "workers": 4, "tls": {"cert": "/etc/ssl/api.pem", "minVersion": "1.2"}}
+⟦end⟧
+
+⟦repair 465bc937⟧
+⟦repaired⟧
+{
+  "name": "handbook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.2.3"
+  }
+}
+⟦end⟧

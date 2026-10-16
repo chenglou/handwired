@@ -1,0 +1,555 @@
+⟦case logs-and-transport-01⟧
+from: `systemctl status` in a terminal window of 120 columns: the journal puts the time, the host and the name of the service before the line that the service wrote, and `…` stands where the line reaches the edge of the window
+⟦intended⟧
+{"level":"error","time":"2026-10-14T22:01:07.412Z","msg":"payment declined","order_id":9912,"reason":"insufficient_funds","retryable":false}
+⟦broken⟧
+Oct 14 22:01:07 web-2 orders[8123]: {"level":"error","time":"2026-10-14T22:01:07.412Z","msg":"payment declined","order_…
+⟦end⟧
+
+⟦case logs-and-transport-02⟧
+from: a line of /var/log/syslog for a service that printed its configuration on several lines: rsyslog puts its prefix before the text and writes `#012` for every line feed
+note: the tools take the first `{` for added with the prefix and for removed with the first line feed, so it has no values, and the depth is not scored up to the next bracket
+⟦intended⟧
+{
+  "listen": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "workers": 4,
+  "tls": null
+}
+⟦broken⟧
+Oct 14 22:01:09 web-2 orders[8123]: {#012  "listen": {#012    "host": "0.0.0.0",#012    "port": 8080#012  },#012  "workers": 4,#012  "tls": null#012}
+⟦end⟧
+
+⟦case logs-and-transport-03⟧
+from: a line of the log of a Spring Boot service that writes the body of a request into the middle of its message
+⟦intended⟧
+{"id":"evt_1Qx8","type":"charge.refunded","data":{"charge":"ch_3Nf2","amount":1250,"currency":"eur","reason":null},"livemode":false}
+⟦broken⟧
+2026-10-14 22:01:11.087  INFO 8123 --- [nio-8080-exec-3] c.e.orders.web.WebhookController         : Received webhook {"id":"evt_1Qx8","type":"charge.refunded","data":{"charge":"ch_3Nf2","amount":1250,"currency":"eur","reason":null},"livemode":false} from 203.0.113.9 in 12 ms
+⟦end⟧
+
+⟦case logs-and-transport-04⟧
+from: what `curl -i` prints: the status line and the headers of the answer, each ended by a carriage return and a line feed, then the body with plain line feeds
+⟦intended⟧
+{
+  "error": {
+    "code": "order_not_found",
+    "message": "No order with id 9912",
+    "details": []
+  },
+  "requestId": "7c1e0b52a9d4"
+}⟦lf⟧
+⟦broken⟧
+HTTP/1.1 404 Not Found⟦cr⟧
+X-Request-Id: 7c1e0b52a9d4⟦cr⟧
+Content-Type: application/json; charset=utf-8⟦cr⟧
+Content-Length: 141⟦cr⟧
+Date: Wed, 14 Oct 2026 22:01:13 GMT⟦cr⟧
+⟦cr⟧
+{
+  "error": {
+    "code": "order_not_found",
+    "message": "No order with id 9912",
+    "details": []
+  },
+  "requestId": "7c1e0b52a9d4"
+}⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-05⟧
+from: the body of an HTTP answer of a service that puts `)]}',` and a line feed before its JSON, so that a page of another site cannot load the answer as a script
+⟦intended⟧
+{"kind":"calendar#events","nextSyncToken":"CPDAlvWDx4YDEPDAlvWDx4YDGAU=","items":[{"id":"7ac81f0e","status":"confirmed","start":{"dateTime":"2026-10-16T09:30:00+02:00"},"attendees":[]}]}
+⟦broken⟧
+)]}',
+{"kind":"calendar#events","nextSyncToken":"CPDAlvWDx4YDEPDAlvWDx4YDGAU=","items":[{"id":"7ac81f0e","status":"confirmed","start":{"dateTime":"2026-10-16T09:30:00+02:00"},"attendees":[]}]}
+⟦end⟧
+
+⟦case logs-and-transport-06⟧
+from: the answer of a JSONP endpoint as the Express framework writes it: the document is the argument of a call of the function that the page named
+⟦intended⟧
+{"station":"LIS-04","unit":"km/h","gusts":[14,17.5,22,19.25,0,31],"calm":false}
+⟦broken⟧
+/**/ typeof jsonp_1760479271044 === 'function' && jsonp_1760479271044({"station":"LIS-04","unit":"km/h","gusts":[14,17.5,22,19.25,0,31],"calm":false});
+⟦end⟧
+
+⟦case logs-and-transport-07⟧
+from: the body of an HTTP answer of a PHP script: PHP printed a warning as HTML before the script printed its JSON
+⟦intended⟧
+{
+    "success": true,
+    "page": 1,
+    "products": [
+        {
+            "sku": "TEA-200",
+            "price": "7.90"
+        },
+        {
+            "sku": "FLT-9",
+            "price": "3.20"
+        }
+    ]
+}
+⟦broken⟧
+<br />
+<b>Warning</b>:  Undefined array key "page" in <b>/var/www/shop/api/products.php</b> on line <b>23</b><br />
+{
+    "success": true,
+    "page": 1,
+    "products": [
+        {
+            "sku": "TEA-200",
+            "price": "7.90"
+        },
+        {
+            "sku": "FLT-9",
+            "price": "3.20"
+        }
+    ]
+}
+⟦end⟧
+
+⟦case logs-and-transport-08⟧
+from: a command and its output copied from a terminal: the endpoint answers with a lone string and no line feed, so the next prompt of the shell stands right after it
+⟦intended⟧
+"2.14.0-rc.3+build.871"
+⟦broken⟧
+$ curl -s http://localhost:8080/internal/build
+"2.14.0-rc.3+build.871"deploy@build-02:~$
+⟦end⟧
+
+⟦case logs-and-transport-09⟧
+from: a message of a socket.io connection as the network tab of the browser's developer tools shows it: the two digits before the array say what kind of packet it is
+⟦intended⟧
+["order:update",{"orderId":9912,"status":"shipped","eta":null,"items":[{"sku":"TEA-200","qty":2}]}]
+⟦broken⟧
+42["order:update",{"orderId":9912,"status":"shipped","eta":null,"items":[{"sku":"TEA-200","qty":2}]}]
+⟦end⟧
+
+⟦case logs-and-transport-10⟧
+from: the output of `docker compose up` for a service that prints its settings on several lines: the name of the service, in color, stands before every line
+⟦intended⟧
+{
+  "queue": "emails",
+  "concurrency": 8,
+  "retry": {
+    "attempts": 5,
+    "backoffMs": [
+      1000,
+      30000
+    ]
+  },
+  "redis": "redis://cache:6379/2"
+}
+⟦broken⟧
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m{
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m  "queue": "emails",
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m  "concurrency": 8,
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m  "retry": {
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m    "attempts": 5,
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m    "backoffMs": [
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m      1000,
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m      30000
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m    ]
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m  },
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m  "redis": "redis://cache:6379/2"
+⟦esc⟧[36mworker-1  | ⟦esc⟧[0m}
+⟦end⟧
+
+⟦case logs-and-transport-11⟧
+from: the output of `jq -C .`, i.e. with colors, written to a file: color codes of the terminal stand around every key, value and bracket
+⟦intended⟧
+{
+  "phase": "Running",
+  "podIP": "10.42.0.17",
+  "restarts": 7,
+  "ready": true,
+  "nominatedNode": null,
+  "containers": [
+    "app",
+    "sidecar"
+  ]
+}
+⟦broken⟧
+⟦esc⟧[1;39m{
+  ⟦esc⟧[0m⟦esc⟧[1;34m"phase"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[0;32m"Running"⟦esc⟧[0m⟦esc⟧[1;39m,
+  ⟦esc⟧[0m⟦esc⟧[1;34m"podIP"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[0;32m"10.42.0.17"⟦esc⟧[0m⟦esc⟧[1;39m,
+  ⟦esc⟧[0m⟦esc⟧[1;34m"restarts"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[0;39m7⟦esc⟧[0m⟦esc⟧[1;39m,
+  ⟦esc⟧[0m⟦esc⟧[1;34m"ready"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[0;39mtrue⟦esc⟧[0m⟦esc⟧[1;39m,
+  ⟦esc⟧[0m⟦esc⟧[1;34m"nominatedNode"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[0;90mnull⟦esc⟧[0m⟦esc⟧[1;39m,
+  ⟦esc⟧[0m⟦esc⟧[1;34m"containers"⟦esc⟧[0m⟦esc⟧[1;39m: ⟦esc⟧[0m⟦esc⟧[1;39m[
+    ⟦esc⟧[0;32m"app"⟦esc⟧[0m⟦esc⟧[1;39m,
+    ⟦esc⟧[0;32m"sidecar"⟦esc⟧[0m⟦esc⟧[1;39m
+  ⟦esc⟧[1;39m]⟦esc⟧[0m⟦esc⟧[1;39m
+⟦esc⟧[1;39m}⟦esc⟧[0m⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-12⟧
+from: a line that `grep -n --color=always timeout` found in a log: the number of the line before it, and color codes around the word inside a string and inside a key
+⟦intended⟧
+{"level":"error","ts":"2026-10-14T22:01:13Z","msg":"upstream timeout","upstream":"10.0.3.17:9000","attempt":2,"timeout_ms":3000}
+⟦broken⟧
+⟦esc⟧[32m⟦esc⟧[K118⟦esc⟧[m⟦esc⟧[K⟦esc⟧[36m⟦esc⟧[K:⟦esc⟧[m⟦esc⟧[K{"level":"error","ts":"2026-10-14T22:01:13Z","msg":"upstream ⟦esc⟧[01;31m⟦esc⟧[Ktimeout⟦esc⟧[m⟦esc⟧[K","upstream":"10.0.3.17:9000","attempt":2,"⟦esc⟧[01;31m⟦esc⟧[Ktimeout⟦esc⟧[m⟦esc⟧[K_ms":3000}
+⟦end⟧
+
+⟦case logs-and-transport-13⟧
+from: a settings file that a Windows program saved with a byte order mark and lines that end with a carriage return and a line feed, after a script on a Linux server put two lines with plain line feeds into it
+⟦intended⟧
+{⟦cr⟧
+⟦tab⟧"printer": "HP-LJ-4th-floor",⟦cr⟧
+⟦tab⟧"duplex": true,⟦cr⟧
+⟦tab⟧"copies": 2,
+⟦tab⟧"tray": null,
+⟦tab⟧"margins": [12.5, 12.5, 15, 15]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦broken⟧
+⟦bom⟧{⟦cr⟧
+⟦tab⟧"printer": "HP-LJ-4th-floor",⟦cr⟧
+⟦tab⟧"duplex": true,⟦cr⟧
+⟦tab⟧"copies": 2,
+⟦tab⟧"tray": null,
+⟦tab⟧"margins": [12.5, 12.5, 15, 15]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-14⟧
+from: a file that PowerShell 5 wrote with `>`, which is UTF-16, read by a program that takes every byte for a character: `ÿþ` is the byte order mark, and a NUL follows every character
+⟦intended⟧
+{"ok":true,"version":"10.0.19045","elevated":false}
+⟦broken⟧
+ÿþ{⟦U+0000⟧"⟦U+0000⟧o⟦U+0000⟧k⟦U+0000⟧"⟦U+0000⟧:⟦U+0000⟧t⟦U+0000⟧r⟦U+0000⟧u⟦U+0000⟧e⟦U+0000⟧,⟦U+0000⟧"⟦U+0000⟧v⟦U+0000⟧e⟦U+0000⟧r⟦U+0000⟧s⟦U+0000⟧i⟦U+0000⟧o⟦U+0000⟧n⟦U+0000⟧"⟦U+0000⟧:⟦U+0000⟧"⟦U+0000⟧1⟦U+0000⟧0⟦U+0000⟧.⟦U+0000⟧0⟦U+0000⟧.⟦U+0000⟧1⟦U+0000⟧9⟦U+0000⟧0⟦U+0000⟧4⟦U+0000⟧5⟦U+0000⟧"⟦U+0000⟧,⟦U+0000⟧"⟦U+0000⟧e⟦U+0000⟧l⟦U+0000⟧e⟦U+0000⟧v⟦U+0000⟧a⟦U+0000⟧t⟦U+0000⟧e⟦U+0000⟧d⟦U+0000⟧"⟦U+0000⟧:⟦U+0000⟧f⟦U+0000⟧a⟦U+0000⟧l⟦U+0000⟧s⟦U+0000⟧e⟦U+0000⟧}⟦U+0000⟧⟦cr⟧⟦U+0000⟧
+⟦U+0000⟧
+⟦end⟧
+
+⟦case logs-and-transport-15⟧
+from: the output of `mosquitto_sub -v` for a sensor whose firmware builds its message in a buffer of 128 bytes: the topic stands before the message, and the message ends after the first of the two bytes of `ä`
+⟦intended⟧
+{"id":"esp-7f3a","fw":"1.8.2","rssi":-67,"uptime_s":864120,"temp_c":21.4,"hum_pct":48,"batt_mv":3712,"window":"shut","room":"Gästezimmer"}
+⟦broken⟧
+home/guest/climate {"id":"esp-7f3a","fw":"1.8.2","rssi":-67,"uptime_s":864120,"temp_c":21.4,"hum_pct":48,"batt_mv":3712,"window":"shut","room":"G�
+⟦end⟧
+
+⟦case logs-and-transport-16⟧
+from: a line of `strace` for a server that writes its state to its standard output: strace shows the first 32 bytes of the text, with a backslash before every quote, inside its own notation for the call
+⟦intended⟧
+{"pid":8123,"ready":true,"port":8080,"workers":4}
+⟦broken⟧
+write(1, "{\"pid\":8123,\"ready\":true,\"port\":"..., 50) = 50
+⟦end⟧
+
+⟦case logs-and-transport-17⟧
+from: a file that `curl -o` wrote before the connection closed: the document stops in the middle of a number, five levels deep
+⟦intended⟧
+{
+  "repository": "acme/storefront",
+  "default_branch": "main",
+  "releases": [
+    {
+      "tag": "v4.2.0",
+      "assets": [
+        {
+          "name": "storefront-linux-amd64.tar.gz",
+          "size": 18734122,
+          "download_count": 412
+        }
+      ]
+    }
+  ]
+}
+⟦broken⟧
+{
+  "repository": "acme/storefront",
+  "default_branch": "main",
+  "releases": [
+    {
+      "tag": "v4.2.0",
+      "assets": [
+        {
+          "name": "storefront-linux-amd64.tar.gz",
+          "size": 187
+⟦end⟧
+
+⟦case logs-and-transport-18⟧
+from: an HTTP answer whose Content-Length header counts characters where it has to count bytes: the client stops reading 3 bytes early, one for each of `ë`, `ö` and `ã`
+⟦intended⟧
+{"customers":[{"name":"Zoë Keller","city":"Köln","orders":3},{"name":"João Pires","city":"Porto","orders":11}]}
+⟦broken⟧
+{"customers":[{"name":"Zoë Keller","city":"Köln","orders":3},{"name":"João Pires","city":"Porto","orders":11
+⟦end⟧
+
+⟦case logs-and-transport-19⟧
+from: what `grep -oE '.{0,40}timeout.{0,40}'` prints for a long line of a log: the word and 40 characters on each side of it, so the start and the end of the document are missing
+note: the records may sit deeper than in an array at the top, e.g. in an array under a key of an object: nothing in the part that is left says how many brackets are open
+debatable
+⟦intended⟧
+[{"id":"job-17","state":"done","ms":412},{"id":"job-18","state":"failed","error":"upstream timeout","ms":30000},{"id":"job-19","state":"done","ms":388}]
+⟦broken⟧
+-18","state":"failed","error":"upstream timeout","ms":30000},{"id":"job-19","state":"do
+⟦end⟧
+
+⟦case logs-and-transport-20⟧
+from: the last 5 lines of the output of a program that printed a status on several lines, as `kubectl logs --tail=5` gives them
+⟦intended⟧
+{
+  "deployment": "checkout",
+  "namespace": "shop",
+  "status": {
+    "replicas": 3,
+    "ready": 2,
+    "conditions": ["Progressing"]
+  },
+  "updatedAt": "2026-10-14T22:01:17Z"
+}
+⟦broken⟧
+    "ready": 2,
+    "conditions": ["Progressing"]
+  },
+  "updatedAt": "2026-10-14T22:01:17Z"
+}
+⟦end⟧
+
+⟦case logs-and-transport-21⟧
+from: an export that writes an array with one record per line, one write per record: the disk was full for a moment, so the write of the second record stopped part way, and the third record follows on the same line
+⟦intended⟧
+[
+  {"ts":"2026-10-14T22:01:07Z","host":"edge-3","status":502,"ms":3004},
+  {"ts":"2026-10-14T22:01:09Z","host":"edge-2","status":200,"ms":38},
+  {"ts":"2026-10-14T22:01:12Z","host":"edge-1","status":200,"ms":41}
+]
+⟦broken⟧
+[
+  {"ts":"2026-10-14T22:01:07Z","host":"edge-3","status":502,"ms":3004},
+  {"ts":"2026-10-14T22:01:09Z","host":"edge-  {"ts":"2026-10-14T22:01:12Z","host":"edge-1","status":200,"ms":41}
+]
+⟦end⟧
+
+⟦case logs-and-transport-22⟧
+from: one read from a TCP connection on which a server sends one message after the other with nothing between them: the read starts in the middle of one message and holds the whole of the next one
+note: the other repair gives the first message a start and makes an array of the two messages
+debatable
+⟦intended⟧
+{"type":"heartbeat","seq":42,"ts":1760479279113}
+⟦broken⟧
+ge.created","seq":41,"data":{"id":"88213","pinned":false}}{"type":"heartbeat","seq":42,"ts":1760479279113}
+⟦end⟧
+
+⟦case logs-and-transport-23⟧
+from: a log file that two worker processes append to: the first one wrote its line in two parts, and the whole line of the other one landed between the two
+note: the other repair takes the line of worker 5 for the document, and the two halves of the line of worker 3 for text before and after it
+debatable
+⟦intended⟧
+{"level":"info","worker":3,"msg":"job finished","job":"thumbnail-8812","took_ms":912}
+⟦broken⟧
+{"level":"info","worker":3,"msg":"job finished","job":"thumbnail-8812","took_{"level":"warn","worker":5,"msg":"queue depth high","depth":1204}
+ms":912}
+⟦end⟧
+
+⟦case logs-and-transport-24⟧
+from: a client that writes a message to a non-blocking socket: the first write takes only 64 bytes, and the client then sends the whole message again where it had to send the rest
+⟦intended⟧
+{"jsonrpc":"2.0","id":17042,"method":"tools/call","params":{"name":"search_orders","arguments":{"customer":"C-2291","limit":5}}}
+⟦broken⟧
+{"jsonrpc":"2.0","id":17042,"method":"tools/call","params":{"nam{"jsonrpc":"2.0","id":17042,"method":"tools/call","params":{"name":"search_orders","arguments":{"customer":"C-2291","limit":5}}}
+⟦end⟧
+
+⟦case logs-and-transport-25⟧
+from: the body of an HTTP answer with chunked transfer encoding, read straight from the connection: before every chunk stands its size in hexadecimal on a line of its own, and a chunk of size 0 ends the body
+⟦intended⟧
+{"status":"degraded","regions":["eu-west-1","us-east-2"],"unhealthy":["ap-south-1"],"checked_at":1760479283}
+⟦broken⟧
+3c⟦cr⟧
+{"status":"degraded","regions":["eu-west-1","us-east-2"],"un⟦cr⟧
+30⟦cr⟧
+healthy":["ap-south-1"],"checked_at":1760479283}⟦cr⟧
+0⟦cr⟧
+⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-26⟧
+from: a long line copied out of `less` in a terminal window of 80 columns: the copy has a line feed wherever the line reaches the edge of the window
+⟦intended⟧
+[0.0132,-0.0471,0.0089,0.1204,-0.0033,0.0518,-0.0907,0.0246,0.0071,-0.0655,0.0312,0.0984,-0.0127,0.0463,-0.0298,0.0841,0.0059,-0.0716,0.0195,0.0627,-0.0384,0.0102,0.0773,-0.0549,0.0268]
+⟦broken⟧
+[0.0132,-0.0471,0.0089,0.1204,-0.0033,0.0518,-0.0907,0.0246,0.0071,-0.0655,0.031
+2,0.0984,-0.0127,0.0463,-0.0298,0.0841,0.0059,-0.0716,0.0195,0.0627,-0.0384,0.01
+02,0.0773,-0.0549,0.0268]
+⟦end⟧
+
+⟦case logs-and-transport-27⟧
+from: the body of an alert e-mail, copied from the raw message: the quoted-printable encoding writes `=3D` for `=`, two such codes for a letter with an accent, and breaks a long line with `=` at its end
+⟦intended⟧
+{
+  "alert": "DiskSpaceLow",
+  "host": "db-replica-2",
+  "owner": "José Araújo",
+  "used_pct": 93.4,
+  "runbook": "https://wiki.example.com/runbooks/disk?host=db-replica-2&sev=2&from=alertmanager",
+  "silenced": false
+}
+⟦broken⟧
+{
+  "alert": "DiskSpaceLow",
+  "host": "db-replica-2",
+  "owner": "Jos=C3=A9 Ara=C3=BAjo",
+  "used_pct": 93.4,
+  "runbook": "https://wiki.example.com/runbooks/disk?host=3Ddb-replica-2&se=
+v=3D2&from=3Dalertmanager",
+  "silenced": false
+}
+⟦end⟧
+
+⟦case logs-and-transport-28⟧
+from: the log stream of the Docker API read without taking its frames apart: 8 bytes stand before every write of the container, here one write for the line and one for its line feed, and the last of the 8 bytes is the size, which shows as a character
+⟦intended⟧
+{"event":"cache.evicted","keys":128,"freed_mb":41.5,"reason":"memory_pressure"}
+⟦broken⟧
+⟦U+0001⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧O{"event":"cache.evicted","keys":128,"freed_mb":41.5,"reason":"memory_pressure"}⟦U+0001⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0000⟧⟦U+0001⟧⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-29⟧
+from: a client that reads every message into the same buffer and then parses the whole buffer: after a short message, the end of the longer message before it still stands behind it
+note: the other repair takes the first `}` for the slip and lets the object go on with the keys that follow
+debatable
+⟦intended⟧
+{"type":"heartbeat","seq":4412}
+⟦broken⟧
+{"type":"heartbeat","seq":4412}bids":[[101.25,300],[101.2,150]],"asks":[[101.31,200]]}
+⟦end⟧
+
+⟦case logs-and-transport-30⟧
+from: a value read with `redis-cli`: the command stands on the line before, and redis-cli shows the value between quotes with a backslash before every quote and every backslash
+⟦intended⟧
+{"uid":812,"roles":["admin","billing"],"last_page":"\/account\/invoices","flash":"Saved \"Q3 report\"","exp":1760482800}
+⟦broken⟧
+127.0.0.1:6379> GET session:8f2c1d
+"{\"uid\":812,\"roles\":[\"admin\",\"billing\"],\"last_page\":\"\\/account\\/invoices\",\"flash\":\"Saved \\\"Q3 report\\\"\",\"exp\":1760482800}"
+⟦end⟧
+
+⟦case logs-and-transport-31⟧
+from: what a Python program prints for the body of an HTTP answer that it did not decode, `print(response.content)`: the bytes between `b'` and `'`, with `\xc3\xab` for the two bytes of `ë` and `\n` for the line feed at the end
+⟦intended⟧
+{"id": 4411, "name": "Zoë Keller", "city": "Malmö", "tags": ["vip", "newsletter"], "balance": -12.5}
+⟦broken⟧
+b'{"id": 4411, "name": "Zo\xc3\xab Keller", "city": "Malm\xc3\xb6", "tags": ["vip", "newsletter"], "balance": -12.5}\n'
+⟦end⟧
+
+⟦case logs-and-transport-32⟧
+from: one row of a CSV export of a table of events, with the column that holds JSON as the file has it: the field stands between quotes, and every quote inside it is written twice
+⟦intended⟧
+{"plan":"free","referrer":"","utm":{"source":"newsletter","campaign":"autumn-26"},"trial_days":14}
+⟦broken⟧
+8812,2026-10-14 22:01:21,signup,"{""plan"":""free"",""referrer"":"""",""utm"":{""source"":""newsletter"",""campaign"":""autumn-26""},""trial_days"":14}"
+⟦end⟧
+
+⟦case logs-and-transport-33⟧
+from: a line of an nginx access log whose format ends with the body of the request: nginx writes `\x22` for every quote and `\xC3\xA9` for the two bytes of `é`
+note: the tools give no values to a part of up to 3 code points that stands between two of the codes, e.g. the first `{`, a lone `:` or `,` and `caf`, so the depth is not scored up to the `[`
+⟦intended⟧
+{"cart":"c_8812","items":[4411,4412,4420],"coupon":"AUTUMN26","gift_wrap":false,"note":"café blend"}
+⟦broken⟧
+2026-10-14T22:01:23+00:00 203.0.113.9 POST /v1/cart/checkout 422 {\x22cart\x22:\x22c_8812\x22,\x22items\x22:[4411,4412,4420],\x22coupon\x22:\x22AUTUMN26\x22,\x22gift_wrap\x22:false,\x22note\x22:\x22caf\xC3\xA9 blend\x22}
+⟦end⟧
+
+⟦case logs-and-transport-34⟧
+from: a message that a relay for webhooks builds from a text template: the template puts the body it received between two quotes and does not escape the quotes inside the body
+note: the other repair takes the two quotes around the braces for the mistake and makes the payload an object inside the document
+debatable
+⟦intended⟧
+{
+  "id": "evt_3Kq81",
+  "type": "invoice.paid",
+  "payload": "{\"invoice\":\"in_8812\",\"amount\":4200,\"currency\":\"eur\"}",
+  "delivered": true
+}
+⟦broken⟧
+{
+  "id": "evt_3Kq81",
+  "type": "invoice.paid",
+  "payload": "{"invoice":"in_8812","amount":4200,"currency":"eur"}",
+  "delivered": true
+}
+⟦end⟧
+
+⟦case logs-and-transport-35⟧
+from: the body that a server receives when the JSON was given to `curl -d` between double quotes: the shell ends its string at every quote inside, so no quote arrives
+⟦intended⟧
+{"name": "checkout-latency", "threshold_ms": 750, "channels": ["pager", "email"], "enabled": true, "owner": null}
+⟦broken⟧
+{name: checkout-latency, threshold_ms: 750, channels: [pager, email], enabled: true, owner: null}
+⟦end⟧
+
+⟦case logs-and-transport-36⟧
+from: a file written with `echo` in zsh, with the JSON between single quotes: the echo of zsh makes a line feed of every `\n` and a tab of every `\t`, also inside a string
+⟦intended⟧
+{"subject":"Build #871 failed","body":"Step 3/7 failed:\n\tnpm ERR! code ELIFECYCLE\n\texit status 1","notify":["ana","li"]}⟦lf⟧
+⟦broken⟧
+{"subject":"Build #871 failed","body":"Step 3/7 failed:
+⟦tab⟧npm ERR! code ELIFECYCLE
+⟦tab⟧exit status 1","notify":["ana","li"]}⟦lf⟧
+⟦end⟧
+
+⟦case logs-and-transport-37⟧
+from: a file of rules written by a shell script with `echo "..."`: inside double quotes the shell makes one backslash of every two, so the regular expression arrives with single backslashes
+⟦intended⟧
+{"rules": [{"field": "version", "pattern": "^v\\d+\\.\\d+(-rc\\.\\d+)?$"}], "strict": true}
+⟦broken⟧
+{"rules": [{"field": "version", "pattern": "^v\d+\.\d+(-rc\.\d+)?$"}], "strict": true}
+⟦end⟧
+
+⟦case logs-and-transport-38⟧
+from: a message that a CI script builds with a here-document and sends to a chat: the variable for the number of the build was not set, so nothing stands where the number belongs
+⟦intended⟧
+{
+  "channel": "#deploys",
+  "text": "Deploy finished",
+  "build": {
+    "number": 4127,
+    "branch": "main",
+    "commit": "9f3c2ab"
+  },
+  "ok": true
+}
+⟦broken⟧
+{
+  "channel": "#deploys",
+  "text": "Deploy finished",
+  "build": {
+    "number": ,
+    "branch": "main",
+    "commit": "9f3c2ab"
+  },
+  "ok": true
+}
+⟦end⟧
+
+⟦case logs-and-transport-39⟧
+from: the serial monitor of a microcontroller board: the logger of the firmware puts a color code, the time since the start and a tag before the line and a color code after it, and one byte was lost on the wire, the quote before `open`
+⟦intended⟧
+{"node":"greenhouse-2","soil":[412,398,405],"valve":{"open":false,"last_ms":1840},"vbat":3.71}
+⟦broken⟧
+⟦esc⟧[0;32mI (512340) telemetry: {"node":"greenhouse-2","soil":[412,398,405],"valve":{open":false,"last_ms":1840},"vbat":3.71}⟦esc⟧[0m
+⟦end⟧
+
+⟦case logs-and-transport-40⟧
+from: a log entry copied from the web page of a log viewer that shows the indentation with no-break spaces, so the copy has them at the start of every line that is indented
+⟦intended⟧
+{
+  "traceId": "4bf92f3577b34da6",
+  "spans": [
+    {"name": "GET /cart", "durationMs": 182},
+    {"name": "redis.get", "durationMs": 3}
+  ],
+  "sampled": true
+}
+⟦broken⟧
+{
+⟦nbsp⟧⟦nbsp⟧"traceId": "4bf92f3577b34da6",
+⟦nbsp⟧⟦nbsp⟧"spans": [
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧{"name": "GET /cart", "durationMs": 182},
+⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧⟦nbsp⟧{"name": "redis.get", "durationMs": 3}
+⟦nbsp⟧⟦nbsp⟧],
+⟦nbsp⟧⟦nbsp⟧"sampled": true
+}
+⟦end⟧
