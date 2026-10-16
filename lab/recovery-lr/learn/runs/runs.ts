@@ -67,8 +67,9 @@ export function savedRunsOf(folder: string): {record: RunRecord, recordFile: str
   if (!existsSync(folder)) return []
   return readdirSync(folder).filter(name => name.endsWith('.record.json')).map(name => {
     const recordFile = join(folder, name)
-    const record = JSON.parse(readFileSync(recordFile, 'utf8')) as RunRecord
-    if (record.format !== 'recovery-lr run record 1') throw new Error(`${recordFile} is no record of a run`)
+    const parsed = JSON.parse(readFileSync(recordFile, 'utf8')) as {format?: string}
+    if (parsed.format !== 'recovery-lr run record 1') throw new Error(`${recordFile} is no record of a run`)
+    const record = parsed as RunRecord
     return {record, recordFile, tablesFile: join(folder, record.tablesFile)}
   }).sort((left, right) => left.record.row - right.record.row || left.record.seed - right.record.seed)
 }
