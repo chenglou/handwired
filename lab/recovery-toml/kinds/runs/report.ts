@@ -165,7 +165,8 @@ function breakdown(title: string, note: string, rowNamesOfTable: readonly string
     }))
   }
 }
-const afterColon = (name: string) => [name.slice(name.indexOf(': ') + 2)]
+const afterColonOf = (name: string) => name.slice(name.indexOf(': ') + 2)
+const afterColon = (name: string) => [afterColonOf(name)]
 breakdown('The half of the kinds, per number of kinds', 'A sample of this half has one kind of mistake or two.', ['group: one kind', 'group: two kinds'], afterColon, ['kinds in the sample'])
 breakdown('The half of the kinds, per family of kinds', 'Every sample with a kind of the family. A sample with kinds of two families is in both lines.', mistakeFamilyRowNames, afterColon, ['family'])
 breakdown(
@@ -178,6 +179,27 @@ breakdown(
   'Every sample with the kind, alone or with a second kind, so a line also shows what the other kinds of its samples do.',
   namesOfMistakes.map(kindRowNameOf), name => [`\`${afterColon(name)[0]}\``, familyOfMistakeNamed(afterColon(name)[0]!) ?? ''], ['kind', 'family'],
 )
+// Where the trained rows stand against the one rule, per kind alone, as scored code points: a share says nothing of
+// how much a kind weighs, e.g. 10 points of a kind with 300 scored code points are 30 code points.
+{
+  const lineOfRow = (row: number) => lines.find(line => line.row === row)
+  const rule = lineOfRow(2)!
+  const meanRight = (line: Line, rowName: string) => line.rowsOfSeed.reduce((total, rows) => total + rowNamed(rows, rowName)!.allRight, 0) / line.rowsOfSeed.length
+  const trained = [7, 8].flatMap(row => lineOfRow(row) ?? [])
+  const body = namesOfMistakes.map(aloneKindRowNameOf).filter(name => rowNamed(firstRows, name) !== undefined).map(name => {
+    const row = rowNamed(firstRows, name)!
+    const ofTheRule = meanRight(rule, name)
+    return {name, row, ofTheRule, differences: trained.map(line => meanRight(line, name) - ofTheRule)}
+  }).sort((left, right) => (left.differences[0] ?? 0) - (right.differences[0] ?? 0))
+  print('## The half of the kinds, per kind alone: the trained rows against the one rule, in scored code points')
+  print()
+  print('The samples with one kind of mistake, by that kind. A difference is the mean over the seeds of the scored code points that the trained row has right, minus the ones that row 2 has right: first as code points, then as points of the kind\'s all three. The lines are in the order of row 7\'s difference in code points, from the largest loss to the largest gain.')
+  print()
+  tableOf(['kind', 'samples', 'scored code points', 'row 2, all three', ...trained.flatMap(line => [`${shortNameOf(line)} minus row 2, code points`, 'in points'])], body.map(({name, row, ofTheRule, differences}) => [
+    `\`${afterColonOf(name)}\``, String(row.samples), String(row.codePoints), percent(ofTheRule / row.codePoints).toFixed(1), ...differences.flatMap(difference => [difference.toFixed(0), percent(difference / row.codePoints).toFixed(1)]),
+  ]))
+}
+
 breakdown('The half of the dataset, per number of edits', 'A sample of this half has one, two or three edits, each applied to what the edit before it left.', ['group: one edit', 'group: two edits', 'group: three edits'], afterColon, ['edits in the sample'])
 breakdown('The half of the dataset, per family of edit, samples with one edit', 'The samples with one edit, by the family of that edit.', oneEditFamilyRowNames, afterColon, ['family of the one edit'])
 breakdown('The half of the dataset, per family of edit, every sample', 'Every sample with an edit of the family. A sample with edits of two families is in both lines.', editFamilyRowNames, afterColon, ['family of edit'])
@@ -238,8 +260,9 @@ tableOf(['', ...parts.flatMap(({rowName}) => {
 
 // The classes of the rule, counted here again on the mixed train split.
 {
-  const invisible: Record<number, string> = {0x09: 'tab', 0x0a: 'line feed', 0x0d: 'carriage return', 0x1b: 'escape character', 0x20: 'space', 0xa0: 'no-break space', 0xfeff: 'byte order mark'}
-  const shown = (codePoint: number) => invisible[codePoint] ?? `\`${String.fromCodePoint(codePoint)}\``
+  // The code points that do not show, and the two that would break the table.
+  const namedCodePoints: Record<number, string> = {0x09: 'tab', 0x0a: 'line feed', 0x0d: 'carriage return', 0x1b: 'escape character', 0x20: 'space', 0x60: 'backtick', 0x7c: 'vertical bar', 0xa0: 'no-break space', 0xfeff: 'byte order mark'}
+  const shown = (codePoint: number) => namedCodePoints[codePoint] ?? `\`${String.fromCodePoint(codePoint)}\``
   const nameOf = (codePoint: number) => `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`
   const ofTheRule = codePointsOfTheRule(mixedTrain)
   const picked = ofTheRule.filter(entry => entry.picked && entry.notAdded === '')

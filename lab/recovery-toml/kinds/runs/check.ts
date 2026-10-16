@@ -27,6 +27,10 @@
 //    sample of both halves of the mixed set, of the dataset's sample of every index whose mixed sample is of the
 //    kinds, and the edited, random, too long and too deep texts of ../../learn/check-texts.ts.
 // 5. Valid texts with a value of more than 16 levels are shown as today.
+// 6. The record's main numbers are counted a second time: on the mixed validation split and on each of its halves,
+//    the scored code points, the ones with every scored value right, and the whole samples. The second count runs
+//    each sample's broken text by itself and reads its labels from labelsOf of the dataset, where the record's
+//    numbers come from the arrays of ../../learn/data.ts and from ../../learn/score.ts.
 //
 // No sample of the test split is made past its field `split`: the mixed set leaves those indexes out.
 import {existsSync, readFileSync} from 'node:fs'
@@ -40,9 +44,10 @@ import {differencesOnTooDeepTexts, tooDeepTextsOfTheCheck} from '../../learn/rec
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from '../../learn/recovery-parser.ts'
 import {type RecoveryTables, cellCounts, copyTables, displayEntryOf, loadTables, problemsOf, today} from '../../learn/recovery-tables.ts'
 import {sha256OfFile} from '../../learn/runs/runs.ts'
+import {labelsOf} from '../../samples.ts'
 import {type ParserTrace, positionCount, runTableParser} from '../../table-parser.ts'
 import {kindsKey, mixedTrainSamples, mixedValidationSamples} from '../mixed.ts'
-import {type MixedRunRecord, listFileName, runsFolderOf, savedRunsOf} from './mixed-runs.ts'
+import {type MixedRunRecord, kindsHalfRowName, listFileName, neutralHalfRowName, rowNamed, runsFolderOf, savedRunsOf} from './mixed-runs.ts'
 
 refuseUnknownOptions('kinds/runs/check.ts', ['--folder'])
 const folder = runsFolderOf(optionOf('--folder'))
@@ -87,7 +92,8 @@ const validTexts = new Set<string>(validEdgeCases)
 const brokenTexts = new Set<string>()
 let mixedSamples = 0
 let brokenTextsOfTheKinds = 0
-for (const mixed of [...mixedTrainSamples(range), ...mixedValidationSamples(range)]) {
+const validationOfTheMixedSet = mixedValidationSamples(range)
+for (const mixed of [...mixedTrainSamples(range), ...validationOfTheMixedSet]) {
   mixedSamples++
   validTexts.add(mixed.sample.original)
   brokenTexts.add(mixed.sample.broken)
@@ -197,6 +203,45 @@ for (const entry of checked) {
   if (tooDeep.state + tooDeep.nesting + tooDeep.kind + tooDeep.openTokenizerCells > 0) fail(`${name}: too deep valid texts are not shown as today: ${tooDeep.state} other grammar states, ${tooDeep.nesting} other depths or containers, ${tooDeep.kind} other display kinds, ${tooDeep.openTokenizerCells} open tokenizer cells read`)
   const counts = cellCounts(entry.tables)
   console.log(`${name}: ${counts.lexerFrozen} frozen tokenizer cells, ${counts.grammarFrozen} frozen grammar cells and ${counts.displayEntries - counts.displayOpen} display entries that are not open hold today's. ${entry.validPositions} positions of valid texts and ${entry.brokenTexts} texts up to their first error: ${entry.differences} differ from today. ${entry.tables.addedClasses.length} added classes, each with a code point in a valid text: ${classesWithoutAValidText.length === 0 ? 'yes' : 'no'}. Too deep valid texts, ${tooDeep.codePoints} code points from the first error on: ${tooDeep.nesting} other depths or containers, ${tooDeep.kind} other display kinds.`)
+}
+
+// 6. The main numbers of every record, counted a second time. The records come from the arrays of
+// ../../learn/data.ts and the rows of ../../learn/score.ts. Here each validation sample of the mixed set is run as
+// its own text, and its labels come from labelsOf of the dataset.
+const partNames = {all: 'all', neutral: neutralHalfRowName, kinds: kindsHalfRowName}
+for (const entry of checked) {
+  const counted = {all: {samples: 0, codePoints: 0, allRight: 0, wholeSamples: 0}, neutral: {samples: 0, codePoints: 0, allRight: 0, wholeSamples: 0}, kinds: {samples: 0, codePoints: 0, allRight: 0, wholeSamples: 0}}
+  for (const {half, sample} of validationOfTheMixedSet) {
+    const labels = labelsOf(sample)
+    const {codePoints, truncated} = codePointsOf(sample.broken)
+    runRecoveryParserInto(trace, codePoints, 0, codePoints.length, truncated, entry.tables)
+    let scored = 0
+    let right = 0
+    for (let position = sample.firstErrorPosition; position < labels.length; position++) {
+      const label = labels[position]
+      if (label === undefined || (label.kind === undefined && label.depth === undefined)) continue
+      scored++
+      const kindRight = label.kind === undefined || trace.displayKind[position] === label.kind
+      const nestingRight = label.depth === undefined || (trace.depthAfter[position] === label.depth && trace.containerAfter[position] === label.container)
+      if (kindRight && nestingRight) right++
+    }
+    for (const part of [counted.all, counted[half]]) {
+      part.samples++
+      part.codePoints += scored
+      part.allRight += right
+      if (scored > 0 && right === scored) part.wholeSamples++
+    }
+  }
+  const lines: string[] = []
+  for (const part of ['all', 'neutral', 'kinds'] as const) {
+    const row = rowNamed(entry.record.validation, partNames[part])
+    const again = counted[part]
+    if (row === undefined || row.samples !== again.samples || row.codePoints !== again.codePoints || row.allRight !== again.allRight || row.wholeSamples !== again.wholeSamples) {
+      fail(`${basename(entry.file)}: the record's row "${partNames[part]}" on the mixed validation split is ${JSON.stringify(row === undefined ? null : {samples: row.samples, codePoints: row.codePoints, allRight: row.allRight, wholeSamples: row.wholeSamples})}, and the second count is ${JSON.stringify(again)}`)
+    }
+    lines.push(`${part === 'all' ? 'mixed' : part === 'neutral' ? 'half of the dataset' : 'half of the kinds'} ${again.allRight} of ${again.codePoints} scored code points and ${again.wholeSamples} of ${again.samples} whole samples`)
+  }
+  console.log(`${basename(entry.file)}: the second count of the record's score on the mixed validation split: ${lines.join(', ')}.`)
 }
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)
 if (failures > 0) process.exitCode = 1
