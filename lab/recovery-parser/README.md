@@ -1,6 +1,6 @@
 # Training a strict parser to recover from errors
 
-A parser that gives up at the first error can be turned into one that keeps going, by training the table entries that valid input never reads. Valid input is parsed exactly as before. On JSON the trained parser ended up slightly better than recovery rules written by hand. On TOML and on a parser made by bison, the gradient training alone did not carry over with JSON's settings, and filling the same entries by trial and error did.
+A parser that gives up at the first error can be turned into one that keeps going, by training the table entries that valid input never reads. Valid input is parsed exactly as before. On JSON the trained parser ended up slightly better than recovery rules written by hand. On TOML and on a parser made by bison, the gradient training alone did not carry over with JSON's settings and random damage as its training data. Filling the same entries by trial and error did, and so did gradient training once it was given a fairer start: one small hand-written rule on TOML, realistic mistakes in the training data on the bison parser.
 
 This section explains the experiment and its results in plain words. The folders hold the details, and the rest of this file documents the JSON dataset.
 
@@ -107,29 +107,43 @@ The record is `../recovery-toml/RESULTS.md`.
 
 The JSON and TOML tables are made by hand. Most parsers in use come from a generator such as yacc, bison or Menhir. `../recovery-lr/` holds a small ML-like language with a parser made by bison: about 3,800 table entries, of which about 2,400 are free.
 
-These numbers are from validation data only, from before the review of the machinery was finished. The final test has not run.
+These numbers are from validation data only. The final test has not run.
 
 | | Characters right / programs entirely right |
 |---|---|
 | Original parser | 2.0 / 0.0 |
 | Panic mode, the textbook recovery | 60.8 / 27.6 |
-| Panic mode with a hand-picked list of tokens to restart at | 78.7 / 34.6 |
-| yacc error productions, written by hand | 83.1 / 37.1 |
+| Panic mode with a hand-picked list of tokens to restart at | 78.9 / 35.6 |
+| yacc error productions, written by hand | 84.5 / 39.3 |
 | Table filled by hand-written rules | 88.0 / 48.7 |
 | Gradient descent alone | 82.9 / 35.9 |
 | Gradient descent, then trial and error | 88.1 / 48.4 |
 | Trial and error alone | 87.4 / 44.5 |
 
-The picture is the same as on TOML: gradient descent alone is above both panic modes, level with yacc error productions and below the hand-written rules, and trial and error brings it level with them. Details: `../recovery-lr/learn/runs/README.md`.
+The picture is the same as on TOML: gradient descent alone is above both panic modes, a little below yacc error productions and below the hand-written rules, and trial and error brings it level with the hand-written rules. Details: `../recovery-lr/learn/runs/README.md`.
+
+With realistic mistakes in the training data the order changes. `../recovery-lr/kinds/` holds 34 types of mistakes that people make in such a language, e.g. `;;` after a definition, `==` for `=` or commas in a list, and a training set that is half random damage and half these mistakes. On validation programs with these mistakes, characters right:
+
+| | Characters right |
+|---|---|
+| Hand-written rules | 90.6 |
+| yacc error productions | 90.6 |
+| Gradient descent alone, trained on random damage | 79.4 |
+| Gradient descent alone, trained on the half-and-half set | 94.1 |
+| Gradient descent, then trial and error, half-and-half set | 96.2 |
+
+The validation programs hold the same 34 types as the training data, on other programs. So this shows that the types are learned, and not how the parser does on mistakes that someone else wrote. The types were written in under an hour and were not reviewed.
 
 ## How to read this
 
 - **JSON is a clear success.** A strict parser became a recovering one with no recovery code written, and valid JSON is unchanged by construction.
 - **The rule for TOML and bison was strict on purpose:** gradient descent alone, every setting frozen as tuned for JSON, and random damage as the training data. A failure by that rule says that the gradient step does not carry over as it is. It does not say that training cannot work there.
-- **What would be fair to the trained parser and is not done, or only started:**
-  - more passes and more data. On the bison table the training had not settled on its choices after its three passes.
-  - one small hand-written rule where a format asks for it, with training for the rest, e.g. the per-line rule on TOML.
-  - training damage for the cases the tests showed, e.g. text in front of a JSON document.
+- **Two fairer starts were tried on validation data, after the tests above:**
+  - **One small hand-written rule on TOML, with gradient descent for the rest.** Only the entries that start a new line after an error are set by hand. Gradient descent alone then has 95.7 / 52.9 when it may change those entries too, and 94.2 / 46.2 when they stay fixed, against 91.5 / 36.0 for the one rule, 90.7 / 33.6 for gradient descent without it and 94.9 / 50.7 for the 39 hand-written rules. The lost section headers are back: 95% right. Details: `../recovery-toml/learn/line-rule/README.md`.
+  - **More passes and more data on the bison parser.** Neither moves gradient descent alone: 83.1 after 3 passes, 83.6 after 30, and 83.5 with ten times the data. The training does not fit the data it has, since trial and error reaches 89.5 on the same training programs. So the gap there is in how the soft parser is trained and rounded, not in the amount of data. Details: `../recovery-lr/learn/scale/README.md`.
+- **Realistic mistakes in the training data help everywhere they were tried:** on JSON, on TOML and on the bison parser.
+- **Not done yet:** training damage for the cases the tests showed, e.g. text in front of a JSON document; a look at why the soft bison parser trains poorly; the bison parser's final test.
+- **These later numbers are not results on unseen data.** Their settings were chosen with validation scores in view.
 - **The final tests of JSON and TOML are used up.** A setting that is tuned after looking at them needs new unseen data.
 
 ## Where things are
