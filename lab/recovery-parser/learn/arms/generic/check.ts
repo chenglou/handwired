@@ -6,7 +6,7 @@
 // 2. The events of a text's end: after ruleOutEndEvents no trainable tokenizer cell that a code point of a text
 //    reads has a share for such an event, random weights never snap to one, and a short training leaves it so.
 // 3. The recipe of the plain pass gives the tables that ../plain-pass/run.ts saved for seed 1, so the arm's control
-//    is that run.
+//    is that run. And a recipe without a training gives today's tables, so its search starts from them.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after ../plain-pass/run.ts. About
 // 40 s, most of it the training of the third part, with 4 worker threads:
@@ -21,7 +21,7 @@ import {train} from '../../soft/train.ts'
 import {packForTwin, placesForTwin} from '../../soft/twin-data.ts'
 import {createCellArrays, createModel, mixesInto, snappedTables} from '../../soft/twin.ts'
 import {armFolderOf, fileNameOf, samplesOfTheStandardSet} from '../harness.ts'
-import {buildRecipe, cellsOfTooDeepValidJson, plainPass, ruleOutEndEvents} from './generic.ts'
+import {buildRecipe, cellsOfTooDeepValidJson, plainPass, recipeWith, ruleOutEndEvents} from './generic.ts'
 
 refuseUnknownOptions('arms/generic/check.ts', [])
 let failures = 0
@@ -101,6 +101,8 @@ check(sharesOfEndEvents() === 0 && snapsToAnEndEvent() === 0 && brokenWeights ==
 const savedPlainPass = loadTablesOfThisDataset(join(armFolderOf('plain-pass'), fileNameOf('one pass of the trainer from today\'s tables, defaults'), 'seed-1.tables.json')).tables
 const built = await buildRecipe(plainPass, 1, 'generic')
 check(tablesToJson(built.tables) === tablesToJson(savedPlainPass), 'the recipe of the plain pass gives the tables that ../plain-pass/run.ts saved for seed 1')
+const withoutTraining = await buildRecipe(recipeWith({passes: 0}), 1, 'generic')
+check(tablesToJson(withoutTraining.tables) === tablesToJson(todays), 'a recipe without a training gives today\'s tables')
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)
 if (failures > 0) process.exitCode = 1

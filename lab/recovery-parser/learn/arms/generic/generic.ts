@@ -20,12 +20,12 @@ import type {Cell} from '../holes/holes.ts'
 import {searchCells} from '../holes/restricted-search.ts'
 
 export type Recipe = {
-  // Passes of the trainer over the train samples.
+  // Passes of the trainer over the train samples. With 0 nothing is trained: the tables before the recipe's search
+  // are today's, and no other setting of the trainer counts.
   passes: number
-  // Where a trainable mix starts: 'base' gives the share `startShare` to today's choice, 'uniform' gives every choice
-  // the same share.
+  // Where a trainable mix starts: 'base' gives today's choice the trainer's default share, 0.9, and 'uniform' gives
+  // every choice the same share.
   start: 'base' | 'uniform'
-  startShare: number
   learningRate: number
   // Samples per step of Adam.
   batchSize: number
@@ -45,44 +45,49 @@ export type Recipe = {
   // as much as its other ones. 0 code points switches it off.
   firstCodePoints: number
   firstCodePointsWeight: number
-  // 'kept' keeps the cells that valid JSON of more than 16 levels reads out of training, see cellsOfTooDeepValidJson.
+  // 'kept' keeps the cells that valid JSON of more than 16 levels reads out of the training and out of the search,
+  // see cellsOfTooDeepValidJson.
   tooDeepCells: 'trained' | 'kept'
   // 'ruled out' keeps a trained tokenizer cell from taking an event of a text's end, see ruleOutEndEvents.
   endEvents: 'allowed' | 'ruled out'
   // How many times the standard set's range of indexes the train samples come from: 1 is the standard set, 4 is the
   // train samples of the indexes 0 to 239,999.
   sampleSets: number
-  // With a number, the greedy search of ../../search/ goes over the trainable cells after the training, in a random
+  // With a number, the greedy search of ../../search/ goes over the recipe's cells after the training, in a random
   // order that the seed and this number draw. Undefined is the training alone.
   searchOrder: number | undefined
 }
 
 // The trainer's plain pass, ../plain-pass/: one pass, every default.
 export const plainPass: Recipe = {
-  passes: 1, start: 'base', startShare: 0.9, learningRate: 0.05, batchSize: 32, temperatureEnd: 1, sharpnessCost: 0, intendedWeight: 0, displayTable: 'fixed',
+  passes: 1, start: 'base', learningRate: 0.05, batchSize: 32, temperatureEnd: 1, sharpnessCost: 0, intendedWeight: 0, displayTable: 'fixed',
   sampleWeightPower: 0, firstCodePoints: 0, firstCodePointsWeight: 1, tooDeepCells: 'trained', endEvents: 'allowed', sampleSets: 1, searchOrder: undefined,
 }
 export const recipeWith = (changes: Partial<Recipe>, from: Recipe = plainPass): Recipe => ({...from, ...changes})
 
 // A recipe's name, which is the name of its row and of its folder of saved runs: the passes and the start, then
-// whatever is not as in the plain pass, e.g. "3 passes, uniform start, learning rate 0.1".
+// whatever is not as in the plain pass, e.g. "3 passes, uniform start, learning rate 0.1". A recipe without a
+// training is named by what its search is told, e.g. "no training, too deep cells kept, then searched, order 1".
 export function describeRecipe(recipe: Recipe): string {
-  const parts = [
-    `${recipe.passes} pass${recipe.passes === 1 ? '' : 'es'}`,
-    recipe.start === 'uniform' ? 'uniform start' : `start at today's choice${recipe.startShare === plainPass.startShare ? '' : ` with the share ${recipe.startShare}`}`,
-  ]
-  if (recipe.learningRate !== plainPass.learningRate) parts.push(`learning rate ${recipe.learningRate}`)
-  if (recipe.batchSize !== plainPass.batchSize) parts.push(`batches of ${recipe.batchSize}`)
-  if (recipe.temperatureEnd !== plainPass.temperatureEnd) parts.push(`temperature falls to ${recipe.temperatureEnd}`)
-  if (recipe.sharpnessCost !== plainPass.sharpnessCost) parts.push(`sharpness cost ${recipe.sharpnessCost}`)
-  if (recipe.intendedWeight !== plainPass.intendedWeight) parts.push(`extra targets ${recipe.intendedWeight}`)
-  if (recipe.displayTable === 'open') parts.push('display table open')
-  if (recipe.sampleWeightPower === 1) parts.push('every sample weighs the same')
-  else if (recipe.sampleWeightPower !== 0) parts.push(`sample weight power ${recipe.sampleWeightPower}`)
-  if (recipe.firstCodePoints > 0) parts.push(`the first ${recipe.firstCodePoints} code points weigh ${recipe.firstCodePointsWeight} times`)
-  if (recipe.tooDeepCells === 'kept') parts.push('too deep cells kept')
-  if (recipe.endEvents === 'ruled out') parts.push('no event of a text\'s end')
-  if (recipe.sampleSets !== 1) parts.push(`${recipe.sampleSets} times the samples`)
+  const parts: string[] = []
+  if (recipe.passes === 0) {
+    parts.push('no training')
+    if (recipe.tooDeepCells === 'kept') parts.push('too deep cells kept')
+  } else {
+    parts.push(`${recipe.passes} pass${recipe.passes === 1 ? '' : 'es'}`, recipe.start === 'uniform' ? 'uniform start' : 'start at today\'s choice')
+    if (recipe.learningRate !== plainPass.learningRate) parts.push(`learning rate ${recipe.learningRate}`)
+    if (recipe.batchSize !== plainPass.batchSize) parts.push(`batches of ${recipe.batchSize}`)
+    if (recipe.temperatureEnd !== plainPass.temperatureEnd) parts.push(`temperature falls to ${recipe.temperatureEnd}`)
+    if (recipe.sharpnessCost !== plainPass.sharpnessCost) parts.push(`sharpness cost ${recipe.sharpnessCost}`)
+    if (recipe.intendedWeight !== plainPass.intendedWeight) parts.push(`extra targets ${recipe.intendedWeight}`)
+    if (recipe.displayTable === 'open') parts.push('display table open')
+    if (recipe.sampleWeightPower === 1) parts.push('every sample weighs the same')
+    else if (recipe.sampleWeightPower !== 0) parts.push(`sample weight power ${recipe.sampleWeightPower}`)
+    if (recipe.firstCodePoints > 0) parts.push(`the first ${recipe.firstCodePoints} code points weigh ${recipe.firstCodePointsWeight} times`)
+    if (recipe.tooDeepCells === 'kept') parts.push('too deep cells kept')
+    if (recipe.endEvents === 'ruled out') parts.push('no event of a text\'s end')
+    if (recipe.sampleSets !== 1) parts.push(`${recipe.sampleSets} times the samples`)
+  }
   if (recipe.searchOrder !== undefined) parts.push(`then searched, order ${recipe.searchOrder}`)
   return parts.join(', ')
 }
@@ -124,8 +129,8 @@ export function cellsOfTooDeepValidJson(): Uint8Array {
   return cells
 }
 
-// The mask of the grammar cells that a recipe trains: every open one, without the cells of too deep valid JSON when
-// the recipe keeps those.
+// The mask of the grammar cells that a recipe may change, by its training and by its search: every open one,
+// without the cells of too deep valid JSON when the recipe keeps those.
 function trainableGrammarCellsOf(recipe: Recipe, base: RecoveryTables): Uint8Array {
   if (recipe.tooDeepCells === 'trained') return base.grammarOpen.slice()
   const kept = cellsOfTooDeepValidJson()
@@ -176,8 +181,9 @@ function trainedTablesOf(recipe: Recipe, seed: number): Promise<RecoveryTables> 
 
 async function trainRecipe(recipe: Recipe, seed: number): Promise<RecoveryTables> {
   const base = baseOf(recipe)
+  if (recipe.passes === 0) return base
   // The model is made here, once per seed: `train` changes the model that it is given.
-  const model = createModel(base, {start: recipe.start, startShare: recipe.startShare, trainable: {lexer: 'open', grammar: trainableGrammarCellsOf(recipe, base), display: 'open'}})
+  const model = createModel(base, {start: recipe.start, trainable: {lexer: 'open', grammar: trainableGrammarCellsOf(recipe, base), display: 'open'}})
   if (recipe.endEvents === 'ruled out') ruleOutEndEvents(model)
   const result = await train(model, trainDataOf(recipe.sampleSets), {
     seed, epochs: recipe.passes, learningRate: recipe.learningRate, batchSize: recipe.batchSize, temperatureStart: 1, temperatureEnd: recipe.temperatureEnd, sharpnessCost: recipe.sharpnessCost,
@@ -202,11 +208,12 @@ function savedTrainedTablesOf(armName: string, recipe: Recipe, seed: number): Re
 }
 
 // The tables of a recipe for a seed: the trained ones, and for a recipe with a search, what the greedy search makes
-// of them. The search goes over the cells that the recipe trains and no others, in a random order that is drawn anew
-// for every pass, from a seed that the run's seed and the recipe's order number make, e.g. 113 for seed 11 and
+// of them. The search goes over the cells that the recipe may change and no others, in a random order that is drawn
+// anew for every pass, from a seed that the run's seed and the recipe's order number make, e.g. 113 for seed 11 and
 // order 3. It always runs on the train split of the standard set. It starts from the trained tables that an earlier
 // command saved for the same recipe without the search under `armName`, when there are such, so that a later command
-// with more orders does not train again: a seed's training gives the same tables every time.
+// with more orders does not train again: a seed's training gives the same tables every time. For a recipe without
+// a training it starts from today's tables, and its seed only draws the order.
 export async function buildRecipe(recipe: Recipe, seed: number, armName: string): Promise<Built> {
   const base = baseOf(recipe)
   if (recipe.searchOrder === undefined) return {tables: await trainedTablesOf(recipe, seed), base}
@@ -217,16 +224,18 @@ export async function buildRecipe(recipe: Recipe, seed: number, armName: string)
   for (let cell = 0; cell < grammarCells.length; cell++) if (grammarCells[cell] === 1) cells.push({grammar: true, cell})
   const started = performance.now()
   const result = await searchCells(trained, cells, searchSamples(), seed * 10 + recipe.searchOrder)
-  if (!result.lastPassChangedNothing) throw new Error(`the search after ${JSON.stringify(describeRecipe(recipe))} did not end in ${result.passes} passes`)
+  if (!result.lastPassChangedNothing) throw new Error(`the search of ${JSON.stringify(describeRecipe(recipe))} did not end in ${result.passes} passes`)
   console.log(`The search ended when pass ${result.passes} changed nothing, after ${result.changes} changes of a cell and ${(result.runs / 1e6).toFixed(1)} million runs of a sample, in ${((performance.now() - started) / 1000).toFixed(0)} s.`)
   return {tables: result.tables, base}
 }
 
-// A step of the arm: recipes that are read next to each other, the first one as the control of the others. The
-// tuning steps run with the seeds 11, 12 and 13 and save under the arm name "generic-tuning". The step "reported"
-// runs once with the seeds 1 to 5 and saves under "generic".
-export type Step = {armName: string, seeds: readonly number[], recipes: readonly Recipe[]}
+// A step of the arm: recipes that are read next to each other. The tuning steps run with the seeds 11, 12 and 13
+// and save under the arm name "generic-tuning", and the first recipe of a tuning step is the control of its others.
+// With `everyPair` the report compares every two recipes of the step, for a step whose recipes differ from its
+// control in more than one thing. The two reported steps run once with the seeds 1 to 5 and save under "generic".
+export type Step = {armName: string, seeds: readonly number[], recipes: readonly Recipe[], everyPair?: true}
 const tuning = (recipes: readonly Recipe[]): Step => ({armName: 'generic-tuning', seeds: [11, 12, 13], recipes})
+const reported = (recipes: readonly Recipe[]): Step => ({armName: 'generic', seeds: [1, 2, 3, 4, 5], recipes})
 
 const onePassUniform = recipeWith({start: 'uniform'})
 // What the step passes-and-start chose, and the control of the steps after it.
@@ -235,11 +244,19 @@ const fourTimesTheSamples = recipeWith({start: 'uniform', sampleSets: 4})
 // The arm's best recipe, as the tuning steps chose it: one pass from a uniform start over four times the samples,
 // with the cells of too deep valid JSON kept and without the events of a text's end. README.md says why.
 export const bestRecipe = recipeWith({tooDeepCells: 'kept', endEvents: 'ruled out'}, fourTimesTheSamples)
-const bestThenSearched = [1, 2, 3].map(searchOrder => recipeWith({searchOrder}, bestRecipe))
+export const searchOrders = [1, 2, 3]
+export const bestThenSearched = searchOrders.map(searchOrder => recipeWith({searchOrder}, bestRecipe))
+// The comparison without gradients: the search of the best recipe from today's tables, over the same cells, on the
+// same train samples and in the same orders, since a seed and an order number draw the same order here as there.
+export const searchedWithoutTraining = searchOrders.map(searchOrder => recipeWith({passes: 0, searchOrder}, bestRecipe))
+// The best recipe with the standard set in four passes in place of four times the samples in one pass, which are as
+// many steps of the trainer: the control of the larger set of samples.
+export const bestOnTheStandardSet = recipeWith({passes: 4, sampleSets: 1}, bestRecipe)
 
-export const steps: Record<string, Step> = {
-  // The trainer's setting: the passes and the start, then the other settings of the trainer on one pass.
-  'passes-and-start': tuning([plainPass, onePassUniform, recipeWith({passes: 3}), threePasses]),
+export const tuningSteps: Record<string, Step> = {
+  // The trainer's setting: the passes and the start, then the other settings of the trainer on one pass. The four
+  // recipes of the first step are two starts with two numbers of passes each, so every pair of them is compared.
+  'passes-and-start': {...tuning([plainPass, onePassUniform, recipeWith({passes: 3}), threePasses]), everyPair: true},
   'trainer': tuning([
     onePassUniform,
     ...[0.02, 0.1, 0.2].map(learningRate => recipeWith({learningRate}, onePassUniform)),
@@ -262,9 +279,17 @@ export const steps: Record<string, Step> = {
   'combined': tuning([fourTimesTheSamples, bestRecipe]),
   // Gradient, then search: the greedy search from the trained tables of the best recipe, in three orders per seed.
   'then-search': tuning([bestRecipe, ...bestThenSearched]),
-  // The reported runs: the best recipe alone and with the search, once, with the seeds 1 to 5.
-  'reported': {armName: 'generic', seeds: [1, 2, 3, 4, 5], recipes: [bestRecipe, ...bestThenSearched]},
 }
+
+export const reportedSteps: Record<string, Step> = {
+  // The reported runs: the best recipe alone and with the search, once, with the seeds 1 to 5.
+  'reported': reported([bestRecipe, ...bestThenSearched]),
+  // The controls of the reported runs, with the same seeds: the search without the training, and the training
+  // without the larger set of samples.
+  'reported-controls': reported([...searchedWithoutTraining, bestOnTheStandardSet]),
+}
+
+export const steps: Record<string, Step> = {...tuningSteps, ...reportedSteps}
 
 // The saved result of a recipe in a step's arm, or undefined when it was not run with the step's seeds yet.
 export function savedRecipeOf(step: Step, recipe: Recipe): SettingResult | undefined {
