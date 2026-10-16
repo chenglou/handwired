@@ -18,7 +18,7 @@ for (const record of records) if (record.format !== 'recovery-lr scale record 1'
 
 // The rows in the order: the recipe's rate before another rate, the rows with a search last, fewer train samples
 // and fewer passes first.
-const settingOf = (record: ScaleRecord): string => [record.learningRate === 0.05 ? 0 : 1, record.learningRate, record.startShare, record.steps === 'training, then the count' ? 0 : 1, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
+const settingOf = (record: ScaleRecord): string => [record.learningRate === 0.05 && record.startShare === 0.9 ? 0 : 1, record.learningRate, record.startShare, record.steps === 'training, then the count' ? 0 : 1, String(record.trainSamples).padStart(9, '0'), String(record.passes).padStart(4, '0')].join(' ')
 const groups = new Map<string, ScaleRecord[]>()
 for (const record of records) groups.set(settingOf(record), [...(groups.get(settingOf(record)) ?? []), record])
 
