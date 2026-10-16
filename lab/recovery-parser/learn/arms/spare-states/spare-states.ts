@@ -332,10 +332,11 @@ export function standInOf(tables: RecoveryTables, spare: SpareState, samples: Sa
 
 // `tables` without any spare state: the spare states are taken away one after the other, the one that the samples
 // read most first, each with its stand-in in the given way, or with 'base' each sent to the choices of `base`.
-export function withoutSpareStates(tables: RecoveryTables, to: Way | 'base', base: RecoveryTables, samples: Samples): RecoveryTables {
+// With `taken`, only the spare states that it names are taken away, e.g. the ones of the grammar.
+export function withoutSpareStates(tables: RecoveryTables, to: Way | 'base', base: RecoveryTables, samples: Samples, taken: (spare: SpareState) => boolean = () => true): RecoveryTables {
   const use = stateUseOf(tables, samples)
   let result = tables
-  for (const spare of spareStatesOf(tables).sort((left, right) => codePointsIn(use, right) - codePointsIn(use, left))) {
+  for (const spare of spareStatesOf(tables).filter(taken).sort((left, right) => codePointsIn(use, right) - codePointsIn(use, left))) {
     result = to === 'base' ? withoutState(result, spare, 'base', base) : standInOf(result, spare, samples, to).tables
   }
   return result

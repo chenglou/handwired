@@ -5,8 +5,8 @@
 // 3. A run from tables that a person wrote changes only what it may: a cell of a spare state, or the next state of
 //    an open cell of another state, which then is a spare state.
 // 4. Tables without a spare state: no cell leads into the state, no text is in it, a spare state that is a copy of
-//    a state of today's folds into that state without a changed trace, and taking away a state that no text reads
-//    changes no trace.
+//    a state of today's folds into that state without a changed trace, taking away a state that no text reads
+//    changes no trace, and taking away the spare states of one table leaves the ones of the other table as they were.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, in a few seconds:
 //   bun lab/recovery-parser/learn/arms/spare-states/check.ts
@@ -118,6 +118,8 @@ const noSpare = withoutSpareStates(used, 'sent', base, standInSamples)
 const useWithout = stateUseOf(noSpare, trainSamples)
 check(spareStates.every(state => codePointsIn(useWithout, state) === 0), 'without every spare state, no train sample is in a spare state')
 check(sameTraces(noSpare, withoutSpareStates(noSpare, 'base', base, standInSamples)), 'taking the spare states away a second time changes no trace of 2,000 train samples')
+const withoutGrammarStates = withoutSpareStates(used, 'sent', base, standInSamples, state => state.grammar)
+check(spareStates.every(state => cellsInto(withoutGrammarStates, state) === (state.grammar ? 0 : cellsInto(used, state))), 'with only the spare grammar states taken away, no cell leads into one of them, and the same cells as before lead into each spare tokenizer state')
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks failed.`)
 process.exit(failures === 0 ? 0 : 1)

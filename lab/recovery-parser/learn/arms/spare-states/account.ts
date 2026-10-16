@@ -10,7 +10,8 @@
 //   of the train split. "Folded": the same, and the stand-in's open cells take the spare state's choices, so that a
 //   state of today's does the spare state's job. And every cell that leads into the state holds the base's choice
 //   again. The drop is what the state is worth, per group and kind, and the drop after folding is what the state
-//   holds that no state of today's can hold.
+//   holds apart from its stand-in. Both are tries: a drop says that this way does not move the state's job into a
+//   state of today's, not that no tables of today's layout hold it.
 // The sentence that says what the state remembers is for the reader to write, and the test is the check of it.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
