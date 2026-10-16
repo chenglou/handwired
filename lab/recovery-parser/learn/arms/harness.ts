@@ -14,7 +14,8 @@
 // - trainDataFor(base) and trainPartOfTheStandardSet(): the train split, which is all that a build function trains on.
 //
 // README.md of this folder says how to write an arm with them. Nothing here reads the test split: the samples that
-// loadStandardSamples gives hold no test sample. final.ts is the one script for the test split.
+// loadStandardSamples gives hold no test sample. The scripts for the test split are final.ts, and run.ts and
+// show.ts of ../final/.
 import {existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {type HandRule, handRuleTables, handRules} from '../../hand-rules.ts'

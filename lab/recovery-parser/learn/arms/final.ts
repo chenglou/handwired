@@ -1,6 +1,8 @@
-// The one script that scores tables on the test split. It is for final numbers, after every choice between tables
-// is made on the validation split. It refuses to run unless the environment variable RECOVERY_FINAL is `yes`:
+// Scores tables on the test split. It is for final numbers, after every choice between tables is made on the
+// validation split. It refuses to run unless the environment variable RECOVERY_FINAL is `yes`:
 //   RECOVERY_FINAL=yes bun lab/recovery-parser/learn/arms/final.ts <name>=<tables.json> ...
+// It is not the one script that reads the test split: the final scoring of the experiment is ../final/run.ts, which
+// also scores the written set, and ../final/show.ts shows single samples.
 //
 // The test split holds four kinds of damage and one template that training never sees, and about a half of its
 // samples have one of them. So one number for "the test split" means little, and the script prints four rows per

@@ -1,6 +1,6 @@
 // One command for everything that has to hold in learn/: the type check of this folder, the lint of
-// lab/recovery-parser, and the check scripts of learn/ and of the folders in it. The one check that it leaves out
-// is arms/holes/check-search.ts, which takes about 8 minutes.
+// lab/recovery-parser, and the check scripts of learn/ and of the folders in it, final/check.ts of the final scoring
+// among them. The one check that it leaves out is arms/holes/check-search.ts, which takes about 8 minutes.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL:
 //   bun lab/recovery-parser/learn/check-all.ts [--only <part of a name>]
@@ -8,7 +8,7 @@
 // tables of arms/plain-pass/run.ts, and arms/combined/check.ts with the tables of
 // `arms/extra-facts/run.ts --trainer three-base --settings all --seeds 11,12,13,14,15`.
 //
-// It takes a bit over two minutes on an 18 core machine with little else running (130 s and 133 s in two runs), and
+// It takes a bit over two minutes on an 18 core machine with little else running (130 s and 131 s in two runs), and
 // longer with other jobs running, with the cache of the standard set in place, and about half a minute more the
 // first time, for that cache and for the intended stacks. arms/combined/check.ts alone is that long, and without it
 // the command took 64 s. Up to 4 commands run at a time, and three of the checks use 4 worker threads each,
@@ -26,10 +26,13 @@ import {optionOf, refuseUnknownOptions} from './data.ts'
 const root = resolve(import.meta.dir, '../../..')
 const here = relative(root, import.meta.dir)
 // arms/combined/check.ts takes the longest by far, so it comes first and the other checks run next to it.
+// final/check.ts comes last: it fails when a file is added to the cache folder while it runs, which another check
+// does the first time, when it makes the cache of the standard set.
 const checks = [
   'arms/combined/check.ts',
   'check-tables.ts', 'check-parser.ts', 'check-data.ts', 'check-deep.ts', 'check-guard.ts', 'check-commands.ts', 'handwritten/check.ts', 'search/check.ts',
   'soft/check-twin.ts', 'soft/check-gradient.ts', 'soft/check-circuit.ts', 'soft/check-train.ts', 'arms/check.ts', 'arms/generic/check.ts', 'arms/spare-states/check.ts',
+  'final/check.ts',
 ]
 const commands: {name: string, command: string[], isCheck: boolean}[] = [
   {name: 'tsc', command: ['bunx', 'tsc', '-p', here], isCheck: false},

@@ -44,7 +44,8 @@ export const heldOutByTemplate = 2
 
 // The test split is for final numbers only, and so are the four kinds of damage and the template that are held out,
 // which only samples of the test split have. Nothing in learn/ makes, loads or scores a test sample unless the
-// environment variable RECOVERY_FINAL is `yes`. arms/final.ts is the one script that is meant to run so.
+// environment variable RECOVERY_FINAL is `yes`. Three scripts are meant to run so: arms/final.ts, and final/run.ts
+// and final/show.ts of the final scoring.
 export const finalIsAllowed = () => process.env['RECOVERY_FINAL'] === 'yes'
 export function requireFinal(what: string) {
   if (!finalIsAllowed()) throw new Error(`${what} reads the test split, which is for final numbers only. Nothing in learn/ reads it unless the environment variable RECOVERY_FINAL is set to yes, see arms/README.md.`)
@@ -464,11 +465,11 @@ export function optionOf(name: string, argv: readonly string[] = process.argv): 
 
 // The splits that a command's --split names, e.g. ['train', 'validation'] for `--split train,validation`. Without
 // the option, the validation split. The test split is refused, with or without RECOVERY_FINAL: the commands load no
-// test sample, and arms/final.ts is the one script that scores the test split.
+// test sample. Only arms/final.ts and final/run.ts score the test split, and final/show.ts shows samples of it.
 export function splitsOfOption(command: string, argv: readonly string[] = process.argv): Split[] {
   const named = (optionOf('--split', argv) ?? 'validation').split(',') as Split[]
   for (const split of named) {
-    if (split === 'test') throw new Error(`${command} --split test: this command does not read the test split, which is for final numbers only. arms/final.ts is the one script that scores it, see arms/README.md.`)
+    if (split === 'test') throw new Error(`${command} --split test: this command does not read the test split, which is for final numbers only. Only arms/final.ts and the scripts of final/ read it, see arms/README.md and final/README.md.`)
     if (!splitNames.includes(split)) throw new Error(`--split takes train or validation, or both with a comma, and got ${split}`)
   }
   return named
