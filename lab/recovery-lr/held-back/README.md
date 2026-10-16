@@ -19,6 +19,7 @@ Everyone else gets numbers through whoever runs the final scoring, and no texts.
 - A dump of a set for reading goes to a folder outside the repo, e.g. below `recovery-scratch/transfer/lr/build/`, and its first line says that the file is held back.
 - A command of this folder that anyone may run prints counts and no text of a case, e.g. `written/check-written.ts`. A command that prints cases says so at the top of its file, e.g. `written/check.ts`.
 - The skeptic's probe of hand-written mistakes in `recovery-scratch/transfer/lr/skeptic/` is no part of this folder and no source for it. Nobody on the training side and no author of a bar may use the probe to choose anything.
+- A commit that touches this folder gets a subject that names no content of a set, e.g. "held-back: fixes after the review": every agent in the worktree sees the subjects with `git log`.
 
 ## The sets
 
@@ -26,3 +27,15 @@ Everyone else gets numbers through whoever runs the final scoring, and no texts.
 - `specific/`: 6,000 broken programs that a generator makes from valid programs of its own, with one or two mistakes each of 41 kinds that people make in a language of this sort, e.g. a forgotten `in` or `;;` after a definition. Its `README.md` lists the kinds, says how a sample gets its labels and how other code reads the set, and says for every kind what a table can show.
 
 A set that is added later gets a folder of its own here, with a `README.md`, and a line in this list.
+
+## For the final scoring
+
+- `FINAL-SCORING.md`: what the final table has to show and say, gathered from the two reviews of the foundation.
+- `columns.ts`: the columns that the reviews asked for next to "all three" and "whole", on the three sets of the final table. It takes more rows.
+- `search-per-sample.ts`: row 13, the search per sample, as the better of two searches per sample, for any list of samples.
+
+```sh
+bun lab/recovery-lr/held-back/columns.ts
+bun lab/recovery-lr/held-back/search-per-sample.ts --set validation|specific|written [--count <samples>] [--width 64] [--without-end-early]
+bunx tsc -p lab/recovery-lr/held-back && bunx oxlint --type-aware lab/recovery-lr/held-back
+```

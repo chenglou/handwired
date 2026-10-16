@@ -6,7 +6,8 @@
 // follows the rules of a run of ../../learn/recovery-parser.ts (frozen cells are followed, a token gets 16 steps
 // and is then skipped, a frozen display entry shows what it shows).
 //
-// It is a search of its own and not the one of ../../learn/search/per-sample.ts, for one reason. Both keep a
+// The search is bestOfSample of ../search-per-sample.ts, which also makes row 13 of the final table for any list
+// of samples. It is a search of its own and not the one of ../../learn/search/per-sample.ts, for one reason. Both keep a
 // number of runs after every token, the ones with the most code points right. Where runs are level, the search
 // of learn/ keeps the ones with the shortest stack. In this set the first error's token is often an added one,
 // which has no label, so every run is level after it, and the runs with the shortest stacks are the ones that
@@ -29,113 +30,13 @@
 //   bun lab/recovery-lr/held-back/specific/reach.ts [--width 64] [--count 6000] [--forms] [--without-end-early] [--search-of-learn]
 // The output holds counts per kind and form, and no text of a sample. It takes about 4 minutes on 4 threads.
 // With --search-of-learn, the search of learn/ runs in its place, for the comparison of the two.
-import {displayKind, displayKindCount} from '../../labels.ts'
-import {type PackedSamples, packSamples, packedComment} from '../../learn/data.ts'
-import {containerOfStack, depthOfStack} from '../../learn/recovery-parser.ts'
-import {type RecoveryTables, applyChoice, baseTables, choiceStop, choicesOf, maximumStepsPerToken, tokenSkipped, tokenStays, tokenTaken, withoutEndEarly} from '../../learn/recovery-tables.ts'
+import {packSamples} from '../../learn/data.ts'
+import {baseTables, withoutEndEarly} from '../../learn/recovery-tables.ts'
 import {searchPerSample} from '../../learn/search/per-sample.ts'
-import type {Sample} from '../../sample.ts'
 import {scoredOutOfReach} from '../../stats.ts'
+import {bestOfSample} from '../search-per-sample.ts'
 import {kindNames} from './kinds.ts'
 import {specificSampleAt, specificSampleCount, specificSeed} from './specific.ts'
-
-// One run: its stack, the code points that it has right so far, of which in tokens, the steps at open cells in
-// which it did another thing than the parser as it is, its steps for the token at hand, and all its steps.
-type Run = {stack: number[], right: number, rightInTokens: number, changes: number, steps: number, allSteps: number}
-// The order of the runs: the most code points right, then the fewest changes, then the fewest steps, e.g. a
-// token that is skipped at once before one that is skipped after six reductions.
-const better = (left: Run, right: Run): number => right.right - left.right || left.changes - right.changes || left.allSteps - right.allSteps || left.stack.length - right.stack.length
-// A second order, which keeps other runs among level ones: the shortest stack before the fewest steps. A run
-// that drops a part of the stack and builds another one in its place takes many steps and leaves a short stack.
-const betterWithShortStack = (left: Run, right: Run): number => right.right - left.right || left.changes - right.changes || left.stack.length - right.stack.length || left.allSteps - right.allSteps
-// The runs that go on after a token: the first `width` in each of the two orders.
-function keptOf(runs: Run[], width: number): Run[] {
-  if (runs.length <= width) return runs
-  const kept = new Set(runs.sort(better).slice(0, width))
-  for (const run of runs.sort(betterWithShortStack).slice(0, width)) kept.add(run)
-  return [...kept]
-}
-
-export type Best = {right: number, rightInTokens: number, scoredInTokens: number}
-
-const perKind = new Int32Array(displayKindCount)
-// The code points of a packed token that have all three right when the token is shown with the kind, or with the
-// best kind for -1, and with the depth and the container of the stack.
-function rightOfToken(samples: PackedSamples, token: number, stack: readonly number[], kind: number): number {
-  const depth = depthOfStack(stack), container = containerOfStack(stack)
-  let right = 0
-  perKind.fill(0)
-  for (let group = samples.groupStart[token]!; group < samples.groupStart[token + 1]!; group++) {
-    if (samples.groupDepth[group] !== depth || samples.groupContainer[group] !== container) continue
-    if (kind === -1) {
-      perKind[samples.groupKind[group]!]! += samples.groupCount[group]!
-      if (perKind[samples.groupKind[group]!]! > right) right = perKind[samples.groupKind[group]!]!
-    } else if (samples.groupKind[group] === kind) right += samples.groupCount[group]!
-  }
-  return right
-}
-
-// The best run that the search finds for one sample.
-export function bestOfSample(sample: Sample, tables: RecoveryTables, width: number): Best {
-  const samples = packSamples([sample], tables)
-  const {terminalCount} = tables
-  const first = samples.tokenStart[0]!, end = samples.tokenStart[1]! - 1
-  let scoredInTokens = 0
-  for (let at = first; at < end; at++) if (samples.terminal[at]! >= 0) for (let group = samples.groupStart[at]!; group < samples.groupStart[at + 1]!; group++) scoredInTokens += samples.groupCount[group]!
-  let kept: Run[] = [{stack: Array.from(samples.stackState.subarray(samples.stackStart[0], samples.stackStart[1])), right: 0, rightInTokens: 0, changes: 0, steps: 0, allSteps: 0}]
-  for (let at = first; at < end; at++) {
-    const terminal = samples.terminal[at]!
-    if (terminal < 0) {
-      for (const run of kept) run.right += rightOfToken(samples, at, run.stack, terminal === packedComment ? displayKind.comment : displayKind.whitespace)
-      continue
-    }
-    // The runs that have taken or skipped the token, the best one per stack.
-    const done = new Map<string, Run>()
-    const finish = (run: Run, entry: number) => {
-      const right = rightOfToken(samples, at, run.stack, tables.displayOpen[entry] === 1 ? -1 : tables.display[entry]!)
-      run.right += right
-      run.rightInTokens += right
-      const key = run.stack.join()
-      const other = done.get(key)
-      if (other === undefined || better(run, other) < 0) done.set(key, run)
-    }
-    // The fewest changes with which a stack was reached while the token was read. Within a token the runs differ
-    // in what they had right before it and in their changes.
-    const reached = new Map<string, Run>()
-    let live = kept
-    for (const run of live) run.steps = 0
-    while (live.length > 0) {
-      const next: Run[] = []
-      for (const run of live) {
-        const state = run.stack.at(-1)!
-        if (run.steps === maximumStepsPerToken) {
-          finish(run, state * terminalCount + terminal)
-          continue
-        }
-        const cell = state * terminalCount + terminal
-        const isOpen = tables.open[cell] === 1
-        const choices = isOpen ? choicesOf(tables, cell) : [tables.choice[cell]!]
-        for (const choice of choices) {
-          if (choice === choiceStop) continue
-          const child: Run = {stack: run.stack.slice(), right: run.right, rightInTokens: run.rightInTokens, changes: run.changes + (isOpen && choice !== tables.choice[cell] ? 1 : 0), steps: run.steps + 1, allSteps: run.allSteps + 1}
-          const became = applyChoice(child.stack, choice)
-          if (became === tokenStays) {
-            const key = child.stack.join()
-            const other = reached.get(key)
-            if (other !== undefined && better(child, other) >= 0) continue
-            reached.set(key, child)
-            next.push(child)
-          } else if (became === tokenSkipped || became === tokenTaken) finish(child, child.stack.at(-1)! * terminalCount + terminal)
-          else throw new Error(`the cell ${cell} holds ${choice}, which the search does not know`)
-        }
-      }
-      live = keptOf(next, width * 4)
-    }
-    kept = keptOf([...done.values()], width)
-  }
-  const best = kept.reduce((left, right) => better(left, right) <= 0 ? left : right)
-  return {right: best.right, rightInTokens: best.rightInTokens, scoredInTokens}
-}
 
 type Request = {share: number, shares: number, count: number, width: number, withoutEndEarly: boolean}
 type Reply = {right: Int32Array, rightInTokens: Int32Array, scoredInTokens: Int32Array}
