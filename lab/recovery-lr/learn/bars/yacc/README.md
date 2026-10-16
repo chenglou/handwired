@@ -104,7 +104,7 @@ A reduction gives its left side and the tokens that its right side covers. An `e
 ## What its kind does not allow
 
 - **Reductions before the error is seen.** An LALR parser reduces at a token before it finds that the token has no action, and bison cannot take that back. E.g. in `let a = f (n - 1);; let b = 2` the `;` first reduces the bracket and the application, and is then passed over with the stack at `let a = expr`. The white space after it is labelled with the bracket still on the stack. This costs whole samples: 33 of 100 with `;;` after a definition are wholly right, where panic mode has 93.
-- **Lookahead sets merged over all contexts.** A stray `)` closes every unfinished `if` and local `let` above it, whether a bracket is open or not, since `)` is in the lookahead set of those rules in every context. A `)` too many has 86.7, where panic mode, which looks down the stack, has 99.9.
+- **Lookahead sets merged over all contexts.** A stray `)` closes every unfinished `if` and local `let` above it, whether a bracket is open or not, since `)` is in the lookahead set of those rules in every context. A `)` too many has 88.1, where panic mode, which looks down the stack, has 99.9.
 - **One guess per state and token.** A local `let` without `in` before another `let` is read as "the next definition at the top starts here". The other reading, a missing `in`, was tried and is worse (see below). bison cannot look at a second token or try both.
 
 ## How the grammar was chosen

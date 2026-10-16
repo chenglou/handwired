@@ -89,7 +89,7 @@ if (wrongStacks > 0) problem(`${wrongStacks} stacks that are no path of the auto
 console.log(`${samples.length} samples: of the ${tokensBefore} tokens before a first error, ${tokensBefore - wrongBefore} are shown as the parser as it is shows them, and none of them is dropped. The stack is a path of the automaton after each of ${stacksSeen} tokens. The bar drops ${tokensDropped} tokens and cuts the stack down ${cuts} times, by ${statesDropped} states.`)
 
 // 4: without the list, the panic mode of ../../bars.ts.
-const withoutList = {inBracketsOnly: false, letRestartsAtTheTop: false, onlyListedTokens: false}
+const withoutList = {inBracketsOnly: false, letRestartsAtTheTop: false, onlyListedTokens: false, expressionTakenAsThere: false}
 const errors = new Int8Array(tables.terminalCount).fill(displayKind.error)
 let differentFromBars = 0
 for (const sample of samples.slice(0, 3000)) {

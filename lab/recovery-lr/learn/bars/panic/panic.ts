@@ -5,6 +5,9 @@
 // The parser feeds every token to the grammar's table: it reduces while the table says so, and shifts. Where the
 // table rejects a token, i.e. the token reads an open cell, the stack is put back as it was before the token, so
 // the reductions that an LALR parser makes before it sees that a token has no action are undone. Then:
+// - Where the state on top waits for an expression, the parser tries the token once more as if an expression stood
+//   there: the textbook's panic mode stacks the state after a nonterminal and goes on. When the token is taken so,
+//   the expression counts as there, e.g. the `then` of `if then 1 else 2` is taken after `if expr`.
 // - A token that is not on the list is dropped, and the parser goes on with the next token on the same stack.
 // - A synchronizing token cuts the stack down to the highest part from which the table takes the token, and is
 //   taken there. Where no part takes it, the token is dropped.
@@ -21,7 +24,8 @@
 //   `fun`, `rec`, `_` and text that is no token. Each of them is taken wherever the table takes it and dropped
 //   everywhere else, e.g. the second `+` of `a + + b`, so the stack is never cut down for a token that only starts
 //   or continues an expression.
-// The parser never puts a token in: a missing `then` or a missing `=` stays missing.
+// The parser never puts a token in: a missing `then` or a missing `=` stays missing. The expression that it takes
+// as there covers no token and is no token, so the bar counts no inserted token.
 //
 // What a token is shown as: a taken token as the labels show it. A dropped token reads an entry of a display table
 // over (the state on top, the terminal), set by the count that the trained tables use, see dropped-kinds.json and
@@ -43,7 +47,7 @@ import {type ParserOutput, scoreHeader, scoreOutputs, scoreRow} from '../../scor
 
 const {terminalCount, nonterminalCount, stateCount, endSymbol} = tables
 const terminalsOf = (names: readonly string[]): number[] => names.map(name => symbolOf(name))
-const letTerminal = symbolOf('LET')
+const letTerminal = symbolOf('LET'), expressionSymbol = symbolOf('expr')
 // The tokens that close or separate inside a bracket, and the keywords that go on with a `let` or an `if`.
 const closers = terminalsOf(['RPAREN', 'RBRACK', 'COMMA', 'SEMI'])
 const middleKeywords = terminalsOf(['IN', 'THEN', 'ELSE'])
@@ -61,8 +65,13 @@ export type PanicDetails = {
   // Only tokens of the list cut the stack down. Without it every rejected token does, which is the panic mode
   // without knowledge of the language of ../../bars.ts.
   onlyListedTokens: boolean
+  // Where the state on top waits for an expression and the table rejects the token, the token is tried once more
+  // with the state after an expression on top, and when it is taken so, the expression counts as there. A review
+  // of the foundation found this detail: it adds a tenth of a point of all three and a point of whole samples, on
+  // the train samples and on the author's own broken programs alike.
+  expressionTakenAsThere: boolean
 }
-export const chosenDetails: PanicDetails = {inBracketsOnly: false, letRestartsAtTheTop: true, onlyListedTokens: true}
+export const chosenDetails: PanicDetails = {inBracketsOnly: false, letRestartsAtTheTop: true, onlyListedTokens: true, expressionTakenAsThere: true}
 
 type Stacks = {states: number[], firstToken: number[], lastToken: number[]}
 type Reduction = {nonterminal: number, firstToken: number, lastToken: number}
@@ -152,6 +161,16 @@ export function runPanic(tokens: Tokens, details: PanicDetails = chosenDetails, 
   const take = (terminal: number, token: number): number => {
     const whole = tryPart(stacks.states.length, terminal, token)
     if (whole !== rejected) return whole
+    if (details.expressionTakenAsThere) {
+      const afterExpression = tables.gotoState[stacks.states.at(-1)! * nonterminalCount + expressionSymbol - terminalCount]!
+      if (afterExpression !== -1) {
+        const kept = stacks
+        stacks = {states: [...kept.states, afterExpression], firstToken: [...kept.firstToken, -1], lastToken: [...kept.lastToken, -1]}
+        const result = tryPart(stacks.states.length, terminal, token)
+        if (result !== rejected) return result
+        stacks = kept
+      }
+    }
     if (terminal === letTerminal && details.letRestartsAtTheTop) {
       // The state after the definitions so far, or the start state before the first definition.
       for (const height of [2, 1]) {
