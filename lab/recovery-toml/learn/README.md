@@ -67,9 +67,18 @@ Two things carry over as numbers and mean something else here:
 - **The share of 0.9 is a larger weight.** A tokenizer cell's next state has 111 choices where JSON has 26, so the base's choice starts 6.9 above the others where it starts 5.4 for JSON. A step of Adam moves a weight by about 0.05, so a cell needs more steps to snap to another choice. On a set of 2,000 texts, 68 steps, the training changes no cell.
 - **The rule's 100 samples** is a count, and the standard set is again the indexes 0 to 59,999.
 
+## Step 1 on the dataset as it is
+
+With the dataset's key 2942d0e59ca7ebdf, which changes with every change of a `.ts` file of the folder above. Nothing was trained.
+
+- The standard set has 47,273 samples that are not in the test split: 41,872 train and 5,401 validation, with 6,231,653 scored code points. Every train sample gives the twin a step: 269 code points and 138 steps on average.
+- The rule picks 18 code points: `→`, `ß`, `ö`, and the capital letters A, B, G, I, J, L, M, O, P, Q, S, V, W, X, Y. The three first are 95% to 97% the content of a comment, where the rest of the class `other` is not. The capitals are mostly the content of a string, where the rest of `otherLetter` and `otherHexLetter`, i.e. the small letters, is mostly a key. K is the first that is not picked, at a distance of 0.49.
+- The base then has 65 classes and a class table of 8,597 entries: 7,215 tokenizer cells, 3,806 of them open, 5,622 open grammar cells, of which 378 are kept, 522 open display entries, and 1,234,935 weights. Both forms of the search for frozen cells find the same cells for these classes.
+- The parser as it is has 64.25% of all three and 12.50% of whole samples on the validation split.
+
 ## Speed
 
-On an 18 core machine with other jobs running. One step of the twin at one code point, forward and backward, in one thread, with open display entries and the bit, at the start of a training: 113 microseconds, against 20.5 for the JSON twin. One batch of 32 samples with 4 worker threads, on the first train samples of each dataset: 204 ms against 31 ms, i.e. 157 samples per second against 1,038. Three passes over 40,000 train samples then take about 13 minutes.
+On an 18 core machine with other jobs running. One step of the twin at one code point, forward and backward, in one thread, with open display entries and the bit, at the start of a training: 113 microseconds, against 20.5 for the JSON twin. One batch of 32 samples with 4 worker threads, on the first train samples of each dataset: 204 ms against 31 ms, i.e. 157 samples per second against 1,038. Three passes over the 41,872 train samples then take about 13 minutes.
 
 ## The check set
 
@@ -131,5 +140,6 @@ console.log(sharesOf(score.rows[0]!).allThree, sharesOf(score.rows[0]!).whole)
 ## Not done
 
 - **The real run.** The recipe has not trained on the dataset. Per seed it needs about 13 minutes of training, and the search after it was only timed on the check set, 3 s for 4,410 samples.
+- **The dataset's key** is a hash of every `.ts` file of the folder above, the checks and the statistics among them, as on the JSON side. A change of any of them gives another key: the cache is made again, and saved tables are then tables of another dataset.
 - **A table of scores as the JSON arms have it**: `recipe.ts` prints one line per row for one seed. Several seeds, their spread and a saved record are the caller's.
 - **The dataset as an import.** `data.ts` loads `../samples.ts` by its path when it is first needed. With the dataset in place, an import at the top does the same and lets the type check compare the two.
