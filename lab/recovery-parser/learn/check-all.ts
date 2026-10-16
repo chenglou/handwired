@@ -2,13 +2,17 @@
 // lab/recovery-parser, and the check scripts of learn/ and of the folders in it. The one check that it leaves out
 // is arms/holes/check-search.ts, which takes about 8 minutes.
 //
-// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL, after
-// arms/plain-pass/run.ts, whose saved tables arms/generic/check.ts compares with:
+// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL:
 //   bun lab/recovery-parser/learn/check-all.ts [--only <part of a name>]
-// It takes a bit over a minute on an 18 core machine with little else running (64 s in two runs), and longer with
-// other jobs running, with the cache of the standard set in place, and about half a minute more the first time, for
-// that cache and for the intended stacks. Up to 4 commands run at a time, and two of the checks use 4 worker threads
-// each, soft/check-train.ts and arms/generic/check.ts, so the command stays within 10 threads.
+// Two checks compare with saved tables and fail in a scratch folder without them: arms/generic/check.ts with the
+// tables of arms/plain-pass/run.ts, and arms/combined/check.ts with the tables of
+// `arms/extra-facts/run.ts --trainer three-base --settings all --seeds 11,12,13,14,15`.
+//
+// It takes a bit over two minutes on an 18 core machine with little else running (130 s and 133 s in two runs), and
+// longer with other jobs running, with the cache of the standard set in place, and about half a minute more the
+// first time, for that cache and for the intended stacks. arms/combined/check.ts alone is that long, and without it
+// the command took 64 s. Up to 4 commands run at a time, and three of the checks use 4 worker threads each,
+// soft/check-train.ts, arms/generic/check.ts and arms/combined/check.ts, so the command stays within 13 threads.
 //
 // `bun run check` of the repo type-checks lab/recovery-parser without learn/, since the dataset's tsconfig.json only
 // includes its own files. This command is what type-checks learn/.
@@ -21,7 +25,9 @@ import {optionOf, refuseUnknownOptions} from './data.ts'
 
 const root = resolve(import.meta.dir, '../../..')
 const here = relative(root, import.meta.dir)
+// arms/combined/check.ts takes the longest by far, so it comes first and the other checks run next to it.
 const checks = [
+  'arms/combined/check.ts',
   'check-tables.ts', 'check-parser.ts', 'check-data.ts', 'check-deep.ts', 'check-guard.ts', 'check-commands.ts', 'handwritten/check.ts', 'search/check.ts',
   'soft/check-twin.ts', 'soft/check-gradient.ts', 'soft/check-circuit.ts', 'soft/check-train.ts', 'arms/check.ts', 'arms/generic/check.ts', 'arms/spare-states/check.ts',
 ]

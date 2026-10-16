@@ -23,8 +23,9 @@
 //    container and the display kind of today's tables at every code point of the too deep valid texts.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo, after
-// `../extra-facts/run.ts --trainer three-base --settings all --seeds 11,12,13,14,15`. About 3 minutes, most of it
-// the training of the fifth part, with 4 worker threads. check-all.ts does not run it:
+// `../extra-facts/run.ts --trainer three-base --settings all --seeds 11,12,13,14,15`, whose tables the fifth part
+// compares with: without them the check fails. 2 to 3 minutes, most of it the training of the fifth part, with 4
+// worker threads. check-all.ts runs it too:
 //   bun lab/recovery-parser/learn/arms/combined/check.ts
 import {existsSync} from 'node:fs'
 import {labelsOfValidText} from '../../../labels.ts'
