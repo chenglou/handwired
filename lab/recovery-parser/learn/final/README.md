@@ -33,7 +33,7 @@ Whoever builds or chooses tables does not read `../../written/`, and does not ru
 - A path that is not absolute is read from the folder of the list file.
 - The six baselines of `../arms/harness.ts` come first in every table, without an entry. The number to beat is not one of them: give it an entry, as above.
 
-A list with a field that an entry does not have is refused, e.g. a misspelled `confirmationTables`. So are two rows with one name, a file that a row names twice, and a file of tables that was saved with another dataset key.
+A list with a field that an entry does not have is refused, e.g. a misspelled `confirmationTables`. So are two rows with one name, a file that a row names twice, a file that an entry names in `tables` and in `confirmationTables`, and a file of tables that was saved with another dataset key.
 
 ## Commands
 
@@ -41,7 +41,7 @@ Run from the repo root.
 
 ```sh
 export RECOVERY_SCRATCH=<the experiment's scratch folder>
-bun lab/recovery-parser/learn/final/check.ts                                # the check of this folder, about 5 s. check-all.ts does not run it
+bun lab/recovery-parser/learn/final/check.ts                                # the check of this folder, about 5 s. check-all.ts runs it too
 bun lab/recovery-parser/learn/final/run.ts --dry-run <list.json>            # a dry run, a few seconds
 RECOVERY_FINAL=yes bun lab/recovery-parser/learn/final/run.ts <list.json>   # the final run, once
 
@@ -54,7 +54,7 @@ RECOVERY_FINAL=yes bun lab/recovery-parser/learn/final/show.ts --differs hand-wr
 
 `run.ts` prints the report and writes it as `<list name>.report.md` into `<RECOVERY_SCRATCH>/final/`, with every count next to it as `<list name>.counts.json`. The report has one table for the validation split (all three, all three within reach of the tables, whole samples), one for each of the four ways a test sample can be held out and one for the whole test split, and one for the written set (the cases with full agreement: code points right and whole cases right, over every case and over the two parts that `kinds.txt` makes). The file of counts holds, per file of tables, every row of the score on the validation split and on the whole test split, the rows of the groups for each of the four parts, and every part of the written set's score, also per writer's file.
 
-Like `../arms/final.ts`, a final run appends a line to `<RECOVERY_SCRATCH>/arms/final-runs.log` before it loads a sample: the time, the dataset's key, the command, and the name, the path and a hash of each file of tables. `show.ts` appends such a line on every run with `RECOVERY_FINAL=yes`.
+Like `../arms/final.ts`, a final run appends a line to `<RECOVERY_SCRATCH>/arms/final-runs.log` before it loads a sample: the time, the dataset's key, the commit of the worktree and whether the worktree has uncommitted changes, the command, and the name, the path and a hash of each file of tables. `show.ts` appends such a line on every run with `RECOVERY_FINAL=yes`. The commit is there because no key covers the code that scores, e.g. `../score.ts`. A line that was written before the log held the commit has none, e.g. the line of the final run of 2026-10-16.
 
 `show.ts` takes tables as `<name>=<tables.json>`, or as a name that needs no file: `now`, `stay`, `resync`, `words`, `lines` and `hand-written`. Its first comment explains the rows. It needs `RECOVERY_FINAL=yes` for a case of the written set with tables other than the five, and for every sample of the test split.
 
@@ -66,7 +66,7 @@ It shows that the list is read as meant, that every file loads and is of this da
 
 It does not show:
 
-- **Anything about the test split.** It loads no test sample. In its place stands the validation split again, with held-out bits that are made up from a sample's place: of every 10 samples, 4 have nothing held out, 1 a kind, 3 the template and 2 both. So its tables under "The test split" say nothing about held-out damage. The loading of the test split itself is still the one code path that no run has taken, so read the first output of the final run with care: `run.ts` stops when the test split is not exactly what the standard set lacks, or when the four parts do not add up to the whole split.
+- **Anything about the test split.** It loads no test sample. In its place stands the validation split again, with held-out bits that are made up from a sample's place: of every 10 samples, 4 have nothing held out, 1 a kind, 3 the template and 2 both. So its tables under "The test split" say nothing about held-out damage. The loading of the test split itself is a code path that no check and no dry run takes, so `run.ts` checks it when it loads the split. It stops unless every index from 0 to 59,999 stands once in the loaded set and the loaded set without its test samples has the indexes of the standard set, place by place, and it stops when the four parts do not add up to the whole split.
 - **Anything about the written set for the tables of the list.** It scores the five tables there and writes "left for the final run" for every other row.
 
 ## The written set in the exact parser
@@ -92,4 +92,4 @@ The two parsers show something else in 7 to 9 of the 240 cases, and the right co
 - `written-score.ts`: `scoreWritten(tables)`, the score of tables of the experiment on the written set, as counts in the parts of `../../written/score.ts`. `scoreWrittenWith` scores any parser over any cases, `scoredOnTheSetAlready` says whether tables are one of the five, and `sharesOfWritten` turns a score into shares.
 - `run.ts`: the final run and the dry run.
 - `show.ts`: one case or one sample with what named tables show for it, and `--differs`.
-- `check.ts`: the check of this folder, in six parts, see its first comment. It reads no test sample, and it scores only the five tables on the written set.
+- `check.ts`: the check of this folder, in seven parts, see its first comment. It reads no test sample, and it scores only the five tables on the written set.

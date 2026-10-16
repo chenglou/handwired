@@ -4,7 +4,7 @@
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to the experiment's scratch folder and without RECOVERY_FINAL:
 //   bun lab/recovery-parser/learn/final/check.ts
-// ../check-all.ts does not run this check: the folder ../../written/ is only on the branch of the final scoring.
+// ../check-all.ts runs it too. This folder and ../../written/ are only on the branch of the final scoring.
 //
 // 1. The counting of scoreWritten. With the dataset's plain table parser in the exact parser's place, the counting
 //    of written-score.ts gives what ../../written/score.ts counts, for each of the five tables: every count of every
@@ -26,7 +26,8 @@
 // 4. Tables with every kind of added structure run in the scorer: with no cell changed they give the made-up cases
 //    the counts of today's tables, while code points read the added class and the bit "first on its line". And
 //    scoreWritten refuses, without RECOVERY_FINAL, tables with a changed cell, tables with added structure and the
-//    hand-written tables, and names RECOVERY_FINAL.
+//    hand-written tables, and names RECOVERY_FINAL. The exact parser of the scorer refuses a text of more than 512
+//    code points, and runs one of 512.
 // 5. The dry run of run.ts, as a command, on a list of toy tables: three hand rules as the "seeds" of one entry, a
 //    fourth as its confirmation file, and two tables with added structure and random open cells. Every line that it
 //    prints and every line of its report is marked as a dry run. A row is the mean, the lowest and the highest that
@@ -35,13 +36,18 @@
 //    up to the validation split. On the written set only the five tables have numbers. The report that a final run
 //    words from the same counts has the same tables and names no dry run. The log of the final runs and the cache
 //    folder are as before the run. Without --dry-run the command refuses by its own first line, and a
-//    list with a file of another dataset, with an unknown field, with one name twice, with one file twice or
-//    without tables is refused. The line that a final run appends to the log is written to a log in a folder that
-//    is made up here.
+//    list with a file of another dataset, with an unknown field, with one name twice, with one file twice, with one
+//    file in an entry's tables and in its confirmation files, or without tables is refused. The line that a final
+//    run appends to the log is written to a log in a folder that is made up here, and names the commit of the
+//    worktree.
 // 6. show.ts, as a command: a case of the written set with two of the five tables, a validation sample with any
 //    tables, and the two lists of --differs on the written set and on the validation split, whose counts of whole
 //    texts are the ones of scoreWritten and of scoreTables. It refuses a case of the written set with other tables,
 //    a sample of the test split, and --differs on the test split, each with an error that names RECOVERY_FINAL.
+// 7. The check that run.ts makes of the test split when it loads it, problemOfTheLoadedTestSplit, on arrays that are
+//    made up here from the indexes of the standard set, without a test sample: every index of the range, with the
+//    test split for an index that the standard set lacks. That set passes. Six changed sets do not, among them one
+//    with the same two counts and other samples, which a comparison of the counts alone lets pass.
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from 'node:fs'
 import {join, relative, resolve} from 'node:path'
 import {visible} from '../../dump.ts'
@@ -50,13 +56,13 @@ import {createRandom} from '../../random.ts'
 import {type ParserTables, defaultTables, runTableParser} from '../../table-parser.ts'
 import {scoreTables as scoreTablesOfTheSet} from '../../written/score.ts'
 import {type WrittenCase, caseOf, labelsOfWritten} from '../../written/written.ts'
-import {baselineTables, validationOfTheStandardSet} from '../arms/harness.ts'
-import {type Samples, allowedSampleAt, cacheFolderOf, datasetKey, heldOutByKind, heldOutByTemplate, refuseUnknownOptions, standardRange} from '../data.ts'
+import {baselineTables, samplesOfTheStandardSet, validationOfTheStandardSet} from '../arms/harness.ts'
+import {type Samples, allowedSampleAt, cacheFolderOf, datasetKey, heldOutByKind, heldOutByTemplate, refuseUnknownOptions, splitNames, standardRange} from '../data.ts'
 import {handwrittenTables} from '../handwritten/rules.ts'
 import {codePointsOf, runRecoveryParser} from '../recovery-parser.ts'
 import {type RecoveryTables, addClasses, addFirstOnLineBit, addStates, asIsTables, copyTables, grammarStateNames, openDisplayEntries, randomizeOpenCells, saveTables, today} from '../recovery-tables.ts'
 import {type ScoreRow, heldOutRowNames, scoreTables, sharesOf} from '../score.ts'
-import {type RowCounts, appendToTheLogOfFinalRuns, describeReport, dryRunMark, wholeSplit} from './run.ts'
+import {type RowCounts, appendToTheLogOfFinalRuns, describeReport, dryRunMark, problemOfTheLoadedTestSplit, wholeSplit} from './run.ts'
 import {
   type ReaderOfTheSet, type Score, type WrittenScore, type WrittenScores, countText, exactParserWith, readersOfTheSet, scoreWritten, scoreWrittenWith, scoredOnTheSetAlready, sharesOfWritten, tablesOfReader,
   writtenCases,
@@ -285,7 +291,16 @@ const withRandomCells = [72, 73].map(stream => {
   check(baselines.length === 6 && allowed.join() === 'true,true,true,true,true,false', `of the baselines (${baselines.map(baseline => baseline.name).join('; ')}), scoredOnTheSetAlready says ${allowed.join()}`)
   const refusals = [withStructure, ...withRandomCells, handwrittenTables().tables].map(tables => errorOf(() => scoreWritten(tables)))
   check(refusals.every(refusal => refusal !== undefined && refusal.includes('RECOVERY_FINAL')), `scoreWritten of tables with added structure and of the hand-written tables says ${JSON.stringify(refusals)}`)
-  console.log(`4. Tables with an added class, open display entries, the bit "first on its line" and added states: with no cell changed they give the ${madeUp.length} made-up cases the counts of today's tables, ${inAddedClass} code points read the added class and ${withTheBit} a context with the bit. With random open cells they have ${random.map(score => `${score.right} of ${score.scored}`).join(' and ')} code points right, where today's tables have ${todays.right}. Of the 6 baselines, the first 5 may be scored on the written set before the final run. scoreWritten refuses the hand-written tables and the ${1 + withRandomCells.length} tables with added structure, and names RECOVERY_FINAL.`)
+  // A text that is cut at 512 code points is refused, and a text of 512 code points is not: an array of 255 numbers,
+  // and a string of 510 emoji, which is 512 code points and 1,022 UTF-16 code units.
+  const shown = exactParserWith(asIsTables())
+  const arrayOf512 = `[${'1,'.repeat(254)}12]`
+  const stringOf512 = `"${'\u{1F600}'.repeat(510)}"`
+  const tooLong = [`${arrayOf512} `, `[${arrayOf512}]`, `${stringOf512} `].map(text => errorOf(() => shown(text)))
+  const longEnough = [arrayOf512, stringOf512].map(text => errorOf(() => shown(text)))
+  check([arrayOf512, stringOf512].every(text => Array.from(text).length === 512) && tooLong.every(refusal => refusal !== undefined && refusal.includes('512 code points')) && longEnough.every(refusal => refusal === undefined),
+    `the exact parser of the scorer says ${JSON.stringify(tooLong)} for texts of 513 and 514 code points, and ${JSON.stringify(longEnough)} for texts of 512`)
+  console.log(`4. Tables with an added class, open display entries, the bit "first on its line" and added states: with no cell changed they give the ${madeUp.length} made-up cases the counts of today's tables, ${inAddedClass} code points read the added class and ${withTheBit} a context with the bit. With random open cells they have ${random.map(score => `${score.right} of ${score.scored}`).join(' and ')} code points right, where today's tables have ${todays.right}. Of the 6 baselines, the first 5 may be scored on the written set before the final run. scoreWritten refuses the hand-written tables and the ${1 + withRandomCells.length} tables with added structure, and names RECOVERY_FINAL. The exact parser of the scorer refuses ${tooLong.length} texts of 513 and 514 code points, and runs ${longEnough.length} texts of 512, one of them a string of 510 emoji.`)
 }
 
 // The commands run from the repo root, without RECOVERY_FINAL.
@@ -459,6 +474,8 @@ const rowNamed = (rows: readonly ScoreRow[], name: string) => rows.find(row => r
     ['an unknown field', [{name: 'misspelled', description: '', tables: ['stay.json'], confirmationTable: ['lines.json']}], 'has the field "confirmationTable"'],
     ['a name twice', [{name: 'twice', description: '', tables: ['stay.json']}, {name: 'twice', description: '', tables: ['lines.json']}], 'would have the name "twice"'],
     ['a file twice', [{name: 'one seed twice', description: '', tables: ['stay.json', 'stay.json']}], 'twice: two files of one seed are one run'],
+    // The same file by its name and by its absolute path.
+    ['a file in tables and in confirmationTables', [{name: 'one seed in both', description: '', tables: ['stay.json', 'lines.json'], confirmationTables: [join(folder, 'stay.json')]}], 'in "tables" and in "confirmationTables"'],
     ['no tables', [{name: 'empty', description: '', tables: []}], 'needs "tables"'],
   ]
   let refused = 0
@@ -475,9 +492,13 @@ const rowNamed = (rows: readonly ScoreRow[], name: string) => rows.find(row => r
   // log of the final runs stays as it is.
   const madeUpScratch = join(folder, 'a-made-up-scratch-folder')
   appendToTheLogOfFinalRuns(madeUpScratch, new Date(Date.UTC(2026, 9, 16, 12, 0, 0)), 'a made-up line of final/check.ts', [{name: 'mine', file: join(folder, 'stay.json'), hash: 'abc'}])
-  const logged = JSON.parse(readFileSync(join(madeUpScratch, 'arms', 'final-runs.log'), 'utf8').trimEnd().split('\n').at(-1)!) as {time: string, datasetKey: string, command: string, tables: {name: string, file: string, hash: string}[]}
+  const logged = JSON.parse(readFileSync(join(madeUpScratch, 'arms', 'final-runs.log'), 'utf8').trimEnd().split('\n').at(-1)!) as {time: string, datasetKey: string, commit: string, uncommittedChanges: boolean, command: string, tables: {name: string, file: string, hash: string}[]}
   check(logged.time === '2026-10-16T12:00:00.000Z' && logged.datasetKey === datasetKey() && logged.command === 'a made-up line of final/check.ts' && logged.tables.length === 1 && logged.tables[0]!.name === 'mine' && logged.tables[0]!.file === join(folder, 'stay.json') && logged.tables[0]!.hash === 'abc', `the line of a final run in the log is ${JSON.stringify(logged)}`)
-  console.log(`   Without --dry-run and without RECOVERY_FINAL, run.ts refuses by its own first line. A dry run refuses ${refused} of ${refusedLists.length} lists: with ${refusedLists.map(([name]) => name).join(', with ')}. The line that a final run appends to the log holds the time, the dataset's key, the command, and the name, the path and the hash of each file: it is written here to a log under ${madeUpScratch}.`)
+  // The commit and the uncommitted changes, as git says them to this check.
+  const git = (parameters: readonly string[]) => Bun.spawnSync(['git', ...parameters], {cwd: root, stdout: 'pipe', stderr: 'pipe'}).stdout.toString().trim()
+  const [commit, uncommittedChanges] = [git(['rev-parse', 'HEAD']), git(['status', '--porcelain']) !== '']
+  check(/^[0-9a-f]{40}$/.test(logged.commit) && logged.commit === commit && logged.uncommittedChanges === uncommittedChanges, `the line of a final run in the log names the commit ${JSON.stringify(logged.commit)} and says ${JSON.stringify(logged.uncommittedChanges)} for uncommitted changes, and git says ${commit} and ${uncommittedChanges}`)
+  console.log(`   Without --dry-run and without RECOVERY_FINAL, run.ts refuses by its own first line. A dry run refuses ${refused} of ${refusedLists.length} lists: with ${refusedLists.map(([name]) => name).join(', with ')}. The line that a final run appends to the log holds the time, the dataset's key, the commit of the worktree and whether it has uncommitted changes, as git says both, the command, and the name, the path and the hash of each file: it is written here to a log under ${madeUpScratch}.`)
 }
 
 // 6. show.ts.
@@ -530,6 +551,58 @@ const rowNamed = (rows: readonly ScoreRow[], name: string) => rows.find(row => r
   check(refusedLists.every(refusedForFinal), 'show.ts --differs runs on the written set with the hand-written tables, or on the test split, without RECOVERY_FINAL')
   check(stateOfTheScratchFolder() === stateBefore, 'a run of show.ts changed the log of the final runs or the cache folder')
   console.log(`6. show.ts shows the case ${firstCase.id} with today's tables and the hand rule lines: one letter per code point in every row, and ${countsOfNow.scored - countsOfNow.right} marks under today's tables for its ${countsOfNow.scored - countsOfNow.right} wrong code points of ${countsOfNow.scored}. It shows the validation sample ${validationId} with the hand-written tables and with tables with added structure. --differs counts ${ofTheSet[0]} and ${ofTheSet[1]} whole cases of the written set for now and lines, as scoreWritten does, and ${ofValidation[0]} and ${ofValidation[1]} whole validation samples for the hand-written tables and the tables with added structure, as scoreTables does. Without RECOVERY_FINAL it refuses a case with the hand-written tables or with saved tables, the test sample ${standardRange.seed}:${testIndex}, and --differs with the hand-written tables on the written set or on the test split. The log of the final runs and the cache folder are as before.`)
+}
+
+// 7. The check of the loaded test split.
+{
+  const standard = samplesOfTheStandardSet()
+  const testSplit = splitNames.indexOf('test')
+  const validationSplit = splitNames.indexOf('validation')
+  const length = standardRange.to - standardRange.from
+  type IndexesAndSplits = {index: Int32Array, split: Uint8Array}
+  // A set as loadSamples gives it with the test split, made up from the standard set alone: every index of the
+  // range, with the split that the standard set has for it, and the test split for an index that the standard set
+  // lacks. No test sample is made for it.
+  const madeUpSet = (): IndexesAndSplits => {
+    const loaded = {index: Int32Array.from({length}, (_, at) => standardRange.from + at), split: new Uint8Array(length).fill(testSplit)}
+    for (let place = 0; place < standard.sampleCount; place++) loaded.split[standard.index[place]! - standardRange.from] = standard.split[place]!
+    return loaded
+  }
+  const countsOf = (loaded: IndexesAndSplits) => {
+    const inTest = loaded.split.reduce((total, split) => total + Number(split === testSplit), 0)
+    return {inTest, others: loaded.split.length - inTest}
+  }
+  const asLoaded = madeUpSet()
+  const ofTheSet = countsOf(asLoaded)
+  const problem = problemOfTheLoadedTestSplit(asLoaded, standard)
+  check(problem === undefined && ofTheSet.others === standard.sampleCount && ofTheSet.inTest > 0, `the made-up set with every index of the standard range and ${ofTheSet.inTest} of them in the test split does not pass the check of the loaded test split: ${problem}`)
+  // The first place of a sample that the standard set has, and the first of an index that it lacks.
+  const kept = asLoaded.split.findIndex(split => split !== testSplit)
+  const lacking = asLoaded.split.indexOf(testSplit)
+  const changed = (change: (loaded: IndexesAndSplits) => void): IndexesAndSplits => {
+    const loaded = madeUpSet()
+    change(loaded)
+    return loaded
+  }
+  const faults: [name: string, loaded: IndexesAndSplits, says: string][] = [
+    ['one sample of the standard set in the test split and one index that the standard set lacks in the validation split', changed(loaded => { loaded.split[kept] = testSplit; loaded.split[lacking] = validationSplit }), 'where the standard set has'],
+    ['an index twice', changed(loaded => { loaded.index[kept + 1] = loaded.index[kept]! }), 'twice'],
+    ['the last index left out', {index: asLoaded.index.slice(0, -1), split: asLoaded.split.slice(0, -1)}, 'and not e.g.'],
+    ['an index after the range', changed(loaded => { loaded.index[length - 1] = standardRange.to }), 'which is not one of'],
+    ['no sample in the test split', changed(loaded => { loaded.split.fill(validationSplit) }), 'holds no sample of the test split'],
+    ['one sample of the standard set in the test split', changed(loaded => { loaded.split[kept] = testSplit }), 'samples of the other splits'],
+  ]
+  let refused = 0
+  for (const [name, loaded, says] of faults) {
+    const ofFault = problemOfTheLoadedTestSplit(loaded, standard)
+    const refusedSo = ofFault !== undefined && ofFault.includes(says)
+    check(refusedSo, `a made-up set with ${name} ${ofFault === undefined ? 'passes the check of the loaded test split' : `is refused with: ${ofFault}`}`)
+    if (refusedSo) refused++
+  }
+  // The first fault has the two counts of the set that passes, so a comparison of the counts alone lets it pass.
+  const ofTheFirstFault = countsOf(faults[0]![1])
+  check(ofTheFirstFault.inTest === ofTheSet.inTest && ofTheFirstFault.others === ofTheSet.others, `the first made-up fault has ${ofTheFirstFault.inTest} and ${ofTheFirstFault.others} samples in and outside the test split, and the set that passes ${ofTheSet.inTest} and ${ofTheSet.others}`)
+  console.log(`7. The check of the loaded test split, on arrays made up from the standard set's indexes, without a test sample: the set with every index ${standardRange.from} to ${standardRange.to - 1}, ${ofTheSet.others} of them with the standard set's split and ${ofTheSet.inTest} in the test split, passes. ${refused} of ${faults.length} changed sets are refused: with ${faults.map(([name]) => name).join(', with ')}. The first of them has the same two counts as the set that passes, ${ofTheFirstFault.others} and ${ofTheFirstFault.inTest}.`)
 }
 
 console.log(failures === 0 ? 'Every check passed.' : `${failures} checks FAILED.`)

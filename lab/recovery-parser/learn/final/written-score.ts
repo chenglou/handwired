@@ -25,7 +25,7 @@ import type {Score, WrittenScore, WrittenScores} from '../../written/score.ts'
 import {type WrittenCase, labelsOfWritten, readWritten} from '../../written/written.ts'
 import {finalIsAllowed} from '../data.ts'
 import {recoveryTablesOf} from '../plain-tables.ts'
-import {codePointsOf, createTrace, runRecoveryParserInto} from '../recovery-parser.ts'
+import {capacity, codePointsOf, createTrace, runRecoveryParserInto} from '../recovery-parser.ts'
 import {type RecoveryTables, asIsTables, checkTables, tablesToJson} from '../recovery-tables.ts'
 import {wrongContainer, wrongDepth, wrongKind} from '../score.ts'
 
@@ -37,12 +37,17 @@ export type Shown = {displayKind: ArrayLike<number>, depthAfter: ArrayLike<numbe
 
 // The exact parser with `tables`, as a function of a text. Every call writes into the same trace, so read what a
 // call returns before the next call. Throws when the tables break the ground rules.
+//
+// The function that it returns throws for a text of more than 512 code points. The parser runs the first 512, so a
+// count over the labels of a longer text would read entries of the trace that no run wrote, e.g. position 512 as
+// white space at depth 0. No sample of the dataset and no case of the written set is that long.
 export function exactParserWith(tables: RecoveryTables): (text: string) => Shown {
   checkTables(tables)
   const trace = createTrace()
   return text => {
     const {codePoints, truncated} = codePointsOf(text)
-    runRecoveryParserInto(trace, codePoints, 0, codePoints.length, truncated, tables, codePoints.length)
+    if (truncated) throw new Error(`the exact parser runs the first ${capacity} code points of a text, and this text has more, so it cannot be scored or shown here: nothing is shown for the code points after them. The text starts with ${JSON.stringify(text.slice(0, 60))}`)
+    runRecoveryParserInto(trace, codePoints, 0, codePoints.length, false, tables, codePoints.length)
     return trace
   }
 }

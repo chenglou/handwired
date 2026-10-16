@@ -22,7 +22,8 @@
 // - A run without RECOVERY_FINAL=yes, unless it is a dry run.
 // - A file of tables that was not saved with the dataset as it is now, see otherDatasetOf in ../recovery-tables.ts.
 // And like ../arms/final.ts it appends a line to <RECOVERY_SCRATCH>/arms/final-runs.log before it loads a sample:
-// the time, the dataset's key, the command, and the name, the path and a hash of each file of tables.
+// the time, the dataset's key, the commit of the worktree and whether it has uncommitted changes, the command, and
+// the name, the path and a hash of each file of tables.
 //
 // A dry run runs without RECOVERY_FINAL, and refuses to run with it. It reads no test sample: it takes the
 // validation split in the place of the test split, with held-out bits that are made up from a sample's place, as
@@ -37,7 +38,7 @@ import type {Split} from '../../samples.ts'
 import {defaultTables} from '../../table-parser.ts'
 import {scoreTables as scoreTablesOfTheSet} from '../../written/score.ts'
 import {baselineTables, percentSpread, samplesOfTheStandardSet, spreadOf, validationOfTheStandardSet} from '../arms/harness.ts'
-import {type Samples, cacheFolderOf, datasetKey, heldOutByKind, heldOutByTemplate, loadSamples, refuseUnknownOptions, requireFinal, selectSamples, standardRange, testPart} from '../data.ts'
+import {type Samples, cacheFolderOf, datasetKey, heldOutByKind, heldOutByTemplate, loadSamples, refuseUnknownOptions, requireFinal, selectSamples, splitNames, standardRange, testPart} from '../data.ts'
 import {type RecoveryTables, loadTablesOfThisDataset} from '../recovery-tables.ts'
 import {type ScoreRow, heldOutRowNames, scoreTables, sharesOf} from '../score.ts'
 import {type Score, type WrittenScore, readersOfTheSet, scoreWritten, scoredOnTheSetAlready, sharesOfWritten} from './written-score.ts'
@@ -82,30 +83,50 @@ export const baselineRows = (): ReportRow[] => baselineTables().map(({name, tabl
 
 // The rows of a list's entries, with the tables loaded: one row per entry, and one more for its confirmation files.
 // `folder` is the folder of the list file. Throws for a file of tables that was not saved with the dataset as it is
-// now, for a file that a row names twice, and for two rows with one name.
+// now, for a file that a row names twice, for a file that an entry names in `tables` and in `confirmationTables`,
+// and for two rows with one name.
 export function rowsOfList(entries: readonly ListEntry[], folder: string): ReportRow[] {
+  const pathOf = (file: string) => isAbsolute(file) ? file : resolve(folder, file)
   const rowOf = (name: string, description: string, files: readonly string[]): ReportRow => {
-    const paths = files.map(file => isAbsolute(file) ? file : resolve(folder, file))
+    const paths = files.map(pathOf)
     const twice = paths.find((path, at) => paths.indexOf(path) !== at)
     if (twice !== undefined) throw new Error(`the row ${JSON.stringify(name)} names ${twice} twice: two files of one seed are one run`)
     return {name, description, tables: paths.map(path => ({file: path, hash: Bun.hash(readFileSync(path)).toString(16), tables: loadTablesOfThisDataset(path).tables}))}
   }
-  const rows = entries.flatMap(({name, description, tables, confirmationTables}) => [
-    rowOf(name, description, tables),
-    ...(confirmationTables === undefined ? [] : [rowOf(`${name}, confirmation files`, `the same with tables that were made after the choice: ${description}`, confirmationTables)]),
-  ])
+  const rows = entries.flatMap(({name, description, tables, confirmationTables}) => {
+    if (confirmationTables === undefined) return [rowOf(name, description, tables)]
+    // The confirmation row is a second sample of the setting only when its files are other runs than the entry's.
+    const paths = new Set(tables.map(pathOf))
+    const inBoth = confirmationTables.map(pathOf).find(path => paths.has(path))
+    if (inBoth !== undefined) throw new Error(`the entry ${JSON.stringify(name)} names ${inBoth} in "tables" and in "confirmationTables": the confirmation files are other runs than the entry's own files`)
+    return [rowOf(name, description, tables), rowOf(`${name}, confirmation files`, `the same with tables that were made after the choice: ${description}`, confirmationTables)]
+  })
   const names = [...baselineTables().map(baseline => baseline.name), ...rows.map(row => row.name)]
   const twice = names.find((name, at) => names.indexOf(name) !== at)
   if (twice !== undefined) throw new Error(`two rows of the report would have the name ${JSON.stringify(twice)}: give every entry of the list a name of its own, and none the name of a baseline`)
   return rows
 }
 
+// The commit that the worktree of this file is at, as git says it, and whether the worktree holds changes that are
+// not committed: a changed or a new file that git does not ignore. The dataset's key covers the files that decide
+// what the samples are, and no key covers the code that scores, e.g. ../score.ts, so the log names the commit.
+// Throws when git cannot say, e.g. in a copy of the files without the repo.
+export function commitOfTheWorktree(): {commit: string, uncommittedChanges: boolean} {
+  const git = (parameters: readonly string[]) => {
+    const result = Bun.spawnSync(['git', ...parameters], {cwd: import.meta.dir, stdout: 'pipe', stderr: 'pipe'})
+    if (result.exitCode !== 0) throw new Error(`git ${parameters.join(' ')} failed in ${import.meta.dir}, so the log of the final runs cannot name the commit of the code: ${result.stderr.toString().trim()}`)
+    return result.stdout.toString().trim()
+  }
+  return {commit: git(['rev-parse', 'HEAD']), uncommittedChanges: git(['status', '--porcelain']) !== ''}
+}
+
 // The line that a run appends to the log of the runs that read the test split: the fields of logLineOf in
-// ../arms/final.ts, and the command, since this folder's commands read the written set too.
+// ../arms/final.ts, the commit of the worktree with whether it has uncommitted changes, and the command, since this
+// folder's commands read the written set too.
 export function appendToTheLogOfFinalRuns(scratchFolder: string, time: Date, command: string, tables: readonly {name: string, file: string | null, hash: string | null}[]) {
   const logFolder = join(scratchFolder, 'arms')
   mkdirSync(logFolder, {recursive: true})
-  appendFileSync(join(logFolder, 'final-runs.log'), `${JSON.stringify({time: time.toISOString(), datasetKey: datasetKey(), command, tables})}\n`)
+  appendFileSync(join(logFolder, 'final-runs.log'), `${JSON.stringify({time: time.toISOString(), datasetKey: datasetKey(), ...commitOfTheWorktree(), command, tables})}\n`)
 }
 
 // The name of the last part of the test split: every sample of it.
@@ -135,16 +156,36 @@ export type ScoredSets = {
   scoresOnTheWrittenSet: (tables: RecoveryTables) => boolean
 }
 
-// The test split of the standard set. Needs RECOVERY_FINAL. The loading of the test split is the one code path that
-// no check has run, so the function throws unless what the test split adds to the standard set is the test split
-// and nothing else.
+// Why a set that was loaded with the test split is not the standard set and its test split, or undefined when it
+// is. `loaded` and `standard` are the arrays `index` and `split` of the two sets, with one entry per sample. Three
+// things have to hold: every index of `range` stands once in the loaded set, e.g. 0 to 59,999, the loaded set has a
+// sample of the test split, and without its samples of the test split the loaded set has the indexes of the
+// standard set, place by place. Two sets of the right sizes that hold other samples do not pass.
+export function problemOfTheLoadedTestSplit(loaded: Pick<Samples, 'index' | 'split'>, standard: Pick<Samples, 'index'>, range: {from: number, to: number} = standardRange): string | undefined {
+  const seen = new Uint8Array(range.to - range.from)
+  for (const index of loaded.index) {
+    if (!(index >= range.from && index < range.to)) return `the set with the test split holds the index ${index}, which is not one of ${range.from} to ${range.to - 1}`
+    if (seen[index - range.from] === 1) return `the set with the test split holds the index ${index} twice`
+    seen[index - range.from] = 1
+  }
+  if (loaded.index.length !== seen.length) return `the set with the test split holds ${loaded.index.length} of the ${seen.length} indexes ${range.from} to ${range.to - 1}, and not e.g. ${range.from + seen.indexOf(0)}`
+  const testSplit = splitNames.indexOf('test')
+  const withoutTest = loaded.index.filter((_, place) => loaded.split[place] !== testSplit)
+  if (withoutTest.length === loaded.index.length) return 'the set with the test split holds no sample of the test split'
+  if (withoutTest.length !== standard.index.length) return `the set with the test split holds ${withoutTest.length} samples of the other splits, and the standard set holds ${standard.index.length}`
+  const place = withoutTest.findIndex((index, at) => index !== standard.index[at])
+  return place === -1 ? undefined : `without its test split, the set with the test split has the index ${withoutTest[place]} at the place ${place}, where the standard set has ${standard.index[place]}`
+}
+
+// The test split of the standard set. Needs RECOVERY_FINAL. No check runs the loading of the test split, since a
+// check reads no test sample, so the function throws unless the loaded set is the standard set and its test split,
+// index by index, see problemOfTheLoadedTestSplit.
 export function testSplitOfTheStandardSet(): Samples {
   requireFinal('The test split of the standard set')
   const withTest = loadSamples(standardRange.seed, standardRange.from, standardRange.to, cacheFolderOf(), true)
-  const test = testPart(withTest)
-  const standard = samplesOfTheStandardSet()
-  if (test.sampleCount === 0 || withTest.sampleCount - test.sampleCount !== standard.sampleCount) throw new Error(`the standard set with the test split has ${withTest.sampleCount} samples, ${test.sampleCount} of them in the test split, and without it ${standard.sampleCount}: the two were not made from the same samples`)
-  return test
+  const problem = problemOfTheLoadedTestSplit(withTest, samplesOfTheStandardSet())
+  if (problem !== undefined) throw new Error(`${problem}: the standard set with and without the test split were not made from the same samples`)
+  return testPart(withTest)
 }
 
 // The sets of the final run: the validation split and the test split of the standard set. Needs RECOVERY_FINAL.
