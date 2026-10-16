@@ -1,0 +1,840 @@
+⟦repair model-and-paste-01⟧
+from: a step of a numbered list in the answer of a language model, with the new block of a fly.toml in a code fence that is indented under the step
+note: the indentation of the fenced block stays as the indentation of the document's lines, which TOML takes. Only the indentation of the first line goes with the text before the document
+⟦aligned⟧
+⟦extra⟧2. In `fly.toml`, replace the old `[[services]]` block with this one:
+
+   ```toml
+   ⟦/⟧[http_service]
+   internal_port = 8080
+   force_https = true
+   auto_stop_machines = "stop"
+   auto_start_machines = true
+   min_machines_running = 0
+
+   [[http_service.checks]]
+   interval = "15s"
+   timeout = "2s"
+   path = "/healthz"⟦extra⟧
+   ```
+
+3. Run `fly deploy` again.⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-02⟧
+from: a table copied out of a line of a log, where the logger writes every line end as a backslash and an n, and pasted into a config between two other tables
+⟦aligned⟧
+[server]
+bind = "0.0.0.0:8443"
+workers = 4
+[retry]⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧max_attempts = 5⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧backoff_ms = 2000⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧jitter = true⟦extra⟧\n⟦/⟧
+[limits]
+max_body_bytes = 1_048_576
+request_timeout = "30s"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-03⟧
+from: the answer of a language model in plain text, saved as the file with the sentence that introduces it
+⟦aligned⟧
+⟦extra⟧Here is the maintenance window file with next week's entries added:
+
+⟦/⟧[[window]]
+service = "billing-api"
+start = 2024-06-03T22:00:00Z
+end = 2024-06-04T01:30:00Z
+reason = "Postgres 16 upgrade"
+
+[[window]]
+service = "search"
+start = 2024-06-06T23:00:00+02:00
+duration_minutes = 45
+notify = ["#ops", "search-oncall@ferry.example"]
+
+[[window]]
+service = "object-store"
+start = 2024-06-08T05:00:00Z
+end = 2024-06-08T05:20:00Z
+reason = "rotate the signing keys"
+freeze_deploys = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-04⟧
+from: a code block of a chat page selected with the mouse, so that the block's title "toml" and its button "Copy code" came along
+⟦aligned⟧
+⟦extra⟧toml
+Copy code
+⟦/⟧[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["migrations", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ledgerkit"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-05⟧
+from: the answer of a language model that shows one Cargo.toml in two code blocks with a sentence between them, copied from the first block's first line to the last fence
+⟦aligned⟧
+[package]
+name = "skiff"
+version = "0.3.0"
+edition = "2021"
+⟦extra⟧```
+
+Then add both crates under the dependencies table:
+
+```toml
+⟦/⟧[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+anyhow = "1"⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-06⟧
+from: the answer of a language model with two settings files, each under its name in bold and in its own code fence, pasted as one file
+⟦aligned⟧
+⟦extra⟧**rustfmt.toml**
+
+```toml
+⟦/⟧max_width = 100
+use_small_heuristics = "Max"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+⟦extra⟧```
+
+**clippy.toml**
+
+```toml
+⟦/⟧msrv = "1.74"
+too-many-arguments-threshold = 8
+disallowed-names = ["tmp", "data2"]⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-07⟧
+from: the answer of a language model that reached its length limit in the middle of a string, saved with the line that opens the code fence
+⟦aligned⟧
+⟦extra⟧```toml
+⟦/⟧# Telegraf: collect every 10 seconds, write to the v2 bucket
+[agent]
+interval = "10s"
+round_interval = true
+metric_batch_size = 1000
+flush_interval = "10s"
+
+[[inputs.cpu]]
+percpu = false
+totalcpu = true
+
+[[inputs.disk]]
+ignore_fs = ["tmpfs", "devtmpfs", "overlay"]
+
+[[outputs.influxdb_v2]]
+urls = ["http://influx.internal:8086"]
+token = "$INFLUX_TOKEN"
+organization = "plat⟦missing⟧"⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-08⟧
+from: a Cargo.toml sent as a chat message and read back through the chat program's interface for bots, where the program made a link of the name profile.dev and writes the link in its own form
+unsure: the second profile.dev, after the bar, could be the one that is kept, since it is the text of the link
+⟦aligned⟧
+[package]
+name = "kelpie"
+version = "0.8.2"
+edition = "2021"
+
+[⟦extra⟧<http://⟦/⟧profile.dev⟦extra⟧|profile.dev>⟦/⟧]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.release]
+lto = "thin"
+strip = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-09⟧
+from: the config of a GitLab runner as a language model gave it back, with an arrow and a remark after the line that the answer is about
+unsure: the arrow and the remark could be extra as text that is no part of the document, with no comment
+⟦aligned⟧
+concurrent = 4
+check_interval = 0
+
+[[runners]]
+  name = "docker-runner-02"
+  url = "https://gitlab.example.com/"
+  executor = "docker"
+  [runners.docker]
+    image = "alpine:3.19"
+    privileged = true   ⟦extra⟧<--⟦/⟧⟦missing⟧#⟦/⟧ this is the line you need to change
+    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+    shm_size = 0⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-10⟧
+from: a netlify.toml that a language model gave back without a code fence, with the one line that it changed in bold
+⟦aligned⟧
+[build]
+command = "npm run build"
+publish = "dist"
+
+[build.environment]
+NPM_FLAGS = "--no-audit"
+
+[[redirects]]
+from = "/docs/*"
+to = "https://docs.tidewatch.example/:splat"
+⟦extra⟧**⟦/⟧status = 301⟦extra⟧**⟦/⟧
+force = true
+
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-11⟧
+from: a Hugo config that went through a converter to Markdown, which put a backslash before every square bracket and underscore
+⟦aligned⟧
+baseURL = "https://notes.example.org/"
+title = "Field Notes"
+theme = "paper"
+enableRobotsTXT = true
+
+⟦extra⟧\⟦/⟧[params⟦extra⟧\⟦/⟧]
+date⟦extra⟧\⟦/⟧_format = "2 January 2006"
+show⟦extra⟧\⟦/⟧_reading⟦extra⟧\⟦/⟧_time = true
+contact = "field⟦extra⟧\⟦/⟧_notes@example.org"
+
+⟦extra⟧\⟦/⟧[⟦extra⟧\⟦/⟧[menu.main⟦extra⟧\⟦/⟧]⟦extra⟧\⟦/⟧]
+name = "Archive"
+url = "/posts/"
+weight = 10⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-12⟧
+from: a mise.toml pasted into an issue comment without a code fence and copied back from the page, where the two comment lines had become headings and lost their sign
+unsure: the two lines without a sign could be extra as text that is no part of the document
+⟦aligned⟧
+[tools]
+node = "20.12"
+python = "3.12"
+
+⟦missing⟧# ⟦/⟧Pin terraform until the provider upgrade lands
+terraform = "1.7.5"
+
+[env]
+AWS_PROFILE = "ferry-dev"
+
+⟦missing⟧# ⟦/⟧Tasks that every service repo shares
+[tasks.lint]
+run = "ruff check ."
+[tasks.test]
+run = "pytest -q"
+depends = ["lint"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-13⟧
+from: a Cargo.toml as a language model gave it back, with three dots on a line of their own where it left sections out
+⟦aligned⟧
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.9.2"
+license = "Apache-2.0"
+
+⟦extra⟧...
+⟦/⟧
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-14⟧
+from: a pyproject.toml as a language model gave it back, with a line in square brackets that says which sections it left out
+unsure: the line in square brackets could be read as a header whose name needs quotes
+⟦aligned⟧
+[project]
+name = "tidewatch"
+version = "1.4.0"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+]
+
+⟦extra⟧[... build-system and tool sections unchanged ...]
+⟦/⟧
+[project.scripts]
+tidewatch = "tidewatch.cli:main"
+
+[project.urls]
+Changelog = "https://tidewatch.example/changelog"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-15⟧
+from: the edit of a coding assistant applied as a whole file, with its marker for the lines that it left out, which has the comment sign of JavaScript
+⟦aligned⟧
+model = "o4-mini"
+approval_policy = "on-request"
+
+[mcp_servers.docs]
+command = "npx"
+args = ["-y", "@ferry/docs-mcp"]
+
+⟦extra⟧//⟦/⟧⟦missing⟧#⟦/⟧ ... existing servers ...
+
+[mcp_servers.tickets]
+command = "uvx"
+args = ["tickets-mcp", "--readonly"]
+startup_timeout_sec = 20⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-16⟧
+from: a pyproject.toml as a language model gave it back, with three dots for the rest of a long list of modules
+⟦aligned⟧
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "celery.*", ⟦extra⟧...⟦/⟧]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-17⟧
+from: a deny.toml as a language model gave it back, with an ellipsis character on a line of its own inside the list of licenses
+⟦aligned⟧
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+⟦extra⟧    …
+⟦/⟧    "Unicode-DFS-2016",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+skip = [{ name = "syn", version = "1.0.109" }]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-18⟧
+from: mail settings written by a language model, which put three dots where the user has to fill in the password
+⟦aligned⟧
+[smtp]
+host = "smtp.mailgun.org"
+port = 587
+starttls = true
+
+[smtp.limits]
+per_minute = 60
+burst = 10
+
+[smtp.auth]
+username = "postmaster@mg.ferry.example"
+password = ⟦extra⟧...⟦/⟧⟦missing⟧""⟦/⟧
+mechanism = "plain"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-19⟧
+from: a Cargo.lock copied from a viewer that shows 48 columns and ends every longer line with an ellipsis character
+⟦aligned⟧
+# This file is automatically @generated by Cargo.
+version = 3
+
+[[package]]
+name = "itoa"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang⟦extra⟧…⟦/⟧⟦missing⟧"⟦/⟧
+checksum = "49f1f14873335454500d59611f1cf4a4b0f⟦extra⟧…⟦/⟧⟦missing⟧"⟦/⟧
+
+[[package]]
+name = "skiff-cli"
+version = "0.3.0"
+dependencies = [
+ "itoa",
+ "serde",
+]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-20⟧
+from: a book.toml that was kept in a word processor, which made every quote a typographic one
+⟦aligned⟧
+[book]
+title = ⟦“ for "⟧Operating the Ledger⟦” for "⟧
+authors = [⟦“ for "⟧Priya Raman⟦” for "⟧, ⟦“ for "⟧Tom Okoye⟦” for "⟧]
+language = ⟦“ for "⟧en⟦” for "⟧
+src = ⟦“ for "⟧src⟦” for "⟧
+
+[build]
+build-dir = ⟦“ for "⟧book⟦” for "⟧
+create-missing = false
+
+[output.html]
+default-theme = ⟦“ for "⟧rust⟦” for "⟧
+git-repository-url = ⟦“ for "⟧https://github.com/ledgerworks/handbook⟦” for "⟧
+edit-url-template = ⟦“ for "⟧https://github.com/ledgerworks/handbook/edit/main/{path}⟦” for "⟧
+additional-css = []
+no-section-label = false⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-21⟧
+from: a Pipfile of which two values were changed on a phone, whose keyboard types typographic quotes
+⟦aligned⟧
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "~=5.0"
+gunicorn = ⟦“ for "⟧>=22.0⟦” for "⟧
+psycopg = {extras = [⟦“ for "⟧binary⟦” for "⟧], version = "*"}
+
+[requires]
+python_version = "3.12"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-22⟧
+from: the config of a Zola site whose strings were typed in a word processor with German settings, which opens a quote low and closes it high
+⟦aligned⟧
+base_url = ⟦„ for "⟧https://werkstatt-notizen.example⟦“ for "⟧
+title = ⟦„ for "⟧Werkstattnotizen⟦“ for "⟧
+default_language = ⟦„ for "⟧de⟦“ for "⟧
+compile_sass = true
+
+[markdown]
+highlight_code = true
+smart_punctuation = false
+
+[extra]
+footer = ⟦„ for "⟧Gebaut mit Zola⟦“ for "⟧
+posts_per_page = 12⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-23⟧
+from: an Alacritty config for Windows sent through a mail program, which made the apostrophes of the strings typographic
+⟦aligned⟧
+[font]
+size = 11.5
+
+[shell]
+program = ⟦‘ for '⟧C:\Program Files\PowerShell\7\pwsh.exe⟦’ for '⟧
+args = [⟦‘ for '⟧-NoLogo⟦’ for '⟧, ⟦‘ for '⟧-NoProfile⟦’ for '⟧]
+
+[[hints.enabled]]
+regex = ⟦‘ for '⟧(https?://)[^\s<>]+⟦’ for '⟧
+command = ⟦‘ for '⟧explorer⟦’ for '⟧
+hyperlinks = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-24⟧
+from: a pyproject.toml whose description was rewritten in a notes app, which made the three quotes at both ends of the string typographic
+⟦aligned⟧
+[tool.poetry]
+name = "harborline"
+version = "2.1.0"
+description = ⟦“ for "⟧⟦” for "⟧⟦” for "⟧
+Sync harbor schedules.
+Reads the port authority feed and writes iCal files.
+⟦“ for "⟧⟦” for "⟧⟦” for "⟧
+authors = ["Lena Fischer <lena@harborline.dev>"]
+readme = "README.md"
+packages = [{ include = "harborline", from = "src" }]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-25⟧
+from: the answer of a language model that reached its length limit in the middle of the last line of a Cargo.toml
+⟦aligned⟧
+[dependencies]
+axum = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-t⟦missing⟧"] }⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-26⟧
+from: the answer of a language model that was cut in the middle of a line, pasted together with the second answer, which starts that line anew
+unsure: the cut line could stay and get its end, with the whole line after it as extra
+⟦aligned⟧
+[tool.hatch.build.targets.wheel]
+packages = ["src/tidewatch"]
+
+[tool.hatch.envs.default]
+⟦extra⟧dependencies = ["pytest>=8", "pytest-co
+⟦/⟧dependencies = ["pytest>=8", "pytest-cov", "ruff"]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+lint = "ruff check src tests"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-27⟧
+from: the answer of a language model that was cut in the middle of a string, pasted together with the second answer, which goes on at the very next character after a sentence and a new code fence
+⟦aligned⟧
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/cl⟦extra⟧
+Continuing from where the output was cut off:
+
+```toml
+⟦/⟧i",
+    "crates/web",
+]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-28⟧
+from: two parts of a config joined into one file with cat, where the first part did not end with a line end
+⟦aligned⟧
+[logging]
+level = "info"
+format = "json"
+
+[metrics]
+enabled = true
+sample_rate = 0.25
+listen = "127.0.0.1:9100"⟦missing⟧⟦lf⟧⟦/⟧[storage]
+path = "/var/lib/ferry"
+compression = "zstd"
+retention_days = -1⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-29⟧
+from: two snippets of a stylua.toml pasted one after the other, where the first one was copied without its last line end
+⟦aligned⟧
+column_width = 100
+indent_width = 2⟦missing⟧⟦lf⟧⟦/⟧quote_style = "AutoPreferDouble"
+call_parentheses = "Always"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-30⟧
+from: the output of the command head for two files of a Rust project, pasted into a chat as one text with the line that head prints before each file
+⟦aligned⟧
+⟦extra⟧==> .cargo/config.toml <==
+⟦/⟧[build]
+rustflags = ["-D", "warnings"]
+
+[alias]
+xt = "run --package xtask --"
+
+⟦extra⟧==> rust-toolchain.toml <==
+⟦/⟧[toolchain]
+channel = "1.78.0"
+components = ["rustfmt", "clippy"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-31⟧
+from: a part of a pyproject.toml printed with cat -n and copied from the terminal with the line numbers
+⟦aligned⟧
+⟦extra⟧     1⟦tab⟧⟦/⟧[tool.black]
+⟦extra⟧     2⟦tab⟧⟦/⟧line-length = 100
+⟦extra⟧     3⟦tab⟧⟦/⟧target-version = ["py311"]
+⟦extra⟧     4⟦tab⟧⟦/⟧
+⟦extra⟧     5⟦tab⟧⟦/⟧[tool.isort]
+⟦extra⟧     6⟦tab⟧⟦/⟧profile = "black"
+⟦extra⟧     7⟦tab⟧⟦/⟧known_first_party = ["harborline"]
+⟦extra⟧     8⟦tab⟧⟦/⟧skip_gitignore = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-32⟧
+from: a Cargo.toml copied from a web page that shows line numbers, where each number came along right before its line with nothing between them
+⟦aligned⟧
+⟦extra⟧1⟦/⟧[package]
+⟦extra⟧2⟦/⟧name = "glint"
+⟦extra⟧3⟦/⟧version = "0.5.1"
+⟦extra⟧4⟦/⟧edition = "2021"
+⟦extra⟧5⟦/⟧rust-version = "1.75"
+⟦extra⟧6⟦/⟧
+⟦extra⟧7⟦/⟧[lib]
+⟦extra⟧8⟦/⟧crate-type = ["cdylib", "rlib"]
+⟦extra⟧9⟦/⟧
+⟦extra⟧10⟦/⟧[features]
+⟦extra⟧11⟦/⟧default = ["console_error_panic_hook"]
+⟦extra⟧12⟦/⟧console_error_panic_hook = ["dep:console_error_panic_hook"]
+⟦end⟧
+
+⟦repair model-and-paste-33⟧
+from: the edit of a coding assistant, which read another file with a line number and an arrow before every line and copied two of those lines into this pyproject.toml as it saw them
+⟦aligned⟧
+[project]
+name = "portside"
+version = "2.1.0"
+dependencies = [
+    "httpx>=0.27",
+⟦extra⟧    12→⟦/⟧    "icalendar>=5.0",
+⟦extra⟧    13→⟦/⟧    "tenacity>=8.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-34⟧
+from: a Trunk.toml shown with the tool bat and copied from the terminal with the frame, the file's name and the line numbers that bat draws
+⟦aligned⟧
+⟦extra⟧───────┬──────────────────────────────
+       │ File: Trunk.toml
+───────┼──────────────────────────────
+   1   │ ⟦/⟧[build]
+⟦extra⟧   2   │ ⟦/⟧target = "index.html"
+⟦extra⟧   3   │ ⟦/⟧dist = "dist"
+⟦extra⟧   4   │⟦/⟧
+⟦extra⟧   5   │ ⟦/⟧[watch]
+⟦extra⟧   6   │ ⟦/⟧ignore = ["dist", "target"]
+⟦extra⟧   7   │⟦/⟧
+⟦extra⟧   8   │ ⟦/⟧[serve]
+⟦extra⟧   9   │ ⟦/⟧port = 8088
+⟦extra⟧  10   │ ⟦/⟧open = false⟦extra⟧
+───────┴──────────────────────────────⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-35⟧
+from: a wrangler.toml printed with cat and copied from the terminal with the line of the command and the prompt after the output
+⟦aligned⟧
+⟦extra⟧dana@build-03:~/svc/gateway$ cat wrangler.toml
+⟦/⟧name = "edge-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-04-05"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "7c1e5f0a9b2d4e63a8f1c0d2b3e4f5a6"
+
+[vars]
+UPSTREAM = "https://api.internal.example"⟦extra⟧
+dana@build-03:~/svc/gateway$⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-36⟧
+from: a config typed into a shell as a here-document and copied from the terminal, with the command line and the sign that the shell shows before every further line
+⟦aligned⟧
+⟦extra⟧$ cat > ~/.config/atuin/config.toml <<'EOF'
+> ⟦/⟧auto_sync = true
+⟦extra⟧> ⟦/⟧sync_frequency = "10m"
+⟦extra⟧> ⟦/⟧search_mode = "fuzzy"
+⟦extra⟧> ⟦/⟧filter_mode = "host"
+⟦extra⟧>⟦sp⟧⟦/⟧
+⟦extra⟧> ⟦/⟧[daemon]
+⟦extra⟧> ⟦/⟧enabled = true
+⟦extra⟧> ⟦/⟧sync_frequency = 300⟦extra⟧
+> EOF⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-37⟧
+from: a part of a Traefik config copied from the quoted text of a mail reply, with the line that says who wrote it and the sign before every quoted line
+⟦aligned⟧
+⟦extra⟧On Tue, 14 May 2024 at 09:12, Rafael Lima <rafael@ferry.example> wrote:
+> ⟦/⟧[entryPoints.web]
+⟦extra⟧> ⟦/⟧address = ":80"
+⟦extra⟧>⟦/⟧
+⟦extra⟧> ⟦/⟧[entryPoints.websecure]
+⟦extra⟧> ⟦/⟧address = ":443"
+⟦extra⟧>⟦/⟧
+⟦extra⟧> ⟦/⟧[certificatesResolvers.le.acme]
+⟦extra⟧> ⟦/⟧email = "infra@ferry.example"
+⟦extra⟧> ⟦/⟧storage = "/data/acme.json"
+⟦end⟧
+
+⟦repair model-and-paste-38⟧
+from: settings typed as a string of several lines at the prompt of Python and copied from the terminal with the prompts
+⟦aligned⟧
+⟦extra⟧>>> settings = tomllib.loads("""
+... ⟦/⟧[scheduler]
+⟦extra⟧... ⟦/⟧timezone = "Europe/Lisbon"
+⟦extra⟧... ⟦/⟧max_instances = 3
+⟦extra⟧... ⟦/⟧quiet_from = 22:30:00
+⟦extra⟧...⟦sp⟧⟦/⟧
+⟦extra⟧... ⟦/⟧[scheduler.jobstores.default]
+⟦extra⟧... ⟦/⟧url = "sqlite:///jobs.sqlite"⟦extra⟧
+... """)⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-39⟧
+from: the diff of a commit that adds a typos.toml, saved as the file itself
+⟦aligned⟧
+⟦extra⟧diff --git a/typos.toml b/typos.toml
+new file mode 100644
+index 0000000..3b1f2c4
+--- /dev/null
++++ b/typos.toml
+@@ -0,0 +1,9 @@
++⟦/⟧[files]
+⟦extra⟧+⟦/⟧extend-exclude = ["*.lock", "vendor/"]
+⟦extra⟧+⟦/⟧
+⟦extra⟧+⟦/⟧[default]
+⟦extra⟧+⟦/⟧extend-ignore-re = ['(?Rm)^.*#\s*spellchecker:disable-line$']
+⟦extra⟧+⟦/⟧
+⟦extra⟧+⟦/⟧[default.extend-words]
+⟦extra⟧+⟦/⟧ba = "ba"
+⟦extra⟧+⟦/⟧teh = "the"
+⟦end⟧
+
+⟦repair model-and-paste-40⟧
+from: three lines copied from the diff view of a pull request into a pyproject.toml, each with the plus sign of the diff
+⟦aligned⟧
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111"
+⟦extra⟧+⟦/⟧orjson = "^3.10"
+⟦extra⟧+⟦/⟧uvloop = { version = "^0.19", markers = "sys_platform != 'win32'" }
+sqlalchemy = "^2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+⟦extra⟧+⟦/⟧pytest-asyncio = "^0.23"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-41⟧
+from: one hunk of a diff for a Cargo.toml, pasted where the changed lines were meant
+unsure: of the two lines for opt-level the first one could stay, as the first of two things of which one is too many
+note: the space that the diff puts before an unchanged line stays as indentation, which TOML takes
+⟦aligned⟧
+⟦extra⟧@@ -9,6 +9,7 @@ members = ["crates/*"]
+ ⟦/⟧resolver = "2"
+⟦sp⟧
+ [profile.release]
+⟦extra⟧-opt-level = 3
++⟦/⟧opt-level = "s"
+⟦extra⟧+⟦/⟧strip = "debuginfo"
+ lto = "thin"
+ codegen-units = 1
+⟦end⟧
+
+⟦repair model-and-paste-42⟧
+from: the arguments of a tool call that writes a file, pasted as they stand in the log: JSON on one line, with the file as a string
+⟦aligned⟧
+⟦extra⟧{"path": "config/alerts.toml", "content": "⟦/⟧[[rule]]⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧id = ⟦extra⟧\⟦/⟧"disk-full⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧expr = ⟦extra⟧\⟦/⟧"disk_used_percent > 90⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧for = ⟦extra⟧\⟦/⟧"10m⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧send_to = [⟦extra⟧\⟦/⟧"pager⟦extra⟧\⟦/⟧", ⟦extra⟧\⟦/⟧"ops@ferry.example⟦extra⟧\⟦/⟧"]⟦extra⟧\n"}⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-43⟧
+from: a pyproject.toml read with readlines at the prompt of Python, copied as the list of lines that Python prints
+⟦aligned⟧
+⟦extra⟧['⟦/⟧[build-system]⟦extra⟧\n', '⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧requires = ["maturin>=1.5,<2.0"]⟦extra⟧\n', '⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧build-backend = "maturin"⟦extra⟧\n', '\n', '⟦/⟧⟦missing⟧⟦lf⟧⟦lf⟧⟦/⟧[tool.maturin]⟦extra⟧\n', '⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧features = ["pyo3/extension-module"]⟦extra⟧\n', '⟦/⟧⟦missing⟧⟦lf⟧⟦/⟧module-name = "tidewatch._core"⟦extra⟧\n']⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-44⟧
+from: the answer of a language model that writes the file's path as the first line inside the code fence, with no comment sign
+⟦aligned⟧
+⟦extra⟧```toml
+deploy/staging.toml
+⟦/⟧[upstream]
+url = "https://staging-api.ferry.example"
+timeout_seconds = 15
+retries = 2
+
+[feature_flags]
+checkout.new_flow = true
+export.legacy_csv = false⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-45⟧
+from: a config copied from a handbook in PDF, where the table goes over a page break and the foot of the one page and the head of the next came along
+⟦aligned⟧
+[cluster]
+name = "ferry-eu"
+seed_nodes = ["10.20.0.11", "10.20.0.12"]
+
+[cluster.gossip]
+interval_ms = 500
+⟦extra⟧Ferry Operations Handbook 41
+Chapter 4. Clustering
+⟦/⟧fanout = 3
+suspect_timeout_ms = 4_000
+
+[cluster.tls]
+enabled = true
+ca_file = "/etc/ferry/ca.pem"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-46⟧
+from: a Helix config copied out of a chat on a phone as two messages, each with the date, the time and the sender's name before it
+⟦aligned⟧
+⟦extra⟧[14/05/2024, 10:42] Marta: ⟦/⟧theme = "onedark"
+[editor]
+line-number = "relative"
+bufferline = "multiple"
+
+[editor.cursor-shape]
+insert = "bar"
+
+[editor.lsp]
+display-inlay-hints = true⟦extra⟧
+[14/05/2024, 10:43] Marta: the lsp part is what fixed the hints for me⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-47⟧
+from: a Cargo config copied from a terminal window of 60 columns, which put a line end into the one line that is longer
+⟦aligned⟧
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ledgerworks/ferry-proto?rev=⟦extra⟧
+⟦/⟧4be1c0a"]
+git = "https://github.com/ledgerworks/ferry-proto"
+rev = "4be1c0a"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-48⟧
+from: a part of a pyproject.toml copied from the page of a build log, which drops the escape character of every color code of the terminal and shows the rest of the code: one around the header and one around each key
+⟦aligned⟧
+⟦extra⟧[1;33m⟦/⟧[tool.towncrier]⟦extra⟧[0m⟦/⟧
+⟦extra⟧[36m⟦/⟧directory⟦extra⟧[0m⟦/⟧ = "changes"
+⟦extra⟧[36m⟦/⟧filename⟦extra⟧[0m⟦/⟧ = "CHANGELOG.md"
+⟦extra⟧[36m⟦/⟧title_format⟦extra⟧[0m⟦/⟧ = "## {version} ({project_date})"
+⟦extra⟧[36m⟦/⟧underlines⟦extra⟧[0m⟦/⟧ = ["", "", ""]
+⟦end⟧
+
+⟦repair model-and-paste-49⟧
+from: a Cargo.toml printed with cat -A to look for stray characters, and copied with the sign that the command puts at every line end and its spelling of a tab
+⟦aligned⟧
+[workspace]⟦extra⟧$⟦/⟧
+members = [⟦extra⟧$⟦/⟧
+⟦extra⟧^I⟦/⟧"crates/core",⟦extra⟧$⟦/⟧
+⟦extra⟧^I⟦/⟧"crates/cli",⟦extra⟧$⟦/⟧
+]⟦extra⟧$⟦/⟧
+⟦extra⟧$⟦/⟧
+[workspace.lints.rust]⟦extra⟧$⟦/⟧
+unsafe_code = "forbid"⟦extra⟧$⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-50⟧
+from: the edit block of a coding assistant pasted into a pixi.toml as it was, with the text to search for, the text to put in its place and the three marker lines
+unsure: the lower side could be the one that is meant, since the block says to put it in the place of the upper side
+⟦aligned⟧
+[project]
+name = "tide-models"
+channels = ["conda-forge"]
+⟦extra⟧<<<<<<< SEARCH
+⟦/⟧platforms = ["linux-64"]
+⟦extra⟧=======
+platforms = ["linux-64", "osx-arm64"]
+>>>>>>> REPLACE
+⟦/⟧
+[dependencies]
+python = "3.12.*"
+numpy = ">=1.26"⟦lf⟧
+⟦end⟧
