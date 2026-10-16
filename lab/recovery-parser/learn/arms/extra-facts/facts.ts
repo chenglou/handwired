@@ -38,19 +38,28 @@ export type TrainerSetting = {
 
 // The trainer's settings that run.ts takes by name, as `--trainer <name>`. `plain` is the plain pass of
 // ../plain-pass/, and `three-uniform` is the setting of ../holes/: the two that every setting of the arm ran with.
-// `one-uniform` and `three-base` are the two other pairs of their passes and their starts, which say whether a
+// `three-base` and `one-uniform` are the two other pairs of their passes and their starts, which say whether a
 // difference between the two comes from the passes or from the start. A tuned setting gets a line here.
 export const trainerSettings: Record<string, TrainerSetting> = {
   'plain': {passes: 1, start: 'base', learningRate: 0.05, temperatureEnd: 1, sharpnessCost: 0},
   'three-uniform': {passes: 3, start: 'uniform', learningRate: 0.05, temperatureEnd: 1, sharpnessCost: 0},
-  'one-uniform': {passes: 1, start: 'uniform', learningRate: 0.05, temperatureEnd: 1, sharpnessCost: 0},
   'three-base': {passes: 3, start: 'base', learningRate: 0.05, temperatureEnd: 1, sharpnessCost: 0},
+  'one-uniform': {passes: 1, start: 'uniform', learningRate: 0.05, temperatureEnd: 1, sharpnessCost: 0},
 }
 export const describeTrainerSetting = (setting: TrainerSetting) =>
   `${setting.passes} pass${setting.passes === 1 ? '' : 'es'}, ${setting.start === 'base' ? 'start at the base\'s choices' : 'uniform start'}, learning rate ${setting.learningRate}, temperature 1 to ${setting.temperatureEnd}, sharpness cost ${setting.sharpnessCost}`
+// The seeds of every reported run, and the seeds of the confirmation. The row with the most of all three, the setting
+// `all` with the trainer's setting `three-base`, was added after the validation scores of the reported seeds were
+// seen, so it ran again with seeds that it had not been run with, next to its control and next to the same two
+// settings with `plain`.
+export const reportedSeeds: readonly number[] = [1, 2, 3, 4, 5]
+export const confirmationSeeds: readonly number[] = [11, 12, 13, 14, 15]
 // Every trainer's setting is an arm of its own for the harness, e.g. "extra-facts-plain", so that two of them can be
-// kept next to each other: a run of the harness moves the files of an earlier run of the same name away.
-export const armNameOf = (trainerName: string) => `extra-facts-${trainerName}`
+// kept next to each other: a run of the harness moves the files of an earlier run of the same name away. For the same
+// reason a run with other seeds than the reported ones is an arm of its own, e.g.
+// "extra-facts-three-base-seeds-11-12-13-14-15".
+export const armNameOf = (trainerName: string, seeds: readonly number[] = reportedSeeds) =>
+  `extra-facts-${trainerName}${seeds.join(' ') === reportedSeeds.join(' ') ? '' : `-seeds-${seeds.join('-')}`}`
 
 // The classes chosen by hand: a class for every character that the dataset's descriptions of the damage name as one
 // that the tokenizer must tell apart, see `needsClass` in ../../../README.md and in ../../../damage/. The choice saw
@@ -277,13 +286,18 @@ export function displayEntriesByCount(tables: RecoveryTables, trainSamples: Samp
 }
 
 // The arm's name for the harness and the settings' names of search-display.ts, the comparison without gradients for
-// the open display entries: with the most read cells first, which has no seed, and in the random order of a seed.
+// the open display entries. `inTurns` is the search and the count in turns with the most read cells first, which has
+// no seed. The three others are in the random order of a seed: the search alone, the search with one count after
+// it, and the search and the count in turns.
 export const armNameOfTheSearch = 'extra-facts-search'
 export const settingNamesOfTheSearch = {
-  mostReadFirst: 'search from the hand-written tables and the display entries by a count, in turns',
-  randomOrder: 'search from the hand-written tables in a random order and the display entries by a count, in turns',
+  inTurns: 'search from the hand-written tables and the display entries by a count, in turns',
+  randomOrderAlone: 'search from the hand-written tables in a random order',
+  randomOrderThenCount: 'search from the hand-written tables in a random order, then the open display entries by a count',
+  randomOrderInTurns: 'search from the hand-written tables in a random order and the display entries by a count, in turns',
 }
 
-// The tables that run.ts saved for a setting and a seed of a trainer's setting.
-export const savedTablesOf = (trainerName: string, setting: SettingOfTheArm, seed: number): RecoveryTables =>
-  copyTables(loadTablesOfThisDataset(join(armFolderOf(armNameOf(trainerName)), fileNameOf(setting.name), `seed-${seed}.tables.json`)).tables)
+// The tables that the harness saved for the setting `settingName` and a seed, in the run of the arm `armName`, e.g.
+// armNameOf('plain') or armNameOfTheSearch.
+export const savedTablesOf = (armName: string, settingName: string, seed: number): RecoveryTables =>
+  copyTables(loadTablesOfThisDataset(join(armFolderOf(armName), fileNameOf(settingName), `seed-${seed}.tables.json`)).tables)
