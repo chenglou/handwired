@@ -1,0 +1,210 @@
+hand-editing-01 delete a run
+hand-editing-02 copy a run
+hand-editing-03 delete a run
+hand-editing-04 new: an apostrophe for the opening quote of a string, in a program without an apostrophe
+hand-editing-05 delete a run, copy a run, copy a run
+hand-editing-06 delete a code point
+hand-editing-07 delete a run
+hand-editing-08 copy a run, copy a run
+hand-editing-09 delete a code point
+hand-editing-10 new: a comma after an argument at two calls, in a program without a comma
+hand-editing-11 delete a run
+hand-editing-12 copy a run
+hand-editing-13 swap two code points
+hand-editing-14 delete a run, delete a run
+hand-editing-15 delete a code point
+hand-editing-16 delete a code point, delete a code point
+hand-editing-17 delete a line, copy a run
+hand-editing-18 delete a run
+hand-editing-19 new: the editor command `:w` at the end of a line, in a program without a colon
+hand-editing-20 delete a run
+hand-editing-21 replace a code point, replace a code point
+hand-editing-22 insert a code point
+hand-editing-23 delete a code point
+hand-editing-24 copy a run
+hand-editing-25 delete a run
+hand-editing-26 new: a `*)` left after a definition, in a program without an asterisk
+hand-editing-27 delete a run
+hand-editing-28 insert a code point, insert a code point
+hand-editing-29 delete a run
+hand-editing-30 delete a code point
+hand-editing-31 delete a run
+hand-editing-32 copy a run
+hand-editing-33 delete a code point
+hand-editing-34 delete a run, delete a run
+hand-editing-35 replace a code point
+hand-editing-36 copy a run, copy a run
+hand-editing-37 duplicate a run
+hand-editing-38 delete a code point
+hand-editing-39 copy a run, copy a run
+hand-editing-40 copy a run, copy a run, delete a run
+hand-editing-41 replace a code point
+hand-editing-42 delete a run
+hand-editing-43 delete a code point
+hand-editing-44 delete a run
+hand-editing-45 insert a code point, replace a code point
+hand-editing-46 insert a code point, insert a code point
+hand-editing-47 duplicate a line
+hand-editing-48 new: a colon for a `;` of a list, in a program without a colon
+hand-editing-49 delete a run
+hand-editing-50 delete a run
+hand-editing-51 new: a `;` for the `,` of a tuple, in a program without a `;`
+hand-editing-52 delete a code point
+hand-editing-53 copy a run, delete a run
+hand-editing-54 replace a code point, replace a code point, replace a code point
+hand-editing-55 delete a run
+hand-editing-56 swap two code points
+hand-editing-57 replace a code point
+hand-editing-58 insert a code point, delete a run
+hand-editing-59 delete a run, copy a run
+hand-editing-60 insert a code point
+hand-editing-61 delete a run
+hand-editing-62 new: an editor command on a line of its own, with characters that the program lacks
+hand-editing-63 copy a run, copy a run, copy a run
+hand-editing-64 insert a code point
+hand-editing-65 delete a run
+hand-editing-66 delete a code point
+hand-editing-67 copy a run
+hand-editing-68 copy a run
+hand-editing-69 delete a code point
+hand-editing-70 delete a run
+model-and-paste-01 new: a sentence and a code fence before the program, and a fence and a sentence after it
+model-and-paste-02 new: code fences and a sentence between two definitions
+model-and-paste-03 new: code fences and a sentence in the middle of an expression
+model-and-paste-04 new: a sentence on a line before each of two definitions
+model-and-paste-05 new: a paragraph of a page between two definitions
+model-and-paste-06 new: the header of a chat page's code block before the program
+model-and-paste-07 insert a code point, insert a code point, copy a run
+model-and-paste-08 new: the marker of a source after a number, with characters that the program lacks
+model-and-paste-09 new: the quote sign of a mail before every line, in a program without `>`
+model-and-paste-10 new: a remark after `//` at the end of a line
+model-and-paste-11 delete a run new: three dots for the body of a function, in a program without a dot
+model-and-paste-12 delete a run new: an ellipsis character for a branch of a conditional
+model-and-paste-13 new: three dots for items of a list
+model-and-paste-14 new: a line of three dots between two definitions
+model-and-paste-15 delete a run
+model-and-paste-16 delete a run
+model-and-paste-17 new: a line with a remark after `//` inside a list
+model-and-paste-18 delete a code point
+model-and-paste-19 delete a run
+model-and-paste-20 duplicate a line, delete a run
+model-and-paste-21 delete a run
+model-and-paste-22 delete a code point
+model-and-paste-23 new: banners with the files' names before two files
+model-and-paste-24 new: the token `<|endoftext|>` between two definitions
+model-and-paste-25 copy a run, copy a run
+model-and-paste-26 insert a code point new: a line number glued to the start of every line
+model-and-paste-27 new: a line number and a sign before three lines
+model-and-paste-28 new: a file's name and a line number before two lines
+model-and-paste-29 new: the prompts, the `;;` and the answers of an interactive session
+model-and-paste-30 new: the commands and the output of a shell session around the lines
+model-and-paste-31 new: lines of printed output between the definitions
+model-and-paste-32 new: a tool's warning on a line between two definitions
+model-and-paste-33 new: the cell markers of a notebook and its output
+model-and-paste-34 new: lines with a name and a time between the definitions
+model-and-paste-35 new: the head lines of a diff and a plus sign before every line
+model-and-paste-36 insert a code point new: the head line of a hunk, the old line and the signs of a diff
+model-and-paste-37 new: a plus sign before two lines, in a program without `+`
+model-and-paste-38 new: the marks of a word diff around the old and the new value
+model-and-paste-39 new: the old value between tildes before the new one
+model-and-paste-40 new: the marker lines of a merge conflict and its lower side
+model-and-paste-41 new: the marker lines of a merge conflict, the ancestor and the lower side
+model-and-paste-42 new: one marker line of a merge conflict
+model-and-paste-43 new: typographic quotes around a string
+model-and-paste-44 new: German typographic quotes around a string
+model-and-paste-45 new: a dash for `-` at two places
+model-and-paste-46 new: mathematical characters for `-` and `*`
+model-and-paste-47 new: an arrow character for `->` at two places
+model-and-paste-48 new: one character each for `<=` and `<>`
+model-and-paste-49 new: a typographic apostrophe in a name at three places
+model-and-paste-50 new: no-break spaces as the indentation of two lines
+model-and-paste-51 new: a capital letter at the start of `let`, in a program without `L`
+model-and-paste-52 new: a capital letter at the start of three lines
+model-and-paste-53 new: the copyright sign for `(c)`
+model-and-paste-54 new: the characters of two fractions for `1/2` and `1/4`
+model-and-paste-55 new: an emoji for `(y)`
+model-and-paste-56 new: an emoji for `8)`
+model-and-paste-57 new: brackets and a comma of full width
+model-and-paste-58 new: a soft hyphen inside a name at three places
+model-and-paste-59 delete a code point, delete a code point
+model-and-paste-60 new: a bullet for `*` at the start of two lines
+model-and-paste-61 new: a backslash before `_` at three places, in a program without a backslash
+model-and-paste-62 new: a backslash before `*` at two places, in a program without a backslash
+model-and-paste-63 new: a backslash before `[` and `]`, in a program without a backslash
+model-and-paste-64 new: a ligature for `fi` at three places
+model-and-paste-65 new: a page number and a running head on a line inside a function
+model-and-paste-66 insert a code point
+model-and-paste-67 insert a code point
+model-and-paste-68 new: a backslash and `n` for a line feed at two places
+model-and-paste-69 new: a backslash and a letter for every line feed and tab
+model-and-paste-70 new: a backslash at the end of two lines
+other-languages-01 new: `;;` after every definition, in a program without `;`
+other-languages-02 copy a run
+other-languages-03 insert a code point, insert a code point, insert a code point new: types after parameters, with colons and brackets
+other-languages-04 delete a run new: a `match` with three arms
+other-languages-05 delete a run new: `function` with two arms
+other-languages-06 delete a run, replace a code point, replace a code point new: a record in braces and fields after a dot
+other-languages-07 new: `:=`, `!` and a `;` between two expressions
+other-languages-08 copy a run, replace a code point new: `begin` and `end` for brackets and a `;` between two expressions
+other-languages-09 new: `begin` and `end` for brackets
+other-languages-10 replace a code point, insert a code point
+other-languages-11 new: apostrophes around characters, in a program without an apostrophe
+other-languages-12 replace a code point, copy a run, copy a run new: a pattern in brackets after `let` and after `fun`
+other-languages-13 new: `@` and `|>`
+other-languages-14 copy a run
+other-languages-15 new: a module's name with a dot and the label `~sep:`
+other-languages-16 insert a code point
+other-languages-17 delete a run new: `try … with`
+other-languages-18 new: the definition of a type before the program
+other-languages-19 new: `[|`, `|]` and `.(…)` of an array
+other-languages-20 insert a code point
+other-languages-21 delete a code point, delete a code point
+other-languages-22 new: `.[0]` and characters between apostrophes
+other-languages-23 new: an `open` line and `;;` after the definitions
+other-languages-24 delete a run new: a `for … in … do` loop
+other-languages-25 delete a run, delete a run, delete a run
+other-languages-26 delete a run, delete a run
+other-languages-27 new: a module's name with a dot and `$` before a string
+other-languages-28 new: the range `..` and `%`
+other-languages-29 insert a code point new: `>>` and `<|`
+other-languages-30 delete a run new: an attribute line, a property after a dot and a local definition without `in`
+other-languages-31 delete a run, delete a run new: a module line before the program and definitions without `let`
+other-languages-32 insert a code point, insert a code point new: a line with the type above a definition and `==`
+other-languages-33 new: a line with the type above every definition and a backslash for `fun`
+other-languages-34 new: a remark between `{-` and `-}` on two lines
+other-languages-35 new: a remark after `--` at the end of a line
+other-languages-36 new: commas in a list and `/=`
+other-languages-37 insert a code point new: `++`, a dot between two functions and `$`
+other-languages-38 delete a run new: `case … of` with three arms
+other-languages-39 delete a run new: guards with `|` in the place of a body
+other-languages-40 new: a comma at the start of the lines of a list
+other-languages-41 delete a run, delete a run new: definitions without `let` and a `where` line
+other-languages-42 delete a code point new: backticks around a function and one colon for `::`
+other-languages-43 insert a code point
+other-languages-44 insert a code point
+other-languages-45 insert a code point, replace a code point, insert a code point, replace a code point new: `!!` and `++`
+other-languages-46 replace a code point, replace a code point, replace a code point new: `def`, brackets around the parameter, a colon and `return`
+other-languages-47 delete a run new: a colon after every condition and `elif`
+other-languages-48 new: an interpreter line, remarks after `#` and a string in apostrophes
+other-languages-49 insert a code point new: `lambda n:` and `**`
+other-languages-50 insert a code point new: `//` and `!=`
+other-languages-51 new: a text between three quotes on two lines
+other-languages-52 insert a code point, insert a code point
+other-languages-53 replace a code point, insert a code point
+other-languages-54 insert a code point new: `==` and the slice `[1:]`
+other-languages-55 replace a code point, insert a code point, insert a code point new: `function` with brackets, braces and `return`
+other-languages-56 delete a run, replace a code point new: `const`, `=>` and a `;` at the end of every line
+other-languages-57 delete a run, insert a code point, insert a code point new: `===` and `? :`
+other-languages-58 new: remarks between `/*` and `*/` and after `//`, and a `;` at the end of every line
+other-languages-59 new: a string between backticks and `!`
+other-languages-60 delete a run, delete a run
+other-languages-61 insert a code point
+other-languages-62 delete a run, replace a code point, delete a run, replace a code point new: methods after a dot and `=>`
+other-languages-63 insert a code point, delete a run new: braces around a body and a `;` after a local definition
+other-languages-64 insert a code point, insert a code point, delete a run, replace a code point new: `fn`, types and braces around a body
+other-languages-65 new: `mut`, a type after a name and a `;` at the end of every line
+other-languages-66 new: braces around the branches and `|score|`
+other-languages-67 new: `&` and `!` after a name
+other-languages-68 replace a code point, replace a code point, replace a code point, copy a run, delete a run new: `val` and `fun` for `let` at four places
+other-languages-69 delete a code point, replace a code point, delete a code point, replace a code point new: `fn` and `=>` twice, which is four edits at four places
+other-languages-70 delete a run, delete a run new: `:=` and definitions without `let`
