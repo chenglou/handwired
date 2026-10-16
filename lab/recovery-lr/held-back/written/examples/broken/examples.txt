@@ -1,0 +1,35 @@
+⟦case examples-01⟧
+⟦broken⟧
+(* Totals for the weekly report. *)
+let rec sum xs = if xs = [] then 0 else head xs + sum (tail xs)
+
+let average xs =
+  let total = sum xs
+  let count = length xs in
+  if count = 0 then 0 else total / count
+
+let heading = "Weekly average  (* shown above the table *)
+let () = print_string (heading ^ ": " ^ string_of_int (average [12; 15; 9]))⟦lf⟧
+⟦end⟧
+
+⟦case examples-02⟧
+⟦broken⟧
+let rec gcd (a : int) (b : int) : int =
+  if b == 0 then a else gcd b (a mod b);;
+
+let scores = [72, 85, 91]
+let best = List.fold_left max 0 scores;;
+let () = Printf.printf "best: %d\n" best⟦lf⟧
+⟦end⟧
+
+⟦case examples-03⟧
+⟦broken⟧
+let width = 72
+let rec repeat text count = if count = 0 then "" else text ^ repeat text (count - 1)
+<<<<<<< HEAD
+let indent depth = repeat "  " depth
+=======
+let indent depth = repeat "\t" depth
+>>>>>>> use-tabs
+let line depth text = indent depth ^ text⟦lf⟧
+⟦end⟧
