@@ -41,13 +41,13 @@
 //    empty list of seeds, a seed that is named twice and a seed that is no whole number throw, and a rerun with
 //    fewer seeds moves the earlier run's files away. savedResultOf reads every setting back as the result that
 //    runArm returned, and refuses a folder without a record, a record of another dataset and a record of another
-//    run.
+//    run: of another setting, of another arm, and of another seed.
 // 6. arms/final.ts without a test sample: its report on validation samples whose held-out bits are made up has four
 //    rows per tables that add up to the row of the whole split, which is the validation row of scoreTables. Its
 //    tables have to be of this dataset: a file with another dataset key, or with none, is refused.
-// 7. numberToBeat on scratch folders made here: the tables of the file as a setting without a seed, with the
-//    hand-written tables as the base, and an error that says what to do for a missing file, for a file of another
-//    dataset and for a file without a dataset key.
+// 7. numberToBeat on scratch folders made here: the file is search/search-from-handwritten.json of the scratch
+//    folder, its tables come back as a setting without a seed, with the hand-written tables as the base, and an
+//    error says what to do for a missing file, for a file of another dataset and for a file without a dataset key.
 import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {handRuleTables, handRules} from '../../hand-rules.ts'
@@ -495,18 +495,31 @@ function damageShownIn(record: ArmRecord) {
     && describeSettings(readBack) === describeSettings(results) && describeComparison(readBack[0]!, readBack[1]!) === comparison,
     'savedResultOf does not give the results that runArm returned for the four settings, or a report made from them is not the report of the run')
   // What savedResultOf refuses: a setting that was never run, a record of another dataset, and a record that
-  // another run saved, here the record of another setting under this setting's file name.
+  // another run saved. A record names its run by the arm, the setting and the seed, so three records of another run
+  // are tried, each with one of the three wrong and the other two right: the record of the setting without a seed
+  // under another setting's name, the same record with another arm in it, and the record of seed 1 under the file
+  // name of seed 2.
   const recordText = readFileSync(join(folder, fileNameOf('without a seed'), 'no-seed.record.json'), 'utf8')
+  const recordTextOfSeed1 = readFileSync(join(folder, fileNameOf('a hand rule per seed'), 'seed-1.record.json'), 'utf8')
   const keyLine = ` "datasetKey": ${JSON.stringify(datasetKey())},\n`
-  for (const [settingName, text] of [['a record of another dataset', recordText.replace(keyLine, ' "datasetKey": "0123456789abcdef",\n').replace('"setting": "without a seed"', '"setting": "a record of another dataset"')], ['a record of another run', recordText]] as const) {
+  const withRun = (text: string, run: ArmRecord['run']) => `${JSON.stringify({...(JSON.parse(text) as ArmRecord), run}, null, 1)}\n`
+  const recordsOfAnotherRun = [
+    {settingName: 'a record of another setting', fileName: 'no-seed', text: recordText},
+    {settingName: 'a record of another arm', fileName: 'no-seed', text: withRun(recordText, {arm: 'another-arm', setting: 'a record of another arm', seed: null})},
+    {settingName: 'a record of another seed', fileName: 'seed-2', text: withRun(recordTextOfSeed1, {arm: armName, setting: 'a record of another seed', seed: 1})},
+  ]
+  const recordOfAnotherDataset = {settingName: 'a record of another dataset', fileName: 'no-seed', text: withRun(recordText.replace(keyLine, ' "datasetKey": "0123456789abcdef",\n'), {arm: armName, setting: 'a record of another dataset', seed: null})}
+  for (const {settingName, fileName, text} of [recordOfAnotherDataset, ...recordsOfAnotherRun]) {
     mkdirSync(join(folder, fileNameOf(settingName)), {recursive: true})
-    writeFileSync(join(folder, fileNameOf(settingName), 'no-seed.record.json'), text)
+    writeFileSync(join(folder, fileNameOf(settingName), `${fileName}.record.json`), text)
   }
   const neverRunError = await errorOf(() => savedResultOf(armName, 'a setting that was never run'))
   const otherDatasetError = await errorOf(() => savedResultOf(armName, 'a record of another dataset'))
-  const otherRunError = await errorOf(() => savedResultOf(armName, 'a record of another run'))
-  check(recordText.includes(keyLine) && neverRunError !== undefined && neverRunError.includes('holds no record') && otherDatasetError !== undefined && otherDatasetError.includes('was saved with the dataset 0123456789abcdef')
-    && otherRunError !== undefined && otherRunError.includes('holds the record of the run'), `savedResultOf says ${JSON.stringify(neverRunError)} for a setting that was never run, ${JSON.stringify(otherDatasetError)} for a record of another dataset and ${JSON.stringify(otherRunError)} for a record of another run`)
+  const otherRunErrors = await Promise.all(recordsOfAnotherRun.map(({settingName}) => errorOf(() => savedResultOf(armName, settingName))))
+  // withRun changes the run of a record and nothing else: with the record's own run it gives the record's text.
+  check(recordText.includes(keyLine) && withRun(recordText, (JSON.parse(recordText) as ArmRecord).run) === recordText && neverRunError !== undefined && neverRunError.includes('holds no record')
+    && otherDatasetError !== undefined && otherDatasetError.includes('was saved with the dataset 0123456789abcdef') && otherRunErrors.every(error => error !== undefined && error.includes('holds the record of the run')),
+    `savedResultOf says ${JSON.stringify(neverRunError)} for a setting that was never run, ${JSON.stringify(otherDatasetError)} for a record of another dataset, and for a record of another setting, of another arm and of another seed: ${JSON.stringify(otherRunErrors)}`)
   // Lists of seeds that cannot be meant: runArm throws before it builds anything.
   let built = 0
   const counting = [{name: 'never built', build: () => { built++; return oneCell() }}]
@@ -533,7 +546,7 @@ function damageShownIn(record: ArmRecord) {
   const trainPart = trainPartOfTheStandardSet()
   check(trainData.sampleCount > 30_000 && trainData.split.every(split => split === 0) && trainPart.sampleCount > trainData.sampleCount && trainPart.split.every(split => split === 0), 'trainDataFor or trainPartOfTheStandardSet holds a sample that is not of the train split')
   console.log(`5. runArm with 4 settings and 3 seeds saved 10 tables, each with the record that recordOf gives for the saved tables and with the arm, the setting and the seed in it. The seeds 1, 2, 3 of the first setting have the scores of the hand rules that they pick (${sharesOfSeeds.map(percent).join(', ')}), and the summary's row is ${expectedRow.slice(2, -2)}. The setting without a seed is built once. The build that ignores its seed is named in the summary, and the build whose third seed gives other tables than its first two is not. No seed, a seed named twice and the seed 2.5 throw before anything is built. A rerun with the seeds 11 and 2 moves the 6 earlier files into ${earlier}.`)
-  console.log(`   savedResultOf reads each of the 4 settings back as the result that runArm returned, so describeSettings and describeComparison give the same text for both, and after the rerun it gives the seeds 2 and 11. It refuses a setting that was never run, a record of another dataset and a record of another run.`)
+  console.log(`   savedResultOf reads each of the 4 settings back as the result that runArm returned, so describeSettings and describeComparison give the same text for both, and after the rerun it gives the seeds 2 and 11. It refuses a setting that was never run, a record of another dataset, and a record of another run: of another setting, of another arm, and of seed 1 under the file name of seed 2.`)
   console.log(`   The baselines: ${baselineNames.join('; ')}. trainDataFor packs ${trainData.sampleCount} samples, all of the train split.`)
 }
 
@@ -615,6 +628,9 @@ function damageShownIn(record: ArmRecord) {
     mkdirSync(join(scratchWith(what), 'search'), {recursive: true})
     writeFileSync(numberToBeatFileOf(scratchWith(what)), fileText)
   }
+  // The file is the one that the READMEs and the search's command name. Every file above is written through
+  // numberToBeatFileOf, so without this line another file name would pass, e.g. the search from today's tables.
+  check(numberToBeatFileOf(folder) === join(folder, 'search', 'search-from-handwritten.json'), `numberToBeat reads ${numberToBeatFileOf(folder)}, and the file of the search from the hand-written tables is ${join(folder, 'search', 'search-from-handwritten.json')}`)
   const toBeat = numberToBeat(scratchWith('a file of this dataset'))
   const record = toBeat.records[0]!
   check(toBeat.name === 'search from the hand-written tables' && toBeat.seeds.length === 0 && toBeat.records.length === 1 && rowsAreThoseOf(record, found) && record.run === null && record.datasetKey === datasetKey(),
