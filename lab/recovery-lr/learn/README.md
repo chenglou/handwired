@@ -101,7 +101,7 @@ Two routes give the same counts, and `check-score.ts` compares all 17 of them fo
 
 The same check repairs five samples by hand with one cell each, e.g. `let x = (1 + 2 let y = 3` with "end the atom early" at `let`, and each then has every scored code point right in all three and in the stack, and exactly the original's constituents. And 400 programs with a `#` between two tokens are right everywhere with tables that skip every BADCHAR.
 
-What a score does not count: the kept code points before the first error that are shown with another label than the original's, 10.3% of them in 1,500 train samples. No tables change them.
+What a score does not count: the kept code points before the first error that are shown with another label than the original's, 10.7% of them in the validation samples (`bars.ts` prints the count). No tables change them.
 
 One output per token allows 98.07% of all three on the validation samples: a token can hold kept code points of two tokens of the original.
 
@@ -212,5 +212,5 @@ Every command takes `--train` or `--validation` or `--count` for the number of s
 
 - **The end of input.** Its 58 open cells keep the base, so a parse that is still open at the end stays open, and the constituents that only the end would close are not found. A hand-written table may set those cells. The three main values do not see them.
 - **The search per sample is a beam.** With 256 runs it finds 95.7% of all three where 64 runs find 94.4%, on 400 validation samples. What the list cannot express is not shown by it.
-- **Numbers on the real dataset.** A saved file holds a key of the dataset's source files, so tables of the stand-in generator are named as such once the real generator is in place: `report.ts`, `score.ts` and `per-sample.ts` print a line that starts with "Note:", and `search.ts --from` refuses them.
+- **Numbers on the real dataset.** A saved file holds a key of the dataset's source files, i.e. of `../dataset.ts` and every file that it imports, so tables of the stand-in generator are named as such once the real generator is in place: `report.ts`, `score.ts` and `per-sample.ts` print a line that starts with "Note:", and `search.ts --from` refuses them.
 - **The rule of 16 steps cuts the base** where bison reduces 16 times or more at the first error, see above.

@@ -24,7 +24,7 @@
 // Tables can have more than the base: the flag "first on its line", which gives every cell a second copy
 // (addFirstOnLineFlag), and terminals of their own for picked code points (addTerminals).
 import {readFileSync, writeFileSync} from 'node:fs'
-import {join} from 'node:path'
+import {dirname, resolve} from 'node:path'
 import {containerOfState, displayKind, displayKindCount, displayKindNames, displayOfState, opensDepth} from '../labels.ts'
 import {maximumStackHeight, scan} from '../parser.ts'
 import type {Random} from '../random.ts'
@@ -473,14 +473,25 @@ export function cellCounts(tables: RecoveryTables) {
   return counts
 }
 
-// A key of the grammar's tables, and a key of the files that decide what the train and validation samples are.
+// A key of the grammar's tables, and a key of the files that decide what the train and validation samples are:
+// ../dataset.ts and every file that it imports, directly or through another file, with the grammar's tables.
 // A file of saved tables holds both. Tables of another grammar cannot be loaded: their cells mean something else.
 // Tables of another dataset can, and a command that reports on them says so: a change of the generator moves
 // samples between the splits, so such tables may have been made with samples that are validation samples now.
 const hashOfFiles = (paths: readonly string[]): string => Bun.hash(paths.map(path => readFileSync(path, 'utf8')).join('\u0000')).toString(16)
 export const grammarKey = (): string => hashOfFiles([tablesPath])
-const datasetFiles = ['generate.ts', 'damage.ts', 'dataset.ts', 'sample.ts', 'labels.ts', 'parser.ts', 'random.ts', 'tables.ts', 'grammar/tables.json']
-export const datasetKey = (): string => hashOfFiles(datasetFiles.map(name => join(import.meta.dir, '..', name)))
+// The files of the dataset, in the order in which the imports are met from ../dataset.ts on.
+export function datasetFiles(): string[] {
+  const files = [resolve(import.meta.dir, '../dataset.ts')]
+  for (let at = 0; at < files.length; at++) {
+    for (const [, imported] of readFileSync(files[at]!, 'utf8').matchAll(/from '(\.[^']+)'/g)) {
+      const path = resolve(dirname(files[at]!), imported!)
+      if (!files.includes(path)) files.push(path)
+    }
+  }
+  return [...files, tablesPath]
+}
+export const datasetKey = (): string => hashOfFiles(datasetFiles())
 
 // Tables as JSON text, one line per field, with a note that says where the tables come from, e.g. "search, 4
 // passes". tablesFromJson reads the text back and throws when the tables break the ground rules.

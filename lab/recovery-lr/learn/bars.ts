@@ -20,7 +20,7 @@ import {actionAccept, actionShift, commentKind, isTrivia} from '../tables.ts'
 import {packSamples} from './data.ts'
 import {numberOf, refuseUnknownOptions, standardValidationCount} from './options.ts'
 import {type RecoveryTables, baseTables, bison, bisonTerminalCount, choicePop, choiceSkip, choiceStop, choicesOf, copyTables, endOfInput} from './recovery-tables.ts'
-import {type ParserOutput, type Score, scoreHeader, scoreOutputs, scoreRow, scoreTables} from './score.ts'
+import {type ParserOutput, type Score, scoreHeader, scoreOutputs, scoreRow, scoreTables, wrongBeforeFirstError} from './score.ts'
 import {displayEntriesByCount} from './search/count.ts'
 
 // A copy of `tables` with `choice` in every open cell that holds `stop` and has the choice in its list. So bison's
@@ -174,4 +174,6 @@ if (import.meta.main) {
   console.log(`The bars without an author on ${validation.length} validation samples, with the counts made on ${train.length} train samples:`)
   console.log(scoreHeader)
   for (const {name, score} of barRows(train, validation)) console.log(scoreRow(name, score))
+  const before = wrongBeforeFirstError(validation)
+  console.log(`Before the first error, ${before.wrong} of the ${before.kept} kept code points of the validation samples, ${(100 * before.wrong / before.kept).toFixed(1)}%, are shown with another label than the original has. No parser of this table changes them, and no score counts them.`)
 }
