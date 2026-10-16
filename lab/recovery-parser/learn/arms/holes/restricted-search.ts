@@ -13,7 +13,7 @@
 // check-search.ts shows that with every open cell as the cells it gives the tables of search.ts, in both orders.
 import {createRandom} from '../../../random.ts'
 import {type RecoveryTables, actionByToken, actionCount, actionOfToken, copyTables, eventNames, today} from '../../recovery-tables.ts'
-import {type RunSamples, cellBitCount, messageOf, totalScore} from '../../search/sample-runs.ts'
+import {type RunSamples, cellBitCount, messageOf, refuseOtherClasses, totalScore} from '../../search/sample-runs.ts'
 import type {Reply, Request} from '../../search/search-worker.ts'
 import type {Cell} from './holes.ts'
 
@@ -65,10 +65,11 @@ export type SearchResult = {
 }
 
 // Searches the choices of `cells` from the tables `start`, which are not changed, on the broken samples of `train`,
-// e.g. prepareSamples(trainPartOfTheStandardSet()). Without `orderSeed` a pass goes from the most read cell to the
-// least read one. With it, every pass has a random order of its own, which the seed draws.
+// e.g. prepareSamples(trainPartOfTheStandardSet()), or prepareSamples(trainPartOfTheStandardSet(), start) for tables
+// with added classes. Without `orderSeed` a pass goes from the most read cell to the least read one. With it, every
+// pass has a random order of its own, which the seed draws. The open entries of a display table stay as they are.
 export async function searchCells(start: RecoveryTables, cells: readonly Cell[], train: RunSamples, orderSeed?: number, maximumPasses = 200): Promise<SearchResult> {
-  if (start.addedClasses.length > 0 || start.contextCount !== today.contextCount) throw new Error('the search does not run tables with added classes or with the bit "first on its line"')
+  refuseOtherClasses(train, start)
   const tables = copyTables(start)
   const lexerCellCount = tables.lexerNext.length
   const bitOf = ({grammar, cell}: Cell) => grammar ? lexerCellCount + cell : cell
