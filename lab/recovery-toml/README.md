@@ -6,7 +6,8 @@ This folder is the TOML track of the transfer experiment: does the recipe that t
 - `tables.ts`: the tables, built from transition functions that read like the grammar, e.g. `lexerStep(state, characterClass)`.
 - `table-parser.ts`: the loop over the tables, with the exports of `lab/recovery-parser/table-parser.ts`: `defaultTables`, `runTableParser(text, tables)`, the name lists, the limits.
 - `reference.ts`: `labelReference(text)`, a hand-written scanner that labels every code point of a valid text and says whether a text is valid. It reads `kinds.ts` and nothing of the tables.
-- `check-*.ts`: the checks, see the end.
+- `check-*.ts`: the checks, see "The checks".
+- `samples.ts` and the files around it: the dataset of broken TOML, see "The dataset" at the end.
 
 ## The form
 
@@ -88,3 +89,46 @@ Run from the repo root. Each prints its counts and ends with "every check passed
 - `bun lab/recovery-toml/check-short-texts.ts`: every text of 8 families, e.g. `a=` followed by every string of up to 5 of the characters `019_.e+-xb:` and space: 17,430,022 texts, 1,655,136 of them valid. The tables and the reference agree on every one, and Bun differs on 866, each for a reason from the section above. About 25 seconds.
 - `bun lab/recovery-toml/check-toml-test.ts <folder>`: the official test suite, [toml-test](https://github.com/toml-lang/toml-test), with its list for TOML 1.0. Clone it into a folder outside the repo. All 208 valid cases are accepted by the tables and the reference, with the same labels. Of the 501 invalid cases, 393 are rejected, 9 are no UTF-8, and 99 are accepted and on the check's list by reason: 63 a name defined twice, 30 a range in a date or a time, 6 an escape's code point.
 - `bunx tsc -p lab/recovery-toml` and `bunx oxlint --type-aware lab/recovery-toml`.
+
+## The dataset
+
+Broken TOML for the experiment, in the shapes and names of `lab/recovery-parser/`. `sampleAt(seed, index)` in `samples.ts` makes sample `index` of a seed without the ones before it, in about 0.15 ms. A sample is a valid document of at most 512 code points, a broken text made of it, and which code points of the broken text are which code points of the document. `labelsOf(sample)` gives every code point of the broken text the label of its counterpart, i.e. the display kind, the depth after it and the innermost container after it as `reference.ts` gives them, and `undefined` to a code point that the damage added. The type `Sample` has a comment on every field.
+
+**Documents** (`documents.ts`). 18 templates. 16 are modeled on files that people write and tools generate: a Cargo manifest, a Cargo workspace, a pyproject, the config of a formatter, of a linter, of a static site, of a deploy, of an editor or a terminal, of a server, of a database and of a metrics agent, feature flags, strings for translation, a data file with records and dates, the tasks of a task runner, and a lockfile. Two are not: `deepNesting` nests arrays and inline tables up to 16 levels, and `oddities` holds what TOML allows and config files rarely have, e.g. the key `1979-05-27`, the number `-nan` and the header `[ g .  h  . i ]`. A template draws its tables, entries, names, values and comments, and a layout draws how the document is written, e.g. `key=value`, equals signs in one column, entries indented below their header, an array on one line or on several, strings between apostrophes, lines that end with `\r\n`. Every document is valid for the tables, for the reference labeler and for `Bun.TOML.parse`. In the first 60,000 samples the documents read all 205 grammar cells and all 105 display entries that a valid text can read, and 2,344 of the 2,459 such tokenizer cells. About half of the other 115 are read only by a text that TOML rejects for a number in it, e.g. the escape `\U10000000` or the minute 80, and the rest need one letter after one start of a word, e.g. `fal` followed by `r` as a key. `stats.ts` lists them.
+
+**Damage** (`damage.ts`). The damage is fixed by the experiment and knows nothing of TOML: it reads which code points of a payload are equal and where its line feeds are. Ten edits, each as likely as the others, with positions and lengths drawn uniformly: delete one code point, insert a copy of one of the payload's code points, replace one code point with another of the payload's, swap two neighbours that differ, delete a run of 2 to 20 code points, write such a run twice, copy such a run to another place, delete a line, write a line twice, and cut the payload's tail. A sample gets one edit with probability 0.6, two with 0.3 and three with 0.1, each applied to what the edit before it left. A draw is thrown away, and the edits are drawn again on the same document, when the result is still valid for the tables, is the document again, has more than 512 code points, is counted deeper than 16 by the parser as it is, or leaves no code point to score.
+
+**Labels and what is scored.** A kept code point has the label that it has in the document. What an edit inserts is added and has none: the code point of a replacement, the copy of a run or of a line, and of two swapped code points the one that moved to the right. The edits of a sample are in the canonical form of `lab/recovery-parser/edits.ts`, so of two equal code points the later one is the added or the removed one. Scores count the code points from the first error of the parser as it is on. Two of the JSON dataset's rules leave a value out: before that first error, a value that the parser as it is does not give, and the depth and the container from a code point at which they change without a bracket, i.e. after a removed bracket, up to the next kept bracket. The bracket of a header counts, so after a lost `]` the depth 0 is scored again from the next header on. The JSON dataset's other two rules rest on knowing the damage, and are not here: e.g. after a string lost its closing quote, the rest of its line is scored with the labels of the document, which no parser can give.
+
+**Splits** (`splits.ts`). As in the JSON dataset, a document's split is a hash of its tokens, e.g. `[h]k=sk=n` for a header and two entries, whatever its names, values, comments and layout are: 80 of 100 sequences are in train, 10 in validation and 10 in test. So no document and no sequence of tokens is in two splits. The templates `deployConfig` and `taskRunner` are held out: their samples are only made from documents of the test split.
+
+**Numbers**, for the first 60,000 samples of the default seed, 20261016:
+
+| | |
+|---|---|
+| Samples per split | train 42,082, validation 5,382, test 12,536, of which 7,336 are of the two held-out templates |
+| Samples with 1, 2 and 3 edits | 47.4%, 37.5% and 15.1%, where the draws are 60%, 30% and 10%: a draw of one edit is thrown away more often |
+| Draws of edits | 145,497, of which 85,497 (58.8%) are thrown away: 69,300 are still valid, 14,660 leave nothing to score, 1,204 are longer than 512 code points, 133 have an edit without a place, 102 are unchanged, 98 are deeper than 16 |
+| Scored code points per sample | mean 132.7, median 112, a tenth of the samples has 21 or fewer, a tenth 277 or more. 7,964,119 in all |
+| From the first damaged code point to the first error | median 1 code point, mean 22.4. 36.7% of the samples have 0, and 13.4% more than 50, e.g. when the first edit fell into a comment and left the text valid, and a later edit broke it. With one edit: median 1, mean 3.2 |
+| The parser as it is, outside the test split | 64.4% of the scored code points have display kind, depth and container right, and 11.3% of the samples have every one right |
+
+A cut alone leaves nothing to score and a copy of a line with a key is valid for the tables, which keep no names, so `cutTail` is only in samples of two or three edits, and the two edits of lines are rare alone: 328 and 413 of 28,433 samples with one edit.
+
+**Run it**, from the repo root:
+
+```sh
+bun test lab/recovery-toml/invariants.test.ts              # the invariants, about 2 seconds
+bun lab/recovery-toml/check-samples.ts [samples] [seed]    # a second derivation of every sample, by default of 40,000, the splits, and that the damage reads no TOML
+bun lab/recovery-toml/stats.ts <file> [samples] [seed]     # the numbers above and the cells, by default of 40,000 samples
+bun lab/recovery-toml/dump.ts <folder> [seed]              # samples.txt and documents.txt for reading
+```
+
+Files: `documents.ts` (templates and layouts), `damage.ts` (the ten edits), `edits.ts` (edits, alignment and the canonical form, as in the JSON dataset), `labels.ts` (labels of a valid text and the sequence of tokens), `splits.ts`, `samples.ts` (`sampleAt`, `labelsOf`, `scoredCodePoints`, `groupOf`, which is the number of edits), `limits.ts` (the cells that valid TOML reads under the JSON names, `conditionProblems`, and a bound on the depth), `random.ts`, `check-samples.ts`, `stats.ts`, `dump.ts`, `invariants.test.ts`.
+
+Known limits:
+
+- The damage is blind, so some scored labels are out of every parser's reach, and nothing marks them. E.g. a copied `[` has no label, and the labels after it are those of a text without it. The JSON dataset has a judgment per form of damage for this (`reachable`, `needsClass`, `debatable`) and this one has none: the fields are constants in `Sample`.
+- `limits.ts` proves little for this parser. A stack action per grammar cell and a display entry per event and state leave one limit, that the depth moves by one level per code point. 481 of the 60,000 samples (0.8%) have a scored depth out of that reach, e.g. a header after an array that lost its `]` and ends with a comma: the parser as it is reads the header's `[` as an array inside the array, and the label asks for depth 0 at the next code point.
+- The words of free text come from a small list, and a comment is drawn without a look at the entry next to it, as in the JSON dataset.
+- The largest sequence of tokens of a template can fall into validation or test and weigh much there, e.g. one sequence has 25.2% of the validation samples of `lockfile`. `stats.ts` prints the share per template and split.
