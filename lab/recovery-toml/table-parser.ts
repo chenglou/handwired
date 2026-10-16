@@ -87,6 +87,9 @@ export const defaultTables: ParserTables = {
 // point of a longer text.
 export const positionCount = capacity + 1
 
+// The name that the code of the JSON experiment imports for the container with the number 1.
+export const containerObject = containerInlineTable
+
 // What the parser computes at every position. Each array has 513 entries. Entries from the text's length on belong to
 // cells after the text.
 export type ParserTrace = {

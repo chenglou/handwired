@@ -28,7 +28,7 @@ const characterClasses = [
   'z', 'otherHexLetter', 'capitalE', 'capitalT', 'capitalU', 'capitalZ', 'otherLetter', 'other',
 ] as const
 type CharacterClass = typeof characterClasses[number]
-export const classNames: readonly string[] = characterClasses
+export const classNames = characterClasses
 export const classCount = characterClasses.length
 const classIndex = (name: CharacterClass) => characterClasses.indexOf(name)
 
@@ -65,7 +65,7 @@ export const classTable: readonly number[] = Array.from({length: 130}, (_, entry
 // Tokenizer states, by what was read.
 //
 // Between tokens: `afterOpenBracket` and `afterCloseBracket` are `between` right after a `[` or a `]`, where a second
-// bracket is the second one of `[[` or `]]`. `carriageReturn` expects a line feed.
+// bracket is the second one of `[[` or `]]`. `carriageReturn` expects a line feed. `comment` is inside a comment.
 //
 // Strings: `basicOpen` is after the first quote, `basicEmpty` after two quotes, which are an empty string unless a
 // third quote follows and starts a string of several lines. `basicHex4` expects 4 more hex digits of an escape. In a
@@ -97,7 +97,7 @@ const lexerStates = [
   'errorLine',
 ] as const
 type LexerState = typeof lexerStates[number]
-export const lexerStateNames: readonly string[] = lexerStates
+export const lexerStateNames = lexerStates
 export const lexerStateCount = lexerStates.length
 
 // What one character does, from the tokenizer state before it and its class.
@@ -120,7 +120,7 @@ const lexerEvents = [
   'badUnicodeEscape', 'badValue', 'errorContinuation', 'end', 'endInsideToken', 'truncatedEnd',
 ] as const
 type LexerEvent = typeof lexerEvents[number]
-export const eventNames: readonly string[] = lexerEvents
+export const eventNames = lexerEvents
 export const eventCount = lexerEvents.length
 
 type Step = readonly [next: LexerState, event: LexerEvent]
@@ -521,7 +521,7 @@ const grammarTokens = [
   'numberDot', 'fraction', 'lexerError', 'end',
 ] as const
 type GrammarToken = typeof grammarTokens[number]
-export const tokenNames: readonly string[] = grammarTokens
+export const tokenNames = grammarTokens
 export const tokenCount = grammarTokens.length
 
 function grammarTokenOf(event: LexerEvent): GrammarToken {
@@ -584,7 +584,7 @@ export const contextNames = [
 // tables name the action in every cell, because a `[` opens an array in a value position and nothing in a header.
 const stackActions = ['by token', 'none', 'push array', 'push inline table', 'pop'] as const
 type StackAction = Exclude<typeof stackActions[number], 'by token'>
-export const actionNames: readonly string[] = stackActions
+export const actionNames = stackActions
 
 // What a token does to the stack where the grammar has no rule for it: in a cell that leads into the state `error`,
 // and in that state. As in the JSON tables, the parser goes on counting brackets after an error.
@@ -620,7 +620,7 @@ const grammarStates = [
   'afterHeaderDot', 'arrayHeaderOpen', 'afterArrayHeaderKey', 'afterArrayHeaderDot', 'arrayHeaderClose', 'afterHeader', 'error',
 ] as const
 type GrammarState = typeof grammarStates[number]
-export const grammarStateNames: readonly string[] = grammarStates
+export const grammarStateNames = grammarStates
 export const grammarStateCount = grammarStates.length
 export const symbolCount = grammarTokens.length * contextCount
 

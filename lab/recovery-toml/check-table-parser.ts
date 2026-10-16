@@ -42,13 +42,13 @@ export function tableParserDifference(text: string, trace: ParserTrace = runTabl
 }
 
 // One code point per class, for the search below. The classes `end` and `truncatedEnd` have none.
-const codePointOfClass: number[] = classNames.map((_, characterClass) => defaultTables.classOfCodePoint.indexOf(characterClass, 1) - 1)
+export const codePointOfClass: number[] = classNames.map((_, characterClass) => defaultTables.classOfCodePoint.indexOf(characterClass, 1) - 1)
 
 // The shortest code points that make a valid text of the first `upTo` code points of a text, which the tables have
 // not rejected, or null when there are none. The search runs the tables from the state after those code points and
 // never opens a container, so the open containers are always the first ones of the text's.
 const completions = new Map<string, number[] | null>()
-function completionOf(codePoints: readonly number[], upTo: number): number[] | null {
+export function completionOf(codePoints: readonly number[], upTo: number): number[] | null {
   const tables = defaultTables
   const tokenCount = tables.symbolCount / tables.contextCount
   const kinds: number[] = []
@@ -121,7 +121,7 @@ function firstErrorResult(text: string, trace: ParserTrace): string {
   return 'checked'
 }
 
-function bunResult(text: string): {accepted: true} | {accepted: false, message: string} {
+export function bunResult(text: string): {accepted: true} | {accepted: false, message: string} {
   try {
     Bun.TOML.parse(text)
     return {accepted: true}
@@ -132,7 +132,7 @@ function bunResult(text: string): {accepted: true} | {accepted: false, message: 
 
 // Why Bun rejects a text that the tables accept, from Bun's message, or null. Each reason is on the README's list of
 // what the tables do not check.
-function reasonOfRejection(message: string): string | null {
+export function reasonOfRejection(message: string): string | null {
   if (/Cannot (redefine|extend)/.test(message)) return 'a key or a table is defined twice'
   if (/Invalid (date|time|date-time offset): .*(must be between|is out of range)/.test(message)) return 'a number inside a date or a time is out of its range'
   if (message.includes('Escaped code point must be a Unicode scalar value')) return 'an escape names no Unicode scalar value'
@@ -149,7 +149,7 @@ const additionsOfToml11: readonly (readonly [option: ReferenceOptions, reason: s
   [{moreEscapes: true}, 'TOML 1.1: the escapes \\e and \\xHH'],
   [{linesInInlineTable: true, commaBeforeCloseBrace: true, timeWithoutSeconds: true, moreEscapes: true}, 'TOML 1.1: several of its additions'],
 ]
-function reasonOfAcceptance(text: string): string | null {
+export function reasonOfAcceptance(text: string): string | null {
   if (labelReference(text, {withoutLimits: true}).valid) return 'the limits: more than 512 code points, or nested deeper than 16'
   for (const [option, reason] of additionsOfToml11) if (labelReference(text, option).valid) return reason
   if (text.startsWith('﻿') && labelReference(text.slice(1)).valid) return 'a byte order mark at the start'

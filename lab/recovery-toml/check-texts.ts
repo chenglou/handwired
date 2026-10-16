@@ -153,9 +153,33 @@ const quotedKeys: readonly (readonly [text: string, name: string])[] = [
   ['\'C:\\path\'', 'C:\\path'], ['"tab\\there"', 'tab\there'], ['"#"', '#'], ['\'[x]\'', '[x]'], ['"="', '='], ['"\\U0001F600"', '😀'],
   ['\'"\'', '"'], ['"\'"', '\''], ['"127.0.0.1"', '127.0.0.1'], ['"true"', 'true'], ['"\\\\"', '\\'],
 ]
-const stringCharacters = ['a', 'b', 'z', 'Q', '0', '9', ' ', ' ', '\t', 'é', '字', '😀', '\'', '#', '[', ']', '{', '}', '=', ',', '.', ':', '-', '+', '_', '!', '/', '~']
-const simpleEscapes = ['\\b', '\\t', '\\n', '\\f', '\\r', '\\"', '\\\\', '\\u0041', '\\u00e9', '\\uFFFD', '\\uabcd', '\\U0001F600', '\\U0010FFFF', '\\U00000041']
-const commentTexts = ['', ' a comment', ' é字😀', ' = [ ] { } " \' \\ ,', '\ttab', '# more', ' TODO: 1979-05-27 true', '!']
+const nonAsciiCharacters = ['é', 'ä', '字', '😀', '\u0080', '\u00a0', '\u2028', '\ud7ff', '\ue000', '\ufeff', '\u{10ffff}']
+// A character that a string or a comment may hold as it is, other than the `excluded` ones: a tab, a character from
+// U+0080 up, or any ASCII character from the space to ~, so that every class of tables.ts comes up.
+function plainCharacter(random: Random, excluded: string) {
+  for (;;) {
+    const roll = random.next()
+    const character = roll < 0.06 ? '\t' : roll < 0.2 ? random.pick(nonAsciiCharacters) : String.fromCodePoint(random.integer(0x20, 0x7e))
+    if (!excluded.includes(character)) return character
+  }
+}
+const hexDigitsOf = (random: Random, value: number, count: number) => {
+  const text = value.toString(16).padStart(count, '0')
+  return Array.from(text, digit => random.chance(0.5) ? digit.toUpperCase() : digit).join('')
+}
+// An escape of a string in quotes. \u and \U name any code point but a surrogate.
+function escapeText(random: Random) {
+  const roll = random.next()
+  if (roll < 0.5) return random.pick(['\\b', '\\t', '\\n', '\\f', '\\r', '\\"', '\\\\'])
+  if (roll < 0.8) return `\\u${hexDigitsOf(random, random.chance(0.5) ? random.integer(0, 0xd7ff) : random.integer(0xe000, 0xffff), 4)}`
+  return `\\U${hexDigitsOf(random, random.chance(0.5) ? random.integer(0, 0xd7ff) : random.integer(0xe000, 0x10ffff), 8)}`
+}
+// The text of a comment after its #.
+function commentText(random: Random) {
+  let text = ''
+  for (let character = random.pick([0, 0, 1, 3, 8, 20]); character > 0; character--) text += plainCharacter(random, '')
+  return text
+}
 
 type Generator = {
   random: Random
@@ -213,12 +237,12 @@ function dateOrTimeText(random: Random) {
 
 function basicStringText(random: Random) {
   let text = '"'
-  for (let piece = random.integer(0, 8); piece > 0; piece--) text += random.chance(0.2) ? random.pick(simpleEscapes) : random.pick(stringCharacters)
+  for (let piece = random.integer(0, 8); piece > 0; piece--) text += random.chance(0.2) ? escapeText(random) : plainCharacter(random, '"\\')
   return `${text}"`
 }
 function literalStringText(random: Random) {
   let text = '\''
-  for (let piece = random.integer(0, 8); piece > 0; piece--) text += random.pick(['a', 'B', '7', ' ', '\t', '\\', '"', '#', 'é', '😀', '\\n', '[', '=', '\\'])
+  for (let piece = random.integer(0, 8); piece > 0; piece--) text += plainCharacter(random, '\'')
   return `${text}'`
 }
 // A string of several lines in quotes: line ends, one or two quotes inside, a backslash at the end of a line, and
@@ -229,11 +253,11 @@ function multiLineBasicText(generator: Generator) {
   for (let piece = random.integer(0, 10); piece > 0; piece--) {
     const roll = random.next()
     if (roll < 0.15) text += lineEnd
-    else if (roll < 0.25) text += random.pick(simpleEscapes)
+    else if (roll < 0.25) text += escapeText(random)
     // One or two quotes, with a character after them so that they do not run into the closing quotes.
-    else if (roll < 0.35) text += random.pick(['"', '""']) + random.pick(['a', ' ', lineEnd, '\\n'])
+    else if (roll < 0.35) text += random.pick(['"', '""']) + random.pick([plainCharacter(random, '"\\'), lineEnd, escapeText(random)])
     else if (roll < 0.45) text += `\\${random.pick(['', ' ', '  \t'])}${lineEnd}${random.pick(['', '  ', lineEnd, `\t${lineEnd}  `])}`
-    else text += random.pick(stringCharacters)
+    else text += plainCharacter(random, '"\\')
   }
   return `${text}${random.pick(['', '', '', '"', '""'])}"""`
 }
@@ -243,8 +267,8 @@ function multiLineLiteralText(generator: Generator) {
   for (let piece = random.integer(0, 10); piece > 0; piece--) {
     const roll = random.next()
     if (roll < 0.2) text += lineEnd
-    else if (roll < 0.35) text += random.pick(['\'', '\'\'']) + random.pick(['a', ' ', lineEnd, '\\'])
-    else text += random.pick(['a', 'B', '7', ' ', '\t', '\\', '"', '""', '"""', '#', 'é', '😀', '\\n', ']', '='])
+    else if (roll < 0.35) text += random.pick(['\'', '\'\'']) + random.pick([plainCharacter(random, '\''), lineEnd])
+    else text += plainCharacter(random, '\'')
   }
   return `${text}${random.pick(['', '', '', '\'', '\'\''])}'''`
 }
@@ -255,7 +279,16 @@ function arrayFiller(generator: Generator) {
   const roll = random.next()
   if (roll < 0.45) return random.pick(['', ' ', ' ', '  ', '\t'])
   if (roll < 0.8) return `${lineEnd}${random.pick(['', '  ', '    ', '\t'])}`
-  return `${random.pick(['', ' '])}#${random.pick(commentTexts)}${lineEnd}${random.pick(['', '  '])}`
+  return `${random.pick(['', ' '])}#${commentText(random)}${lineEnd}${random.pick(['', '  '])}`
+}
+
+// A key without quotes of random characters, e.g. `0a`, `-_T9` or `e`: most start like a number or a literal and then
+// turn out to be a key.
+const bareKeyCharacters = Array.from('0123456789abcdefilnorstuxzABCDEFTUZGgkQ_-')
+function randomBareKey(random: Random) {
+  let text = ''
+  for (let character = random.integer(1, 6); character > 0; character--) text += random.pick(bareKeyCharacters)
+  return text
 }
 
 // A key that is new in its table, with dots in some. `used` holds the first parts of the keys of the table so far, so
@@ -275,6 +308,12 @@ function keyText(generator: Generator, used: Set<string>): string {
       used.add(name)
       return text
     }
+  } else if (roll < 0.5) {
+    const text = randomBareKey(random)
+    if (!used.has(text)) {
+      used.add(text)
+      return text
+    }
   }
   const name = `${random.pick(bareNames)}${generator.nextName++}`
   used.add(name)
@@ -283,7 +322,7 @@ function keyText(generator: Generator, used: Set<string>): string {
   let text = name
   for (let part = random.integer(1, 3); part > 0; part--) {
     const dot = random.pick(['.', '.', '.', ' . ', '. ', ' .', '\t.\t'])
-    text += dot + random.pick([random.pick(bareNames), '1', '5e3', 'true', '"q r"', '\'s\'', '-', '2026-01-01', '0x'])
+    text += dot + random.pick([random.pick(bareNames), randomBareKey(random), randomBareKey(random), '1', '5e3', 'true', '"q r"', '\'s\'', '-', '2026-01-01', '0x'])
   }
   return text
 }
@@ -326,12 +365,15 @@ function inlineTableText(generator: Generator, depth: number): string {
   return `{${members.join(',')}}`
 }
 
-// Containers nested to exactly `depth`, arrays and inline tables in a random order.
-function deepValueText(random: Random, depth: number): string {
-  let text = random.pick(['1', '"x"', 'true', '', ''])
-  for (let level = 0; level < depth; level++) {
-    // An inline table needs a key and a value, so the innermost one is `{}` when there is no value.
-    text = random.chance(0.5) ? `[${text}]` : text === '' ? '{}' : `{k = ${text}}`
+// Containers nested to exactly `depth`, arrays and inline tables in a random order. The innermost one holds values of
+// every kind but containers, so that e.g. a dotted key and a comment are read at depth 16 too.
+function deepValueText(generator: Generator, depth: number): string {
+  const {random} = generator
+  const depthWithoutContainers = 5
+  let text = random.chance(0.5) ? arrayText(generator, depthWithoutContainers) : inlineTableText(generator, depthWithoutContainers)
+  for (let level = 1; level < depth; level++) {
+    const roll = random.next()
+    text = roll < 0.4 ? `[${text}]` : roll < 0.5 ? `[${arrayFiller(generator)}${text}${arrayFiller(generator)}]` : roll < 0.9 ? `{k = ${text}}` : `{ k.l = 1, "m" = ${text} }`
   }
   return text
 }
@@ -349,7 +391,7 @@ export function validDocument(seed: number): string {
   const arrayTableNames: string[] = []
   const lines: string[] = []
   let length = 0
-  const trailing = () => `${random.pick(['', '', ' ', '  ', '\t'])}${random.chance(0.2) ? `#${random.pick(commentTexts)}` : ''}`
+  const trailing = () => `${random.pick(['', '', ' ', '  ', '\t'])}${random.chance(0.2) ? `#${commentText(random)}` : ''}`
   const indent = () => random.pick(['', '', '', '  ', '\t'])
   for (let attempt = 0; attempt < 60 && length < target; attempt++) {
     const roll = random.next()
@@ -357,7 +399,7 @@ export function validDocument(seed: number): string {
     if (roll < 0.08) {
       line = random.pick(['', '', '  ', '\t'])
     } else if (roll < 0.16) {
-      line = `${indent()}#${random.pick(commentTexts)}`
+      line = `${indent()}#${commentText(random)}`
     } else if (roll < 0.3) {
       // A header: a new table, a new array of tables, one more entry of an array of tables, or a table below one.
       const headerRoll = random.next()
@@ -383,7 +425,7 @@ export function validDocument(seed: number): string {
       line = `${indent()}${'['.repeat(brackets)}${space()}${name}${space()}${']'.repeat(brackets)}${trailing()}`
       used = new Set<string>()
     } else if (roll < 0.33) {
-      line = `${indent()}${keyText(generator, used)} = ${deepValueText(random, random.pick([maximumDepth, maximumDepth, maximumDepth - 1, 8]))}${trailing()}`
+      line = `${indent()}${keyText(generator, used)} = ${deepValueText(generator, random.pick([maximumDepth, maximumDepth, maximumDepth - 1, 8]))}${trailing()}`
     } else {
       const equals = random.pick([' = ', ' = ', ' = ', '=', ' =', '= ', '\t=\t', '  =  '])
       line = `${indent()}${keyText(generator, used)}${equals}${valueText(generator, 0)}${trailing()}`
