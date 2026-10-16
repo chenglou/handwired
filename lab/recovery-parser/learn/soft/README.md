@@ -60,6 +60,7 @@ The loss is the cross-entropy of the display kind, the depth and the container a
 - **The intended states at every kept code point** (`intendedEverywhere`): the first version of the twin used them so, with or without the mark. The option is only there to measure what the mark changes, see [What the two options with intended states do](#what-the-two-options-with-intended-states-do).
 - **A temperature** (`temperature`): a trainable mix is softmax(weights / temperature), so a temperature below 1 makes every mix closer to one choice.
 - **A cost on a mix being far from one choice** (`sharpnessCost`): the weight of the mean entropy of the trainable mixes. A mix's entropy is 0 for one choice and ln(8) = 2.08 for a uniform mix over the 8 next states of a grammar cell.
+- **Other weights of the samples and of the first code points** (`sampleWeightPower`, `firstCodePoints`, `firstCodePointsWeight`), off by default. By default every scored code point weighs 1, so a sample weighs as much as it has scored code points, e.g. 358 for a long text and 12 for a short one. With `sampleWeightPower`, every loss of a sample is divided by (the sample's scored code points) ^ power, so with 1 every sample weighs the same, whatever its length. With `firstCodePoints: 8` and `firstCodePointsWeight: 4`, the three label losses of the first 8 scored code points of a sample, counted from its first error, weigh 4 times as much as the ones of its other code points. A batch's loss is divided by the weights of its scored code points added up, `LossTally.weight`, which is their number by default. The command of `train.ts` has no option for them: `../arms/generic/` passes them to `train` as `loss`, and its README says what they did.
 
 The backward pass is written by hand in `stepBackward`, in the order of the step's parts from last to first.
 
@@ -202,16 +203,18 @@ Each check is a script that ends with "Every check passed." or with a count of f
 - Random settings: 50,000 runs, 20,054,360 positions, 0 runs differ when the twin's depth range holds the depths that the exact parser reaches in the run. With the depths -8 to 24, 8,963 runs differ, all of them among the 9,215 runs that reach an end of that range.
 - The intended stacks of `twin-data.ts` are the exact parser's stack after every code point of 2,130 original documents, 538,933 code points. They are the documents of the first 2,000 samples that are not in the test split.
 
-**`bun lab/recovery-parser/learn/soft/check-gradient.ts`** (about 45 s, and half a minute more the first time, for the intended stacks): the backward pass against finite differences on random mixes. Every open cell is trainable with random weights. There are 5 settings with today's tables: the three losses alone; every option on; a depth range of -1 to 17, so that shares reach its ends; sharp mixes with the run kept on track; the intended states at every kept code point, with targets and with the run kept on track. Each uses 24 samples with 1,658 steps. Per setting and group of weights, the check compares 6 random directions, each of which moves every weight of the group, and about 60 single weights. The largest differences over the 5 settings:
+**`bun lab/recovery-parser/learn/soft/check-gradient.ts`** (about a minute, and half a minute more the first time, for the intended stacks): the backward pass against finite differences on random mixes. Every open cell is trainable with random weights. There are 6 settings with today's tables: the three losses alone; every option on; a depth range of -1 to 17, so that shares reach its ends; sharp mixes with the run kept on track; the intended states at every kept code point, with targets and with the run kept on track; and other weights of the samples and of the first code points, with `sampleWeightPower` 0.5 and the first 5 scored code points weighing 3 times. Each uses 24 samples with 1,658 steps. Per setting and group of weights, the check compares 6 random directions, each of which moves every weight of the group, and about 60 single weights. The largest differences over the 6 settings:
 
-| Group of weights | 30 directions, relative | 300 single weights, absolute | single weights with a gradient of at least 1e-4, relative |
+| Group of weights | 36 directions, relative | 360 single weights, absolute | single weights with a gradient of at least 1e-4, relative |
 | --- | --- | --- | --- |
 | tokenizer, next state | 1.3e-8 | 2.3e-12 | 2.1e-9 |
-| tokenizer, event | 5.9e-9 | 2.2e-12 | 2.2e-9 |
+| tokenizer, event | 5.9e-9 | 5.4e-12 | 2.2e-9 |
 | grammar, next state | 3.9e-9 | 8.8e-12 | 1.4e-8 |
-| grammar, stack action | 1.6e-9 | 5.0e-11 | 8.6e-9 |
+| grammar, stack action | 1.6e-9 | 1.5e-10 | 8.6e-9 |
 
 The largest relative difference is 1.4e-8. A direction's difference is divided by the length of the group's gradient. For single weights with a gradient below 1e-4 only the absolute difference is reported: the objective holds terms -ln(share + 1e-6), in which a rounding error of 1e-16 in a share near 0 is an error of 1e-10, so a finite difference of the objective cannot resolve a small gradient to many digits.
+
+After the settings the check says what the weights of the loss mean, on the 24 samples: by default the weight of a batch is the number of its scored code points, 1,541. With `sampleWeightPower` 1 the objective is the mean of the samples' own losses per code point, and the weight is 24. With the first 5 scored code points weighing 3 times the weight is 1,753.
 
 Each of the checks then runs tables with added structure, e.g. this one three more settings. `../structure/README.md` says what those parts cover.
 

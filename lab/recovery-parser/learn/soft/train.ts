@@ -144,7 +144,8 @@ export type TrainOptions = {
 
 export type TrainPoint = {
   samples: number
-  // The loss per scored code point over the samples since the point before. NaN at the first point, before any sample.
+  // The loss per scored code point over the samples since the point before, i.e. the loss divided by the weight of
+  // the scored code points, see LossTally.weight. NaN at the first point, before any sample.
   loss: number
   // Shares from 0 to 1 of the returned tables in the exact parser on the validation split, see score.ts. The
   // returned tables are the snapped ones, or with TrainOptions.onlyReadCells the ones in readCellsOnly below.
@@ -334,7 +335,7 @@ export async function train(model: TwinModel, data: TwinData, options: TrainOpti
       const readCellsOnly = options.trainedOn === undefined ? undefined : withUnreadCellsOf(model.base, snapped, cellsReadAt(snapped, options.trainedOn.samples, options.trainedOn.places)).tables
       const changedAndRead = readCellsOnly === undefined ? changedCells : differencesOf(model.base, readCellsOnly).length
       const tables = onlyReadCells && readCellsOnly !== undefined ? readCellsOnly : snapped
-      const loss = sinceLog.codePoints === 0 ? NaN : sinceLog.loss / sinceLog.codePoints
+      const loss = sinceLog.weight === 0 ? NaN : sinceLog.loss / sinceLog.weight
       const point: TrainPoint = {samples: samplesSeen, loss, allThree: NaN, kind: NaN, depth: NaN, container: NaN, whole: NaN, pickingHalf: NaN, otherHalf: NaN, changedCells, changedAndRead, readCellsOnly: NaN, ...readFixedSet(tables)}
       if (options.validation !== undefined && validationHalves !== undefined) {
         if (readCellsOnly !== undefined) point.readCellsOnly = sharesOf(scoreTables(readCellsOnly, options.validation, {breakdowns: false}).rows[0]!).allThree
@@ -354,7 +355,7 @@ export async function train(model: TwinModel, data: TwinData, options: TrainOpti
       last = tables
       points.push(point)
       const percent = (share: number) => (100 * share).toFixed(1).padStart(5)
-      const perCodePoint = (total: number) => sinceLog.codePoints === 0 ? '-' : (total / sinceLog.codePoints).toFixed(3)
+      const perCodePoint = (total: number) => sinceLog.weight === 0 ? '-' : (total / sinceLog.weight).toFixed(3)
       const sharpness = sharpnessOf(model, batches.mixes)
       log(`${String(samplesSeen).padStart(7)} samples  loss ${Number.isNaN(loss) ? '-' : loss.toFixed(4)} (kind ${perCodePoint(sinceLog.kindLoss)} depth ${perCodePoint(sinceLog.depthLoss)} container ${perCodePoint(sinceLog.containerLoss)} intended ${perCodePoint(sinceLog.intendedLoss)})`
         + `  free run: loss ${point.freeLoss.toFixed(4)}, ${point.freeLossWithoutRuledOut.toFixed(4)} without the ${point.ruledOutCodePoints} of ${point.fixedCodePoints} code points with a label ruled out (${(100 * point.ruledOut).toFixed(1)}%), reads as the snapped tables at ${percent(point.readsAsSnapped).trim()}%`
@@ -377,7 +378,7 @@ export async function train(model: TwinModel, data: TwinData, options: TrainOpti
         step++
         // The draws that keep a run on track change with every step.
         const tally = await batches.run(batch, {...options.loss, onTrackSeed: seed * 1_000_003 + step}, true)
-        weightGradientsInto(model, temperature, batches.mixes, batches.mixGradients, 1 / Math.max(1, tally.codePoints), weightGradients)
+        weightGradientsInto(model, temperature, batches.mixes, batches.mixGradients, tally.weight === 0 ? 1 : 1 / tally.weight, weightGradients)
         meanEntropy = addSharpnessCost(model, temperature, batches.mixes, sharpnessCost, weightGradients)
         const firstCorrection = 1 - firstDecay ** step
         const secondCorrection = 1 - secondDecay ** step

@@ -406,6 +406,16 @@ export type LossOptions = {
   intendedEverywhere?: boolean
   // The seed of the draws for onTrackProbability. A sample's draws depend on this seed and on the sample's index.
   onTrackSeed?: number
+  // How much a sample weighs. By default every scored code point weighs 1, so a sample weighs as much as it has
+  // scored code points, e.g. 358 for a long text and 12 for a short one. With this power, every loss of a sample is
+  // divided by (the sample's scored code points) ^ power: with 1 every sample weighs the same, whatever its length,
+  // and 0.5 is in between. The default is 0.
+  sampleWeightPower?: number
+  // More weight on the code points right after the first error: the three label losses of the first
+  // `firstCodePoints` scored code points of a sample weigh `firstCodePointsWeight` times as much as the ones of its
+  // other code points, e.g. the first 8 weigh 4 times as much. The defaults are 0 code points and 1.
+  firstCodePoints?: number
+  firstCodePointsWeight?: number
 }
 
 // What a batch adds up: the loss, how many scored code points it counts, and its parts.
@@ -413,8 +423,12 @@ export type LossTally = {
   // Samples that the twin ran, i.e. that have a code point at or after their first error.
   samples: number
   // Scored code points: at or after the first error, with a label that has a scored value. They are the code points
-  // that a score counts, see ../score.ts. The loss per code point is `loss / codePoints`.
+  // that a score counts, see ../score.ts.
   codePoints: number
+  // The weights of those code points added up, see LossOptions.sampleWeightPower and LossOptions.firstCodePoints:
+  // the same number as `codePoints` when every code point weighs 1, and the number of samples when every sample
+  // weighs the same. The loss per code point is `loss / weight`.
+  weight: number
   // Steps that the twin took.
   positions: number
   loss: number
@@ -433,7 +447,7 @@ export type LossTally = {
   ruledOutLoss: number
 }
 
-export const createTally = (): LossTally => ({samples: 0, codePoints: 0, positions: 0, loss: 0, kindLoss: 0, depthLoss: 0, containerLoss: 0, intendedLoss: 0, replaced: 0, ruledOut: 0, ruledOutLoss: 0})
+export const createTally = (): LossTally => ({samples: 0, codePoints: 0, weight: 0, positions: 0, loss: 0, kindLoss: 0, depthLoss: 0, containerLoss: 0, intendedLoss: 0, replaced: 0, ruledOut: 0, ruledOutLoss: 0})
 export function addTally(total: LossTally, part: LossTally) {
   for (const field of Object.keys(total) as (keyof LossTally)[]) total[field] += part[field]
 }
@@ -481,6 +495,8 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
   const containers = numbers(3)
   // 1 where the state after a position was replaced by the intended state.
   const replaced = new Uint8Array(positions)
+  // What the three label losses of a position weigh, see LossOptions.sampleWeightPower and LossOptions.firstCodePoints.
+  const labelWeights = new Float64Array(positions)
 
   // Per depth of the range: its depth class, and the level whose kind is the innermost container's, 0 for none.
   const classOfDepth = new Uint8Array(depthCount)
@@ -947,7 +963,8 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
 
   // Runs the twin on one sample, from its first error to the last of its code points, or to position `end` - 1 with
   // `end` given, e.g. 513 for the positions after the text too. Adds the sample's loss to `tally`, and with
-  // `gradients`, the gradients of the loss by the cells' mixes to it. Neither is divided by the number of code points.
+  // `gradients`, the gradients of the loss by the cells' mixes to it. Neither is divided by the weight of the code
+  // points, LossTally.weight.
   function runSample(data: TwinData, place: number, options: LossOptions, tally: LossTally, gradients?: CellArrays, end?: number) {
     if (data.classTable !== classTable || data.contextCount !== contextCount) {
       throw new Error(`the samples were packed for tables with ${data.classCount} classes and ${data.contextCount} contexts, and the twin's tables have ${classCount} and ${contextCount}${data.classCount === classCount && data.contextCount === contextCount ? ', with other code points in their added classes' : ''}: give packForTwin the twin's tables`)
@@ -968,6 +985,17 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
     const intendedEverywhere = options.intendedEverywhere === true
     if (onTrackProbability > 0 && !data.hasIntendedObjects) throw new Error('keeping the run on track needs the intended stacks, see twin-data.ts')
     const random = onTrackProbability > 0 ? createRandom(options.onTrackSeed ?? 0, data.index[place]!) : undefined
+    const sampleWeightPower = options.sampleWeightPower ?? 0
+    const firstCodePoints = options.firstCodePoints ?? 0
+    const firstCodePointsWeight = options.firstCodePointsWeight ?? 1
+    // What every loss of this sample is multiplied by: 1 / (its scored code points) ^ sampleWeightPower.
+    let sampleWeight = 1
+    if (sampleWeightPower !== 0) {
+      let scored = 0
+      for (let position = first; position < Math.min(stop, length); position++) if ((data.flags[start + position]! & (codePointNestingScored | codePointKindScored)) !== 0) scored++
+      if (scored > 0) sampleWeight = scored ** -sampleWeightPower
+    }
+    let scoredBefore = 0
 
     tally.samples++
     setStateBefore(first, data.startLexerState[place]!, data.startGrammarState[place]!, data.startDepth[place]!, data.startObjects[place]!)
@@ -995,7 +1023,11 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       const scoresNesting = (flags & codePointNestingScored) !== 0
       const scoresKind = (flags & codePointKindScored) !== 0
       if (scoresNesting || scoresKind) {
+        const labelWeight = scoredBefore < firstCodePoints ? sampleWeight * firstCodePointsWeight : sampleWeight
+        labelWeights[position] = labelWeight
+        scoredBefore++
         tally.codePoints++
+        tally.weight += labelWeight
         let depthShare = 1
         let containerShare = 1
         let kindShare = 1
@@ -1003,15 +1035,15 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
         if (scoresNesting) {
           depthShare = depthAfter[position * depthCount + data.labelDepth[at]! - depthLow]!
           containerShare = containers[position * 3 + data.labelContainer[at]!]!
-          const depthLoss = -depthWeight * Math.log(depthShare + lossFloor)
-          const containerLoss = -containerWeight * Math.log(containerShare + lossFloor)
+          const depthLoss = -labelWeight * depthWeight * Math.log(depthShare + lossFloor)
+          const containerLoss = -labelWeight * containerWeight * Math.log(containerShare + lossFloor)
           tally.depthLoss += depthLoss
           tally.containerLoss += containerLoss
           labelLoss += depthLoss + containerLoss
         }
         if (scoresKind) {
           kindShare = kinds[position * displayKindCount + data.labelKind[at]!]!
-          const kindLoss = -kindWeight * Math.log(kindShare + lossFloor)
+          const kindLoss = -labelWeight * kindWeight * Math.log(kindShare + lossFloor)
           tally.kindLoss += kindLoss
           labelLoss += kindLoss
         }
@@ -1023,9 +1055,9 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
       }
       // The extra targets, at every kept code point whose intended state may be used, scored or not.
       if (intendedTargets && targetHere) {
-        const intendedLoss = -intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
+        const intendedLoss = sampleWeight * (-intendedLexerWeight * Math.log(lexerAfter[position * lexerStateCount + data.intendedLexerAfter[at]!]! + lossFloor)
           - intendedEventWeight * Math.log(events[position * eventCount + data.intendedEvent[at]!]! + lossFloor)
-          - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor)
+          - intendedGrammarWeight * Math.log(grammarAfter[position * grammarStateCount + data.intendedGrammarAfter[at]!]! + lossFloor))
         tally.intendedLoss += intendedLoss
         tally.loss += intendedLoss
       }
@@ -1056,21 +1088,21 @@ export function createTwinRunner(shape: TwinShape, depthLow: number = defaultDep
         const flags = data.flags[at]!
         if ((flags & codePointNestingScored) !== 0) {
           const depthIndex = data.labelDepth[at]! - depthLow
-          depthGradient[depthIndex]! -= depthWeight / (depthAfter[position * depthCount + depthIndex]! + lossFloor)
+          depthGradient[depthIndex]! -= labelWeights[position]! * depthWeight / (depthAfter[position * depthCount + depthIndex]! + lossFloor)
           const container = data.labelContainer[at]!
-          containerGradient[container] = -containerWeight / (containers[position * 3 + container]! + lossFloor)
+          containerGradient[container] = -labelWeights[position]! * containerWeight / (containers[position * 3 + container]! + lossFloor)
         }
         if ((flags & codePointKindScored) !== 0) {
           const kind = data.labelKind[at]!
-          kindGradient[kind] = -kindWeight / (kinds[position * displayKindCount + kind]! + lossFloor)
+          kindGradient[kind] = -labelWeights[position]! * kindWeight / (kinds[position * displayKindCount + kind]! + lossFloor)
         }
         if (intendedTargets && data.intendedLexerAfter[at]! >= 0 && (intendedEverywhere ? (flags & codePointKindScored) !== 0 : (flags & codePointCanFollow) !== 0)) {
           const lexerState = data.intendedLexerAfter[at]!
           const event = data.intendedEvent[at]!
           const grammarState = data.intendedGrammarAfter[at]!
-          lexerGradient[lexerState]! -= intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
-          eventGradient[event] = -intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
-          grammarGradient[grammarState]! -= intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
+          lexerGradient[lexerState]! -= sampleWeight * intendedLexerWeight / (lexerAfter[position * lexerStateCount + lexerState]! + lossFloor)
+          eventGradient[event] = -sampleWeight * intendedEventWeight / (events[position * eventCount + event]! + lossFloor)
+          grammarGradient[grammarState]! -= sampleWeight * intendedGrammarWeight / (grammarAfter[position * grammarStateCount + grammarState]! + lossFloor)
         }
       }
       stepBackward(position, position < length ? data.classes[at]! : 0, gradients)
@@ -1106,7 +1138,8 @@ export type ObjectiveOptions = LossOptions & {
   sharpnessCost?: number
 }
 
-// What training lowers: the loss per scored code point of the samples at `places`, plus the sharpness cost. With
+// What training lowers: the loss of the samples at `places` divided by the weight of their scored code points, which
+// is the loss per scored code point when every code point weighs 1, plus the sharpness cost. With
 // `weightGradients`, writes the gradients by the weights into it. This is the one-thread form. train.ts splits the
 // samples over worker threads and puts the parts together in the same way.
 export function objective(model: TwinModel, runner: TwinRunner, data: TwinData, places: ArrayLike<number>, options: ObjectiveOptions, mixes: CellArrays, mixGradients?: CellArrays, weightGradients?: CellArrays) {
@@ -1115,7 +1148,7 @@ export function objective(model: TwinModel, runner: TwinRunner, data: TwinData, 
   runner.setMixes(mixes)
   if (mixGradients !== undefined) mixGradients.all.fill(0)
   const tally = runBatch(runner, data, places, 0, places.length, options, mixGradients)
-  const scale = 1 / Math.max(1, tally.codePoints)
+  const scale = tally.weight === 0 ? 1 : 1 / tally.weight
   if (mixGradients !== undefined && weightGradients !== undefined) weightGradientsInto(model, temperature, mixes, mixGradients, scale, weightGradients)
   const sharpnessCost = options.sharpnessCost ?? 0
   const meanEntropy = addSharpnessCost(model, temperature, mixes, sharpnessCost, weightGradients)

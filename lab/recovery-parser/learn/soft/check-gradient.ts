@@ -4,7 +4,9 @@
 //   bun lab/recovery-parser/learn/soft/check-gradient.ts [samples, default 24] [single weights per group and setting, default 60]
 //
 // Every open cell is trainable and its weights are random, so every mix is a random mix. For each setting of the
-// options below, the backward pass gives the gradient of the objective by every weight. The last settings run tables
+// options below, the backward pass gives the gradient of the objective by every weight. The last setting weighs the
+// samples and the first code points after a first error otherwise than by default, see LossOptions.sampleWeightPower,
+// and a part after the settings checks what those weights mean. The three settings before it run tables
 // with added structure, see ../structure/README.md: with added classes, two added tokenizer states, an added
 // grammar state, open entries of the display table, whose mixes are a fifth group of weights, and the bit "first on
 // its line", on samples of which half need a class. The check compares the gradient with
@@ -79,6 +81,9 @@ const settings: Setting[] = [
   {name: `${added}: the three label losses alone`, setup: withStructure, added: true, options: {}, depthLow: -8, depthHigh: 24, weightScale: 1.5},
   {name: `${added}: every option on`, setup: withStructure, added: true, depthLow: -8, depthHigh: 24, weightScale: 1.5, options: everyOption},
   {name: `${added}: sharp mixes, on track with probability 0.5, a narrow depth range`, setup: withStructure, added: true, depthLow: -1, depthHigh: 17, weightScale: 6, options: {onTrackProbability: 0.5, onTrackSeed: 11, sharpnessCost: 0.2}},
+  // The last setting is with today's tables again, so that the settings before it keep their random weights.
+  {name: 'a weight per sample and more weight after the first error: every loss of a sample divided by the root of its scored code points, the first 5 scored code points weigh 3 times, intended targets', setup: todays, added: false,
+    depthLow: -8, depthHigh: 24, weightScale: 1.5, options: {sampleWeightPower: 0.5, firstCodePoints: 5, firstCodePointsWeight: 3, intendedLexerWeight: 0.3, intendedGrammarWeight: 0.4}},
 ]
 
 // A normal random number from two uniform ones.
@@ -182,6 +187,29 @@ for (let settingIndex = 0; settingIndex < settings.length; settingIndex++) {
     console.log(`  ${group.padEnd(13)} ${String(notZero.length).padStart(5)} of ${String(all.length).padStart(5)} weights have a gradient, the largest ${largestGradient.toExponential(2)}. `
       + `${directionsPerGroup} directions: relative difference at most ${groupDirection.toExponential(2)}. ${chosen.size} single weights: absolute at most ${groupAbsolute.toExponential(2)}, relative at most ${groupRelative.toExponential(2)} over the ${large} of at least ${largeGradient}`)
   }
+}
+
+// What the weights of the loss mean, see LossOptions in twin.ts, on the samples of today's tables with the weights
+// that the last setting left:
+// - by default a scored code point weighs 1, so the weight of the samples is the number of their scored code points,
+// - with sampleWeightPower 1 every sample weighs the same: the objective is the mean over the samples of each
+//   sample's own loss per code point, and the weight is the number of samples,
+// - with firstCodePoints 5 and firstCodePointsWeight 3 the weight is the scored code points plus 2 for each of the
+//   first 5 of every sample.
+{
+  const {model, data, everyPlace, mixes} = todays
+  const runner = createTwinRunner(model.shape)
+  const alone = Array.from(everyPlace, place => objective(model, runner, data, [place], {}, mixes))
+  const meanOfTheSamples = alone.reduce((total, result) => total + result.value, 0) / alone.length
+  const together = objective(model, runner, data, everyPlace, {}, mixes)
+  if (together.tally.weight !== together.tally.codePoints) fail(`by default the weight of the samples is ${together.tally.weight}, and they have ${together.tally.codePoints} scored code points`)
+  const sameWeight = objective(model, runner, data, everyPlace, {sampleWeightPower: 1}, mixes)
+  if (!(Math.abs(sameWeight.value - meanOfTheSamples) <= 1e-9 * meanOfTheSamples)) fail(`with every sample weighing the same the objective is ${sameWeight.value}, and the mean of the samples' own losses per code point is ${meanOfTheSamples}`)
+  if (!(Math.abs(sameWeight.tally.weight - alone.length) <= 1e-9)) fail(`with every sample weighing the same the weight is ${sameWeight.tally.weight}, and there are ${alone.length} samples`)
+  const firstWeighMore = objective(model, runner, data, everyPlace, {firstCodePoints: 5, firstCodePointsWeight: 3}, mixes)
+  const expectedWeight = alone.reduce((total, result) => total + result.tally.codePoints + 2 * Math.min(5, result.tally.codePoints), 0)
+  if (firstWeighMore.tally.weight !== expectedWeight) fail(`with the first 5 scored code points weighing 3 times the weight is ${firstWeighMore.tally.weight}, and it should be ${expectedWeight}`)
+  console.log(`The weights of the loss on ${alone.length} samples with ${together.tally.codePoints} scored code points: with every sample weighing the same the objective is ${sameWeight.value.toFixed(6)}, the mean of the samples' own losses per code point, where the loss per code point of all of them is ${together.value.toFixed(6)}. With the first 5 scored code points weighing 3 times the weight is ${firstWeighMore.tally.weight}.`)
 }
 
 for (const [name, worst] of [['today\'s tables', worstOfTodays], ['added structure', worstOfAdded]] as const) {
