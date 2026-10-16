@@ -5,7 +5,11 @@
 //    no state depends on it. So the twin has to show what the reference twin shows, which holds every stack then,
 //    with the same loss and the same gradient by the logits of the display entries.
 // 2. With mixes in cells: what the twin shows for a token adds up to 1 for the display kind, for the depth and for
-//    the container, and no share is negative. So no step loses a share or makes one.
+//    the container, and no share is negative. So no step loses a share or makes one. Two of the settings are
+//    tables that skip a rejected token or pop, with all but 1e-15 of every mix on the tables' choice, as after a
+//    long training: the parse then goes on through hundreds of reductions, and a share that rounding makes
+//    negative by 1e-16 would grow with every reduction, if a step let it through, and end as a loss that is no
+//    number. A training of the design's form on 40,000 samples ended so before the twin kept such a share at 0.
 // 3. A run with a gradient and a run without one take two routes through the twin's memory, and have to give the
 //    same loss to the last digit.
 //
@@ -15,9 +19,10 @@ import {resolve} from 'node:path'
 import {defaultSeed, loadSamples} from '../../dataset.ts'
 import {containerCount, displayKindCount} from '../../labels.ts'
 import {createRandom} from '../../random.ts'
+import {skipTables} from '../bars.ts'
 import {packSamples} from '../data.ts'
 import {optionOf, refuseUnknownOptions} from '../options.ts'
-import {type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, randomizeOpenCells, withoutEndEarly} from '../recovery-tables.ts'
+import {type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, changeableCellsOf, choicePop, choiceSkip, choicesOf, randomizeOpenCells, withoutEndEarly} from '../recovery-tables.ts'
 import {createModel} from '../soft/model.ts'
 import {createTwin as createStacksTwin} from '../soft/stacks-twin.ts'
 import {type TwinModule, createReading, createTally, readingDepthCount} from '../soft/twin.ts'
@@ -88,16 +93,18 @@ const forms = [{name: 'the design\'s form', options: {}}, {name: 'the variant pu
 {
   const reading = createReading()
   for (const {name, options} of forms) {
-    for (const [cut, extra, depthTolerance] of [['without a cut (leastLive 0, leastShare 0), on 40 samples of at most 8 tokens', {leastLive: 0, leastShare: 0}, 1e-9], ['with the settings that train, on 200 samples', {}, 1e-5]] as const) {
+    for (const [cut, extra, depthTolerance] of [['without a cut (leastLive 0, leastShare 0), on 40 samples of at most 8 tokens', {leastLive: 0, leastShare: 0}, 1e-9], ['with the settings that train, on 200 or 400 samples', {}, 1e-5]] as const) {
       let tokens = 0, largestOff = 0, largestDepthOff = 0, mostNegative = 0
-      for (let setting = 0; setting < 4; setting++) {
-        const base = layoutOf(setting)
+      for (let setting = 0; setting < 6; setting++) {
+        // Three starts: random logits, the recipe's 0.9 on the base's choice, and almost all of every mix on the
+        // choice of tables that go on after every rejected token: they skip it, or pop in every third such cell.
+        const base = setting < 4 ? layoutOf(setting) : skipTables(layoutOf(setting))
+        if (setting >= 4) for (const cell of changeableCellsOf(base)) if (cell % 3 === 0 && base.choice[cell] === choiceSkip && choicesOf(base, cell).includes(choicePop)) base.choice[cell] = choicePop
         const random = createRandom(172, setting)
-        // Two starts: random logits, and the recipe's 0.9 on the base's choice.
-        const model = createModel(base, {start: setting < 2 ? 'uniform' : 'base'})
+        const model = createModel(base, setting < 2 ? {start: 'uniform'} : setting < 4 ? {start: 'base'} : {start: 'base', startShare: 1 - 1e-15})
         if (setting < 2) for (let logit = 0; logit < model.logits.length; logit++) model.logits[logit] = 1.5 * normal(random)
         const twin = createTwin(model.layout, {...options, ...extra})
-        const chosen = 'leastShare' in extra ? samples.filter(sample => sample.tokens.count - sample.firstErrorToken <= 8).slice(0, 40) : samples.slice(0, 200)
+        const chosen = 'leastShare' in extra ? samples.filter(sample => sample.tokens.count - sample.firstErrorToken <= 8).slice(0, 40) : setting < 4 ? samples.slice(0, 200) : samples
         const packed = packSamples(chosen, base)
         for (let place = 0; place < packed.sampleCount; place++) {
           twin.run(model.logits, packed, [place], createTally(), null, reading)

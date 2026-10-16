@@ -292,7 +292,7 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
       pushTakeFrom.fill(0)
     }
     pushKeepAll = pushTakeAll = stayAll = popAll = reduceAll = 0
-    fullShare = used === levelCount ? sumOfRange(tape, from + (levelCount - 1) * stateCount, stateCount) / mass : 0
+    fullShare = used === levelCount ? Math.min(1, sumOfRange(tape, from + (levelCount - 1) * stateCount, stateCount) / mass) : 0
     for (let state = 0; state < stateCount; state++) {
       const top = tape[from + state]!
       if (top === 0) continue
@@ -373,7 +373,10 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
     }
 
     // The top level: the pushed states, the level below the top for a pop, and the states after the nonterminals
-    // of the reductions.
+    // of the reductions. The part of a pop or of a reduction whose stack has no state at the level that it reads is
+    // what is left of the mass, and goes to `stopped`. Rounding can make a level's sum larger than the mass by
+    // 1e-16, and what is left is then 0 and not negative: a negative share would double with every reduction that
+    // follows, as any small share that is on the wrong level does in this twin, and has nothing to stop it at 0.
     for (let state = 0; state < stateCount; state++) values[to + state] = pushKeep[state]!
     if (popAll !== 0) {
       const scaled = popAll * inverse
@@ -385,9 +388,10 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
           below += share
         }
       }
-      values[to + stopped]! += scaled * (mass - below)
+      const withoutBelow = Math.max(0, mass - below)
+      values[to + stopped]! += scaled * withoutBelow
       counters.sharePopped += popAll
-      counters.sharePoppedToStopped += scaled * (mass - below)
+      counters.sharePoppedToStopped += scaled * withoutBelow
     }
     if (reduceAll !== 0) {
       for (let slot = 0; slot < reduceWeight.length; slot++) {
@@ -407,8 +411,9 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
             if (target === stopped) withoutState += share
           }
         }
-        values[to + stopped]! += scaled * (mass - found)
-        counters.shareReducedToStopped += scaled * (mass - found + withoutState)
+        const withoutLevel = Math.max(0, mass - found)
+        values[to + stopped]! += scaled * withoutLevel
+        counters.shareReducedToStopped += scaled * (withoutLevel + withoutState)
       }
       counters.shareReduced += reduceAll
     }
@@ -698,7 +703,7 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
         below = sumOfRange(values, from + stateCount, stateCount)
         popDot = dotOfRanges(gradientNext, 0, values, from + stateCount, stateCount)
       }
-      popDot += toStopped * (mass - below)
+      popDot += toStopped * Math.max(0, mass - below)
     }
     if (reduceAll !== 0) {
       for (let slot = 0; slot < reduceWeight.length; slot++) {
@@ -714,7 +719,7 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
             found += share
           }
         }
-        reduceDot[slot] = dot + toStopped * (mass - found)
+        reduceDot[slot] = dot + toStopped * Math.max(0, mass - found)
       }
     }
 
@@ -765,6 +770,8 @@ export function createTwin(layout: Layout, options: TwinOptions = {}): Twin {
     }
     // The mass is the sum of the top level: every weight is divided by it, the part of a pop and of a reduction
     // that finds no state below is what is left of it, and the share whose stack is full is a level's sum over it.
+    // Where rounding made what is left negative and the step took 0, the gradient is still the one of what is left:
+    // the two differ by 1e-16.
     const byMass = -inverse * scaledTotal + toStopped * inverse * (popAll + reduceAll) - fullGradient * fullShare * inverse
     for (let state = 0; state < stateCount; state++) gradientBefore[state]! += byMass
     if (fullShare !== 0) for (let state = 0; state < stateCount; state++) gradientBefore[(levelCount - 1) * stateCount + state]! += fullGradient * inverse
