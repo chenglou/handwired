@@ -33,7 +33,7 @@ import {type RecoveryTables, addClasses, addFirstOnLineBit, asIsTables, differen
 import {scoreRestartAtNextLine} from '../../learn/restart-at-next-line.ts'
 import {countCells, scoreTables} from '../../learn/score.ts'
 import {type Parser, parserAsItIs, parserOfTables, restartAtNextLine} from '../parsers.ts'
-import {countsOf, differencesFromToday, labelKindCountsOf, parserOfCheckedTables, todaysTracesOf} from './count.ts'
+import {countsOf, differencesFromToday, labelKindCountsOf, parserOfCheckedTables, scoredPerTextOf, todaysTracesOf} from './count.ts'
 import {listFile, problemsOfList, readList, sha256OfFile} from './list.ts'
 import {type AsTodayFacts, type FileCounts, type FileFacts, type RowCounts, type RunFacts, type SavedCounts, describeReport, dryRunMark, heldBackLine, mainRows} from './report.ts'
 import {type Comparison, compare, compareWithGeneratorScorer, compareWithLearnScorer, compareWithWrittenScorer} from './second-count.ts'
@@ -73,11 +73,12 @@ export function baseOf(tables: RecoveryTables): RecoveryTables {
 // is held back.
 export const finalRunsIn = (logText: string) => logText.split('\n').filter(line => line.startsWith('{')).length
 
-// JSON text with one line per object whose values are all numbers, strings, booleans or null, e.g. a row of counts.
+// JSON text with one line per object whose values are all numbers, strings, booleans or null, e.g. a row of counts,
+// and one line per list of such values.
 function jsonText(value: unknown, indent = ''): string {
   if (typeof value !== 'object' || value === null) return JSON.stringify(value)
   const inner = `${indent} `
-  if (Array.isArray(value)) return value.length === 0 ? '[]' : `[\n${(value as unknown[]).map(entry => `${inner}${jsonText(entry, inner)}`).join(',\n')}\n${indent}]`
+  if (Array.isArray(value)) return (value as unknown[]).every(entry => typeof entry !== 'object' || entry === null) ? JSON.stringify(value) : `[\n${(value as unknown[]).map(entry => `${inner}${jsonText(entry, inner)}`).join(',\n')}\n${indent}]`
   const entries = Object.entries(value as Record<string, unknown>)
   if (entries.every(([, entry]) => typeof entry !== 'object' || entry === null)) return JSON.stringify(value)
   return `{\n${entries.map(([key, entry]) => `${inner}${JSON.stringify(key)}: ${jsonText(entry, inner)}`).join(',\n')}\n${indent}}`
@@ -204,11 +205,13 @@ if (import.meta.main) {
 
   const countsOfScorer = (label: string, scorer: Scorer): FileCounts | undefined => attempt(`the scoring of ${scorer.quick.name}`, () => {
     const onHeldBack = scoresHeldBack(scorer)
+    const rightPerText: FileCounts['rightPerText'] = {generator: onHeldBack ? [] : null, written: onHeldBack ? [] : null, dataset: []}
     const counts: FileCounts = {
       seed: scorer.seed, file: scorer.file, sha256: scorer.sha256,
-      generator: onHeldBack ? countsOf(scorer.quick, generator) : null,
-      written: onHeldBack ? countsOf(scorer.quick, written) : null,
-      dataset: countsOf(scorer.quick, dataset),
+      generator: rightPerText.generator === null ? null : countsOf(scorer.quick, generator, rightPerText.generator),
+      written: rightPerText.written === null ? null : countsOf(scorer.quick, written, rightPerText.written),
+      dataset: countsOf(scorer.quick, dataset, rightPerText.dataset),
+      rightPerText,
       labelKinds: {
         generator: onHeldBack ? labelKindCountsOf(scorer.quick, generator, mainRows.generator) : null,
         written: onHeldBack ? labelKindCountsOf(scorer.quick, written, mainRows.written) : null,
@@ -281,6 +284,11 @@ if (import.meta.main) {
   const facts: RunFacts = {
     dryRun, time, commit, uncommittedChanges, command, listFile: listPath, listSha256: sha256OfFile(listPath), datasetKey: datasetKey(), countsFile,
     titles: {generator: generator.title, written: written.title, dataset: dataset.title},
+    texts: {
+      generator: {ids: generator.texts.map(text => text.id), scored: scoredPerTextOf(generator)},
+      written: {ids: written.texts.map(text => text.id), scored: scoredPerTextOf(written)},
+      dataset: {ids: dataset.texts.map(text => text.id), scored: scoredPerTextOf(dataset)},
+    },
     files: fileFacts, secondCounts, unchangedTables, asToday,
     datasetSplit: {split, indexesMade: dataset.indexesMade, texts: dataset.texts.length, ofHeldOutTemplates}, problems,
   }

@@ -19,7 +19,7 @@ import {readFileSync} from 'node:fs'
 import {displayKind} from '../../kinds.ts'
 import {asIsTables, classNames, lexerStateNames, tablesFromJson, tablesToJson} from '../../learn/recovery-tables.ts'
 import {type Parser, type Shown, parserAsItIs, restartAtNextLine} from '../parsers.ts'
-import {type Counts, countsOf, countsOfText, differencesFromToday, labelKindCountsOf, parserOfCheckedTables, percentagesOf, todaysTracesOf} from './count.ts'
+import {type Counts, countsOf, countsOfText, differencesFromToday, labelKindCountsOf, parserOfCheckedTables, percentagesOf, scoredPerTextOf, todaysTracesOf} from './count.ts'
 import {type FinalList, listFile, problemsOfList, readList} from './list.ts'
 import {type FileCounts, type RowCounts, type RunFacts, type VerdictSet, describeReport, heldBackLine, mainRows, verdictOf, verdicts} from './report.ts'
 import {baseOf, countsFileText, finalRunsIn} from './run.ts'
@@ -100,8 +100,13 @@ for (const [name, set] of sets) {
   check(asErrors.kindScored > 0 && asErrors.kindRight === 0 && asErrors.addedShownAsError === asErrors.added, `the ${name} set with \`error\` everywhere: none of the ${asErrors.kindScored} scored display kinds is right`)
 }
 
-// The counts per display kind of the label add up to the row's counts.
+// The counts per display kind of the label and the counts per text add up to the row's counts.
 for (const [name, set] of sets) {
+  const rightPerText: number[] = []
+  const all = countsOf(parserAsItIs, set, rightPerText)
+  const total = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0)
+  const allCases = name === 'generator' ? 'all' : 'all cases, the agreed code points'
+  check(rightPerText.length === set.texts.length && total(rightPerText) === rowOf(all, allCases).right && total(scoredPerTextOf(set)) === rowOf(all, allCases).scored, `the counts per text of the ${name} set add up to the ${rowOf(all, allCases).right} right of ${rowOf(all, allCases).scored} scored code points of all its texts`)
   const ofKinds = labelKindCountsOf(parserAsItIs, set, mainRows[name])
   const row = rowOf(counts[0]![name], mainRows[name])
   check(ofKinds.reduce((total, of) => total + of.scored, 0) === row.scored && ofKinds.reduce((total, of) => total + of.right, 0) === row.right, `the counts per display kind of the label of the ${name} set add up to the ${row.scored} scored and ${row.right} right code points of its main row`)
@@ -155,6 +160,7 @@ const standIn = (seed: number | null, movedRight: number): FileCounts => {
   return {
     seed, file: seed === null ? null : `made up/seed-${seed}.tables.json`, sha256: seed === null ? null : 'made up', generator: moved(counts[1]!.generator), written: moved(counts[1]!.written), dataset: moved(counts[1]!.generator),
     labelKinds: {generator: labelKindCountsOf(restartAtNextLine, generator, mainRows.generator), written: labelKindCountsOf(restartAtNextLine, written, mainRows.written), dataset: []},
+    rightPerText: {generator: [1, 2], written: [3], dataset: []},
   }
 }
 const asItIsCounts: FileCounts = {...standIn(null, 0), generator: counts[0]!.generator, written: counts[0]!.written, dataset: counts[0]!.generator}
@@ -169,7 +175,7 @@ const madeUpRows = (row4: number[], row7: number[]): RowCounts[] => [
 ]
 const madeUpFacts: RunFacts = {
   dryRun: false, time: 'made up', commit: 'made up', uncommittedChanges: false, command: 'made up', listFile: 'made up', listSha256: 'made up', datasetKey: 'made up', countsFile: 'made up',
-  titles: {generator: 'made up', written: 'made up', dataset: 'made up'}, files: [], secondCounts: {compared: 0, different: []}, unchangedTables: {compared: 0, different: []}, asToday: [],
+  titles: {generator: 'made up', written: 'made up', dataset: 'made up'}, texts: {generator: {ids: ['made up'], scored: [1]}, written: {ids: [], scored: []}, dataset: {ids: [], scored: []}}, files: [], secondCounts: {compared: 0, different: []}, unchangedTables: {compared: 0, different: []}, asToday: [],
   datasetSplit: {split: 'test', indexesMade: 0, texts: 0, ofHeldOutTemplates: 0}, problems: [],
 }
 const reportChecks: [expected: typeof verdicts[number], row4: number[], row7: number[]][] = [[verdicts[0], [40, 60], [0]], [verdicts[1], [40, -5], [31, 45]], [verdicts[2], [10, 45], [-5]], [verdicts[3], [-1, 45], [0, 3]]]
@@ -182,7 +188,7 @@ for (const [expected, row4, row7] of reportChecks) {
   const saved = JSON.parse(countsFileText({format: 'recovery-toml final counts 1', ...madeUpFacts, rows, bases: []})) as {heldBack?: unknown, rows?: RowCounts[]}
   check(saved.heldBack === heldBackLine && countsFileText({format: 'recovery-toml final counts 1', ...madeUpFacts, rows, bases: []}).startsWith('{"heldBack": "HELD BACK') && JSON.stringify(saved.rows) === JSON.stringify(rows), 'the file of counts starts with the held-back line and gives the counts back when it is read')
 }
-const dryReport = describeReport(madeUpRows([1], [1]).map(row => ['1', '2'].includes(row.label) ? row : {...row, files: row.files.map(file => ({...file, generator: null, written: null, labelKinds: {...file.labelKinds, generator: null, written: null}}))}), [], {...madeUpFacts, dryRun: true})
+const dryReport = describeReport(madeUpRows([1], [1]).map(row => ['1', '2'].includes(row.label) ? row : {...row, files: row.files.map(file => ({...file, generator: null, written: null, labelKinds: {...file.labelKinds, generator: null, written: null}, rightPerText: {...file.rightPerText, generator: null, written: null}}))}), [], {...madeUpFacts, dryRun: true})
 check(dryReport[0] === heldBackLine && dryReport.slice(1).every(line => line.startsWith('dry run: ')) && dryReport.some(line => line.includes('A dry run has no verdict')), 'every line of a dry run\'s report but the first starts with "dry run: ", and it has no verdict')
 
 // The log, and what run.ts refuses before it reads the list.

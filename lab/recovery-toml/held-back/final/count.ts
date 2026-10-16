@@ -69,10 +69,13 @@ export function countsOfText(text: ScoredText, shown: Shown): Omit<Counts, 'name
 }
 
 // The counts of a parser in every row of a set, in the order of the set's rows. A row without a text is left out.
-export function countsOf(parser: Parser, set: ScoredSet): Counts[] {
+// With `rightPerText`, the number of right code points of every text is added to that list, in the order of the
+// set's texts, so that two parsers can later be compared text by text without scoring again.
+export function countsOf(parser: Parser, set: ScoredSet, rightPerText?: number[]): Counts[] {
   const rows = new Map<string, Counts>(set.rowNames.map(name => [name, noCounts(name)]))
   for (const text of set.texts) {
     const ofText = countsOfText(text, parser.show(text.broken))
+    rightPerText?.push(ofText.right)
     for (const name of text.rows) {
       const row = rows.get(name)
       if (row === undefined) throw new Error(`the text ${text.id} is in the row ${JSON.stringify(name)}, which is not among the rows of its set`)
@@ -108,6 +111,17 @@ export function labelKindCountsOf(parser: Parser, set: ScoredSet, rowName: strin
   }
   return counts.filter(of => of.scored > 0)
 }
+
+// How many code points of every text of a set a score counts, in the order of the set's texts. It is the same for
+// every parser.
+export const scoredPerTextOf = (set: ScoredSet): number[] => set.texts.map(text => {
+  let scored = 0
+  for (let position = Math.max(0, text.firstErrorPosition === -1 ? text.labels.length : text.firstErrorPosition); position < text.labels.length; position++) {
+    const label = text.labels[position]
+    if (label !== undefined && (label.kind !== undefined || label.depth !== undefined)) scored++
+  }
+  return scored
+})
 
 // A row's shares in percent, and NaN where there is nothing to divide by: "all three" and "whole".
 export function percentagesOf(row: Counts | undefined) {

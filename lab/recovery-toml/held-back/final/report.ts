@@ -25,6 +25,8 @@ export type FileCounts = {
   written: Counts[] | null
   dataset: Counts[]
   labelKinds: {generator: LabelKindCounts[] | null, written: LabelKindCounts[] | null, dataset: LabelKindCounts[]}
+  // Per text of a set, in the order of RunFacts.texts: how many of its scored code points are right.
+  rightPerText: {generator: number[] | null, written: number[] | null, dataset: number[]}
 }
 
 // A row of the experiment with the counts of each of its files. `label` is the row's number, e.g. "4", or "base" for
@@ -91,6 +93,8 @@ export type RunFacts = {
   countsFile: string
   // What the report calls each set.
   titles: Record<SetKey, string>
+  // The texts of each set in their order: the id, e.g. "20261107:12", and how many code points a score counts.
+  texts: Record<SetKey, {ids: string[], scored: number[]}>
   // The files of the list as they were checked before a text was scored.
   files: FileFacts[]
   // The second counts: how many counts were held against the count of a set's own scorer, and which differed.
