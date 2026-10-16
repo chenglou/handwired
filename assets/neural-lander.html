@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090e12">
+  <meta name="description" content="A rocket learns to land by differentiating through its own physics. A live Handwired experiment, entirely in TypeScript.">
+  <title>Neural Lander — a Handwired experiment</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3L24 24L16 20L8 24Z' fill='%237cf9d1'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./neural-lander.css">
+</head>
+<body>
+  <main class="app">
+    <header class="mast">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">⌁</span><span class="muted">EXPERIMENT 01</span></div>
+      <a class="source-link" href="https://github.com/chenglou/handwired/blob/main/docs/tutorial.md">THE RUNTIME ↗</a>
+    </header>
+    <section class="intro">
+      <div><h1>Neural <span>Lander.</span></h1><p>A rocket learning to land.<br>By backpropagating through its own universe.</p></div>
+      <div class="intro-note"><span>NO PRETRAINED MODEL.</span><span>NO SCRIPTED FLIGHT.</span><span>JUST TYPESCRIPT.</span></div>
+    </section>
+    <section class="experiment" aria-label="Interactive rocket experiment">
+      <div class="stage">
+        <div class="stage-top"><span><span class="dot"></span> FLIGHT REPLAY <b id="replay-iteration">0000</b></span><span id="replay-status">RANDOM INITIALIZATION</span></div>
+        <canvas id="flight" aria-label="Rocket trajectory. Move the landing platform with the target slider below."></canvas>
+        <div class="stage-bottom"><span><i class="legend-line"></i> CURRENT ATTEMPT <i class="legend-line ghost"></i> HISTORY</span><span id="flight-time">T + 0.00 s</span></div>
+        <div class="target-control"><label for="target">↔ DRAG THE LANDING PLATFORM <output id="target-value">+4.00 m</output></label><input id="target" type="range" min="-8" max="8" step="0.05" value="4" aria-label="Landing platform horizontal position in meters"></div>
+      </div>
+      <aside class="telemetry" aria-label="Live training telemetry">
+        <div class="telemetry-heading"><span class="eyebrow">LIVE OPTIMIZATION</span><span id="training-status" role="status">TRAINING</span></div>
+        <div class="loss-block"><span class="metric-label">TRAINING LOSS</span><div id="loss">—</div><canvas id="loss-chart" aria-label="Training loss history on a logarithmic scale"></canvas><div class="chart-caption"><span>LOG SCALE</span><span id="loss-change">INITIALIZING</span></div></div>
+        <div class="metrics"><div><span class="metric-label">ITERATION</span><strong id="iteration">0000</strong></div><div><span class="metric-label">LANDING ERROR</span><strong id="accuracy">— <small>m</small></strong></div><div><span class="metric-label">CONTACT SPEED</span><strong id="speed">— <small>m/s</small></strong></div><div><span class="metric-label">FLIGHT OUTCOME</span><strong id="outcome">—</strong></div></div>
+        <p class="metric-note" id="metric-note">Metrics describe the latest optimized trajectory.</p>
+        <div class="controls"><button id="pause" type="button" aria-pressed="false">Ⅱ Pause</button><button id="reset" type="button">↻ New seed</button></div>
+        <p id="failure" class="failure" role="alert" hidden></p>
+      </aside>
+    </section>
+    <section class="wiring" aria-label="Circuit transparency">
+      <div class="wiring-header"><div class="circuit-stats"><span><b id="operations">—</b> OPERATIONS</span><span><b id="weights">—</b> FIXED WEIGHTS</span><span><b>32</b> TRAINABLE VALUES</span></div></div>
+      <div class="parameters"><div class="parameter-label"><span>THRUST COMMANDS</span><small>16 intervals × 2 axes</small><div><i class="key lateral"></i> LATERAL <i class="key vertical"></i> VERTICAL</div></div><div id="parameter-bars" class="parameter-bars" aria-label="Current trainable thrust parameters"></div></div>
+      <div class="parameter-readout"><output id="parameter-value"></output></div>
+      <details><summary>Follow the computation <span>THRUST → ACCELERATION → VELOCITY → POSITION → LOSS ↵</span></summary><div class="explanation"><p>96 simulation steps, unrolled into Handwired numerical operations. Gravity, thrust, velocity, position and the loss all execute inside the circuit. <code>backpropagateReference</code> differentiates the loss; Adam updates the 32 bounded thrust values shown above.</p><p>Every fresh seed starts randomly. The target is a circuit input: drag it and the same graph adapts. The first ground contact determines the outcome. A landing needs ≤ 0.25 m error and ≤ 0.5 m/s speed. Hovering or crashing before reaching the target does not count.</p><p>Trajectories are immutable replays of real training steps. Live metrics may be ahead of the replay. Stored weights describe the compiled graph; trainable values are its input cells. This is trajectory optimization, not reinforcement learning.</p></div></details>
+    </section>
+    <footer><span>BUILT WITH <a href="https://github.com/chenglou/handwired">CHENGLOU/HANDWIRED ↗</a></span></footer>
+  </main>
+  <script type="module" src="../src/neural-lander/demo.ts"></script>
+</body>
+</html>
