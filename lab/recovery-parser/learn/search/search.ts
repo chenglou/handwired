@@ -88,14 +88,13 @@ const leftOut = withoutKinds.map(kind => wholeTrain.kindNames.indexOf(kind))
 const hasLeftOutKind = (place: number) => wholeTrain.kindList.subarray(wholeTrain.kindStart[place], wholeTrain.kindStart[place + 1]).some(kind => leftOut.includes(kind))
 const train = withoutKinds.length === 0 ? wholeTrain : selectSamples(wholeTrain, Int32Array.from({length: wholeTrain.sampleCount}, (_, place) => place).filter(place => !hasLeftOutKind(place)))
 const validation = validationPart(samples)
-const prepared = prepareSamples(train)
 // Tables to start from have to be of this dataset: the search's output is saved with this dataset's key, and tables
 // that were made with another version of the dataset may have seen samples that are validation or test samples now.
 const tables: RecoveryTables = fromFile === undefined ? asIsTables() : loadTablesOfThisDataset(fromFile).tables
 checkTables(tables)
-// The search's own parser loop, in sample-runs.ts, gives every code point the class it has today, and reads the 8
-// contexts of today.
-if (tables.addedClasses.length > 0 || tables.contextCount !== today.contextCount) throw new Error('search.ts does not run tables with added classes or with the bit "first on its line", see ../structure/README.md')
+// The search's own parser loop, in sample-runs.ts, gives every code point the class that the tables give it, and
+// reads the bit "first on its line" when the tables have it.
+const prepared = prepareSamples(train, tables)
 const startTables = fromFile === undefined ? asIsTables() : loadTablesOfThisDataset(fromFile).tables
 
 const percent = (count: number, of: number) => (100 * count / of).toFixed(2)

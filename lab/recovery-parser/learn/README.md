@@ -190,7 +190,7 @@ Run from the repo root. `RECOVERY_SCRATCH` is a folder outside the repo for the 
 ```sh
 export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-parser/learn/data.ts                              # makes the cache of the standard set, about 12 s once
-bun lab/recovery-parser/learn/check-all.ts                         # the type check, the lint and every check of learn/, 1 to 1.7 minutes
+bun lab/recovery-parser/learn/check-all.ts                         # the type check, the lint and the checks of learn/, a bit over a minute. One check needs the saved plain pass, see below
 bun lab/recovery-parser/learn/score.ts                             # today's tables on the validation split, every row
 bun lab/recovery-parser/learn/score.ts --tables <file.json> --base <base.json> --cells
 bun lab/recovery-parser/learn/score.ts --to 20000 --split train,validation
@@ -199,7 +199,7 @@ bun lab/recovery-parser/learn/check-deep.ts <name>=<file.json> ... # the depth o
 bun lab/recovery-parser/learn/intended-reached.ts <name>=<file.json> ...   # where saved tables are in the intended state
 ```
 
-`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and the 13 checks, 4 at a time, in about a minute on an idle 18 core machine and in up to 100 s with other jobs running, with the cache of the samples in place (57 to 99 s in twelve runs), and ends with "Every check passed." or with the names of the commands that failed. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
+`check-all.ts` runs `bunx tsc -p lab/recovery-parser/learn`, the lint and 15 checks, 4 at a time, in a bit over a minute on an 18 core machine with little else running (64 s in two runs) and longer with other jobs running, with the cache of the samples in place, and ends with "Every check passed." or with the names of the commands that failed. Two of the 15 are checks of arms, `arms/generic/check.ts` and `arms/spare-states/check.ts`. The first compares with the tables that `arms/plain-pass/run.ts` saved for seed 1, so it fails in a scratch folder without that run: make the table of scores below first. The one check that `check-all.ts` leaves out is `arms/holes/check-search.ts`, which takes about 8 minutes. It is the one command that type-checks this folder: `bun run check` of the repo does not, since `lab/recovery-parser/tsconfig.json` only includes the dataset's own files. Every check alone also ends with the line "Every check passed." and the exit code 0, or with a count of failures and the exit code 1.
 
 The table of scores, from an empty scratch folder, in about 17 minutes with one command after the other, and in less with two searches at a time:
 

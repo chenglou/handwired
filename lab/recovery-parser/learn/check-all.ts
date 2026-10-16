@@ -1,12 +1,14 @@
 // One command for everything that has to hold in learn/: the type check of this folder, the lint of
-// lab/recovery-parser, and every check script of learn/ and of the folders in it.
+// lab/recovery-parser, and the check scripts of learn/ and of the folders in it. The one check that it leaves out
+// is arms/holes/check-search.ts, which takes about 8 minutes.
 //
-// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL:
+// Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo and without RECOVERY_FINAL, after
+// arms/plain-pass/run.ts, whose saved tables arms/generic/check.ts compares with:
 //   bun lab/recovery-parser/learn/check-all.ts [--only <part of a name>]
-// It takes about a minute on an idle 18 core machine and up to 100 s with other jobs running, with the cache of the
-// standard set in place (57 to 99 s in twelve runs), and about half a minute more the first time, for that cache and
-// for the intended stacks. Up to 4 commands run at a time, and one of the checks
-// uses 4 worker threads, so the command stays within 8 threads.
+// It takes a bit over a minute on an 18 core machine with little else running (64 s in two runs), and longer with
+// other jobs running, with the cache of the standard set in place, and about half a minute more the first time, for
+// that cache and for the intended stacks. Up to 4 commands run at a time, and two of the checks use 4 worker threads
+// each, soft/check-train.ts and arms/generic/check.ts, so the command stays within 10 threads.
 //
 // `bun run check` of the repo type-checks lab/recovery-parser without learn/, since the dataset's tsconfig.json only
 // includes its own files. This command is what type-checks learn/.
@@ -21,7 +23,7 @@ const root = resolve(import.meta.dir, '../../..')
 const here = relative(root, import.meta.dir)
 const checks = [
   'check-tables.ts', 'check-parser.ts', 'check-data.ts', 'check-deep.ts', 'check-guard.ts', 'check-commands.ts', 'handwritten/check.ts', 'search/check.ts',
-  'soft/check-twin.ts', 'soft/check-gradient.ts', 'soft/check-circuit.ts', 'soft/check-train.ts', 'arms/check.ts',
+  'soft/check-twin.ts', 'soft/check-gradient.ts', 'soft/check-circuit.ts', 'soft/check-train.ts', 'arms/check.ts', 'arms/generic/check.ts', 'arms/spare-states/check.ts',
 ]
 const commands: {name: string, command: string[], isCheck: boolean}[] = [
   {name: 'tsc', command: ['bunx', 'tsc', '-p', here], isCheck: false},

@@ -200,7 +200,7 @@ bun lab/recovery-parser/learn/compare.ts search=$RECOVERY_SCRATCH/search/search-
 bun lab/recovery-parser/learn/check-deep.ts search=$RECOVERY_SCRATCH/search/search-from-today.json   # the depth on valid JSON of 17 to 19 levels
 ```
 
-`search.ts` refuses tables with added classes or with the bit "first on its line", see `../structure/README.md`.
+`search.ts --from` also runs tables with added classes, with the bit "first on its line" or with open display entries, see `../structure/README.md`: the search's parser loop reads the class that the tables give a code point, and the context with the bit. The open entries of a display table stay as they are. `check.ts` compares the loop with `score.ts` for such tables too.
 
 ## Files
 
