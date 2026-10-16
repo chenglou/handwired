@@ -10,7 +10,13 @@
 //    program as its labels say.
 // 6. What the check asks a writer to look at.
 // 7. The three examples have no problem, and the tools read them as the pages say.
-// 8. The files of the set have no problem. This part prints counts only, so that its output quotes no case.
+// 8. The files of the set have no problem. This part and the next ones print counts only, so that their output
+//    quotes no case.
+// 9. The edits of the train data's damage that make a damaged place, see neutral-edits.ts: one made-up repair per
+//    edit, and kinds.txt against what the repairs of the set give.
+// 10. The parts of the set for the final scoring, see score.ts: they add up, and the parser as it is has the same
+//    score by the exact parser and by the loop over packed samples.
+// 11. README.md holds the numbers that numbers.ts and score.ts give for the set.
 //
 // The texts of parts 1 to 6 are made up here. Run from the repo root:
 //   bun lab/recovery-lr/held-back/written/check-written.ts
@@ -20,10 +26,16 @@ import {damageProgram} from '../../damage.ts'
 import {containerNames, displayKindNames, labelsOfValidText} from '../../labels.ts'
 import {textOf} from '../../parser.ts'
 import {createRandom} from '../../random.ts'
+import {packSamples} from '../../learn/data.ts'
+import {baseTables} from '../../learn/recovery-tables.ts'
+import {scoreTables, sharesOf} from '../../learn/score.ts'
 import {isScored, makeSample} from '../../sample.ts'
 import {caseNotes, shapeOf} from './check.ts'
 import {beyondTheLabels, differenceLines, differencesOf} from './compare.ts'
 import {type Aligned, alignedOfLines, blankRepairFileText, brokenFileText, linesOfAligned, linesOfText, readBrokenFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
+import {couldComeFromEdits, damagePartOf, damagedPlacesOf, kindsLineOf, mostEditsOfSample, neutralEditsOf, neutralEditsOfPlaces, readKinds} from './neutral-edits.ts'
+import {readmeLines} from './numbers.ts'
+import {disputedCodePointsOf, partsOfWritten, rowsOfParts, scoreOfParserAsItIs} from './score.ts'
 import {describeCase, wrongBeforeFirstError} from './show.ts'
 import {
   type Opinion, type WrittenCase, brokenTextProblems, caseOf, changeRunsOf, firstDamageOf, keptTokensAndConstituents, missingBeforeWhiteSpace, opinionOf, readWritten, samplesOfWritten,
@@ -297,6 +309,9 @@ const after = '\nlet cells = width * height\nlet () = print_int cells\n'
   ]
   const perProgram = 150
   let samples = 0, accepted = 0, refusedByRule4 = 0
+  // What neutral-edits.ts says of these samples, whose damage is one to three edits: the samples for which it finds
+  // one to three edits, and the most edits of a draw.
+  let foundAsEdits = 0, mostEdits = 0
   programs.forEach((program, programIndex) => {
     const labels = labelsOfValidText(program)
     // The parser as it is shows a valid program as its labels say.
@@ -309,6 +324,8 @@ const after = '\nlet cells = width * height\nlet () = print_int cells\n'
       if (typeof sample === 'string') continue
       samples++
       const name = `program ${programIndex}, draw ${draw}`
+      mostEdits = Math.max(mostEdits, damaged.edits.length)
+      if (couldComeFromEdits(neutralEditsOfPlaces(damagedPlacesOf(sample.broken, {text: program, sample})))) foundAsEdits++
       const copy = keptTokensAndConstituents(labels, sample.tokens, sample.alignment)
       expect(same(Array.from(copy.keptToken), Array.from(sample.keptToken)) && same(Array.from(copy.constituents), Array.from(sample.constituents)), () => `${name}: the copy of the kept tokens and constituents differs from makeSample's`)
       // The alignment through a file: as lines of an aligned text and back.
@@ -334,7 +351,9 @@ const after = '\nlet cells = width * height\nlet () = print_int cells\n'
   })
   // The numbers of README.md, under "How a code point gets its label".
   expectSame([samples, accepted, refusedByRule4], [403, 353, 50], 'the samples of the damage, those that the written set\'s reader takes, and those that it refuses by rule 4')
-  console.log(`5. The parser as it is shows ${programs.length} valid programs as their labels say. Of ${programs.length * perProgram} draws of the train data's damage on them, ${samples} give a sample: the copy of the kept tokens and constituents gives what makeSample gives, and every alignment comes back from a file. The written set's reader takes ${accepted} of them as they are and refuses ${refusedByRule4} by rule 4 alone.`)
+  // The number of README.md, under "What the damage is".
+  expectSame([mostEdits, mostEditsOfSample, foundAsEdits], [3, 3, 397], 'the most edits of a draw of the damage, the same in neutral-edits.ts, and the samples for which neutral-edits.ts finds one to three edits')
+  console.log(`5. The parser as it is shows ${programs.length} valid programs as their labels say. Of ${programs.length * perProgram} draws of the train data's damage on them, ${samples} give a sample: the copy of the kept tokens and constituents gives what makeSample gives, and every alignment comes back from a file. The written set's reader takes ${accepted} of them as they are and refuses ${refusedByRule4} by rule 4 alone, and neutral-edits.ts finds one to three edits for ${foundAsEdits} of them.`)
 }
 
 // 6. What the check asks a writer to look at.
@@ -400,6 +419,93 @@ const examplesFolder = join(writtenFolder, 'examples')
   expect(cases.every(writtenCase => !Array.from(writtenCase.sample.labelKind).includes(displayKindNames.indexOf('error'))), () => 'a label of the set is the display kind error')
   const twice = cases.filter(writtenCase => writtenCase.opinions.length === 2).length
   console.log(`8. The set has ${cases.length} cases in ${new Set(cases.map(writtenCase => writtenCase.file)).size} files, ${twice} of them with two repairs, and ${found.length} problems. ${samplesOfWritten(cases).length} cases have full agreement from the first error on, and ${samplesOfWritten(cases, 'agreed code points').length} have an agreed code point there.`)
+}
+
+// 9. The edits that make a damaged place.
+{
+  const editsOf = (text: string) => {
+    const derived = neutralEditsOf(madeCase(text))
+    return `${derived.edits.join(', ')}${derived.otherPlaces.length === 0 ? '' : ` | ${derived.otherPlaces.map(place => `${place.added}/${place.missing}/${place.notInProgram}`).join(' ')}`}`
+  }
+  const rest = after.slice(1)
+  expectSame(editsOf(`${before}let area = (width * height\n⟦missing⟧)⟦/⟧${rest}`), 'delete a code point', 'a missing code point')
+  expectSame(editsOf(`${before}let area ⟦missing⟧= ⟦/⟧width * height${after}`), 'delete a run', 'a missing run')
+  expectSame(editsOf(`${before}let area =\n⟦missing⟧  width * height\n⟦/⟧${rest}`), 'delete a line', 'a missing line')
+  expectSame(editsOf(`${before}let area ⟦missing⟧= ⟦/⟧width * height\nlet cells = width * height\nlet () = print_int⟦missing⟧ cells\n⟦/⟧`), 'delete a run, cut the tail', 'a missing end')
+  expectSame(editsOf(`${before}let area = width * height⟦added⟧)⟦/⟧${after}`), 'insert a code point', 'an added code point that the program holds')
+  expectSame(editsOf(`${before}let area = width * height⟦added⟧;;⟦/⟧${after}`), ' | ;;//;', 'added code points that the program does not hold')
+  expectSame(editsOf(`${before}let area ⟦added⟧*⟦/⟧⟦missing⟧=⟦/⟧ width * height${after}`), 'replace a code point', 'a code point in the place of another')
+  expectSame(editsOf(`l⟦missing⟧e⟦/⟧t⟦added⟧e⟦/⟧ width = 72\nlet height = 24${after}`), 'swap two code points', 'two code points in the wrong order')
+  expectSame(editsOf(`${before}let area = width * ⟦added⟧let cells ⟦/⟧height${after}`), 'copy a run', 'an added run that the program holds at another place')
+  expectSame(editsOf(`${before}⟦added⟧let ⟦/⟧let area = width * height${after}`), 'duplicate a run', 'an added run beside its source')
+  expectSame(editsOf(`${before}let area = (width\n  * height)\n⟦added⟧  * height)\n⟦/⟧${rest}`), 'duplicate a line', 'an added line beside its source')
+  // A line that stands twice, the first time without its end: more code points than three copied runs hold.
+  expectSame(editsOf(`${before}let scaled = width\n⟦added⟧  * area_of_the_whole_room_in_square_meters (hei\n⟦/⟧  * area_of_the_whole_room_in_square_meters (height)${after}`), 'duplicate a line, delete a run', 'a duplicated line that lost its end')
+  // An added run that the fixed form of an alignment has one code point further right than the repair's marks: the
+  // `(`, the name and the space are a run of the program, and the name, the space and the `(` are not.
+  expectSame(editsOf(`${before}let area = ⟦added⟧(width ⟦/⟧(width * height)${after}`), 'duplicate a run', 'an added run that the fixed form moved')
+  // The second pair of asterisks is a copy of the first, which two edits wrote.
+  expectSame(editsOf(`${before}let area = width * ⟦added⟧**⟦/⟧24⟦added⟧**⟦/⟧${after}`), 'insert a code point, insert a code point, copy a run', 'a run that is a copy of text that an earlier edit wrote')
+  const fourPlaces = neutralEditsOf(madeCase(`${before}let area = width⟦added⟧)⟦/⟧ * height⟦added⟧)⟦/⟧\nlet cells = width⟦added⟧)⟦/⟧ * height⟦added⟧)⟦/⟧\nlet () = print_int cells\n`))
+  expectSame([fourPlaces.edits.length, damagePartOf(fourPlaces), couldComeFromEdits(fourPlaces)], [4, 'more edits', false], 'four places of one edit each')
+  expectSame([kindsLineOf('made-01 delete a run, copy a run'), kindsLineOf('made-02 new: a sentence before the program'), kindsLineOf('made-03 insert a code point new: `;;` after a definition, with new: in it')], [
+    {id: 'made-01', edits: ['delete a run', 'copy a run']}, {id: 'made-02', edits: [], other: 'a sentence before the program'}, {id: 'made-03', edits: ['insert a code point'], other: '`;;` after a definition, with new: in it'},
+  ], 'the lines of kinds.txt')
+
+  // The set: kinds.txt has a line for every case, with the edits that the writer's repair gives.
+  const {cases} = readWritten()
+  const kinds = readKinds()
+  expectSame(kinds.problems.length, 0, 'the problems of kinds.txt')
+  expectSame([...kinds.lines.keys()], cases.map(writtenCase => writtenCase.id), 'the cases of kinds.txt')
+  const differs = cases.filter(writtenCase => {
+    const listed = kinds.lines.get(writtenCase.id)
+    const derived = neutralEditsOf(writtenCase)
+    return listed === undefined || listed.edits.join(', ') !== derived.edits.join(', ') || (listed.other === undefined) !== couldComeFromEdits(derived)
+  })
+  expectSame(differs.map(writtenCase => writtenCase.id), [], 'the cases whose line of kinds.txt is not what neutral-edits.ts gives')
+  console.log(`9. One made-up repair per edit of the train data's damage gives that edit. kinds.txt has ${kinds.lines.size} lines, ${[...kinds.lines.values()].filter(line => line.other === undefined).length} of them without "new:", and each is what the writer's repair gives.`)
+}
+
+// 10. The parts of the set for the final scoring.
+const setParts = partsOfWritten()
+{
+  const {cases} = readWritten()
+  const ids = (samples: readonly {id: string}[]) => samples.map(sample => sample.id).sort()
+  const {all, perFile, neutralEdits, otherDamage, unmarked} = setParts
+  for (const counted of ['fullAgreement', 'agreedCodePoints'] as const) {
+    expectSame(ids([...neutralEdits[counted], ...otherDamage[counted]]), ids(all[counted]), `${counted}: the two parts of kinds.txt together`)
+    expectSame(ids([...perFile.values()].flatMap(samples => samples[counted])), ids(all[counted]), `${counted}: the writers' files together`)
+    expect(unmarked[counted].every(sample => all[counted].some(other => other.id === sample.id)), () => `${counted}: a case without a mark is no case of the set`)
+  }
+  expectSame(ids(all.agreedCodePoints), ids(cases.map(writtenCase => writtenCase.sample)), 'the cases over their agreed code points')
+  expect(all.fullAgreement.every(sample => all.agreedCodePoints.includes(sample)), () => 'a case with full agreement is not among the cases over their agreed code points')
+  // No disputed code point from the first error on is in a sample, and every one is in the list of them.
+  const disputed = disputedCodePointsOf(cases)
+  const disputedCases = new Set(disputed.filter(codePoint => codePoint.fromFirstError).map(codePoint => codePoint.id))
+  expectSame(ids(all.agreedCodePoints.filter(sample => !all.fullAgreement.includes(sample))), [...disputedCases].sort(), 'the cases with a disputed code point from the first error on')
+  expect(disputed.every(codePoint => cases.find(writtenCase => writtenCase.id === codePoint.id)!.sample.alignment[codePoint.position] === -1), () => 'a disputed code point has a label in its case\'s sample')
+  expect(disputed.every(codePoint => codePoint.writer === undefined || codePoint.second === undefined || JSON.stringify(codePoint.writer) !== JSON.stringify(codePoint.second)), () => 'a disputed code point has the same label by both repairs')
+  // The parser as it is, by the exact parser and by the loop over packed samples.
+  const rows = rowsOfParts(setParts)
+  for (const {name, samples} of rows.slice(0, 5)) expectSame(scoreOfParserAsItIs(samples), scoreTables(baseTables(), packSamples(samples)).score, `the score of the parser as it is by its two routes, ${name}`)
+  const main = scoreOfParserAsItIs(all.fullAgreement)
+  expect(main.wholeSamples === 0 && main.insertedTokens === 0 && main.allThreeRight * 20 < main.scoredCodePoints, () => 'the parser as it is has a whole case, inserts a token or has more than a twentieth of the scored code points right')
+  console.log(`10. The set as samples: ${all.fullAgreement.length} cases with full agreement and ${all.agreedCodePoints.length} over their agreed code points, in ${rows.length} rows that add up. ${disputed.length} disputed code points, ${disputed.filter(codePoint => codePoint.fromFirstError).length} of them from the first error on, are in no sample. The parser as it is has ${main.allThreeRight} of ${main.scoredCodePoints} scored code points right by both routes.`)
+}
+
+// 11. README.md holds the numbers of the set.
+{
+  const {cases} = readWritten()
+  const readme = readFileSync(join(writtenFolder, 'README.md'), 'utf8')
+  for (const line of readmeLines(cases)) expectHolds(readme, line, 'README.md, a line of numbers.ts')
+  const number = (value: number) => Number.isNaN(value) ? 'none' : value.toFixed(1)
+  for (const {name, samples} of rowsOfParts(setParts)) {
+    const score = scoreOfParserAsItIs(samples)
+    const shares = sharesOf(score)
+    const packed = packSamples(samples)
+    expectHolds(readme, `| ${name} | ${score.samples} | ${score.scoredCodePoints.toLocaleString('en-US')} | ${number(100 * packed.boundCodePoints / packed.scoredCodePoints)} | ${number(shares.allThree)} | ${number(shares.whole)} | ${number(shares.kind)} | ${number(shares.depth)} | ${number(shares.container)} | ${number(shares.stack)} | ${number(shares.constituentsFound)}, ${number(shares.constituentsRight)} |`, 'README.md, a row of score.ts')
+  }
+  console.log('11. README.md holds the lines of numbers.ts and the rows of score.ts for the parser as it is.')
 }
 
 console.log(problems.length === 0 ? 'Every check passed.' : `${problems.length} problems.`)

@@ -216,10 +216,24 @@ const samples = samplesOfWritten(cases)                              // the case
 const allSamples = samplesOfWritten(cases, 'agreed code points')     // all cases, without their disputed code points
 ```
 
-- A sample is a `Sample` of `lab/recovery-lr/sample.ts`, so whatever scores the train and validation samples scores these: `isScored(sample, position)` is true for the agreed code points from the first error on, and `labelKind`, `labelDepth`, `labelContainer`, `labelStack`, `keptToken` and `constituents` are what a score compares with. `sample.original` is the writer's repaired program, and `sample.edits` holds the name of the writer's file, e.g. `['hand-edits']`.
+- A sample is a `Sample` of `lab/recovery-lr/sample.ts`, so whatever scores the train and validation samples scores these: `isScored(sample, position)` is true for the agreed code points from the first error on, and `labelKind`, `labelDepth`, `labelContainer`, `labelStack`, `keptToken` and `constituents` are what a score compares with. `sample.original` is the writer's repaired program, and `sample.edits` holds the name of the writer's file, e.g. `['hand-editing']`.
 - In a sample, a disputed code point is given as an added one: its alignment is -1 and it has no label. A token with such a code point is no kept token, and the constituents are those of the kept tokens that are left.
 - `'full agreement'` gives the cases without a disputed code point from the first error on. A case with one repair has none. `'agreed code points'` gives every case in which an agreed code point stands from the first error on.
 - A `WrittenCase` also has `file`, `from`, `opinions` (per repair the repaired program, its labels and the sample as that repair alone reads it), `agreement` per code point, `stackAgreed` (1 where both repairs also give the same hash of the stack; `sample.labelStack` is the writer's), `constituentsAgreed`, and `disputedFromFirstError`.
+
+`score.ts` gives the set in the parts that a report has, for the final scoring:
+
+```ts
+import {scoreRow, scoreTablesByExactParser} from '../../learn/score.ts'
+import {partsOfWritten, rowsOfParts} from './score.ts'
+for (const {name, samples} of rowsOfParts(partsOfWritten())) console.log(scoreRow(name, scoreTablesByExactParser(tables, samples)))
+```
+
+- `partsOfWritten()` reads the set and `kinds.txt`, and throws when a file has a problem, so that no number is made of a set that is not whole. It returns `all`, `perFile` by the name of the writer's file, `neutralEdits` and `otherDamage`, which are the two parts that `kinds.txt` makes of the set, and `unmarked`, the cases of which no repair is marked as unsure. Each is `{fullAgreement, agreedCodePoints}`, two lists of samples.
+- `rowsOfParts(parts)` gives the 13 rows of a report in their order, each with a name and its samples: the first is the cases with full agreement, which is the set's main number.
+- A parser that is no table of the experiment is scored with `scoreOutputs` of `lab/recovery-lr/learn/score.ts` on the same samples, and `reportOf` of `lab/recovery-lr/learn/report.ts` counts the inserted tokens and the open cells that the samples read, on `packSamples(samples, tables)`.
+- `disputedCodePointsOf(cases)` lists every disputed code point with its label by each repair. The disputed code points are in no sample, and nothing settles them.
+- `bun lab/recovery-lr/held-back/written/score.ts` prints the rows for the parser as it is. It runs no recovery.
 
 No code outside `lab/recovery-lr/held-back/` may import from it, so a command that scores tables on the set stands in this folder and imports the recovery parser and the score from outside. Whoever runs the final scoring writes it.
 
@@ -227,12 +241,154 @@ No code outside `lab/recovery-lr/held-back/` may import from it, so a command th
 
 - `README.md`, `REPAIR.md` and `THEMES.md`: the rules for the writers and the repairers.
 - `broken/`, `repairs/` and `second-repairs/`: the set. One file per writer in each, with the same name.
+- `kinds.txt` says for every case which edits of the train data's damage make its damage, and whether one to three of them do. `neutral-edits.ts` derives the lines from the writers' repairs and says where the file differs.
 - `examples/`: three worked cases in a folder of the same layout, with second repairs. They are no part of the set, and no score counts them.
 - `format.ts` reads and writes the files. `written.ts` makes the samples and reads the set, with `readWritten(folder, options)`. `show.ts` prints a case, `check.ts` checks one writer's file or the whole set, `compare.ts` compares the two repairs of each case, and `start-second.ts` writes the file that a second repairer starts from.
-- `check-written.ts` checks the tools, the examples and the pages' printed examples. Its part about the set prints counts only, so that its output quotes no case. `tsconfig.json` is for the type check of this folder: `bunx tsc -p lab/recovery-lr/held-back/written`.
+- `score.ts` gives the set in the parts of a report and scores the parser as it is. `numbers.ts` prints the numbers of this page, and `check-overlap.ts` checks that no case is among the samples of the dataset.
+- `dump.ts` writes 60 cases, or all of them, with their label rows into a file outside the repo, for a human reader.
+- `check-written.ts` checks the tools, the examples and the pages' printed examples, `kinds.txt` and the numbers of this page. Its parts about the set print counts only, so that its output quotes no case. `tsconfig.json` is for the type check of this folder: `bunx tsc -p lab/recovery-lr/held-back/written`.
 
-Every command takes `--set <folder>` for another folder of the same layout, except `check-written.ts`. `check.ts` without a name checks every file of the set and prints one line per case, and `show.ts <id>` prints one case of it, with `--second` as the second repair reads it and with `--both` both repairs side by side.
+Every command takes `--set <folder>` for another folder of the same layout, except `check-written.ts`. `check.ts` without a name checks every file of the set and prints one line per case, and `show.ts <id>` prints one case of it, with `--second` as the second repair reads it and with `--both` both repairs side by side. `check.ts`, `show.ts`, `compare.ts`, `neutral-edits.ts` and `dump.ts` print or write the texts of cases. `written.ts`, `score.ts`, `numbers.ts`, `check-overlap.ts` and `check-written.ts` print counts only.
 
 ## The set as it is
 
-The set is not written yet. This section gets its numbers when the three writers and the second repairers are done: the cases per writer's file, the cases with full agreement, the scored code points, what the two repairs differ on, and what is dropped.
+The set has 210 cases: three writers wrote 70 each, every writer from one cause of broken programs, and every broken program was repaired a second time by an agent who did not see the writer's repair. It is used once, at the end of the experiment, to see how far a result on the train data carries over to broken programs that no generator made. The train data's damage is ten edits that know nothing of miniml, and the writers did not see it. One to three of these edits make the damage of 89 cases, and 121 cases have damage that such edits do not make, see [What the damage is](#what-the-damage-is).
+
+Whoever builds or trains a parser, or writes a bar, reads nothing in this folder: not the cases, the repairs and `kinds.txt`, and not this page, the tools and the checks either, whose examples describe sorts of damage that only the cases have. Such a reader gets numbers alone, from whoever runs the final scoring.
+
+The three files are `hand-editing.txt`, `other-languages.txt` and `model-and-paste.txt`. `THEMES.md` calls the first theme `hand-edits`, and its third theme, `tools-and-transport`, was written as `model-and-paste`: what the answer of a language model and a copy from a page, a chat, a PDF or a terminal do to a program, e.g. a code fence, line numbers, typographic quotes, the signs of a diff and the marker lines of a merge conflict. So the set has no place of a template that was not filled in, no HTML entity, no color code of a terminal and no byte order mark, which the third theme also lists. No broken program holds a tab or a carriage return.
+
+The two second repairers read `REPAIR.md`, `lab/recovery-lr/LANGUAGE.md` and the files of `broken/`, and also this page as it stood before the set was written, although the page says that a second repairer does not read it. The page held the rules for a case and the first example then, and no case of the set. They committed their repairs before they ran `compare.ts`, and no repair was changed afterwards.
+
+### What the set holds
+
+| Writer's file | Cases | With full agreement | With a disputed code point | Scored code points | Of them in cases with full agreement |
+| --- | --- | --- | --- | --- | --- |
+| `hand-editing.txt` | 70 | 69 | 1 | 10,146 | 10,047 |
+| `model-and-paste.txt` | 70 | 68 | 2 | 8,888 | 8,726 |
+| `other-languages.txt` | 70 | 62 | 8 | 8,334 | 7,332 |
+| All | 210 | 199 | 11 | 27,368 | 26,105 |
+
+A case has full agreement when no code point from the first error of the parser as it is on is disputed. The broken programs have 47,354 code points, and 29,878 of them stand from that first error on. Of these, 27,368 are scored, 2,429 are added by both repairs, and 81 are disputed.
+
+In 190 cases the two repairs give the same repaired program, and in 194 they give every code point the same label. In 5 cases the labels differ only before the first error, where no score counts, and 11 cases have a disputed code point from the first error on. See [Where the two repairs differ](#where-the-two-repairs-differ).
+
+No case has nothing to recover: the check refuses a case without a kept code point from the first error on. The broken programs have 61 to 463 code points, with a median of 224, and all but 2 are on several lines. 18 hold a character outside ASCII, and 2 hold a character outside the Basic Multilingual Plane. A case has 130 scored code points on average, a tenth of the cases has 66 or fewer, and a tenth 214 or more. In 22 cases the first error is the program's first token.
+
+The writers' repairs change the programs at 426 places, and 95 cases have one damaged place. In 43 cases the broken program only lacks text, in 87 it only has added text, and in 80 both. 49 cases hold a line of which every code point but white space is added. E.g. a sentence between two definitions, a marker line of a merge conflict, or a line with the type of a function above its definition.
+
+**Most of what a score counts is easy once a parser finds the next definition.** 19,539 of the 27,368 scored code points, 71.4%, stand in a later definition that the damage did not touch: a definition at the top of the program that comes after the first error and whose code points all stand in the broken program, side by side. A parser that closes what is open and starts anew at the `let` of such a definition reads it as the plain parser reads a valid program. In 36 cases every scored code point stands in such a definition. So what tells two recoveries apart is mostly the other 7,829 scored code points: the rest of the damaged definition, and whether the parser finds the start of the next one. `numbers.ts` counts them from the labels, and no recovery was run for the number.
+
+Three things about the labels that bound what a parser can get:
+
+- **One output per token.** Every parser of the experiment shows a token of the frozen scanner as one thing. A token of a broken program can hold kept code points with different labels. E.g. in `hand-editing-04` an apostrophe stands for the opening quote of a string, so the closing quote starts a string for the scanner that reaches to the end of the line, over an operator and a name of the repaired program. So 130 of the 26,105 scored code points of the cases with full agreement cannot be right, 0.5%, and 12 of the 199 cases with full agreement cannot be right as a whole: `hand-editing-04`, `-16`, `-49`, `-52`, `-58`, `-64` and `-70`, `model-and-paste-43` and `-44`, and `other-languages-26`, `-47` and `-48`. For all 210 cases over their agreed code points, it is 130 of 27,368. The train data's samples lose more here, since their damage cuts tokens at random: `bun lab/recovery-lr/learn/score.ts` prints that one output per token allows 97.04% of the scored code points of the 5,000 validation samples, where it allows 99.5% here. 161 tokens in 49 cases have kept code points and are no token of the repaired program. Most of them can still be shown right, e.g. the words of a string between typographic quotes, which the scanner cuts as names: each is one token whose code points all want the label of a string.
+- **`hand-editing-70` has 85 of the 130.** Its first error is a comment that is not closed, and the scanner reads the rest of the program as that comment. Of its 135 scored code points, the 50 of the comment can be right. `THEMES.md` allows two such cases per file, and the set has this one.
+- **Before the first error nothing can change.** The parser as it is shows 756 of the 17,115 code points that the writers' repairs keep before the first error as another thing than their label, 4.4%. E.g. after a missing `=`, the first name of the body reads as a parameter. No score counts them.
+
+The cases are not 210 trials that have nothing to do with each other. The three causes overlap, so the same sort of damage comes from two or three writers, in other programs. By a reader's count of all cases:
+
+- A remark, a sentence, the output of a tool or a declaration of another language on lines of its own: 49 cases, by the count of `numbers.ts` above.
+- A character outside ASCII, e.g. a typographic quote, a dash, an arrow, a ligature, an emoji or a no-break space: 18 cases, all of `model-and-paste.txt`.
+- A mark before the lines, e.g. a line number, the quote sign of a mail, the sign of a diff or a prompt: 8 cases, all of `model-and-paste.txt`.
+- A comment sign that is missing, too many or made by accident: 9 cases, e.g. `hand-editing-67` and `other-languages-14`, which are both a comment inside a commented-out block.
+- Another character for a quote of a string, e.g. an apostrophe, a backtick or a typographic quote: 7 cases. A string that lacks one of its quotes: 4 cases.
+- A separator of a list, a tuple or a call that is another one, too many or left over: 12 cases, e.g. `hand-editing-21` and `other-languages-36`, which both have commas in a list.
+- A bracket that is missing: 8 cases. A bracket too many or of the wrong sort: 4 cases.
+- A missing `in` after a local definition: 4 cases, and a missing `then`: 4 cases. In 4 more cases a sign of another language stands for one of the two, e.g. the colon of Python for `then`.
+- A definition without its `let`: 4 cases. A keyword in another form or with a slip in it, e.g. `def`, `fn`, `elif`, `lte` and a capital letter: 16 cases.
+- An expression that miniml lacks and that is added as a whole, or dots in the place of a body: 10 cases.
+- `;;` after a definition: 3 cases, and a `;` at the end of every line: 3 cases.
+
+So a parser that fails on one sort of damage loses several cases at once. The programs are alike too: all are what a course or a small tool would hold, 138 end with a definition `let () = …`, and the same names come in many of them, e.g. `head` in 35 of the writers' repaired programs, `tail` in 32 and `total` in 24.
+
+No broken program and no repaired program of the set is among the samples of the dataset, neither as the same text nor, for a repaired program, as the same tokens. `bun lab/recovery-lr/held-back/written/check-overlap.ts` checks it in about 10 seconds, and its first line is `45330 programs of seed 20261016, which hold the first 40000 train and the first 5000 validation samples: 0 of 210 broken programs and 0 of 230 repaired programs of the written set are among their texts, and 0 of 215 repaired programs have the tokens of one of their programs.` Parts of the texts are in both: 276 of the 685 names and 58 of the 248 strings of the writers' repaired programs are also in a program of the dataset, e.g. the names of functions that every such program calls. Run the check again when the dataset changes.
+
+### What the damage is
+
+The train data of this track is damaged by ten edits that know nothing of miniml, see `lab/recovery-lr/damage.ts`: delete, insert, replace or swap a code point, delete, duplicate or copy a run of 2 to 20 code points, delete or duplicate a line, and cut the tail. A sample gets one to three of them, and an edit writes only copies of code points that the program holds. `kinds.txt` says for every case whether such edits make its damage, i.e. whether the generator of the train data could have made this broken program out of this repaired program. Where it could not, the damage needs knowledge of how people and tools break such programs.
+
+`neutral-edits.ts` derives the answer from the writer's repair. A damaged place is what the repair changes between two kept code points: text that is added, text that is missing, or both. Every place gets the fewest edits that make it, e.g. "delete a code point" for a closing bracket that is missing, "replace a code point" for a `]` in the place of a `)`, and "copy a run" for an argument that was pasted into the head of a definition. No edits make a place with an added code point that the program does not hold, e.g. a typographic quote, or a place that takes more than three edits, e.g. a sentence before the program. A line of `kinds.txt` is the id of a case, the names of the edits in text order with `, ` between them, and for a case whose damage one to three edits do not make ` new: ` and what the damage is in a few words, which a reader of all cases wrote. `check-written.ts` holds the edits and the mark of every line against what `neutral-edits.ts` derives.
+
+| Writer's file | One to three edits make the damage | More than three edits make it | A damaged place that no edits make |
+| --- | --- | --- | --- |
+| `hand-editing.txt` | 63 | 0 | 7 |
+| `model-and-paste.txt` | 12 | 0 | 58 |
+| `other-languages.txt` | 14 | 1 | 55 |
+| All | 89 | 1 | 120 |
+
+- **One to three edits, 89 cases.** A sample of the train data could have this damage. 60 cases take one edit, 23 take two and 6 take three. By the cases that an edit is in: "delete a run" 33, "copy a run" 19, "insert a code point" 18, "delete a code point" 16, "replace a code point" 8, "swap two code points" 2, "duplicate a line" 2, "delete a line" 1, "duplicate a run" 1. No case has "cut the tail": a program that is only cut off has nothing to score, and the check refuses it.
+- **More than three edits, 1 case.** `other-languages-69` has `fn x =>` for `fun x ->` twice, which is four edits at four places. A report counts it with the other damage.
+- **A place that no edits make, 120 cases.** E.g. a sentence and a code fence around the program, a line number before every line, typographic quotes, `;;` after every definition in a program without a `;`, and a `match` with its arms. In 36 of them, one to three edits would make the damage if an edit could write a code point that the program does not hold. E.g. `hand-editing-48` has a colon for one `;` of a list, in a program without a colon.
+
+The line is literal: it follows what the program holds, and not what a person would call the same sort of damage. Three things follow.
+
+- **Damage that only a person or a tool makes can be on the side of the edits.** E.g. a line that was moved up by one is "delete a line" and "copy a run" in `hand-editing-17`, the Markdown marks of `**5**` are two inserted asterisks and a copied run in `model-and-paste-07`, whose program holds an asterisk, and `elif` twice is "delete a run" twice in `other-languages-26`. The writer of `hand-editing.txt` counts 17 of its cases as damage that no simple list of kinds would make, and one to three edits make 16 of them. So the 89 cases have damage that the train data could have, in programs that the train data lacks, and not damage that the train data often has: a copied run that lands where a person would paste it is possible and rare.
+- **The derivation finds a little less than the edits make.** It reads every damaged place by itself, and two edits of a sample can touch the same text. Held against samples whose damage is one to three edits by construction, it finds one to three edits for 2,951 of the first 3,000 validation samples of the dataset: all 1,364 with one edit, 1,123 of the 1,130 with two and 464 of the 506 with three. `bun lab/recovery-lr/held-back/written/neutral-edits.ts --samples 3000` prints the numbers. So a case can be marked `new:` although three edits make it. That cannot be for a case with an added code point that its program does not hold, and of the 120 cases only `other-languages-12` and `other-languages-35` have none: a pattern in brackets after `let` and after `fun`, and a remark of 26 code points after `--`.
+- **The answer is by the writer's repair.** The second repair gives another answer for 1 case, `model-and-paste-59`: the writer puts two asterisks back into a comment, which is "delete a code point" twice, and the second repair adds the 12 code points of the remark.
+
+`partsOfWritten` of `score.ts` gives the samples of the two parts as `neutralEdits` and `otherDamage`.
+
+### What the parser as it is gets right
+
+The parser as it is stops at its first error and shows every token from there on as an error. White space and comments are shown as what they are, with the depth and the container of the stack at the first error. Each row has the share of the scored code points that one output per token can have right, the percentage of the scored code points with display kind, depth and container right, the percentage of the cases in which every scored code point is right, the percentages with the kind, the depth and the container right, the percentage whose token is taken on the stack that the repaired program has there, and for the constituents first the share of the repaired programs' that the parser has and then the share of the parser's that the repaired programs have. `bun lab/recovery-lr/held-back/written/score.ts` prints the same numbers. No recovery was written for the set or run on it.
+
+| Cases | Count | Scored code points | One output per token allows | All three | Whole | Kind | Depth | Container | Stack | Constituents: found, right |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Cases with full agreement | 199 | 26,105 | 99.5 | 1.5 | 0.0 | 20.0 | 19.1 | 12.1 | 0.2 | 29.6, 94.5 |
+| Full agreement, one to three edits make the damage | 87 | 12,642 | 99.1 | 1.3 | 0.0 | 19.4 | 21.5 | 14.5 | 0.1 | 30.0, 95.6 |
+| Full agreement, other damage | 112 | 13,463 | 99.9 | 1.6 | 0.0 | 20.4 | 16.8 | 9.8 | 0.2 | 29.2, 93.4 |
+| Full agreement, no repair marked as unsure | 187 | 24,476 | 99.5 | 1.4 | 0.0 | 20.0 | 17.7 | 11.6 | 0.1 | 29.4, 94.6 |
+| All cases, the agreed code points | 210 | 27,368 | 99.5 | 1.5 | 0.0 | 19.9 | 19.2 | 12.0 | 0.2 | 29.8, 94.5 |
+| Agreed code points, one to three edits make the damage | 89 | 12,817 | 99.1 | 1.3 | 0.0 | 19.4 | 21.4 | 14.4 | 0.1 | 30.6, 95.6 |
+| Agreed code points, other damage | 121 | 14,551 | 99.9 | 1.7 | 0.0 | 20.4 | 17.2 | 10.0 | 0.2 | 29.0, 93.5 |
+| `hand-editing.txt`, full agreement | 69 | 10,047 | 98.8 | 1.3 | 0.0 | 19.7 | 22.0 | 13.5 | 0.1 | 28.2, 95.4 |
+| `hand-editing.txt`, agreed code points | 70 | 10,146 | 98.8 | 1.3 | 0.0 | 19.7 | 21.8 | 13.4 | 0.1 | 28.6, 95.3 |
+| `model-and-paste.txt`, full agreement | 68 | 8,726 | 99.9 | 1.4 | 0.0 | 19.2 | 17.3 | 11.4 | 0.2 | 34.1, 97.6 |
+| `model-and-paste.txt`, agreed code points | 70 | 8,888 | 99.9 | 1.5 | 0.0 | 19.2 | 18.2 | 11.8 | 0.2 | 34.6, 97.7 |
+| `other-languages.txt`, full agreement | 62 | 7,332 | 99.9 | 1.9 | 0.0 | 21.2 | 17.1 | 11.1 | 0.2 | 25.5, 88.0 |
+| `other-languages.txt`, agreed code points | 70 | 8,334 | 99.9 | 1.8 | 0.0 | 21.1 | 16.9 | 10.6 | 0.2 | 25.4, 88.6 |
+
+The set has something to score: in the cases with full agreement the parser as it is has 387 of 26,105 scored code points right, and every scored code point in none of the 199 cases. What it has right is white space and comments where the depth and the container at the first error happen to be the label's. Nearly all constituents that it has are those from before the first error.
+
+The columns "stack" and "constituents" take the writer's repair. Where the two repairs give a code point the same label, they can still differ in these two: 9 scored code points in 2 cases stand on another stack by the second repair. In `hand-editing-22` they are the 4 code points after a bracket that the repairs read in two ways, and in `hand-editing-53` they are 5 code points after text that the writer also gives back as missing where it belongs and the second repairer only calls added. The constituents over the kept tokens are the same by both repairs in every case.
+
+### Where the two repairs differ
+
+`compare.ts` names 16 cases in which the two repairs give a code point other labels. Each was read with both repairs side by side. No repair was corrected or left out, and nothing was settled: a disputed code point has no label.
+
+In 5 cases the labels differ only before the first error of the parser as it is. No score counts such a code point, and the cases have full agreement:
+
+- `hand-editing-26` and `other-languages-02`, 1 code point each: the space before a `*)` and before an `in` that are too many stays as white space for the writer, and is added with them for the second repair.
+- `hand-editing-61`, 2 code points: a list ends with `; ]`. The writer keeps the `;` and has an item missing after it, and the second repair adds the `;` and its space. Both repairs are marked as unsure, each with the other's reading.
+- `other-languages-43` and `other-languages-44`, 1 code point each: the `*` of the operator sections `(*2)` and `(*)` is added for the writer, and stays as an operator with `()` missing at its sides for the second repair.
+
+11 cases have a disputed code point from the first error on, 81 code points in all:
+
+| What the repairs differ on | Cases | Disputed code points |
+| --- | --- | --- |
+| A part of a definition in the form of another language: added as a whole, as rule 6 of `REPAIR.md` says of an expression that miniml lacks, or kept with the keywords of miniml missing at their places, as rule 5 says of a token in another form. The guards of Haskell in the place of a body, and a `where` line | `other-languages-39` with 40, `other-languages-41` with 21 | 61 |
+| Words in brackets after a value: a comment that lost its two asterisks to a chat app, or a remark that is no part of the program | `model-and-paste-59` | 11 |
+| White space beside added text: the line feed after an expression that is added as a whole, and a space beside added text in the middle of a line | `other-languages-04`, `-05`, `-17`, `-24`, `-38` and `-64`, `model-and-paste-39`, with 1 each | 7 |
+| A closing bracket without an opening one: one too many, as rule 8 says, or the opening one is missing | `hand-editing-22` | 2 |
+
+Seven of the 11 cases are out of the cases with full agreement over one scored code point of white space each, and their two repairs give every other scored code point the same label. In five of them an expression that miniml lacks fills whole lines, e.g. a `match` with its arms. Rule 6 adds the expression from its first word to the end of its last arm, and the rule about white space adds a line that holds nothing of the program as a whole line, with its indentation and its line end. The writer followed the first and the second repairer the second. One sentence in `REPAIR.md` would decide these, and it was not added, since that would settle a disputed code point after the fact. The row of the agreed code points counts these seven cases without the one code point.
+
+The section on the comparison above says that a repair which breaks a rule of `REPAIR.md` is corrected. That was not done for this set: every disputed code point stays as the two repairers left it, so that nobody who has seen both repairs decides a label. Two second repairs are against the letter of a rule, and their repairers say so in their reports. In `hand-editing-22` rule 8 adds a closing bracket without an opening one, and in `model-and-paste-59` rule 10 takes the reading that changes fewer code points, which is the writer's with 2 against 12. With these two corrected, 201 cases would have full agreement, and with a sentence on white space 208. The two cases about a definition in the form of another language would stay disputed: each reading has a rule on its side.
+
+The writers marked 9 repairs as unsure and the second repairers 9, in 16 cases. 4 of the 11 disputed cases are among them, and 12 of the 199 cases with full agreement. The row of the table above without these 12 is there so that a result can be held against both.
+
+Four more things that the rules of `REPAIR.md` leave open, on which the two repairs of a case happened to agree:
+
+- **Which side of a diff stays.** In `model-and-paste-36` and `model-and-paste-38` both repairs keep the new side, against the letter of rule 9, by which the first of two things stays: a diff says which one its author wants.
+- **Text that was moved.** No mark says "moved". In `hand-editing-05`, `-40`, `-53` and `-59` the writer calls the text added where it stands and missing where it belongs. In `hand-editing-17`, two lines in the wrong order, both repairs keep the first line and are marked as unsure.
+- **A word of another language that miniml reads as a name.** `mut` in `other-languages-65` and `return` in `other-languages-46` and `-55` are added by both repairs, by rule 6, although miniml accepts them, and `not` stays a name in `other-languages-52`, where only the `in` of `not in` is added.
+- **A line number that miniml reads as an argument.** In `model-and-paste-26` both repairs add the numbers that are glued to the lines.
+
+### What is dropped, and what to know about some cases
+
+- **No case is dropped.** A case is dropped only when its writer or both repairers say that the meaning of the program cannot be known, and nobody says so of any case. `hand-editing-61` is the closest: both repairs call the other reading as likely. They differ at 2 code points before the first error and agree on every scored one.
+- **No text of a case or of a repair was changed,** and no repair is left out. `check.ts` names 0 problems in the three files, for the writers' repairs and for the second repairs, and nothing in the format of the nine files had to be fixed. No case was found whose content is wrong, i.e. whose broken program is not what its `from:` line says, or whose repair by the writer breaks a rule of `REPAIR.md` to the letter.
+- **In three cases a label asks for a comment where the scanner cuts code.** In `hand-editing-67` and `other-languages-14` a comment inside a commented-out block ends the block too early, and both repairs add the inner `*)`, so the text up to the last `*)` is wanted as a comment. Most of it stands before the first error. In `hand-editing-70` the comment is never closed, see above.
+- **The repaired program of `model-and-paste-24` has no white space between two definitions.** A model's end-of-text token stands between `10` and `let`, and it is added with nothing missing in its place, so the repaired program holds `10let`, which miniml reads as two tokens. The labels are those of the program with a line feed there.
+- **`other-languages-58` keeps 66 of its 125 code points,** the least of all cases: the rest is remarks in the comment signs of JavaScript and a `;` after every line. `model-and-paste-29` keeps 76 of 136, without the prompts and the answers of an interactive session. `check.ts` asks to look at a repair that keeps less than half, and there is none.
+- **The labels of the train data and of this set differ in one rule.** Rule 4 of `REPAIR.md` puts a missing token right before the next token of the broken program, so that white space keeps a label that a parser can show. The train data's damage knows no such rule, see [How a code point gets its label](#how-a-code-point-gets-its-label). So the share of whole cases here and the share of whole samples on the validation split are not counted over the same sort of labels.
