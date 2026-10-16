@@ -104,3 +104,64 @@ By reading: the author read three samples of every kind alone, cut to the column
 - In a sample with two kinds, the two are drawn independently. Nothing makes them the habits of one person, e.g. `;` after every definition together with `==`.
 - `mergeConflictMarkers` only takes a definition of at most 100 code points that has a number, and the other version differs in that number alone.
 - The share of samples with two kinds (18.6% of the kinds half on train) is lower than the 30% of the draws, because a draw of two kinds finds no place more often.
+
+## The runs
+
+The frozen recipe of `../learn/recipe.ts` was run on the mixed train split for the seeds 1 to 5, with no setting changed and nothing tuned: `runs/run.ts` calls the recipe's own `trainedTables`, `searchedTables` and `countedTables`, and the only difference from `../learn/runs/run.ts` is that the train samples come from `prepareMixedRecipe()`. One training per seed gives two rows: row 9 is the training then the count, row 10 is the training, then the search, then the count. The rule that picks code points for terminals of their own read the mixed train samples and picked `&` and `|`, the same two as on the dataset's train split, so 5,102 cells may change, as there.
+
+```sh
+bun lab/recovery-lr/kinds/runs/run.ts --seed 1 --folder <scratch>/transfer/lr/runs/mixed
+RECOVERY_LR_SCRATCH=<the scratch folder of ../learn/runs/README.md> bun lab/recovery-lr/kinds/runs/table.ts --mixed <that folder> --neutral <scratch>/transfer/lr/runs/neutral
+```
+
+The tables and a record per row and seed are in `<scratch>/transfer/lr/runs/mixed/`, with the logs in its folder `logs`. `runs/table.ts` scores every saved table itself on four sets of validation samples, also the tables of `../learn/runs/` that were trained on the dataset's train split, and it throws when a score that it makes for one of those on the dataset's validation split is not the one in that run's record. The bars are the ones of `../learn/runs/table.ts`, as the code had them at the commit 22e8a43, with their counts made on the dataset's train samples.
+
+The four sets: the mixed validation split (5000 samples, 773663 scored code points), its half with the dataset's damage (2500 samples, 336530 scored code points), its half with the kinds (2500 samples, 437133 scored code points), the dataset's own validation split (5000 samples, 678386 scored code points). A number with brackets is the mean of the seeds with the lowest and the highest. Every number is a percentage. The scores of the rows trained on the dataset's train split on the dataset's own validation split are the ones in their records.
+
+| parser | seeds | all three: the mixed validation split | all three: its half with the dataset's damage | all three: its half with the kinds | all three: the dataset's own validation split | whole: the mixed validation split | whole: its half with the dataset's damage | whole: its half with the kinds | whole: the dataset's own validation split |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bar: the parser as it is |  | 1.95 | 2.06 | 1.88 | 2.02 | 0.28 | 0.00 | 0.56 | 0.00 |
+| bar: skip every rejected token, dropped tokens shown as errors |  | 27.03 | 27.66 | 26.54 | 28.65 | 9.68 | 7.72 | 11.64 | 7.78 |
+| bar: skip every rejected token, with the count |  | 27.54 | 28.46 | 26.84 | 29.42 | 12.64 | 11.56 | 13.72 | 11.54 |
+| bar: panic mode, dropped tokens shown as errors |  | 69.67 | 59.44 | 77.55 | 60.28 | 39.66 | 21.48 | 57.84 | 22.30 |
+| bar: panic mode, with the count |  | 70.03 | 60.04 | 77.72 | 60.83 | 42.42 | 26.48 | 58.36 | 27.44 |
+| bar: panic mode that keeps the reductions made at a rejected token, with the count |  | 71.00 | 59.26 | 80.03 | 60.12 | 30.64 | 23.00 | 38.28 | 23.88 |
+| bar: the nearest table to panic mode: pop where bison reports, dropped tokens shown as errors |  | 69.40 | 58.29 | 77.95 | 58.62 | 16.62 | 10.52 | 22.72 | 10.58 |
+| bar: the nearest table to panic mode: pop where bison reports, with the count |  | 69.81 | 58.89 | 78.22 | 59.16 | 17.16 | 11.60 | 22.72 | 11.66 |
+| bar: yacc error productions, with the count |  | 87.62 | 83.70 | 90.64 | 84.45 | 36.44 | 38.92 | 33.96 | 39.28 |
+| bar: panic mode with a hand-written list of synchronizing tokens, with the count |  | 84.40 | 77.87 | 89.43 | 78.73 | 44.80 | 33.28 | 56.32 | 34.62 |
+| bar: a table filled by hand-written rules, with the count |  | 89.28 | 87.52 | 90.63 | 88.03 | 47.62 | 48.04 | 47.20 | 48.66 |
+| row 9, trained on the dataset's train split: training, then the count | 1, 2, 3, 4, 5 | 80.61 (78.36 to 85.31) | 82.25 (80.83 to 83.54) | 79.35 (76.45 to 87.25) | 82.87 (81.69 to 84.25) | 32.35 (30.42 to 33.92) | 35.16 (33.16 to 36.92) | 29.54 (25.72 to 30.92) | 35.88 (33.12 to 37.78) |
+| row 10, trained on the dataset's train split: training, then the search, then the count | 1, 2, 3, 4, 5 | 83.09 (81.79 to 84.78) | 87.56 (87.07 to 87.98) | 79.65 (77.02 to 82.40) | 88.10 (87.71 to 88.50) | 42.64 (41.88 to 43.98) | 47.74 (46.76 to 49.60) | 37.53 (36.56 to 38.40) | 48.37 (47.62 to 49.84) |
+| row 9, trained on the mixed train split: training, then the count | 1, 2, 3, 4, 5 | 88.51 (88.19 to 88.79) | 81.25 (80.20 to 81.75) | 94.09 (93.27 to 94.49) | 81.74 (81.09 to 82.16) | 39.46 (37.88 to 41.94) | 32.54 (29.24 to 35.08) | 46.38 (43.48 to 49.84) | 32.74 (30.20 to 34.64) |
+| row 10, trained on the mixed train split: training, then the search, then the count | 1, 2, 3, 4, 5 | 91.94 (91.74 to 92.14) | 86.43 (86.09 to 86.76) | 96.18 (96.10 to 96.28) | 86.92 (86.65 to 87.22) | 51.10 (50.56 to 51.62) | 44.60 (43.28 to 46.32) | 57.59 (56.92 to 58.52) | 44.57 (43.66 to 45.66) |
+
+What the table says:
+
+- The dataset's damage alone does not cover the kinds. On the half of the validation split with the kinds, the tables trained on the dataset's train split have 79.65% of all three right in row 10 and 79.35% in row 9, below the bar of yacc error productions (90.64%) and the bar of hand-written rules (90.63%). Trained on the mixed train split, row 10 has 96.18% and row 9 has 94.09%, with all five seeds of row 10 between 96.10 and 96.28.
+- The price on the dataset's own damage is about one point. On the dataset's own validation split, row 10 goes from 88.10% (87.71 to 88.50) to 86.92% (86.65 to 87.22), and row 9 from 82.87% to 81.74%. The mixed train split has half as many samples with the dataset's damage, 20,000 in the place of 40,000, and the same number of cells for both halves.
+- Against the bars: trained on the mixed split, row 10 is above every bar on the mixed validation split (91.94% against 89.28% for the hand-written rules) and on its half with the kinds, and below the hand-written rules on the dataset's own validation split (86.92% against 88.03%), where the row trained on the dataset alone was level with that bar (88.10%). Whole samples follow the same order: 51.10% on the mixed validation split against 47.62% for the hand-written rules, and 44.57% on the dataset's own validation split against 48.66%.
+- The tables trained on the dataset alone vary a lot between seeds on the kinds: row 9 goes from 76.45% to 87.25% on that half. What such tables do with a mistake they never saw depends on the seed.
+- What this does not say: the half with the kinds in the validation split holds the same 34 kinds as the train split, on other programs. So 96% says that the recipe learns these kinds, and nothing about mistakes that other people write. No held-back set was read or scored here.
+
+The runs one by one, from their records:
+
+| row | seed | all three: mixed validation | its half with the dataset's damage | its half with the kinds | the dataset's own validation | all three on the mixed train split | cells changed | display entries changed | training, s | search, s | commit | sha256 of the tables |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 9 | 1 | 88.19 | 81.59 | 93.27 | 81.79 | 89.10 | 1890 | 2275 | 22 | 0 | 44e74e6 | d424381ac6e31e59 |
+| 9 | 2 | 88.26 | 80.20 | 94.47 | 81.09 | 89.07 | 1872 | 2241 | 25 | 0 | 44e74e6 | 6e81225046066a3c |
+| 9 | 3 | 88.65 | 81.07 | 94.49 | 81.65 | 89.41 | 1913 | 2254 | 23 | 0 | 44e74e6 | 36c22bf0628ae53d |
+| 9 | 4 | 88.79 | 81.75 | 94.22 | 82.16 | 89.86 | 1904 | 2290 | 49 | 0 | cb420a7 | 14155e6e915298fd |
+| 9 | 5 | 88.63 | 81.64 | 94.01 | 81.99 | 89.23 | 1977 | 2230 | 55 | 0 | cb420a7 | 501bf6f05641d04e |
+| 10 | 1 | 91.74 | 86.09 | 96.10 | 86.65 | 93.11 | 2298 | 2267 | 22 | 19 | 44e74e6 | 02ffc8bafbe20637 |
+| 10 | 2 | 92.07 | 86.67 | 96.22 | 87.01 | 93.17 | 2362 | 2235 | 25 | 21 | 44e74e6 | 8af4596dec8f5a67 |
+| 10 | 3 | 91.81 | 86.12 | 96.19 | 86.74 | 93.10 | 2384 | 2236 | 23 | 21 | 44e74e6 | fe77c040b1c85147 |
+| 10 | 4 | 91.93 | 86.49 | 96.12 | 87.00 | 93.20 | 2360 | 2276 | 49 | 30 | cb420a7 | 211caab628d3773d |
+| 10 | 5 | 92.14 | 86.76 | 96.28 | 87.22 | 93.26 | 2377 | 2220 | 55 | 31 | cb420a7 | 3c4bbb75a8b3326c |
+
+Notes on the runs:
+
+- The seeds 1 to 3 ran at the commit 44e74e6 and the seeds 4 and 5 at cb420a7. Between the two, another agent added the folder `../learn/scale/` and changed no file that the recipe or this folder reads. The folder `runs/` itself was not committed yet when the runs started, which is why every record lists it among the files that differ from the commit.
+- The seeds 4 and 5 took twice as long because other runs were using the machine at that time.
+- While the table was being made, another agent had uncommitted changes in `../learn/data.ts` and `../learn/score.ts`. They change the upper bound that a score prints next to its row and add a counter, and not the columns of this table: the table's command checked that its scores of the dataset's rows on the dataset's validation split are the ones in their records, to four decimals of "all three".
+- The yacc bar was changed by its author today (commit b3ead3c), so its numbers here can differ from an older table in `../learn/runs/README.md`.
