@@ -11,7 +11,7 @@ The person's parser is the hand-written tables of `../../handwritten/`, 35 rules
 
 The validation split, the seeds 1 to 5, every setting run once. A number with brackets is the mean of the seeds, with the lowest and the highest. "All" is all three on all samples, "within reach" is all three in the group "within reach of the tables", and "whole" is the share of whole samples.
 
-**1. Training the blanks gets back the code points of all samples. It does not get back the whole samples, and within reach it gets back less with every larger share.**
+**1. Training the blanks gets back the code points of all samples. It does not get back the whole samples, and within reach fewer runs get to the hand-written number at the larger shares: 3, 1, 0 and 0 of 5.**
 
 | | all | within reach | whole |
 | --- | --- | --- | --- |
@@ -21,17 +21,17 @@ The validation split, the seeds 1 to 5, every setting run once. A number with br
 | 50% blanked, trained | 96.44 (96.14 to 97.02) | 99.24 (99.03 to 99.39) | 73.32 (62.90 to 77.72) |
 | 100% blanked, trained | 96.96 (96.87 to 97.06) | 99.24 (99.09 to 99.44) | 74.94 (73.35 to 75.81) |
 
-No trained run of any share has the hand-written tables' whole samples, and at the shares 50 and 100 none has their number within reach. With every decision blanked the hand-written number is outside the range of the seeds in all three columns: the trained tables are 0.45 points above it on all, 0.26 below within reach and 5.50 below on whole.
+None of the 20 runs whose seed draws the blanks has the hand-written tables' whole samples, 3,697 of 4,596: at the share 10 the five runs are 9, 8, 7, 1 and 110 samples short. One reported run has them: at the share 10 with the blanks of seed 1 for every seed, the run of seed 5 has 3,698. Within reach the means do not go on falling, 99.24 at the share 50 and at the share 100, but at these two shares no run has the hand-written number. With every decision blanked the hand-written number is outside the range of the seeds in all three columns: the trained tables are 0.45 points above it on all, 0.26 below within reach and 5.50 below on whole.
 
 **2. The person's decisions do not come back.** After training, 11.3%, 12.7% and 13.6% of the blanked cells hold the hand-written choice again at the shares 10, 25 and 50, and 27.9% at the share 100. The same blanks trained with another order of the samples end with other choices, while all three stays within 0.04 points.
 
-**3. Most of the other choices are in cells that the train samples leave open. Where the samples do tell the two choices apart, they ask for the trained one more often than for the person's.** At the share 10, 408 of the 460 blanked cells of the five runs ended with another choice than the hand-written one. With the hand-written choice put back into that one cell of the trained tables, the train split has as many code points right in 279 of them, fewer in 75 and more in 54. Of the 20 such cells that 1,000 or more train samples read, it is 1, 11 and 8.
+**3. Most of the other choices are in cells that the train samples leave open. Where the samples do tell the two choices apart, they ask for the trained one more often than for the person's in 4 of the 5 runs.** At the share 10, 408 of the 460 blanked cells of the five runs ended with another choice than the hand-written one. With the hand-written choice put back into that one cell of the trained tables, the train split has as many code points right in 279 of them, fewer in 75 and more in 54. Run by run, fewer and more are 13 and 8, 20 and 10, 11 and 9, 12 and 14, 19 and 13. Of the 20 such cells that 1,000 or more train samples read, it is 1, 11 and 8.
 
-**4. What no sample holds is lost.** The hand-written tables keep the depth of valid JSON deeper than 16 levels right at every code point, and the dataset has no such text. The trained tables have that depth wrong at 7% to 13% of the code points in one form of such texts and at 12% to 18% in the other, as the means over the seeds.
+**4. What no sample holds is lost.** The hand-written tables keep the depth of valid JSON deeper than 16 levels right at every code point, and the dataset has no such text. The trained tables have that depth wrong at 7% to 13% of the code points in one form of such texts and at 12% to 18% in the other, as the means over the seeds, on the 600 texts of `../../check-deep.ts`.
 
 **5. A plain search of the same cells is not told apart from training with up to half of the decisions blanked: the ranges of the two overlap on all, within reach and whole. With all of them blanked, training is above each of six orders of the search.** The six orders end at 88.25 to 96.43 of all, 8.2 points apart, and the best of them is 0.44 points below the lowest seed of the training on all, 0.03 within reach and 12.25 on whole.
 
-**6. Knowing which cells the person changed does not move the score.** With every decision blanked, training all 1,326 open cells instead of the person's 915 has ranges that overlap on all, within reach and whole. It has the depth of valid JSON that is too deep wrong at 47.9% of the code points against 10.4%, but the plain pass of `../plain-pass/`, which also trains every open cell, with one pass from the default start, has 3.0%: the 47.9% is what this arm's setting of the trainer does when every open cell is trainable, and not what the list of cells is worth.
+**6. Knowing which cells the person changed does not move the three totals. It moves which groups the right code points are in.** With every decision blanked, training all 1,326 open cells instead of the person's 915 has ranges that overlap on all, within reach and whole. In the group "needs a character class" the person's cells have 93.34 (93.06 to 93.68) against 91.04 (88.76 to 92.20), and are above in each of the 5 seeds. In "needs a nesting fix" they have 81.94 (77.54 to 90.68) against 89.58 (88.32 to 91.14), and are below in each of the 5. Training every open cell has the depth of valid JSON that is too deep wrong at 47.9% of the code points against 10.4%, but the plain pass of `../plain-pass/`, which also trains every open cell, with one pass from the default start, has 3.0%: the 47.9% is what this arm's setting of the trainer does when every open cell is trainable, and not what the list of cells is worth.
 
 ## Setup
 
@@ -48,25 +48,25 @@ No trained run of any share has the hand-written tables' whole samples, and at t
 
 The reported runs use one setting: **3 passes over the train samples, a uniform start, and every other default of the trainer** (learning rate 0.05, temperature 1, no sharpness cost). It is `trainerSetting` in `holes.ts`.
 
-It was chosen with `tune.ts` on the share 10, with the seeds 11, 12 and 13, which draw other blanks than the seeds 1 to 5 of the reported runs. **13 settings of the trainer were tried, and the table has all of them**, so the chosen row can be read as one of thirteen. Validation split, the mean and in brackets the lowest and the highest of the 3 seeds. "Comes back" is the share of what the blanks cost that training gets back.
+It was chosen with `tune.ts` on the share 10, with the seeds 11, 12 and 13, which draw other blanks than the seeds 1 to 5 of the reported runs. **13 settings of the trainer were tried, and the table has all of them**, so the chosen row can be read as one of thirteen. Validation split, the mean and in brackets the lowest and the highest of the 3 seeds.
 
-| passes | start | learning rate | temperature at the end | sharpness cost | all three | within reach of the tables | whole samples | comes back, all three | comes back, within reach | hand's choice, of all blanked cells |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| not filled | | | | | 90.67 (87.51 to 93.95) | 95.22 (92.78 to 97.85) | 72.20 (69.69 to 74.54) | | | |
-| 1 | today's choice | 0.05 | 1 | 0 | 96.33 (96.13 to 96.47) | 99.47 (99.39 to 99.51) | 80.14 (79.59 to 80.55) | 94.16 (85.12 to 99.52) | 98.99 (97.42 to 100.13) | 11.59 (10.87 to 11.96) |
-| 1 | uniform | 0.05 | 1 | 0 | 96.42 (96.31 to 96.52) | 99.48 (99.45 to 99.51) | 80.28 (80.07 to 80.55) | 96.86 (91.90 to 100.08) | 98.76 (96.34 to 100.05) | 6.52 (4.35 to 10.87) |
-| 3 | today's choice | 0.05 | 1 | 0 | 96.41 (96.38 to 96.46) | 99.48 (99.43 to 99.53) | 79.90 (79.57 to 80.33) | 97.38 (94.68 to 99.35) | 99.88 (98.22 to 101.73) | 10.14 (8.70 to 10.87) |
-| **3** | **uniform** | **0.05** | **1** | **0** | 96.46 (96.37 to 96.53) | 99.51 (99.50 to 99.54) | 80.33 (80.31 to 80.37) | 97.98 (94.34 to 100.14) | 100.21 (99.87 to 100.69) | 7.97 (6.52 to 8.70) |
-| 10 | today's choice | 0.05 | 1 | 0 | 96.37 (96.32 to 96.41) | 99.50 (99.42 to 99.56) | 79.75 (79.11 to 80.35) | 97.21 (95.98 to 97.86) | 100.18 (98.05 to 101.72) | 8.33 (4.35 to 10.87) |
-| 10 | uniform | 0.05 | 1 | 0 | 96.49 (96.48 to 96.51) | 99.51 (99.47 to 99.55) | 80.40 (80.18 to 80.55) | 99.62 (99.50 to 99.74) | 99.64 (97.77 to 101.07) | 7.97 (6.52 to 9.78) |
-| 3 | uniform | 0.02 | 1 | 0 | 96.42 (96.35 to 96.53) | 99.47 (99.43 to 99.50) | 80.16 (79.90 to 80.48) | 97.19 (93.48 to 100.12) | 99.02 (98.25 to 99.91) | 6.52 (3.26 to 8.70) |
-| 3 | uniform | 0.1 | 1 | 0 | 96.41 (96.25 to 96.51) | 99.47 (99.40 to 99.53) | 80.37 (80.20 to 80.48) | 98.72 (97.05 to 99.86) | 99.19 (98.42 to 100.48) | 6.88 (5.43 to 7.61) |
-| 3 | uniform | 0.2 | 1 | 0 | 96.51 (96.42 to 96.57) | 99.47 (99.42 to 99.53) | 79.82 (78.94 to 80.37) | 99.02 (96.31 to 100.60) | 98.68 (96.85 to 100.44) | 7.61 (4.35 to 10.87) |
-| 3 | uniform | 0.05 | 0.5 | 0 | 96.43 (96.29 to 96.53) | 99.49 (99.45 to 99.54) | 80.32 (80.13 to 80.50) | 99.15 (97.55 to 100.61) | 99.75 (99.20 to 100.70) | 9.06 (7.61 to 10.87) |
-| 3 | uniform | 0.05 | 0.2 | 0 | 96.45 (96.42 to 96.47) | 99.37 (99.16 to 99.53) | 80.20 (79.96 to 80.46) | 98.29 (96.41 to 99.31) | 96.96 (94.88 to 100.49) | 6.52 (5.43 to 7.61) |
-| 3 | uniform | 0.05 | 1 | 0.01 | 96.39 (96.30 to 96.52) | 99.42 (99.26 to 99.50) | 80.12 (79.72 to 80.44) | 96.57 (93.20 to 100.10) | 97.75 (94.45 to 99.94) | 6.88 (4.35 to 8.70) |
-| 3 | uniform | 0.05 | 1 | 0.1 | 96.37 (96.28 to 96.51) | 99.41 (99.28 to 99.50) | 79.82 (79.68 to 79.98) | 95.81 (90.67 to 99.98) | 96.95 (95.01 to 99.99) | 5.07 (4.35 to 5.43) |
-| the hand-written tables | | | | | 96.52 | 99.51 | 80.44 | | | |
+| passes | start | learning rate | temperature at the end | sharpness cost | all three | within reach of the tables | whole samples | hand's choice, of all blanked cells |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| not filled | | | | | 90.67 (87.51 to 93.95) | 95.22 (92.78 to 97.85) | 72.20 (69.69 to 74.54) | |
+| 1 | today's choice | 0.05 | 1 | 0 | 96.33 (96.13 to 96.47) | 99.47 (99.39 to 99.51) | 80.14 (79.59 to 80.55) | 11.59 (10.87 to 11.96) |
+| 1 | uniform | 0.05 | 1 | 0 | 96.42 (96.31 to 96.52) | 99.48 (99.45 to 99.51) | 80.28 (80.07 to 80.55) | 6.52 (4.35 to 10.87) |
+| 3 | today's choice | 0.05 | 1 | 0 | 96.41 (96.38 to 96.46) | 99.48 (99.43 to 99.53) | 79.90 (79.57 to 80.33) | 10.14 (8.70 to 10.87) |
+| **3** | **uniform** | **0.05** | **1** | **0** | 96.46 (96.37 to 96.53) | 99.51 (99.50 to 99.54) | 80.33 (80.31 to 80.37) | 7.97 (6.52 to 8.70) |
+| 10 | today's choice | 0.05 | 1 | 0 | 96.37 (96.32 to 96.41) | 99.50 (99.42 to 99.56) | 79.75 (79.11 to 80.35) | 8.33 (4.35 to 10.87) |
+| 10 | uniform | 0.05 | 1 | 0 | 96.49 (96.48 to 96.51) | 99.51 (99.47 to 99.55) | 80.40 (80.18 to 80.55) | 7.97 (6.52 to 9.78) |
+| 3 | uniform | 0.02 | 1 | 0 | 96.42 (96.35 to 96.53) | 99.47 (99.43 to 99.50) | 80.16 (79.90 to 80.48) | 6.52 (3.26 to 8.70) |
+| 3 | uniform | 0.1 | 1 | 0 | 96.41 (96.25 to 96.51) | 99.47 (99.40 to 99.53) | 80.37 (80.20 to 80.48) | 6.88 (5.43 to 7.61) |
+| 3 | uniform | 0.2 | 1 | 0 | 96.51 (96.42 to 96.57) | 99.47 (99.42 to 99.53) | 79.82 (78.94 to 80.37) | 7.61 (4.35 to 10.87) |
+| 3 | uniform | 0.05 | 0.5 | 0 | 96.43 (96.29 to 96.53) | 99.49 (99.45 to 99.54) | 80.32 (80.13 to 80.50) | 9.06 (7.61 to 10.87) |
+| 3 | uniform | 0.05 | 0.2 | 0 | 96.45 (96.42 to 96.47) | 99.37 (99.16 to 99.53) | 80.20 (79.96 to 80.46) | 6.52 (5.43 to 7.61) |
+| 3 | uniform | 0.05 | 1 | 0.01 | 96.39 (96.30 to 96.52) | 99.42 (99.26 to 99.50) | 80.12 (79.72 to 80.44) | 6.88 (4.35 to 8.70) |
+| 3 | uniform | 0.05 | 1 | 0.1 | 96.37 (96.28 to 96.51) | 99.41 (99.28 to 99.50) | 79.82 (79.68 to 79.98) | 5.07 (4.35 to 5.43) |
+| the hand-written tables | | | | | 96.52 | 99.51 | 80.44 | |
 
 What the tuning says:
 
@@ -74,11 +74,11 @@ What the tuning says:
 - **The start.** A blanked cell holds today's choice in the base, and by default a trainable mix starts with a share of 0.9 on it. A uniform start gives every choice the same share, which is the honest blank: the run then knows nothing about the cell. The uniform start has the higher mean at 1, 3 and 10 passes, by 0.05 to 0.12 points, with ranges that overlap at 1 and 3 passes. So the honest blank costs nothing and was taken.
 - **The passes.** 3 passes and 10 passes from a uniform start are 0.03 points apart with ranges that overlap, and 10 passes take three times as long. So 3. The 10 passes have the narrower range, 0.03 points against 0.16, which 3 seeds do not settle.
 - **The learning rate, the temperature and the sharpness cost do not move the score**, and nothing that the score does not show speaks for one of them. The depth of valid JSON that is too deep is wrong at 1.3% and 2.6% of the code points for the chosen setting, in the two forms of such texts. With a sharpness cost it is 8% to 15%, and with 10 passes, with 3 passes from today's choice and with a learning rate of 0.2 it is 5.2% in the first form and 9% to 11% in the second. These are means of 3 seeds, and every one of these settings has a seed with 0.0, so the ranges overlap. With a sharpness cost 3 of the 6 runs show 16 to 28 code points as past the end, and one run with the temperature that falls to 0.2 shows 15, where the chosen setting shows none. So the defaults stay.
-- **In every setting the code points of all samples come back and the hand-written choices do not**: 94% to 100% of what the blanks cost on all samples and 97% to 100% within reach, as the means of the settings, and the hand-written choice in 5% to 12% of the blanked cells. The means of whole samples are 79.75 to 80.40 where the hand-written tables have 80.44, and the highest run of 7 of the 13 settings is above them, at 80.46 to 80.55.
+- **In every setting the code points of all samples come back and the hand-written choices do not**: training gets back 94% to 100% of what the blanks cost on all samples and 97% to 100% within reach, as the means of the settings, and the hand-written choice is in 5% to 12% of the blanked cells. The means of whole samples are 79.75 to 80.40 where the hand-written tables have 80.44, and the highest run of 7 of the 13 settings is above them, at 80.46 to 80.55.
 
 ## Results
 
-The validation split of the standard set, the exact parser: 5,021 broken samples, 425 of them with nothing to recover, 675,949 scored code points. Percentages, as the mean and in brackets the lowest and the highest of the seeds 1 to 5. A number without brackets is one run, or runs that all print that number. Every reported setting was run once, with the trainer's setting above. `report.ts` prints every table of this section with more rows, and every pair of ranges that is said here to overlap or not.
+The validation split of the standard set, the exact parser: 5,021 broken samples, 425 of them with nothing to recover, 675,949 scored code points. Percentages, as the mean and in brackets the lowest and the highest of the seeds 1 to 5. A number without brackets is one run, or runs that all print that number. Every reported setting was run once, with the trainer's setting above. `report.ts` prints every table of this section with more rows, and every pair of ranges that is said here to overlap or not. A share of wrong depths on valid JSON that is too deep is a share of the 600 texts of `../../check-deep.ts`. On 142 other texts of 17 to 19 levels a review found the settings in the same order and with other sizes, e.g. 23% to 39% in the first form where the person's 915 cells have 8.0% to 15.6% here, so read the order of the settings and not the sizes.
 
 ### What blanking costs, and what comes back
 
@@ -121,8 +121,8 @@ All three per group of the dataset, trained. "The four groups" are "within reach
 | 50%, trained | 99.2 (99.0 to 99.4) | 97.5 (96.5 to 97.9) | 99.1 (98.9 to 99.5) | 91.3 (90.5 to 92.0) | 77.0 (66.7 to 89.8) | 80.2 (78.7 to 83.2) | 98.27 (98.05 to 98.45) | 5 of 5 | 79.78 (77.14 to 84.04) | 3 of 5 |
 | 100%, trained | 99.2 (99.1 to 99.4) | 97.6 (97.2 to 97.9) | 98.9 (98.9 to 99.0) | 93.3 (93.1 to 93.7) | 81.9 (77.5 to 90.7) | 83.2 (82.2 to 84.3) | 98.49 (98.34 to 98.68) | 3 of 5 | 83.08 (81.90 to 85.12) | 5 of 5 |
 
-- **Within reach less comes back with every larger share**: 3, 1, 0 and 0 of the 5 trained runs are at the hand-written 99.51 or above, and at the shares 50 and 100 the highest seed is 0.11 and 0.06 points below it.
-- **No trained run has the hand-written tables' whole samples**: the means are 0.59, 3.98, 7.11 and 5.50 points below 80.44. That is no rule: in the tuning runs above, with other blanks, single runs at the share 10 have up to 80.55. A run that is far below has lost one group as a whole: in "needs a line rule" the trained run of seed 2 has 40.0% of the whole samples at the share 25 and 0.8% at the share 50, where the hand-written tables have 98.0% and the other four runs of those shares 95.5% to 98.0%.
+- **Within reach fewer runs get to the hand-written number at the larger shares**: 3, 1, 0 and 0 of the 5 trained runs are at 99.51 or above, and at the shares 50 and 100 the highest seed is 0.11 and 0.06 points below it. The means are the same at the shares 50 and 100, 99.24, and the ranges of every two shares overlap.
+- **None of the 20 trained runs of the table has the hand-written tables' whole samples**: the means are 0.59, 3.98, 7.11 and 5.50 points below 80.44. That is no rule: with the blanks of seed 1 for every seed, the trained run of seed 5 has 80.46, and in the tuning runs above, with other blanks, single runs at the share 10 have up to 80.55. A run that is far below has lost one group as a whole: in "needs a line rule" the trained run of seed 2 has 40.0% of the whole samples at the share 25 and 0.8% at the share 50, where the hand-written tables have 98.0% and the other four runs of those shares 95.5% to 98.0%.
 - **What comes back is a loss in the four groups and a gain in the two.** In the four groups the trained tables are below the hand-written 98.57 on the mean at every share, in every seed at the shares 25 and 50 and in 3 of the 5 at the shares 10 and 100. In the two groups they are above the hand-written 77.79 on the mean at every share, in 4, 5, 3 and 5 of the 5 seeds. So tables that have the hand-written all three again have fewer code points right where the hand-written tables were nearly right, and more where they were weakest.
 
 **The sources of spread, at the share 10.** All three on all samples, the seeds one by one:
@@ -134,17 +134,17 @@ With the blanks of seed 1, the order of the samples moves the training by 0.04 p
 
 ### Which blanked cells hold the hand-written choice again
 
-After training. The columns by readers add up the runs of a row, e.g. "18 of 38" over 5 runs. **The split by readers does not say which cells a run can learn.** The trained tables are another parser than the hand-written one and take other paths through the tables: the fourth column counts the blanked cells without a reader under the hand-written tables that a train sample reads with the trained tables. And the twin reads every cell that has a share, however small, so training also moves cells that no exact run reads, see `../../soft/README.md`. So the fair number is the one over all blanked cells.
+After training. **Whether a train sample reads a cell does not say whether a run can learn the cell.** The trained tables are another parser than the hand-written one and take other paths through the tables: the fourth column counts the blanked cells without a reader under the hand-written tables that a train sample reads with the trained tables. And the twin reads every cell that has a share, however small, so training also moves cells that no exact run reads, see `../../soft/README.md`. So the fair number is the one over all blanked cells.
 
-| blanked | blanked cells | of them, no train sample reads | of those, read with the trained tables, over the runs | hand's choice, of all blanked cells | hand's choice, of the cells that a train sample reads | read by 1 to 9 train samples | read by 10 to 99 train samples | read by 100 to 999 train samples | read by 1,000 or more train samples | read by none |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 10% | 92 | 48 (40 to 57) | 42 of 238, 18% | 11.3 (5.4 to 17.4) | 16.5 (6.4 to 25.0) | 5 of 84, 6% | 3 of 58, 5% | 11 of 42, 26% | 18 of 38, 47% | 15 of 238, 6% |
-| 10%, the blanks of seed 1 for every seed | 92 | 40 | 24 of 200, 12% | 17.8 (15.2 to 20.7) | 24.6 (23.1 to 26.9) | 13 of 100, 13% | 10 of 65, 15% | 15 of 40, 38% | 26 of 55, 47% | 18 of 200, 9% |
-| 25% | 229 | 113 (106 to 128) | 212 of 567, 37% | 12.7 (10.0 to 15.7) | 16.0 (12.2 to 19.8) | 14 of 225, 6% | 19 of 153, 12% | 23 of 118, 19% | 36 of 82, 44% | 53 of 567, 9% |
-| 50% | 458 | 234 (227 to 247) | 680 of 1,170, 58% | 13.6 (11.8 to 15.7) | 17.1 (14.7 to 20.9) | 48 of 427, 11% | 45 of 294, 15% | 57 of 231, 25% | 42 of 168, 25% | 120 of 1,170, 10% |
-| 100% | 915 | 474 | 1,118 of 2,370, 47% | 27.9 (25.7 to 30.9) | 28.3 (27.0 to 29.7) | 177 of 800, 22% | 136 of 590, 23% | 147 of 470, 31% | 164 of 345, 48% | 652 of 2,370, 28% |
+| blanked | blanked cells | of them, no train sample reads | of those, read with the trained tables, over the runs | hand's choice, of all blanked cells | hand's choice, of the cells that a train sample reads |
+| --- | --- | --- | --- | --- | --- |
+| 10% | 92 | 48 (40 to 57) | 42 of 238, 18% | 11.3 (5.4 to 17.4) | 16.5 (6.4 to 25.0) |
+| 10%, the blanks of seed 1 for every seed | 92 | 40 | 24 of 200, 12% | 17.8 (15.2 to 20.7) | 24.6 (23.1 to 26.9) |
+| 25% | 229 | 113 (106 to 128) | 212 of 567, 37% | 12.7 (10.0 to 15.7) | 16.0 (12.2 to 19.8) |
+| 50% | 458 | 234 (227 to 247) | 680 of 1,170, 58% | 13.6 (11.8 to 15.7) | 17.1 (14.7 to 20.9) |
+| 100% | 915 | 474 | 1,118 of 2,370, 47% | 27.9 (25.7 to 30.9) | 28.3 (27.0 to 29.7) |
 
-- **More readers raise the share and do not settle it.** Of the cells that 1,000 or more train samples read, 44% to 48% hold the hand-written choice after training at the shares 10, 25 and 100, and 25% at the share 50. What the others hold is in the next section.
+- **More readers raise the share and do not settle it.** Over the 5 runs of the share 10, the hand-written choice is in 5 of the 84 cells that 1 to 9 train samples read and in 18 of the 38 that 1,000 or more read. Of the cells with 1,000 or more readers, 44% to 48% hold the hand-written choice after training at the shares 10, 25 and 100, and 25% at the share 50. What the others hold is in the next section.
 - **The same blanks trained in another order end with other choices**: with the blanks of seed 1, 15.2% to 20.7% of the 92 cells hold the hand-written choice.
 - **At the share 100 a cell that no train sample reads holds the hand-written choice as often as one that is read**: 652 of 2,370 such cells over the 5 runs, 27.5%, against 28.3% of the cells that are read. With every decision blanked the trained tables are far from the hand-written ones, and "read with the hand-written tables" says little about what the run saw.
 - **The search is not told apart from training in how often it holds the hand-written choice** with up to half of the decisions blanked: 14.1% (10.9 to 17.4), 15.3% (11.4 to 18.8) and 15.4% (10.7 to 18.6) of the blanked cells at the shares 10, 25 and 50, with ranges that overlap training's. With every decision blanked training holds it more often, 27.9% (25.7 to 30.9) against 11.6% (9.3 to 15.1) for the five random orders.
@@ -202,7 +202,7 @@ Where a label says what a code point is, the trained tables show what the person
 
 ### Training against a plain search of the same cells
 
-**With up to half of the decisions blanked, the search is not told apart from training.** At the shares 10, 25 and 50, and at the share 10 with the blanks of seed 1, the ranges of the two overlap on all samples, within reach and on whole samples, see the three tables of the first section. At these shares a search takes 2 to 63 s and a training 38 to 81 s, with other jobs running on the machine.
+**With up to half of the decisions blanked, the search is not told apart from training.** At the shares 10, 25 and 50 the ranges of the two overlap on all samples, within reach and on whole samples, see the three tables of [What blanking costs, and what comes back](#what-blanking-costs-and-what-comes-back). So do they at the share 10 with the blanks of seed 1 for every seed: training has 96.52 (96.50 to 96.54), 99.51 (99.50 to 99.54) and 80.30 (80.22 to 80.46), and the search 96.45 (96.35 to 96.55), 99.38 (99.25 to 99.52) and 80.32 (80.05 to 80.66). At these shares a search takes 2 to 63 s and a training 38 to 81 s, with other jobs running on the machine.
 
 **With every decision blanked, training is above the search in each of six orders of its cells.** The search of the 915 cells from today's tables, one order per row:
 
@@ -217,7 +217,7 @@ Where a label says what a code point is, the trained tables show what the person
 | the search, the 6 orders | 93.20 (88.25 to 96.43) | 96.59 (92.97 to 99.06) | 58.75 (56.29 to 61.10) | 11.13 (8.96 to 15.08) |
 | training, 5 seeds | 96.96 (96.87 to 97.06) | 99.24 (99.09 to 99.44) | 74.94 (73.35 to 75.81) | 27.89 (25.68 to 30.93) |
 
-- The six orders end 8.2 points apart on all samples, from 88.25 to 96.43. The first version of this arm had only the order with the most read cells first, which is the lowest of the six.
+- The six orders end 8.2 points apart on all samples, from 88.25 to 96.43. The lowest of the six is the order with the most read cells first, which is the default of `search.ts`.
 - The ranges of training and of the search do not overlap in any of the three columns: the best order is 0.44 points below the lowest seed of the training on all samples, 0.03 within reach and 12.25 on whole samples. Each of the six orders has 0.2% to 0.8% of the whole samples of the group "needs a line rule", where the trained runs have 90.0% to 98.0%.
 - A search in a random order takes 4 to 6 minutes here, and a training a minute and a half.
 - Whether the list of the person's cells helps the search is not told. From today's tables the search of all 1,326 open cells ends at 94.34, 96.30 and 89.41 in three orders (`../../README.md`), which lies inside the range of the six orders of the 915 cells.
@@ -235,9 +235,20 @@ With every decision blanked the trainable cells are the 915 that the person chan
 | every open cell, the plain pass | 96.50 (95.88 to 96.74) | 99.11 (98.87 to 99.31) | 73.22 (72.76 to 73.54) | 3.0 (0.0 to 12.3) | 4.7 (0.0 to 16.4) | 26 (23 to 29) |
 | the hand-written tables | 96.52 | 99.51 | 80.44 | 0.0 | 0.0 | 21 |
 
-- **For the score the list of the person's cells makes no difference**: against every open cell with the same setting the ranges overlap on all samples (+0.08 points), within reach (-0.03) and on whole samples (+1.48).
+All three per group of the dataset:
+
+| trainable cells, setting of the trainer | within reach of the tables | needs a display fix | needs a line rule | needs a character class | needs a nesting fix | out of reach |
+| --- | --- | --- | --- | --- | --- | --- |
+| the person's 915 cells, the arm's setting | 99.2 (99.1 to 99.4) | 97.6 (97.2 to 97.9) | 98.9 (98.9 to 99.0) | 93.3 (93.1 to 93.7) | 81.9 (77.5 to 90.7) | 83.2 (82.2 to 84.3) |
+| every open cell, the arm's setting | 99.3 (99.1 to 99.4) | 96.9 (96.4 to 97.3) | 99.1 (98.9 to 99.8) | 91.0 (88.8 to 92.2) | 89.6 (88.3 to 91.1) | 83.6 (82.9 to 84.1) |
+| seeds in which the person's cells are above every open cell | 2 of 5 | 5 of 5 | 1 of 5 | 5 of 5 | 0 of 5 | 3 of 5 |
+| every open cell, the plain pass | 99.1 (98.9 to 99.3) | 96.2 (94.2 to 96.8) | 99.7 (98.9 to 99.9) | 89.7 (88.9 to 90.5) | 89.4 (83.1 to 92.8) | 81.6 (76.9 to 83.6) |
+| the hand-written tables | 99.5 | 98.2 | 99.0 | 92.2 | 76.1 | 78.0 |
+
+- **For the three totals the list of the person's cells makes no difference**: against every open cell with the same setting the ranges overlap on all samples (+0.08 points), within reach (-0.03) and on whole samples (+1.48).
+- **Per group the list does make a difference, in both directions, and the two cancel in the totals.** For a seed the two settings get the same samples in the same order, so the seeds can be counted in pairs. The person's cells are above in each of the 5 seeds in "needs a character class", where the ranges do not overlap, and in "needs a display fix". They are below in each of the 5 seeds in "needs a nesting fix", where the ranges overlap. So the list keeps text of another notation, e.g. a string in single quotes, and loses in the nesting, where the hand-written tables are weakest.
 - **The person's cells are 0.46 points above the plain pass on all samples**, with ranges that do not overlap. Which part of that is the setting is not told: every open cell with the arm's setting is 0.38 points above the plain pass, with ranges that overlap. Within reach and on whole samples the ranges of every pair of the three overlap.
-- **What the arm's setting costs when every open cell is trainable**: the depth of valid JSON that is too deep is wrong at 47.9% and 54.6% of the code points, against the plain pass's 3.0% and 4.7%, with ranges that do not overlap. So the person's cells are not shown to keep that depth better than a training without the list: their 10.4% and 14.7% are below the control with the arm's setting, with ranges that do not overlap, and above the plain pass on the mean, with ranges that overlap. The count of grammar cells whose stack action is not their token's reads the same way.
+- **What the arm's setting costs when every open cell is trainable**: the depth of valid JSON that is too deep is wrong at 47.9% and 54.6% of the code points, against the plain pass's 3.0% and 4.7%, with ranges that do not overlap. So the person's cells are not shown to keep that depth better than a training without the list: their 10.4% and 14.7% are below the control with the arm's setting, with ranges that do not overlap, and above the plain pass on the mean. The count of grammar cells whose stack action is not their token's reads the same way.
 - **No setting of this arm reaches the number to beat**, the search from the hand-written tables: 96.96 against 97.75 on all samples and 99.24 against 99.68 within reach, and neither pair of ranges overlaps.
 
 ### What no label scores
@@ -269,7 +280,7 @@ The ground rules hold on the fixed texts for every run.
 - **Nothing here is a number on unseen data.** For the hand-written tables no split of this dataset counts as unseen, and the setting of the trainer was chosen with validation scores in view, among 13 settings, on other seeds.
 - **Not whether a person would have left these blanks.** The blanks are a random share of the cells. A person leaves a whole rule open, or the cells of one state, and whether training fills such a hole is not measured: 35 rules set 915 cells, 26 cells per rule on average, and a random share takes a few cells out of many rules.
 - **Not that the other choices are as good as the person's on other text.** "As many code points" is the train split or the validation split of this dataset. 249 of the 408 other choices are read by no validation sample, so nothing was measured for them.
-- **Not which cells a run can learn.** The split by readers uses the hand-written parser's paths, and the trained parser takes others.
+- **Not which cells a run can learn.** The count of a cell's readers uses the hand-written parser's paths, and the trained parser takes others.
 - **Not how much of a spread is the order's.** Only the share 10 has runs with the same blanks for every seed, and for one draw of blanks. At the shares 25 and 50 a seed draws the blanks and the order together.
 - **Not where the search ends in a seventh order.** Six orders of the 915 cells end 8.2 points apart.
 - **The comparison of the person's cells with every open cell is one setting of the trainer**, tuned on the share 10 and on blanks inside the hand-written tables. That setting breaks the depth of valid JSON that is too deep when every open cell is trainable.
@@ -304,7 +315,7 @@ bun lab/recovery-parser/learn/arms/holes/tune.ts --name temperature --passes 3 -
 bun lab/recovery-parser/learn/arms/holes/tune.ts --name sharpness-cost --passes 3 --start uniform --sharpness-cost 0.01,0.1
 ```
 
-Every run was made a second time, from an empty scratch folder: the 13 tuned settings, every trained setting and the search with the most read cells first gave every number of the first version of this README that they stand behind again, to the printed digit.
+Every run was made twice, the second time from an empty scratch folder: the 13 tuned settings, every trained setting and the search with the most read cells first gave the same numbers both times, to the printed digit.
 
 ## Files
 
