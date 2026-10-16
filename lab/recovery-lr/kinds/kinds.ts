@@ -190,8 +190,10 @@ const ocamlKinds: KindDefinition[] = [
       const {definitions, tokens} = scanned
       const places: number[] = []
       for (let place = 0; place + 1 < definitions.length; place++) {
-        const next = definitions[place + 1]!
-        if (!next.rec && (tokens[next.name]!.terminal === T.LPAREN || tokens[next.name]!.terminal === T.UNDERSCORE)) places.push(place)
+        const before = definitions[place]!, next = definitions[place + 1]!
+        const definesNothing = (definition: Definition): boolean => tokens[definition.name]!.terminal === T.LPAREN || tokens[definition.name]!.terminal === T.UNDERSCORE
+        // The first of the two is a function's body or the right side of `let () =`: nobody runs a second expression after a plain value.
+        if (!next.rec && definesNothing(next) && (definesNothing(before) || before.parameters.length > 0)) places.push(place)
       }
       const place = pick(random, places)
       if (place === undefined) return undefined
@@ -410,14 +412,14 @@ const otherLanguageKinds: KindDefinition[] = [
     apply: (random, scanned) => {
       const {codePoints} = scanned
       // A comment on one line with nothing after it on that line: the other languages' comments end with the line.
-      const comments = scanned.comments.filter(comment => comment.end - comment.start >= 5 && lastOnLine(scanned, comment.end) && lineEndOf(scanned, comment.start) >= comment.end)
+      // It has a space after its `(*` and before its `*)`, which leaves out a line of stars.
+      const comments = scanned.comments.filter(comment => comment.end - comment.start >= 7 && codePoints[comment.start + 2] === space && codePoints[comment.end - 3] === space && lastOnLine(scanned, comment.end) && lineEndOf(scanned, comment.start) >= comment.end)
       if (comments.length === 0) return undefined
       const mark = random.weighted([['//', 5], ['#', 4], ['--', 2]] as const)
       const chosen = random.chance(0.6) ? comments : [random.pick(comments)]
       return {
         edits: chosen.flatMap(comment => {
-          const closeFrom = codePoints[comment.end - 3] === space ? comment.end - 3 : comment.end - 2
-          return [replaceRange(comment.start, comment.start + 2, mark), removeRange(closeFrom, comment.end)]
+          return [replaceRange(comment.start, comment.start + 2, mark), removeRange(comment.end - 3, comment.end)]
         }),
         form: `${mark} for a comment${chosen.length > 1 ? ', everywhere' : ''}`,
       }
