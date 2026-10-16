@@ -1,6 +1,6 @@
 # Gradient training with more passes and more train samples
 
-The frozen recipe of `../recipe.ts` trains for 3 passes over 40,000 train samples, with settings that were tuned for JSON. Its row 9, the training and the count, is about 5 points of all three below the search and below the table filled by hand-written rules (see `../runs/README.md`). Two signs there suggested that the training is cut short: the largest share of a cell is only 0.78 to 0.79 after the three passes, and the trained tables run into the limit of 16 steps about 4,000 times on the validation split. This folder measures what the same gradient training reaches on the validation split when it gets more passes and more train samples.
+The frozen recipe of `../recipe.ts` trains for 3 passes over 40,000 train samples, with settings that were tuned for JSON. Its row 9, the training and the count, is about 5 points of all three below the search and below the table filled by hand-written rules (see `../runs/README.md`). Two signs there suggested that the training is cut short: the largest share of a cell is only 0.78 to 0.79 after the three passes, and the trained tables run into the limit of 16 steps about 4,000 times on the validation split. This folder measures what the same gradient training reaches on the validation split when it gets more passes and more train samples, and with two other settings: a lower rate and another share at the start.
 
 **What these numbers are, and are not.** This study changes settings on purpose, and the settings were chosen with the scores of the validation split in view. So its numbers are not rows of the frozen recipe and not results on unseen data. Only the train and the validation split were read. No held-back set was read and no test split was scored.
 
@@ -31,7 +31,7 @@ Yes, for the validation split. `../../dataset.ts` makes sample `index` from prog
 
 ## The numbers
 
-Dataset `60c821012d537395`, the 5,000 validation samples. Every number but the counts and the seconds is a percentage or a share. A number with brackets is the mean of the seeds with the lowest and the highest. "All three" is the share of scored code points with the display kind, the depth and the container all right, "whole" the share of samples with all three right at every scored code point, and "stack" the share of scored code points with the stack right. "Largest share of a cell" is the mean over the trained cells and display entries of the largest share when the tables were snapped. The first five rows are copied from `../runs/README.md`.
+Dataset `60c821012d537395`, the 5,000 validation samples. Every number but the counts and the seconds is a percentage or a share. A number with brackets is the mean of the seeds with the lowest and the highest. "All three" is the share of scored code points with the display kind, the depth and the container all right, "whole" the share of samples with all three right at every scored code point, and "stack" the share of scored code points with the stack right. "Largest share of a cell" is the mean over the trained cells and display entries of the largest share when the tables were snapped. The first five rows are copied from `../runs/README.md`, where the tokens skipped at the limit were looked at for the seeds 1, 2 and 5 of row 9, seed 1 of row 10 and seed 11 of row 11. In a row with the search, the largest share is of the training before the search.
 
 <!-- the output of table.ts -->
 | steps | train samples | passes | steps of Adam | rate | share at the start | seeds | all three | whole | stack | largest share of a cell | tokens skipped at the limit of 16 steps | all three on its train samples | whole on its train samples | cells changed | training, s | search, s |
@@ -106,4 +106,4 @@ All runs started between 16:09 and 16:30 on October 16 and the last one ended at
 
 ## Where the files are
 
-`<scratch>/transfer/lr/runs/scale/` holds the tables `train-<train samples>.passes-<passes>.seed-<seed>.tables.json` with a record next to each, and `logs/` with what every command printed.
+`<scratch>/transfer/lr/runs/scale/` holds the tables `train-<train samples>.passes-<passes>.seed-<seed>.tables.json` with a record next to each, and `logs/` with what every command printed. A name has `.rate-0.01` or `.start-share-0.5` after the passes for a run with that setting, and `.searched` for the tables after the search. No file was saved for the stopped training of 100 passes but its log.
