@@ -23,5 +23,6 @@ Everyone else gets numbers through whoever runs the final scoring, and no texts.
 ## The sets
 
 - `written/`: broken programs that agents wrote from situations in which a program gets broken, each with a repair by its writer and a second repair by an agent who saw only the broken program. Its `README.md` says how a case gets its labels and how other code reads the set.
+- `specific/`: 6,000 broken programs that a generator makes from valid programs of its own, with one or two mistakes each of 41 kinds that people make in a language of this sort, e.g. a forgotten `in` or `;;` after a definition. Its `README.md` lists the kinds, says how a sample gets its labels and how other code reads the set, and says for every kind what a table can show.
 
 A set that is added later gets a folder of its own here, with a `README.md`, and a line in this list.
