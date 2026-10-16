@@ -315,7 +315,10 @@ function keyText(generator: Generator, used: Set<string>): string {
       return text
     }
   }
-  const name = `${random.pick(bareNames)}${generator.nextName++}`
+  // A name with a new number. A key of random characters can have taken it, e.g. `T4`, so the number goes on until
+  // the name is new.
+  let name = `${random.pick(bareNames)}${generator.nextName++}`
+  while (used.has(name)) name = `${random.pick(bareNames)}${generator.nextName++}`
   used.add(name)
   if (!random.chance(0.2)) return name
   // A dotted key: more parts after the new first one, which may repeat no name of the table.
@@ -396,6 +399,7 @@ export function validDocument(seed: number): string {
   for (let attempt = 0; attempt < 60 && length < target; attempt++) {
     const roll = random.next()
     let line: string
+    let startsTable = false
     if (roll < 0.08) {
       line = random.pick(['', '', '  ', '\t'])
     } else if (roll < 0.16) {
@@ -423,7 +427,7 @@ export function validDocument(seed: number): string {
         }
       }
       line = `${indent()}${'['.repeat(brackets)}${space()}${name}${space()}${']'.repeat(brackets)}${trailing()}`
-      used = new Set<string>()
+      startsTable = true
     } else if (roll < 0.33) {
       line = `${indent()}${keyText(generator, used)} = ${deepValueText(generator, random.pick([maximumDepth, maximumDepth, maximumDepth - 1, 8]))}${trailing()}`
     } else {
@@ -434,6 +438,8 @@ export function validDocument(seed: number): string {
     if (length + lineLength > capacity) continue
     lines.push(line)
     length += lineLength
+    // The keys of the lines after a header go into a new table. A header that did not fit starts none.
+    if (startsTable) used = new Set<string>()
   }
   const text = lines.join(lineEnd)
   // The last line has a line end or not.
