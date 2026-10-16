@@ -84,7 +84,7 @@ Chosen by hand and not by the rule, with the distance of each: equalsSign 0.40, 
 Picked by the rule and not chosen by hand: U+FEFF, U+2026.
 
 - **The rule finds 9 of the 15 classes that were chosen by hand**: the apostrophe, the backtick, the two typographic quotes, U+00A0, the two round brackets, `;` and `&`.
-- **It misses 6 of them.** Each is mostly something else than what the damage makes of it: `=` is the content of a string at 48% of its occurrences and stands for a colon at 30%, and `x` is a plain letter at 94% and the `x` of `\xe9` in the rest.
+- **It misses 6 of them.** Each is mostly something else than what the damage makes of it: `=` is the content of a string at 48% of its occurrences and stands for a colon at 30%, and `x` is the content of a string at 94% and the `x` of `\xe9` at fewer than 1%.
 - **It picks 2 that no description names**: U+FEFF, the byte order mark before a document, and U+2026, the ellipsis that marks a text as cut. The damage added every one of their occurrences, where the rest of the class `other` is added at 12%.
 - **The rule knows where a code point differs and not what a class is good for.** E.g. the backtick is picked because the damage adds nearly every backtick, e.g. the three of a code fence, in 2,317 train samples, and not for the 19 train samples in which it stands for a quote.
 
