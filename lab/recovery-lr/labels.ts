@@ -197,9 +197,15 @@ export type ValidLabels = {
 }
 
 // The labels of a valid text. Throws when the parser rejects the text.
-export function labelsOfValidText(text: string): ValidLabels {
+export const labelsOfValidText = (text: string): ValidLabels => {
   const codePoints = codePointsOf(text)
-  const tokens = scan(codePoints)
+  return labelsOfTokens(codePoints, scan(codePoints))
+}
+
+// The labels of code points that are cut into the given tokens, which the parser must accept. The tokens need not
+// be the scanner's own for the code points: a check labels a broken text without the tokens that a repair skips.
+// A code point that is in none of the tokens has no label.
+export function labelsOfTokens(codePoints: Int32Array, tokens: Tokens): ValidLabels {
   const kind = new Int8Array(codePoints.length), depth = new Int16Array(codePoints.length), container = new Int8Array(codePoints.length), stackHash = new Int32Array(codePoints.length)
   const reductionRule: number[] = [], reductionFirstToken: number[] = [], reductionLastToken: number[] = [], reductionAfterToken: number[] = []
   let lastShifted = -1
@@ -244,7 +250,7 @@ export function labelsOfValidText(text: string): ValidLabels {
       reductionAfterToken.push(lastShifted)
     },
   }
-  if (!parse(tokens, codePoints.length, observer).valid) throw new Error(`labels are only defined for a valid text, and the parser rejects ${JSON.stringify(text)}`)
+  if (!parse(tokens, codePoints.length, observer).valid) throw new Error(`labels are only defined for a valid text, and the parser rejects ${JSON.stringify(String.fromCodePoint(...codePoints))}`)
   if (labelled !== tokens.count) throw new Error('a token of a valid text has no label')
   return {
     codePoints, tokens, kind, depth, container, stack: stackHash,

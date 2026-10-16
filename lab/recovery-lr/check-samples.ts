@@ -7,6 +7,8 @@
 // 3. A few texts with their labels written out.
 // 4. The neutral damage: what each of the ten edits does, and how often each is drawn.
 // 5. The samples: what sample.ts promises of every field, on train and validation samples and on pairs by hand.
+//    And the two columns from end to end: a parser that makes the one known repair of a text has every label,
+//    every hash of the stack and exactly the sample's constituents.
 // 6. The dataset: the same seed gives the same samples, and no validation program has the tokens of a train program.
 //
 // Run from the repo root: bun lab/recovery-lr/check-samples.ts
@@ -15,11 +17,11 @@ import {defaultSeed, loadSamples, programAt, sampleAt, splitOf, splitOfTokens} f
 import {randomSentence, textOfTerminals} from './explore.ts'
 import {
   type TreeNode, type ValidLabels, containerNames, containerOf, containerOfSymbols, depthOf, depthOfSymbols, displayKind, displayKindNames, displayOfState, dumpLabels, emptyStackHash, kindOfTerminal,
-  labelsOfValidText, noSymbol, stackHashOf, stackHashOfSymbols, stackSymbolsOfValidText, symbolsOf, treeOf,
+  labelsOfTokens, labelsOfValidText, noSymbol, stackHashOf, stackHashOfSymbols, stackSymbolsOfValidText, symbolsOf, treeOf,
 } from './labels.ts'
 import {codePointsOf, firstOnLineOf, maximumCodePoints, parse, scan} from './parser.ts'
 import {createRandom} from './random.ts'
-import {type Sample, alignmentOfTexts, canonicalAlignment, constituentCounts, constituentOfKey, makeSample, restrictedConstituents} from './sample.ts'
+import {type Sample, alignmentOfTexts, canonicalAlignment, constituentCounts, constituentOfKey, isScored, makeSample, restrictedConstituents} from './sample.ts'
 import {actionReduce, actionShift, commentKind, isTrivia, symbolOf, tables} from './tables.ts'
 
 const problems: string[] = []
@@ -408,6 +410,46 @@ function checkSample(sample: Sample, name: string) {
   }
   expect(Array.from(alignmentOfTexts('let x = (1, 2)', 'let x = (1; 2)')).join() === '0,1,2,3,4,5,6,7,8,9,-1,11,12,13', () => 'the alignment of let x = (1; 2)')
   expect(alignedLikeSample >= 0.95 * singleEdits, () => `of ${singleEdits} samples with one edit, the shortest edit script gives the sample's alignment in ${alignedLikeSample}`)
+  // One repair is known: a `#` between two tokens of a valid program is to be skipped. A parser that skips it has
+  // every label of the sample at every scored code point, also the stack's hash, and has the sample's constituents
+  // and no others. This is how a parser that recovers is scored, with the labels and the places of the broken text.
+  let repaired = 0
+  for (let index = 0; index < 400; index++) {
+    const {text, labels} = programAt(defaultSeed, index)
+    const random = createRandom(defaultSeed + 8, index)
+    const realTokens = Array.from({length: labels.tokens.count}, (_, token) => token).filter(token => !isTrivia(labels.tokens.kind[token]!))
+    if (realTokens.length < 2) continue
+    // After a token that is not the last one, so that code points are left to score.
+    const after = random.pick(realTokens.slice(0, -1))
+    const at = labels.tokens.start[after]! + labels.tokens.length[after]!
+    const broken = `${String.fromCodePoint(...labels.codePoints.slice(0, at))} # ${String.fromCodePoint(...labels.codePoints.slice(at))}`
+    const sample = makeSample({id: 'a # to skip', original: text, broken, alignment: alignmentOfTexts(text, broken)}, labels)
+    if (typeof sample === 'string') {
+      if (sample !== 'too long') problem(`program ${index} with a # after token ${after} is no sample: ${sample}`)
+      continue
+    }
+    checkSample(sample, `program ${index} with a #`)
+    // The tokens without the `#`, and their places in the sample's tokens.
+    const places = Array.from({length: sample.tokens.count}, (_, token) => token).filter(token => token !== sample.firstErrorToken)
+    const skipped = {count: places.length, kind: Int32Array.from(places, token => sample.tokens.kind[token]!), start: Int32Array.from(places, token => sample.tokens.start[token]!), length: Int32Array.from(places, token => sample.tokens.length[token]!)}
+    const parsed = labelsOfTokens(sample.codePoints, skipped)
+    for (let place = sample.firstErrorPosition; place < sample.codePoints.length; place++) {
+      if (!isScored(sample, place)) continue
+      if (parsed.kind[place] !== sample.labelKind[place] || parsed.depth[place] !== sample.labelDepth[place] || parsed.container[place] !== sample.labelContainer[place] || parsed.stack[place] !== sample.labelStack[place]) {
+        problem(`program ${index} with a # after token ${after}: the parser that skips the # has another label at code point ${place}`)
+        break
+      }
+    }
+    const reductions = Array.from({length: parsed.reductionCount}, (_, reduction) => ({
+      nonterminal: tables.ruleLhs[parsed.reductionRule[reduction]!]!,
+      firstToken: parsed.reductionFirstToken[reduction] === -1 ? -1 : places[parsed.reductionFirstToken[reduction]!]!,
+      lastToken: parsed.reductionLastToken[reduction] === -1 ? -1 : places[parsed.reductionLastToken[reduction]!]!,
+    }))
+    const counts = constituentCounts(sample, restrictedConstituents(sample, reductions))
+    expect(counts.shared === counts.originalCount && counts.shared === counts.recoveredCount && counts.shared > 0, () => `program ${index} with a # after token ${after}: the parser that skips the # shares ${counts.shared} constituents, of ${counts.originalCount} and ${counts.recoveredCount}`)
+    expect(sample.keptToken.every((originalToken, token) => (originalToken === -1) === (token === sample.firstErrorToken || isTrivia(sample.tokens.kind[token]!))), () => `program ${index} with a #: a token other than the # is no kept token`)
+    repaired++
+  }
   // What makeSample refuses, and what it throws on.
   expect(make('let x = 1', 'let x = 1', identity('let x = 1')) === 'unchanged', () => 'an unchanged text is a sample')
   expect(make('let x = 1', 'let x = 12', [...identity('let x = 1'), -1]) === 'still valid', () => 'a valid text is a sample')
@@ -425,6 +467,7 @@ function checkSample(sample: Sample, name: string) {
   expect(throws(() => make('let x = 12', 'let x = 21', [0, 1, 2, 3, 4, 5, 6, 7, 9, 8])), () => 'an alignment that does not rise is taken')
   expect(throws(() => make('let x = 1', 'let x = ', [0, 1, 2, 3, 4, 5, 6])), () => 'an alignment of another length is taken')
   console.log(`   Pairs by hand give the samples that are written out in this file, and makeSample refuses or throws where it says. A shortest edit script of the two texts gives the sample's alignment for ${alignedLikeSample} of ${singleEdits} samples with one edit.`)
+  console.log(`   ${repaired} programs with a # between two tokens: the parser that skips the # has every label, every hash of the stack and exactly the sample's constituents.`)
 }
 
 // 6. The dataset.
