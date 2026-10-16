@@ -26,7 +26,9 @@ No script picked a cell's choice. But counts and scores were in view the whole t
 - **Variants by their train scores.** 24 times a rule was scored in two forms on the train splits of both sets, and the form with the higher score stayed. 9 of the new forms stayed, see [What was tried and dropped](#what-was-tried-and-dropped).
 - **Validation scores.** `report.ts` scores the validation split by default, so validation numbers were printed during the writing, and one change came from a validation table: leaving out the rule "a missing comma" scored higher on the neutral validation split, which led to the narrower form of that rule. So no split of these two sets counts as unseen for these rules. The held-back sets do.
 
-Few samples were read as a whole: the first 13 of the dataset's dump and two more. The rest of the reading was the excerpts of the lists, about 100 code points each.
+Few samples were read as a whole: the first 13 of the dataset's dump and about a dozen more. The rest of the reading was the excerpts of the lists, about 100 code points each.
+
+**How much effort went in.** One session of about 75 minutes on the clock: a first draft of 28 rules, a second draft of 33 after the first lists and counts, and then the changes above, each scored on the train splits in under a second. A person would need a few days for the same lists, counts and variants. The session stopped when a change added 0.05 points or less: the last one that added more was the rule "a quote right after a word", 0.37 points on the neutral train split, which came from the list of samples that lose against the one rule. A longer effort would most likely find more of that sort.
 
 ## Result
 
