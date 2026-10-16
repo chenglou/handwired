@@ -20,13 +20,14 @@
 //     [--order <seed>] [--train <samples>] [--validation <samples>] [--flag] [--without-end-early] [--count] [--in-turns]
 // Without --from the search starts from the parser as it is, with the flag "first on its line" for --flag and
 // without the choices "end an item early" for --without-end-early. It scores the validation samples after every
-// pass, for the log only.
+// pass, for the log only. --from refuses tables that were saved with another version of the dataset: a change of
+// the generator moves samples between the splits.
 import {mkdirSync, writeFileSync} from 'node:fs'
 import {dirname, join} from 'node:path'
 import {createRandom} from '../../random.ts'
 import {type PackedSamples, loadPacked, messageOf, refuseOtherTerminals} from '../data.ts'
 import {flagOf, learnFolder, numberOf, optionOf, refuseUnknownOptions, standardTrainCount, standardValidationCount} from '../options.ts'
-import {type RecoveryTables, addFirstOnLineFlag, baseTables, cellName, changeableCellsOf, checkTables, choicesOf, copyTables, differencesOf, loadTables, saveTables, withoutEndEarly} from '../recovery-tables.ts'
+import {type RecoveryTables, addFirstOnLineFlag, baseTables, cellName, changeableCellsOf, checkTables, choicesOf, copyTables, differencesOf, loadTablesOfThisDataset, saveTables, withoutEndEarly} from '../recovery-tables.ts'
 import {scoreRow, scoreTables, sharesOf, totalScore} from '../score.ts'
 import {displayEntriesByCount} from './count.ts'
 import type {Reply, Request} from './search-worker.ts'
@@ -135,7 +136,7 @@ if (import.meta.main) {
   const from = optionOf('--from')
   if (from !== undefined && (flagOf('--flag') || flagOf('--without-end-early'))) throw new Error('--flag and --without-end-early make the tables that a search starts from, and --from names them')
   let start: RecoveryTables
-  if (from !== undefined) start = loadTables(from).tables
+  if (from !== undefined) start = loadTablesOfThisDataset(from).tables
   else {
     start = baseTables()
     if (flagOf('--without-end-early')) start = withoutEndEarly(start)

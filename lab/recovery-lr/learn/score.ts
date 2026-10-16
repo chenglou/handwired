@@ -342,7 +342,7 @@ export type ScoreOptions = {
   wantedKinds?: Int32Array
   // When given: [cell] is set to the number of samples that read the cell.
   readers?: Int32Array
-  // When given: called with every sample's place and whether it is right as a whole.
+  // When given: called with every sample's place and its code points that are right in all three and in the stack.
   perSample?: (sample: number, allThreeRight: number, stackRight: number) => void
 }
 

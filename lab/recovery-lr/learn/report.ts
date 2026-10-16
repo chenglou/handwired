@@ -5,7 +5,7 @@
 // Without --tables it reports on the parser as it is.
 import {type PackedSamples, loadPacked} from './data.ts'
 import {numberOf, optionOf, refuseUnknownOptions, standardValidationCount} from './options.ts'
-import {type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, cellCounts, choiceKindNames, differencesOf, kindOfChoice, loadTablesForReport, withoutEndEarly} from './recovery-tables.ts'
+import {type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, cellCounts, choiceKindNames, differencesOf, displayKindCount, kindOfChoice, loadTablesForReport, withoutEndEarly} from './recovery-tables.ts'
 import {describeTotals, scoreHeader, scoreRow, scoreTables, sharesOf} from './score.ts'
 import {cellInWords, choiceInWords, displayEntryInWords} from './words.ts'
 
@@ -29,7 +29,7 @@ export function reportOf(tables: RecoveryTables, samples: PackedSamples, splitNa
   lines.push(`${counts.openCells} open cells, of which ${counts.keptCells} are cells of the end of input, and ${counts.openDisplayEntries} open display entries. ${changedCells.size} cells and ${changedEntries.size} display entries hold something else than the parser as it is.`)
 
   const reads = new Int32Array(tables.choice.length), readers = new Int32Array(tables.choice.length)
-  const wantedKinds = new Int32Array(tables.display.length * 11)
+  const wantedKinds = new Int32Array(tables.display.length * displayKindCount)
   const {score, totals} = scoreTables(tables, samples, {reads, readers, wantedKinds})
   const shares = sharesOf(score)
   lines.push('', `The ${splitName} samples:`, scoreHeader, scoreRow('the tables', score), scoreRow('the parser as it is', scoreTables(base, samples).score), describeTotals(samples, score, totals))
@@ -58,13 +58,13 @@ export function reportOf(tables: RecoveryTables, samples: PackedSamples, splitNa
   // The open display entries by the code points that are shown by them where the depth and the container are right.
   const shownBy = (entry: number): number => {
     let total = 0
-    for (let kind = 0; kind < 11; kind++) total += wantedKinds[entry * 11 + kind]!
+    for (let kind = 0; kind < displayKindCount; kind++) total += wantedKinds[entry * displayKindCount + kind]!
     return total
   }
   const readEntries = Array.from(tables.display.keys()).filter(entry => tables.displayOpen[entry] === 1 && shownBy(entry) > 0).sort((left, right) => shownBy(right) - shownBy(left) || left - right)
   lines.push('', `The ${Math.min(cellsShown, readEntries.length)} open display entries that show the most scored code points (code points whose depth and container are right there, and how many of them want the entry's kind):`)
   for (const entry of readEntries.slice(0, cellsShown)) {
-    lines.push(`- ${String(shownBy(entry)).padStart(6)} ${String(wantedKinds[entry * 11 + tables.display[entry]!]).padStart(6)}  ${displayEntryInWords(tables, entry)}${changedEntries.has(entry) ? '' : ' (as the parser as it is)'}`)
+    lines.push(`- ${String(shownBy(entry)).padStart(6)} ${String(wantedKinds[entry * displayKindCount + tables.display[entry]!]).padStart(6)}  ${displayEntryInWords(tables, entry)}${changedEntries.has(entry) ? '' : ' (as the parser as it is)'}`)
   }
   return lines
 }

@@ -10,10 +10,10 @@
 //   pop           drop the state on top of the stack. The start state has no such choice: nothing is below it.
 //   reduce r      for a rule r that is complete in the state. The base where bison still reduces by default.
 //   insert X      enter the state after X, for a terminal X that the state shifts, and read the token again, e.g.
-//                 `then` when `else` follows `if a`.
+//                 `then` when `if` follows `if a`.
 //   read as X     enter the state after X and take the token, e.g. an open string as a string.
 //   end early     for an item `A: α . β` of the state's kernel, drop the states of α and enter the state after A,
-//                 e.g. `(1 + 2` before `in` becomes an atom. A switch of the tables leaves these choices out.
+//                 e.g. `(1 + 2` before `let` becomes an atom. A switch of the tables leaves these choices out.
 // Every choice leaves the stack a path of the automaton, so a parser only reads a goto where bison defined one.
 // At the end of input there is no token to skip or to read as another one, so those choices are not in the list.
 //
@@ -392,7 +392,7 @@ export function checkTables(tables: RecoveryTables) {
 }
 
 // Names for logs and errors, in the tables' own terms. words.ts says the same in words for a reader.
-export const terminalName = (tables: Pick<RecoveryTables, 'addedTerminals'>, terminal: number): string => bison.symbolNames[terminal < bisonTerminalCount ? terminal : -1] ?? tables.addedTerminals[terminal - bisonTerminalCount]?.name ?? `terminal ${terminal}`
+export const terminalName = (tables: Pick<RecoveryTables, 'addedTerminals'>, terminal: number): string => terminal < bisonTerminalCount ? bison.symbolNames[terminal]! : tables.addedTerminals[terminal - bisonTerminalCount]?.name ?? `terminal ${terminal}`
 // A state as its kernel items, e.g. "state 7 [binding: IDENT . parameters EQ expr]".
 export const stateName = (state: number): string => state === stopped ? 'stopped' : `state ${state} [${bison.stateKernel[state]!.map(item => ruleText(itemRule(item), itemDot(item))).join(' | ')}]`
 // A cell, e.g. "(state 7 [binding: IDENT . parameters EQ expr], INT)", with ", first on its line" for a second copy.
@@ -535,6 +535,14 @@ export const loadTables = (path: string): LoadedTables => tablesFromJson(readFil
 export function loadTablesForReport(path: string, log: (line: string) => void = line => console.log(line)): LoadedTables {
   const loaded = loadTables(path)
   if (loaded.datasetKey !== datasetKey()) log(`Note: ${path} was saved with the dataset ${loaded.datasetKey}, and the dataset is ${datasetKey()} now: its tables may have been made with samples that are in another split now.`)
+  return loaded
+}
+
+// The tables of a file for a run that starts from them, e.g. search.ts --from: a file of another version of the
+// dataset is refused. Make the tables again with the dataset as it is.
+export function loadTablesOfThisDataset(path: string): LoadedTables {
+  const loaded = loadTables(path)
+  if (loaded.datasetKey !== datasetKey()) throw new Error(`${path} was saved with the dataset ${loaded.datasetKey}, and the dataset is ${datasetKey()} now: its tables may have been made with samples that are in another split now. Make the tables again with this dataset.`)
   return loaded
 }
 
