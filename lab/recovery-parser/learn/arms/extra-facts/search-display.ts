@@ -14,8 +14,11 @@
 // read one to the least read one, which is the order of the number to beat. The search alone is then the number to
 // beat itself, which report.ts reads and counts, so only the search in turns runs, as a setting without a seed. With
 // --seeds a seed draws a random order for every pass, the search in turns and its two controls run, and the range
-// over the seeds says how far the orders are apart. The search refuses tables with added classes or with the bit
-// "first on its line", so the other additions of the arm have no such comparison.
+// over the seeds says how far the orders are apart.
+//
+// The other additions of the arm have no such comparison here: when these runs were made, the search refused tables
+// with added classes or with the bit "first on its line". The search runs such tables now, when prepareSamples gets
+// the tables whose classes it will run, and ../combined/ has the search with all three additions.
 //
 // Run from the repo root, with RECOVERY_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-parser/learn/arms/extra-facts/search-display.ts [--seeds 1,2,3]

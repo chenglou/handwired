@@ -236,7 +236,7 @@ bun lab/recovery-parser/learn/arms/generic/run.ts --step reported # the best rec
 bun lab/recovery-parser/learn/arms/generic/run.ts --step reported-controls   # the 15 searches from today's tables and the 4 passes over the standard set, seeds 1 to 5, about 75 minutes
 bun lab/recovery-parser/learn/arms/generic/report.ts              # every table above but the two of whole-samples.ts, and every comparison, from the saved runs, a few seconds
 bun lab/recovery-parser/learn/arms/generic/whole-samples.ts --step reported --recipe 1   # what keeps a sample from being whole, for the best recipe with its search in the first order
-bun lab/recovery-parser/learn/arms/generic/check.ts               # the two settings that keep cells or events out, and the plain pass as a recipe, about 40 s. check-all.ts does not run it
+bun lab/recovery-parser/learn/arms/generic/check.ts               # the two settings that keep cells or events out, and the plain pass as a recipe, about 40 s. check-all.ts runs it too
 ```
 
 The tuning steps in the order in which they were run, each with the seeds 11, 12 and 13. A recipe that an earlier step saved is not run again. The step `combined` of the report has no command of its own: `more-samples` and `then-search` run its two recipes. The first order of `then-search` was run before the reported runs and its two other orders after them, with `--recipes 0,1` and `--recipes 2,3`:

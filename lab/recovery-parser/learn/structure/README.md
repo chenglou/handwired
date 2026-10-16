@@ -219,7 +219,7 @@ On the 2,800 fixed texts of `../arms/harness.ts`, each run's tables have today's
 ## Not done
 
 - **The whole run as one circuit** is not built, as before. The step is, with all three: a column per class, the mixes of open display entries as source cells, and the bit as one more source cell and one more output.
-- **The search and the votes** of `../search` run today's layout only. `search.ts` refuses tables with added classes or with the bit. It runs tables with open display entries and leaves the entries as they are.
+- **The votes** of `../search` run today's layout only. The search is no longer in this list: `search.ts --from` and `searchCells` of `../arms/holes/restricted-search.ts` run tables with added classes, with the bit and with open display entries, since the search's parser loop reads the class that the tables give a code point and the context with the bit, see `../search/README.md`. The search leaves the open display entries as they are.
 - **The hand-written rules** of `../handwritten` use none of the three.
 - **The marks of the intended states** (`codePointCanFollow`) are made for today's tables. With a class for the apostrophe, a replaced quote reads a cell that no letter reads, so its intended state could be followed, and the marks do not say so. The marks that are set stay right: a state that today's open cells can reach can be reached with more open cells too.
 - **No intended bit.** The twin's extra targets and the states that a run is put on have no bit "first on its line", for the reason given above.

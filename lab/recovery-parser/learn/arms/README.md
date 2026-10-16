@@ -30,8 +30,10 @@ bun lab/recovery-parser/learn/arms/baselines.ts          # the rows that every a
 bun lab/recovery-parser/learn/handwritten/rules.ts       # the hand-written tables, which the next command starts from
 bun lab/recovery-parser/learn/search/search.ts --from $RECOVERY_SCRATCH/handwritten/tables.json --out $RECOVERY_SCRATCH/search/search-from-handwritten.json   # the number to beat, about 2.5 minutes
 bun lab/recovery-parser/learn/arms/plain-pass/run.ts     # the first arm, 5 seeds, about 2 minutes
-bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and the checks, a bit over a minute. One of them reads the tables of the plain pass above
+bun lab/recovery-parser/learn/check-all.ts               # the type check, the lint and the checks, a bit over two minutes. One of them reads the tables of the plain pass above
 ```
+
+In a scratch folder with these runs alone, one command of `check-all.ts` fails: `combined/check.ts` compares with tables that a run of `extra-facts/` saves, see "Commands" in `../README.md`. Every other command passes.
 
 ## The shortest arm
 

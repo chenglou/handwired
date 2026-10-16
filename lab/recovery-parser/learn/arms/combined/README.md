@@ -99,7 +99,7 @@ bun run.ts --step candidates      # 50 minutes
 bun run.ts --step confirmation
 bun report.ts --candidates        # every table, and final-candidates.json
 bun whole-samples.ts --step candidates --recipe 9
-bun check.ts                      # about 3 minutes, not run by check-all.ts
+bun check.ts                      # 2 to 3 minutes, check-all.ts runs it too
 ```
 
 The other steps are `parts`, `trainer`, `hand-written`, `spare-states`, `search-passes`, `then-search`, `search-alone`, `shown-as-today`, `whole-samples --recipes 0,1` and `error-target`. The search needed a change outside this folder: its parser loop, `../../search/sample-runs.ts`, now takes the classes and the contexts from the tables.
