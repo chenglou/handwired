@@ -443,3 +443,364 @@ packages = [{ include = "harborline", from = "src" }]⟦lf⟧
 axum = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-t⟦missing⟧"]}⟦/⟧
 ⟦end⟧
+
+⟦repair model-and-paste-26⟧
+note: the line was started twice, so the cut line is extra. Another reading closes the cut line with a quote and a bracket and takes the whole line after it as extra
+⟦aligned⟧
+[tool.hatch.build.targets.wheel]
+packages = ["src/tidewatch"]
+
+[tool.hatch.envs.default]
+⟦extra⟧dependencies = ["pytest>=8", "pytest-co
+⟦/⟧dependencies = ["pytest>=8", "pytest-cov", "ruff"]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+lint = "ruff check src tests"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-27⟧
+⟦aligned⟧
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/cl⟦extra⟧
+Continuing from where the output was cut off:
+
+```toml
+⟦/⟧i",
+    "crates/web",
+]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-28⟧
+⟦aligned⟧
+[logging]
+level = "info"
+format = "json"
+
+[metrics]
+enabled = true
+sample_rate = 0.25
+listen = "127.0.0.1:9100"⟦missing⟧
+⟦/⟧[storage]
+path = "/var/lib/ferry"
+compression = "zstd"
+retention_days = -1⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-29⟧
+⟦aligned⟧
+column_width = 100
+indent_width = 2⟦missing⟧
+⟦/⟧quote_style = "AutoPreferDouble"
+call_parentheses = "Always"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-30⟧
+unsure: the second file could be a second document, extra as a whole from the line with its name on
+⟦aligned⟧
+⟦extra⟧==> .cargo/config.toml <==
+⟦/⟧[build]
+rustflags = ["-D", "warnings"]
+
+[alias]
+xt = "run --package xtask --"
+
+⟦extra⟧==> rust-toolchain.toml <==
+⟦/⟧[toolchain]
+channel = "1.78.0"
+components = ["rustfmt", "clippy"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-31⟧
+⟦aligned⟧
+⟦extra⟧     1⟦tab⟧⟦/⟧[tool.black]
+⟦extra⟧     2⟦tab⟧⟦/⟧line-length = 100
+⟦extra⟧     3⟦tab⟧⟦/⟧target-version = ["py311"]
+⟦extra⟧     4⟦tab⟧⟦/⟧
+⟦extra⟧     5⟦tab⟧⟦/⟧[tool.isort]
+⟦extra⟧     6⟦tab⟧⟦/⟧profile = "black"
+⟦extra⟧     7⟦tab⟧⟦/⟧known_first_party = ["harborline"]
+⟦extra⟧     8⟦tab⟧⟦/⟧skip_gitignore = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-32⟧
+⟦aligned⟧
+⟦extra⟧1⟦/⟧[package]
+⟦extra⟧2⟦/⟧name = "glint"
+⟦extra⟧3⟦/⟧version = "0.5.1"
+⟦extra⟧4⟦/⟧edition = "2021"
+⟦extra⟧5⟦/⟧rust-version = "1.75"
+⟦extra⟧6⟦/⟧
+⟦extra⟧7⟦/⟧[lib]
+⟦extra⟧8⟦/⟧crate-type = ["cdylib", "rlib"]
+⟦extra⟧9⟦/⟧
+⟦extra⟧10⟦/⟧[features]
+⟦extra⟧11⟦/⟧default = ["console_error_panic_hook"]
+⟦extra⟧12⟦/⟧console_error_panic_hook = ["dep:console_error_panic_hook"]
+⟦end⟧
+
+⟦repair model-and-paste-33⟧
+⟦aligned⟧
+[project]
+name = "portside"
+version = "2.1.0"
+dependencies = [
+    "httpx>=0.27",
+⟦extra⟧    12→⟦/⟧    "icalendar>=5.0",
+⟦extra⟧    13→⟦/⟧    "tenacity>=8.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-34⟧
+⟦aligned⟧
+⟦extra⟧───────┬──────────────────────────────
+       │ File: Trunk.toml
+───────┼──────────────────────────────
+   1   │ ⟦/⟧[build]
+⟦extra⟧   2   │ ⟦/⟧target = "index.html"
+⟦extra⟧   3   │ ⟦/⟧dist = "dist"
+⟦extra⟧   4   │⟦/⟧
+⟦extra⟧   5   │ ⟦/⟧[watch]
+⟦extra⟧   6   │ ⟦/⟧ignore = ["dist", "target"]
+⟦extra⟧   7   │⟦/⟧
+⟦extra⟧   8   │ ⟦/⟧[serve]
+⟦extra⟧   9   │ ⟦/⟧port = 8088
+⟦extra⟧  10   │ ⟦/⟧open = false⟦extra⟧
+───────┴──────────────────────────────⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-35⟧
+⟦aligned⟧
+⟦extra⟧dana@build-03:~/svc/gateway$ cat wrangler.toml
+⟦/⟧name = "edge-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-04-05"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "7c1e5f0a9b2d4e63a8f1c0d2b3e4f5a6"
+
+[vars]
+UPSTREAM = "https://api.internal.example"⟦extra⟧
+dana@build-03:~/svc/gateway$⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-36⟧
+⟦aligned⟧
+⟦extra⟧$ cat > ~/.config/atuin/config.toml <<'EOF'
+> ⟦/⟧auto_sync = true
+⟦extra⟧> ⟦/⟧sync_frequency = "10m"
+⟦extra⟧> ⟦/⟧search_mode = "fuzzy"
+⟦extra⟧> ⟦/⟧filter_mode = "host"
+⟦extra⟧> ⟦/⟧
+⟦extra⟧> ⟦/⟧[daemon]
+⟦extra⟧> ⟦/⟧enabled = true
+⟦extra⟧> ⟦/⟧sync_frequency = 300⟦extra⟧
+> EOF⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-37⟧
+⟦aligned⟧
+⟦extra⟧On Tue, 14 May 2024 at 09:12, Rafael Lima <rafael@ferry.example> wrote:
+> ⟦/⟧[entryPoints.web]
+⟦extra⟧> ⟦/⟧address = ":80"
+⟦extra⟧>⟦/⟧
+⟦extra⟧> ⟦/⟧[entryPoints.websecure]
+⟦extra⟧> ⟦/⟧address = ":443"
+⟦extra⟧>⟦/⟧
+⟦extra⟧> ⟦/⟧[certificatesResolvers.le.acme]
+⟦extra⟧> ⟦/⟧email = "infra@ferry.example"
+⟦extra⟧> ⟦/⟧storage = "/data/acme.json"
+⟦end⟧
+
+⟦repair model-and-paste-38⟧
+⟦aligned⟧
+⟦extra⟧>>> settings = tomllib.loads("""
+... ⟦/⟧[scheduler]
+⟦extra⟧... ⟦/⟧timezone = "Europe/Lisbon"
+⟦extra⟧... ⟦/⟧max_instances = 3
+⟦extra⟧... ⟦/⟧quiet_from = 22:30:00
+⟦extra⟧... ⟦/⟧
+⟦extra⟧... ⟦/⟧[scheduler.jobstores.default]
+⟦extra⟧... ⟦/⟧url = "sqlite:///jobs.sqlite"⟦extra⟧
+... """)⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-39⟧
+⟦aligned⟧
+⟦extra⟧diff --git a/typos.toml b/typos.toml
+new file mode 100644
+index 0000000..3b1f2c4
+--- /dev/null
++++ b/typos.toml
+@@ -0,0 +1,9 @@
++⟦/⟧[files]
+⟦extra⟧+⟦/⟧extend-exclude = ["*.lock", "vendor/"]
+⟦extra⟧+⟦/⟧
+⟦extra⟧+⟦/⟧[default]
+⟦extra⟧+⟦/⟧extend-ignore-re = ['(?Rm)^.*#\s*spellchecker:disable-line$']
+⟦extra⟧+⟦/⟧
+⟦extra⟧+⟦/⟧[default.extend-words]
+⟦extra⟧+⟦/⟧ba = "ba"
+⟦extra⟧+⟦/⟧teh = "the"
+⟦end⟧
+
+⟦repair model-and-paste-40⟧
+⟦aligned⟧
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111"
+⟦extra⟧+⟦/⟧orjson = "^3.10"
+⟦extra⟧+⟦/⟧uvloop = { version = "^0.19", markers = "sys_platform != 'win32'" }
+sqlalchemy = "^2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+⟦extra⟧+⟦/⟧pytest-asyncio = "^0.23"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-41⟧
+unsure: by rule 10 the first of the two opt-level lines could stay, with the line that the diff adds in its place as extra. And the text after the second @@ could be a line of the document
+⟦aligned⟧
+⟦extra⟧@@ -9,6 +9,7 @@ members = ["crates/*"]
+ ⟦/⟧resolver = "2"
+⟦extra⟧ ⟦/⟧
+⟦extra⟧ ⟦/⟧[profile.release]
+⟦extra⟧-opt-level = 3
++⟦/⟧opt-level = "s"
+⟦extra⟧+⟦/⟧strip = "debuginfo"
+⟦extra⟧ ⟦/⟧lto = "thin"
+⟦extra⟧ ⟦/⟧codegen-units = 1
+⟦end⟧
+
+⟦repair model-and-paste-42⟧
+⟦aligned⟧
+⟦extra⟧{"path": "config/alerts.toml", "content": "⟦/⟧[[rule]]⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧id = ⟦extra⟧\⟦/⟧"disk-full⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧expr = ⟦extra⟧\⟦/⟧"disk_used_percent > 90⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧for = ⟦extra⟧\⟦/⟧"10m⟦extra⟧\⟦/⟧"⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧send_to = [⟦extra⟧\⟦/⟧"pager⟦extra⟧\⟦/⟧", ⟦extra⟧\⟦/⟧"ops@ferry.example⟦extra⟧\⟦/⟧"]⟦extra⟧\n"}⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-43⟧
+⟦aligned⟧
+⟦extra⟧['⟦/⟧[build-system]⟦extra⟧\n', '⟦/⟧⟦missing⟧
+⟦/⟧requires = ["maturin>=1.5,<2.0"]⟦extra⟧\n', '⟦/⟧⟦missing⟧
+⟦/⟧build-backend = "maturin"⟦extra⟧\n', '\n', '⟦/⟧⟦missing⟧
+
+⟦/⟧[tool.maturin]⟦extra⟧\n', '⟦/⟧⟦missing⟧
+⟦/⟧features = ["pyo3/extension-module"]⟦extra⟧\n', '⟦/⟧⟦missing⟧
+⟦/⟧module-name = "tidewatch._core"⟦extra⟧\n']⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-44⟧
+note: the line with the name of the file is read as a label of the code block. It could be a remark, kept as a comment with a # added
+⟦aligned⟧
+⟦extra⟧```toml
+deploy/staging.toml
+⟦/⟧[upstream]
+url = "https://staging-api.ferry.example"
+timeout_seconds = 15
+retries = 2
+
+[feature_flags]
+checkout.new_flow = true
+export.legacy_csv = false⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-45⟧
+⟦aligned⟧
+[cluster]
+name = "ferry-eu"
+seed_nodes = ["10.20.0.11", "10.20.0.12"]
+
+[cluster.gossip]
+interval_ms = 500
+⟦extra⟧Ferry Operations Handbook 41
+Chapter 4. Clustering
+⟦/⟧fanout = 3
+suspect_timeout_ms = 4_000
+
+[cluster.tls]
+enabled = true
+ca_file = "/etc/ferry/ca.pem"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-46⟧
+⟦aligned⟧
+⟦extra⟧[14/05/2024, 10:42] Marta: ⟦/⟧theme = "onedark"
+[editor]
+line-number = "relative"
+bufferline = "multiple"
+
+[editor.cursor-shape]
+insert = "bar"
+
+[editor.lsp]
+display-inlay-hints = true⟦extra⟧
+[14/05/2024, 10:43] Marta: the lsp part is what fixed the hints for me⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-47⟧
+⟦aligned⟧
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ledgerworks/ferry-proto?rev=⟦extra⟧
+⟦/⟧4be1c0a"]
+git = "https://github.com/ledgerworks/ferry-proto"
+rev = "4be1c0a"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-48⟧
+⟦aligned⟧
+⟦extra⟧[1;33m⟦/⟧[tool.towncrier]⟦extra⟧[0m⟦/⟧
+⟦extra⟧[36m⟦/⟧directory⟦extra⟧[0m⟦/⟧ = "changes"
+⟦extra⟧[36m⟦/⟧filename⟦extra⟧[0m⟦/⟧ = "CHANGELOG.md"
+⟦extra⟧[36m⟦/⟧title_format⟦extra⟧[0m⟦/⟧ = "## {version} ({project_date})"
+⟦extra⟧[36m⟦/⟧underlines⟦extra⟧[0m⟦/⟧ = ["", "", ""]
+⟦end⟧
+
+⟦repair model-and-paste-49⟧
+⟦aligned⟧
+[workspace]⟦extra⟧$⟦/⟧
+members = [⟦extra⟧$⟦/⟧
+⟦extra⟧^I⟦/⟧"crates/core",⟦extra⟧$⟦/⟧
+⟦extra⟧^I⟦/⟧"crates/cli",⟦extra⟧$⟦/⟧
+]⟦extra⟧$⟦/⟧
+⟦extra⟧$⟦/⟧
+[workspace.lints.rust]⟦extra⟧$⟦/⟧
+unsafe_code = "forbid"⟦extra⟧$⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-50⟧
+unsure: read as a merge conflict, the upper side stays by rule 10, and the lower side is extra with the three marker lines
+⟦aligned⟧
+[project]
+name = "tide-models"
+channels = ["conda-forge"]
+⟦extra⟧<<<<<<< SEARCH
+platforms = ["linux-64"]
+=======
+⟦/⟧platforms = ["linux-64", "osx-arm64"]
+⟦extra⟧>>>>>>> REPLACE
+⟦/⟧
+[dependencies]
+python = "3.12.*"
+numpy = ">=1.26"⟦lf⟧
+⟦end⟧
