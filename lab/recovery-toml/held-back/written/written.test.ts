@@ -1,5 +1,6 @@
 // Tests of the tools of the written set of broken TOML: the files' format, the labels that a repair gives, the values
-// that are not scored, two repairs of one case, the score, the worked examples and the pages that print them.
+// that are not scored, two repairs of one case, the score, the edits of the train data's damage that make a case's
+// damage, the worked examples and the pages that print them.
 //
 // The texts of these tests are made up here. The test of the set itself, at the end, compares counts only, so that a
 // failure prints no text of a held-back case.
@@ -11,6 +12,7 @@ import {defaultTables} from '../../table-parser.ts'
 import {caseNotes, shapeOf} from './check.ts'
 import {differenceLines, differencesOf} from './compare.ts'
 import {type Aligned, alignedOfLines, brokenFileText, linesOfAligned, linesOfText, readBrokenFile, readRepairFile, repairFileText, textOfLines} from './format.ts'
+import {couldComeFromEdits, neutralEditsOf} from './neutral-edits.ts'
 import {scoreCases, scoreTables} from './score.ts'
 import {describeCase} from './show.ts'
 import {
@@ -358,6 +360,55 @@ test('what the check asks a writer to look at', () => {
   expect(shapeOf('port: 8080')).not.toBe(shapeOf('port = 8080'))
 })
 
+test('which edits of the train data\'s damage make a damaged place', () => {
+  const start = '[server]\nhost = "edge-01.internal"\nlink = "a:b"\n'
+  // What the edits make of a repair, which need not be a case: a deleted line leaves valid TOML.
+  const derivedOf = (aligned: string) => {
+    const repair = repairOf(aligned)
+    return neutralEditsOf({broken: repair.aligned.broken, opinions: [opinionOf('writer', repair)]})
+  }
+  // The edits by their names, and after "other:" the extra and the missing text of every place that no three edits
+  // make.
+  const editsOf = (aligned: string) => {
+    const {edits, otherPlaces} = derivedOf(aligned)
+    return [...edits, ...(otherPlaces.length === 0 ? [] : ['other:', ...otherPlaces.map(place => `${place.extra}|${place.missing}`)])].join(' ')
+  }
+  expect(editsOf(`${start}tags = ["db", "cache"⟦missing⟧]⟦/⟧\nwait = 5\n`)).toBe('deleteCodePoint')
+  expect(editsOf(`${start}wait =⟦extra⟧=⟦/⟧ 5\n`)).toBe('insertCodePoint')
+  expect(editsOf(`${start}wait⟦: for =⟧ 5\n`)).toBe('replaceCodePoint')
+  expect(editsOf(`${start}debug = t⟦extra⟧u⟦/⟧r⟦missing⟧u⟦/⟧e\n`)).toBe('swapNeighbours')
+  expect(editsOf(`${start}wait =⟦missing⟧ ""⟦/⟧\n`)).toBe('deleteRun')
+  expect(editsOf(`${start}⟦missing⟧wait = 5\n⟦/⟧debug = true\n`)).toBe('deleteLine')
+  expect(editsOf(`${start}tags = ["db", "cac⟦missing⟧he"]⟦/⟧`)).toBe('cutTail')
+  expect(editsOf(`${start}wait = 5⟦extra⟧ = 5⟦/⟧\n`)).toBe('duplicateRun')
+  expect(editsOf(`${start}wait = 5\n⟦extra⟧wait = 5\n⟦/⟧debug = true\n`)).toBe('duplicateLine')
+  expect(editsOf(`${start}wait = 5⟦extra⟧edge-01⟦/⟧\n`)).toBe('copyRun')
+  // An edit writes only code points of the payload: the document holds a colon and no semicolon.
+  expect(editsOf(`${start}wait = 5⟦extra⟧;⟦/⟧\n`)).toBe('other: ;|')
+  expect(editsOf(`[server]\nhost = "edge-01.internal"\nwait⟦: for =⟧ 5\n`)).toBe('other: :|=')
+  // An extra text that the document does not hold as one run takes an edit per piece, and a text that takes more than
+  // three edits is no place of a sample.
+  expect(editsOf(`${start}wait = 5⟦extra⟧b5e⟦/⟧\n`)).toBe('insertCodePoint insertCodePoint insertCodePoint')
+  expect(editsOf(`${start}wait = 5⟦extra⟧b5eb⟦/⟧\n`)).toBe('other: b5eb|')
+  expect(editsOf(`${start}debug = ⟦extra⟧on⟦/⟧⟦missing⟧true⟦/⟧\n`)).toBe('deleteRun insertCodePoint insertCodePoint')
+  // The fixed form cuts an extra line before an empty line in two, and the two are one place: a run of the document.
+  expect(editsOf(`${start}wait = 5\n⟦extra⟧]\n⟦/⟧\ntags = ["db"]\n`)).toBe('copyRun')
+  // A copy of the end of a line is no copy of a line.
+  expect(editsOf(`${start}tags = ["db"]\n⟦extra⟧]\n⟦/⟧wait = 5\n`)).toBe('duplicateRun')
+  // A sample has at most three edits: the quotes that are missing around two values are four.
+  const fourQuotes = derivedOf(`${start}zone = ⟦missing⟧"⟦/⟧north⟦missing⟧"⟦/⟧\nrole = ⟦missing⟧"⟦/⟧cache⟦missing⟧"⟦/⟧\n`)
+  expect(fourQuotes).toEqual({edits: ['deleteCodePoint', 'deleteCodePoint', 'deleteCodePoint', 'deleteCodePoint'], otherPlaces: []})
+  expect(couldComeFromEdits(fourQuotes)).toBe(false)
+  expect(couldComeFromEdits(derivedOf(`${start}zone = ⟦missing⟧"⟦/⟧north⟦missing⟧"⟦/⟧\n`))).toBe(true)
+
+  // The parts of a score that kinds.txt makes: a case without a line is in none of them.
+  const colon = {...madeCase(`${start}wait⟦: for =⟧ 5\ndebug = true\n`), damage: {edits: ['replaceCodePoint'], other: undefined}}
+  const quotes = {...madeCase(`${start}zone = ⟦missing⟧"⟦/⟧north⟦missing⟧"⟦/⟧\nrole = ⟦missing⟧"⟦/⟧cache⟦missing⟧"⟦/⟧\n`), damage: {edits: fourQuotes.edits, other: '4 edits where a sample has at most 3'}}
+  const fence = {...madeCase(`⟦extra⟧\`\`\`toml\n⟦/⟧${start}wait = 5`), damage: {edits: [], other: 'a code fence before the document'}}
+  const scores = scoreTables(defaultTables, [colon, quotes, fence, madeCase(`${start}wait =⟦extra⟧=⟦/⟧ 5\n`)])
+  expect([scores.all, scores.neutralEdits, scores.otherDamage, scores.moreEdits].map(score => score.fullAgreement.cases)).toEqual([4, 1, 2, 1])
+})
+
 const examplesFolder = join(writtenFolder, 'examples')
 
 test('the three examples have no problem, and the tools read them as the pages say', () => {
@@ -394,4 +445,12 @@ test('the files of the set have no problem', () => {
   expect(scores.all.agreedCodePoints.cases).toBe(cases.length)
   expect(cases.every(writtenCase => labelsOfWritten(writtenCase).length === Array.from(writtenCase.broken).length)).toBe(true)
   expect(cases.every(writtenCase => labelsOfWritten(writtenCase).every(label => label === undefined || label.kind === undefined || (label.kind !== displayKind.error && label.kind !== displayKind.pastEnd)))).toBe(true)
+  // The numbers of README.md, under "The set as it is".
+  expect([cases.length, cases.filter(writtenCase => writtenCase.opinions.length === 2).length, scores.all.fullAgreement.cases, scores.all.fullAgreement.nothingToRecover]).toEqual([150, 150, 144, 2])
+  expect([scores.all.fullAgreement.scored, scores.all.agreedCodePoints.scored]).toEqual([20303, 20986])
+  // kinds.txt names for every case the edits that neutral-edits.ts derives from the writer's repair, and has a reason
+  // after "new:" for the cases whose damage one to three edits do not make.
+  const derived = cases.map(writtenCase => neutralEditsOf(writtenCase))
+  expect(cases.filter((writtenCase, index) => writtenCase.damage === undefined || writtenCase.damage.edits.join(' ') !== derived[index]!.edits.join(' ') || (writtenCase.damage.other === undefined) !== couldComeFromEdits(derived[index]!)).length).toBe(0)
+  expect([scores.neutralEdits, scores.otherDamage, scores.moreEdits].map(score => score.agreedCodePoints.cases)).toEqual([69, 81, 18])
 })

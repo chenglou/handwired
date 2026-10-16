@@ -3,9 +3,13 @@
 // when every scored value is right, and a case is right as a whole when all of its counted code points are.
 //
 // Run from the repo root: bun lab/recovery-toml/held-back/written/score.ts [--set <folder>]
-// It prints the parser as it is. Other code scores its own tables with scoreTables(tables), which returns numbers
-// alone: whoever builds or trains a parser calls it and reads nothing else of this folder.
+// It prints the parser as it is, over the cases with full agreement and over the agreed code points of all cases. It
+// prints both again for the parts that kinds.txt makes of the set, i.e. the cases whose damage one to three of the
+// train data's edits make and the cases with other damage, and per writer's file, and the first of them without the
+// cases that a repairer marked as open to another reading. Other code scores its own tables with scoreTables(tables),
+// which returns numbers alone: whoever builds or trains a parser calls it and reads nothing else of this folder.
 import {type ParserTables, defaultTables, runTableParser} from '../../table-parser.ts'
+import {neutralEditsOf} from './neutral-edits.ts'
 import {type WrittenCase, labelsOfWritten, readWritten, setFolderOf} from './written.ts'
 
 export type Score = {
@@ -69,15 +73,26 @@ export type WrittenScore = {fullAgreement: Score, agreedCodePoints: Score}
 
 // The scores of tables over the set and over its parts:
 // - all: every case.
-// - perFile: the cases of each writer's file, e.g. 'hand-edits.txt'.
-// - unmarked: the cases of which no repair is marked as unsure.
-export type WrittenScores = {all: WrittenScore, perFile: Map<string, WrittenScore>, unmarked: WrittenScore}
+// - perFile: the cases of each writer's file, e.g. 'hand-editing.txt'.
+// - neutralEdits and otherDamage: the two parts that kinds.txt makes of the set. The first has the cases whose damage
+//   one to three of the ten edits of the train data make, so it says how a result carries over to other documents
+//   with damage that the train data could have. The second has the other cases, whose damage needs knowledge of how
+//   TOML gets broken, e.g. a colon after every key, so it says how a result carries over to other damage. A case that
+//   kinds.txt does not name is in neither.
+// - moreEdits: the cases of otherDamage in which up to three edits make every damaged place, and the edits are more
+//   than the three that a sample of the train data has at most, e.g. the quotes that are missing around two values.
+// - unmarked: the cases of which no repair is marked as unsure, i.e. without the cases whose agreement rests on a
+//   reading that a repairer called open.
+export type WrittenScores = {all: WrittenScore, perFile: Map<string, WrittenScore>, neutralEdits: WrittenScore, otherDamage: WrittenScore, moreEdits: WrittenScore, unmarked: WrittenScore}
 export function scoreTables(tables: ParserTables, cases: readonly WrittenCase[] = readWritten().cases): WrittenScores {
   const scoreOf = (some: readonly WrittenCase[]): WrittenScore =>
     ({fullAgreement: scoreCases(tables, some.filter(writtenCase => !writtenCase.disputedFromFirstError)), agreedCodePoints: scoreCases(tables, some)})
   const files = [...new Set(cases.map(writtenCase => writtenCase.file))].sort()
+  const otherDamage = cases.filter(writtenCase => writtenCase.damage?.other !== undefined)
   return {
     all: scoreOf(cases), perFile: new Map(files.map(file => [file, scoreOf(cases.filter(writtenCase => writtenCase.file === file))])),
+    neutralEdits: scoreOf(cases.filter(writtenCase => writtenCase.damage !== undefined && writtenCase.damage.other === undefined)),
+    otherDamage: scoreOf(otherDamage), moreEdits: scoreOf(otherDamage.filter(writtenCase => neutralEditsOf(writtenCase).otherPlaces.length === 0)),
     unmarked: scoreOf(cases.filter(writtenCase => writtenCase.opinions.every(opinion => opinion.unsure === undefined))),
   }
 }
@@ -99,8 +114,14 @@ if (import.meta.main) {
   console.log('of the scored display kinds, depths and containers that are right.')
   console.log(`\n  ${'cases'.padStart(5)} ${'nothing'.padStart(7)} ${'points'.padStart(7)}   ${'all 3'.padStart(6)} ${'whole'.padStart(6)}   ${'kind'.padStart(6)} ${'depth'.padStart(6)} ${'cont'.padStart(6)}`)
   console.log(line(scores.all.fullAgreement, 'cases with full agreement from the first error on'))
+  console.log(line(scores.neutralEdits.fullAgreement, '  of them, the cases whose damage one to three of the ten edits make'))
+  console.log(line(scores.otherDamage.fullAgreement, '  of them, the cases with other damage'))
+  console.log(line(scores.moreEdits.fullAgreement, '    of those, the cases whose damage more than three edits make'))
   console.log(line(scores.unmarked.fullAgreement, '  of them, the cases of which no repair is marked as unsure'))
   console.log(line(scores.all.agreedCodePoints, 'all cases, the agreed code points'))
+  console.log(line(scores.neutralEdits.agreedCodePoints, '  of them, the cases whose damage one to three of the ten edits make'))
+  console.log(line(scores.otherDamage.agreedCodePoints, '  of them, the cases with other damage'))
+  console.log(line(scores.moreEdits.agreedCodePoints, '    of those, the cases whose damage more than three edits make'))
   for (const [file, score] of scores.perFile) {
     console.log(line(score.fullAgreement, `${file}: cases with full agreement`))
     console.log(line(score.agreedCodePoints, `${file}: all cases, the agreed code points`))

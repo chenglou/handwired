@@ -19,10 +19,16 @@
 // - extra: no opinion gives it a label.
 // - disputed: anything else, e.g. one repair keeps a comma and the other marks it as extra. It is kept apart.
 //
-// Run from the repo root: bun lab/recovery-toml/held-back/written/written.ts [--set <folder>]
-// It prints one line per case and the counts of the set.
+// kinds.txt holds a judgment per case of the set: which of the ten edits of the train data's damage make the case's
+// damage, and whether the case has damage that no edit makes. neutral-edits.ts derives the lines, and README.md says
+// how the line between the two is drawn, under "What the damage is".
+//
+// Run from the repo root: bun lab/recovery-toml/held-back/written/written.ts [--set <folder>] [--kinds]
+// It prints one line per case and the counts of the set, and with --kinds what kinds.txt says: per writer's file the
+// cases whose damage the edits make and the cases with damage that no edit makes, and per edit the cases that have it.
 import {existsSync, readFileSync, readdirSync} from 'node:fs'
 import {join} from 'node:path'
+import {kinds as editKinds} from '../../damage.ts'
 import {displayKind, errorKinds, maximumDepth} from '../../kinds.ts'
 import {type ReferenceLabel, labelReference} from '../../reference.ts'
 import {type ParserTrace, runTableParser} from '../../table-parser.ts'
@@ -65,6 +71,10 @@ export type Opinion = {
 
 export type Agreement = 'agreed' | 'extra' | 'disputed'
 
+// What kinds.txt says about a case's damage: the edits of ../../damage.ts that make its damaged places, one name per
+// place in text order, and in a few words the damage that no edit makes, when the case has such damage.
+export type CaseDamage = {edits: string[], other: string | undefined}
+
 export type WrittenCase = {
   id: string
   // The name of the writer's file in broken/, e.g. 'hand-edits.txt'.
@@ -84,6 +94,8 @@ export type WrittenCase = {
   firstErrorKind: number
   // The writer's opinion first, then the second repair when there is one.
   opinions: Opinion[]
+  // What kinds.txt says about the case, or undefined where the folder has no such file, e.g. the examples.
+  damage: CaseDamage | undefined
   // Per code point of the broken payload.
   agreement: Agreement[]
   // Positions in the broken payload of agreed code points whose display kind is not scored, and of those whose depth
@@ -446,9 +458,9 @@ export function repairProblems(repair: Pick<RepairEntry, 'aligned'>, broken: str
   return problems
 }
 
-// A case with its opinions and their agreement. With one opinion every code point is agreed or extra. Throws when a
-// text is not what brokenTextProblems and repairProblems ask for.
-export function caseOf(texts: Pick<BrokenEntry, 'id' | 'broken'>, file: string, repairs: readonly NamedRepair[]): WrittenCase {
+// A case with its opinions and their agreement. With one opinion every code point is agreed or extra. `damage` is what
+// kinds.txt says about the case. Throws when a text is not what brokenTextProblems and repairProblems ask for.
+export function caseOf(texts: Pick<BrokenEntry, 'id' | 'broken'>, file: string, repairs: readonly NamedRepair[], damage?: CaseDamage): WrittenCase {
   const problems = [...brokenTextProblems(texts.broken).map(problem => `the broken payload: ${problem}`), ...repairs.flatMap(({name, repair}) => repairProblems(repair, texts.broken).map(problem => `${name}: ${problem}`))]
   if (repairs.length === 0) problems.push('a case needs a repair')
   if (problems.length > 0) throw new Error(`${texts.id}: ${problems.join('; ')}`)
@@ -474,7 +486,7 @@ export function caseOf(texts: Pick<BrokenEntry, 'id' | 'broken'>, file: string, 
     id: texts.id, file, from: repairs[0]!.repair.from ?? '', broken: texts.broken,
     original: first.text, alignment: first.alignment, replaced: first.replaced, firstDamage: firstDamageOf(first.alignment, first.replaced, codePointLength(first.text)),
     firstErrorPosition: trace.firstErrorPosition, firstErrorKind: trace.firstErrorKind,
-    opinions, agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
+    opinions, damage, agreement, unscoredKindPositions: positionsOf(sets => sets.kinds), unscoredNestingPositions: positionsOf(sets => sets.nesting),
     disputedFromFirstError: agreement.some((state, position) => state === 'disputed' && position >= trace.firstErrorPosition),
   }
 }
@@ -506,6 +518,36 @@ export function scoredCodePointsOfWritten(writtenCase: WrittenCase, labels: read
 
 const textFilesOf = (folder: string) => existsSync(folder) ? readdirSync(folder).filter(name => name.endsWith('.txt')).sort() : []
 
+// What kinds.txt of a folder says, per id of a case, and what is wrong with its lines. A line is the id of a case, the
+// names of the edits that make its damaged places, each after a space, and for a case with damage that no edit makes
+// " new: " and that damage in a few words. An empty line says nothing, and neither does a line that starts with #,
+// which explains the file to its reader.
+function readKinds(folder: string): {damageOf: Map<string, CaseDamage>, problems: string[]} {
+  const damageOf = new Map<string, CaseDamage>()
+  const problems: string[] = []
+  const file = join(folder, 'kinds.txt')
+  if (!existsSync(file)) return {damageOf, problems}
+  const editNames = new Set(editKinds.map(kind => kind.name))
+  readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+    if (line.trim() === '' || line.startsWith('#')) return
+    const where = `kinds.txt, line ${index + 1}`
+    const [, id, names, other] = /^(\S+)((?: [A-Za-z]+)*)(?: new: (\S.*))?$/.exec(line) ?? []
+    if (id === undefined || names === undefined) {
+      problems.push(`${where}: a line is the id of a case, the names of the edits that make its damage, each after a space, and where the case has damage that no edit makes, " new: " and that damage in a few words, and this line is not: ${line}`)
+      return
+    }
+    const edits = names.split(' ').filter(name => name !== '')
+    const found = [
+      ...edits.filter(name => !editNames.has(name)).map(name => `${name} is no edit of lab/recovery-toml/damage.ts`),
+      ...(edits.length === 0 && other === undefined ? ['the line names no edit and no damage that no edit makes'] : []),
+      ...(damageOf.has(id) ? ['the case has a line before this one'] : []),
+    ]
+    problems.push(...found.map(problem => `${where}: ${problem}`))
+    if (found.length === 0) damageOf.set(id, {edits, other})
+  })
+  return {damageOf, problems}
+}
+
 export type ReadOptions = {
   // The name of one writer's file without its ending, e.g. 'hand-edits': only broken/hand-edits.txt and its repairs
   // are read.
@@ -519,7 +561,7 @@ export type ReadOptions = {
 // and what is wrong with the files. A repair of a case stands in the file with the name of the case's file, e.g. the
 // repairs of broken/hand-edits.txt in repairs/hand-edits.txt. A case with a problem, in its broken payload or in one of
 // its repairs, is left out, and `leftOut` has its id. So the problems must be empty before the cases are used for a
-// result.
+// result. Where the folder has a kinds.txt and all of its files are read, every case has one line in it.
 export function readWritten(folder: string = writtenFolder, options: ReadOptions = {}): {cases: WrittenCase[], problems: string[], leftOut: string[]} {
   const problems: string[] = []
   const cases: WrittenCase[] = []
@@ -531,6 +573,8 @@ export function readWritten(folder: string = writtenFolder, options: ReadOptions
   const idOfBroken = new Map<string, string>()
   const opinions = options.opinions ?? 'both'
   const firstFolder = opinions === 'second' ? 'second-repairs' : 'repairs'
+  const kinds = readKinds(folder)
+  problems.push(...kinds.problems)
   const readRepairs = (subfolder: 'repairs' | 'second-repairs', file: string) => {
     const path = join(folder, subfolder, file)
     const repairs = new Map<string, RepairEntry>()
@@ -574,8 +618,12 @@ export function readWritten(folder: string = writtenFolder, options: ReadOptions
       }
       fileOfId.set(texts.id, file)
       idOfBroken.set(texts.broken, texts.id)
-      cases.push(caseOf(texts, file, named))
+      cases.push(caseOf(texts, file, named, kinds.damageOf.get(texts.id)))
     }
+  }
+  if (options.only === undefined && existsSync(join(folder, 'kinds.txt'))) {
+    for (const id of fileOfId.keys()) if (!kinds.damageOf.has(id)) problems.push(`kinds.txt: the case ${id} has no line`)
+    for (const id of kinds.damageOf.keys()) if (!fileOfId.has(id) && !leftOut.includes(id)) problems.push(`kinds.txt: no case has the id ${id}`)
   }
   return {cases, problems, leftOut}
 }
@@ -606,6 +654,20 @@ if (import.meta.main) {
   }
   const disputed = cases.filter(writtenCase => writtenCase.disputedFromFirstError)
   const twice = cases.filter(writtenCase => writtenCase.opinions.length === 2).length
+  if (process.argv.includes('--kinds')) {
+    const listed = cases.filter(writtenCase => writtenCase.damage !== undefined)
+    const fromEdits = (some: readonly WrittenCase[]) => some.filter(writtenCase => writtenCase.damage!.other === undefined)
+    console.log(`\nBy kinds.txt, one to three edits of the train data's damage make the damage of ${fromEdits(listed).length} of ${listed.length} cases, and ${listed.length - fromEdits(listed).length} have other damage. Per writer's file:`)
+    for (const file of [...new Set(listed.map(writtenCase => writtenCase.file))].sort()) {
+      const ofFile = listed.filter(writtenCase => writtenCase.file === file)
+      console.log(`  ${String(fromEdits(ofFile).length).padStart(4)} ${String(ofFile.length - fromEdits(ofFile).length).padStart(4)}  ${file}`)
+    }
+    const casesOfEdit = new Map<string, number>()
+    for (const writtenCase of fromEdits(listed)) for (const edit of new Set(writtenCase.damage!.edits)) casesOfEdit.set(edit, (casesOfEdit.get(edit) ?? 0) + 1)
+    console.log('Of the cases whose damage one to three edits make, the cases that have each edit, and the edits that none has:')
+    for (const [edit, total] of [...casesOfEdit].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))) console.log(`  ${String(total).padStart(4)}  ${edit}`)
+    console.log(`  none: ${editKinds.map(kind => kind.name).filter(name => !casesOfEdit.has(name)).join(', ')}`)
+  }
   console.log(`${cases.length} cases: ${twice} with two repairs, ${cases.length - twice} with one. ${cases.length - disputed.length} with full agreement from the first error on, ${disputed.length} with a disputed code point there. ${problems.length} problems.`)
   if (problems.length > 0) process.exitCode = 1
 }
