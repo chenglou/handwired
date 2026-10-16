@@ -31,6 +31,15 @@ A step reads and writes nothing that the JSON step does not. Three things differ
 
 The class table has 130 entries instead of 129: U+007F is a control character in TOML, so the last entry, which stands for every code point past the table, is U+0080.
 
+## After an error: a choice of this track
+
+The repo ships no TOML highlighter, so what "the parser as it is" does after its first error was chosen when these tables were built, and the experiment's first row rests on that choice. The grammar stays in the state `error`, the tokenizer goes on, a token is shown by its kind, and brackets are counted by token. The JSON parser as it is shows everything after its first error as an error. Two things follow:
+
+- **The parser as it is starts high.** Outside the test split it has 64.4% of the scored code points right, where the JSON parser as it is had about 22% on its written set. A recovery has less room to show.
+- **Every name of a header after an error is wrong,** since the `[` of a header counts as the start of an array: 412,030 code points of the train split, 20.8% of what the parser as it is has wrong there.
+
+So the row to read a trained parser against is not this parser but one rule without any training: after an error, start anew at the next line. It has 91.8% outside the test split, see `learn/restart-at-next-line.ts` and "The row to read a result against" in `learn/README.md`.
+
 ## Words: why the tokenizer is large
 
 A word without quotes is a key or a value by where it stands: `1979-05-27 = 1`, `true = 1` and `-1 = 1` are valid, and `1.5 = 2` sets the key `5` of the table `1`. The tokenizer reads a character from its own state and the character's class, so it cannot know where a word stands: after a comma comes a key in an inline table and a value in an array, and after a line end a key at the top level and a value inside an array.
