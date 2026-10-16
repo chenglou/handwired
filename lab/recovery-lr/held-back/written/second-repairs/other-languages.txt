@@ -1,0 +1,397 @@
+⟦repair other-languages-01⟧
+⟦aligned⟧
+let freezing = 32⟦added⟧;;⟦/⟧
+let to_celsius fahrenheit = (fahrenheit - freezing) * 5 / 9⟦added⟧;;⟦/⟧
+let to_fahrenheit celsius = celsius * 9 / 5 + freezing⟦added⟧;;⟦/⟧
+
+let () = print_int (to_celsius 212)⟦added⟧;;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-02⟧
+⟦aligned⟧
+(* Retry settings for the upload job. *)
+let max_retries = 5
+let base_delay = 200⟦added⟧ in⟦/⟧
+let delay attempt = base_delay * attempt
+
+let rec try_upload attempt =
+  if attempt > max_retries then false
+  else if upload (delay attempt) then true
+  else try_upload (attempt + 1)
+
+let report ok = if ok then "uploaded" else "gave up after " ^ string_of_int max_retries ^ " tries"
+let () = print_string (report (try_upload 1))⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-03⟧
+⟦aligned⟧
+let apply_twice ⟦added⟧(⟦/⟧f⟦added⟧ : int -> int)⟦/⟧ ⟦added⟧(⟦/⟧x⟦added⟧ : int)⟦/⟧ = f (f x)
+let lengths ⟦added⟧(⟦/⟧words⟦added⟧ : string list) : int list⟦/⟧ = map length words
+let bump = apply_twice (fun ⟦added⟧(⟦/⟧n⟦added⟧ : int)⟦/⟧ -> n + 1) 40
+let () = print_int bump⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-04⟧
+⟦aligned⟧
+let describe count =
+⟦added⟧  match count with
+  | 0 -> "none"
+  | 1 -> "one"
+  | _ -> "many"
+⟦/⟧
+⟦missing⟧() ⟦/⟧let plural word count = if count = 1 then word else word ^ "s"
+let summary count = describe count ^ " " ^ plural "item" count
+let () = print_string (summary 3)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-05⟧
+⟦aligned⟧
+(* Helpers for the sign-up sheet. *)
+let max_names = 12
+let trim_all names = map trim names
+
+let rec count = ⟦added⟧function⟦/⟧
+⟦added⟧  | [] -> 0
+  | _ :: rest -> 1 + count rest
+⟦/⟧
+⟦missing⟧() ⟦/⟧let is_long names = count (trim_all names) > max_names
+let warning names = if is_long names then "too many names" else ""⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-06⟧
+⟦aligned⟧
+(* State of the player in the maze game. *)
+let lives_at_start = 3
+let start = (0, 0)
+
+let player = ⟦added⟧{ name = "Ada"; lives = lives_at_start; position = start }⟦/⟧
+⟦missing⟧() ⟦/⟧let is_alive = player⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧lives > 0
+let banner = player⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧name ^ (if is_alive then " is playing" else " is out")
+let () = print_string banner⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-07⟧
+⟦aligned⟧
+(* Ticket numbers for the help desk. *)
+let counter = ref 0
+
+let next_id () =
+  counter ⟦added⟧:⟦/⟧= ⟦added⟧!⟦/⟧counter + 1⟦added⟧;⟦/⟧
+  ⟦added⟧!⟦/⟧counter
+
+let first = next_id ()
+let second = next_id ()
+let label = "ticket-" ^ string_of_int second
+let () = print_string label⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-08⟧
+⟦aligned⟧
+let verbose = true
+
+let warn message =
+  if verbose then ⟦added⟧begin⟦/⟧⟦missing⟧(⟦/⟧
+    print_string "warning: "⟦added⟧;⟦/⟧
+    print_string message
+  ⟦added⟧end⟦/⟧⟦missing⟧)⟦/⟧
+
+let () = warn "disk almost full"⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-09⟧
+⟦aligned⟧
+(* Delivery fees in euros. *)
+let base_fee = 4
+
+let fee express weight =
+  base_fee + ⟦added⟧begin⟦/⟧⟦missing⟧(⟦/⟧ if express then 15 else 0 ⟦added⟧end⟦/⟧⟦missing⟧)⟦/⟧ + weight * 2
+
+let quote = "Shipping: " ^ string_of_int (fee true 3)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-10⟧
+⟦aligned⟧
+(* Yearly interest on a savings account, in cents. *)
+let rate = 0⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧07
+let interest balance = balance *⟦added⟧.⟦/⟧ rate
+let after_year balance = balance + interest balance
+let () = print_int (after_year 100000)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-11⟧
+⟦aligned⟧
+let needs_quotes field = contains field ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧,⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧ || contains field ⟦added⟧'⟦/⟧⟦missing⟧"\⟦/⟧"⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧
+let quote field = if needs_quotes field then "\"" ^ field ^ "\"" else field
+let row = join "," (map quote ["name"; "say \"hi\""; "a,b"])⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-12⟧
+⟦aligned⟧
+(* Splits a bill among friends. *)
+let divide total parts = (total / parts, total - total / parts * parts)
+let ⟦added⟧(share, leftover)⟦/⟧⟦missing⟧_⟦/⟧ = divide 100 7
+let entries = [("each", share); ("left over", leftover)]
+let line = fun ⟦added⟧(name, amount)⟦/⟧⟦missing⟧_⟦/⟧ -> name ^ ": " ^ string_of_int amount
+let report = join ", " (map line entries)
+let () = print_string report⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-13⟧
+⟦aligned⟧
+let defaults = ["--color"; "--jobs"; "4"]
+let extras = if quiet then ["--quiet"] else []
+let arguments = "build" :: defaults ⟦added⟧@⟦/⟧ extras
+
+let command =
+  arguments
+  ⟦added⟧|⟦/⟧> map escape
+  ⟦added⟧|⟦/⟧> join " "
+
+let () = run command⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-14⟧
+⟦aligned⟧
+let columns = 80
+(* Disabled until the wide layout is ready.
+let columns = 120  (* for wide screens ⟦added⟧*)⟦/⟧
+let gutter = 4
+*)
+let usable = columns - 2
+let half = usable / 2
+let () = print_int half⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-15⟧
+⟦aligned⟧
+let names = ["Ada"; "Grace"; "Alan"]
+let greeting = "Hello " ^ String⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧concat ⟦added⟧~sep:⟦/⟧", " names
+let count = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧length names
+let () = print_string (greeting ^ " (" ^ string_of_int count ^ ")")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-16⟧
+⟦aligned⟧
+(* Order totals, in cents. *)
+let prices = [250; 1200; 80]
+let tax_rate = 8
+
+let with_tax amount = amount + amount * tax_rate / 100
+let subtotal = fold_left (⟦added⟧+⟦/⟧) 0 prices
+let total = with_tax subtotal
+let () = print_int total⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-17⟧
+⟦aligned⟧
+(* Where the server listens. *)
+let default_port = 8080
+let host = "localhost"
+
+let parse_port text =
+⟦added⟧  try int_of_string text with Failure _ -> default_port
+⟦/⟧
+⟦missing⟧() ⟦/⟧let port = parse_port (getenv "PORT")
+let address = host ^ ":" ^ string_of_int port
+let () = print_string ("listening on " ^ address)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-18⟧
+⟦aligned⟧
+⟦added⟧type direction = North | East | South | West
+
+⟦/⟧let turn_right direction =
+  if direction = North then East
+  else if direction = East then South
+  else if direction = South then West
+  else North
+
+let facing = turn_right (turn_right North)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-19⟧
+⟦aligned⟧
+let unit = "kg"
+let show weight = string_of_int weight ^ " " ^ unit
+
+let weights = [⟦added⟧|⟦/⟧ 3; 5; 8 ⟦added⟧|⟦/⟧]
+let heaviest = weights⟦added⟧.⟦/⟧(2)
+let lightest = weights⟦added⟧.⟦/⟧(0)
+let spread = heaviest - lightest
+let () = print_string (show spread)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-20⟧
+⟦aligned⟧
+(* Today's lunch menu, printed one dish per line. *)
+let price = 9
+
+let rec print_dishes dishes =
+  if dishes = [] then ()
+  else
+    let () = print_line (head dishes) in
+    print_dishes (tail dishes)
+
+let menu = [
+  "soup";
+  "salad";
+  "bread"⟦added⟧;⟦/⟧
+]
+let total = price * length menu
+let header = "Lunch: " ^ string_of_int total
+let () = print_dishes (header :: menu)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-21⟧
+⟦aligned⟧
+let move point dx dy = (fst point + dx, snd point + dy)
+let scale point factor = (fst point * factor, snd point * factor)
+let origin = ⟦missing⟧(⟦/⟧0, 0
+⟦missing⟧) ⟦/⟧let corner = scale (move origin 3 4) 2
+let () = print_int (fst corner)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-22⟧
+⟦aligned⟧
+let first_letter word = word⟦added⟧.⟦/⟧[0]
+let is_capital word = first_letter word >= ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧A⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧ && first_letter word <= ⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧Z⟦added⟧'⟦/⟧⟦missing⟧"⟦/⟧
+let title name = if is_capital name then name else capitalize name⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-23⟧
+⟦aligned⟧
+⟦added⟧open Printf
+
+⟦/⟧let percent part whole = part * 100 / whole⟦added⟧;;⟦/⟧
+let () = printf "%d%%\n" (percent 3 8)⟦added⟧;;⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-24⟧
+⟦aligned⟧
+let cities = ["Lima"; "Oslo"; "Cairo"]
+let width = 12
+let pad name = name ^ repeat " " (width - length name)
+
+let print_all names =
+⟦added⟧  for name in names do
+    print_string (pad name)
+⟦/⟧
+⟦missing⟧() ⟦/⟧let header = pad "City" ^ "|"
+let () = print_all (header :: cities)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-25⟧
+⟦aligned⟧
+(* Text shown under a rectangle on the worksheet. *)
+let describe_box width height =
+    let area = width * height
+    ⟦missing⟧in ⟦/⟧let border = 2 * (width + height)
+    ⟦missing⟧in ⟦/⟧let ratio = area / border
+    ⟦missing⟧in ⟦/⟧"area " ^ string_of_int area ^ ", ratio " ^ string_of_int ratio
+
+let is_square width height = width = height
+let kind width height = if is_square width height then "square" else "rectangle"
+let () = print_string (kind 6 4 ^ ": " ^ describe_box 6 4)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-26⟧
+⟦aligned⟧
+let grade score =
+    if score >= 90 then "A"
+    el⟦missing⟧se ⟦/⟧if score >= 80 then "B"
+    el⟦missing⟧se ⟦/⟧if score >= 70 then "C"
+    else "F"
+
+let report name score = name ^ ": " ^ grade score
+let () = print_string (report "Ada" 84)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-27⟧
+⟦aligned⟧
+let scores = [64; 78; 93]
+let count = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧length scores
+let best = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧max scores
+let line = ⟦added⟧$⟦/⟧"best of {count}: {best}"
+let () = printfn "%s" line⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-28⟧
+⟦aligned⟧
+let days = [1⟦added⟧..⟦/⟧⟦missing⟧ ⟦/⟧31]
+let is_weekend day = day ⟦added⟧%⟦/⟧ 7 = 6 || day ⟦added⟧%⟦/⟧ 7 = 0
+let weekends = filter is_weekend days
+let () = print_int (length weekends)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-29⟧
+⟦aligned⟧
+let clean = trim >⟦added⟧>⟦/⟧ lowercase
+let shout text = uppercase text ^ "!"
+let () = print_string <⟦added⟧|⟦/⟧ shout (clean "  Hello ")⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-30⟧
+⟦aligned⟧
+⟦added⟧[<EntryPoint>]
+⟦/⟧let main arguments =
+    let count = arguments⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧Length
+    ⟦missing⟧in ⟦/⟧print_string (if count = 0 then "no arguments" else string_of_int count)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-31⟧
+⟦aligned⟧
+⟦added⟧module Main where
+
+⟦/⟧⟦missing⟧let ⟦/⟧double x = x * 2
+⟦missing⟧let ⟦/⟧quadruple x = double (double x)
+⟦missing⟧let ⟦/⟧main = print (quadruple 5)⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-32⟧
+⟦aligned⟧
+let daysInYear = 365
+⟦added⟧isLeap :: Int -> Bool
+⟦/⟧let isLeap year = mod year 4 ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ 0 && (mod year 100 > 0 || mod year 400 ⟦added⟧==⟦/⟧⟦missing⟧=⟦/⟧ 0)
+let daysIn year = if isLeap year then daysInYear + 1 else daysInYear⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-33⟧
+⟦aligned⟧
+⟦added⟧total : List Int -> Int
+⟦/⟧let total prices = fold (⟦added⟧\⟦/⟧⟦missing⟧fun ⟦/⟧sum price -> sum + price) 0 prices
+
+⟦added⟧average : List Int -> Int
+⟦/⟧let average prices = total prices / length prices
+
+⟦added⟧spread : List Int -> Int
+⟦/⟧let spread prices = maximum prices - minimum prices⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-34⟧
+⟦aligned⟧
+let size = 8
+let squares = size * size
+
+⟦added⟧{- A square is dark if its file and rank
+   add up to an even number. -}
+⟦/⟧let file index = index - index / size * size
+let rank index = index / size
+let is_dark index = (file index + rank index) / 2 * 2 = file index + rank index⟦lf⟧
+⟦end⟧
+
+⟦repair other-languages-35⟧
+⟦aligned⟧
+(* Prices in cents. *)
+let tax_rate = 8
+
+let discount price =
+  let threshold = 1000 in
+  if price > threshold then price / 10 else 0
+
+let net price = price - discount price   ⟦added⟧-- discount first then tax⟦/⟧
+let gross price =
+  let base = net price in
+  base + base * tax_rate / 100
+
+let () = print_int (gross 1200)⟦lf⟧
+⟦end⟧
