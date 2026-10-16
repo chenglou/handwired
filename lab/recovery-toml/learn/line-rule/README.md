@@ -56,7 +56,7 @@ On the train split, row (b) has 94.65, 94.67 and 94.56 in the fixed variant and 
 
 ## What ran and what did not
 
-All times are local, October 16, 2026. The machine was running seven to ten trainings of other work the whole time (a load of 40 to 60 on 18 cores), so a training took about 17 minutes where it took 12 alone.
+All times are local, October 16, 2026. Until about 16:33 the machine was running seven to ten trainings of other work (a load of 40 to 60 on 18 cores), so the first three trainings took 17 to 18 minutes each. The later three took 8 to 10 minutes.
 
 - `run.ts --base` scored row (a).
 - The fixed variant, seeds 1 and 2: started at 16:13, trainings of 1,021 and 1,025 seconds, row (b) saved at 16:30. That was before 16:35, so the search ran too: 82 and 81 seconds, four passes, row (c) saved at 16:32.
@@ -72,7 +72,7 @@ All times are local, October 16, 2026. The machine was running seven to ten trai
 - **Against the 39 hand-written rules (94.87 and 50.67), the two variants fall on the two sides.** The fixed variant is 0.71 points of all three and 4.4 points of whole samples below them, in each of its three seeds. The trainable variant is above them in each of its three seeds, by 0.84 and 2.25 in the mean, without a search, and at the level of row 6, the search without a training (95.82 and 51.14).
 - **Keeping the 1,408 waiting cells fixed holds the result down.** With them fixed, the grammar at depth 0 and 1 can only skip to the line end, and the search adds next to nothing on top: 94.22 and 47.13 on the seeds 1 and 2, which is 0.05 and 1.2 above the same two seeds without it, and below row 6, which has no hand-set cell at all. Left trainable, the training changed 830 to 867 of the 1,408 cells, at most 2 of them back into the state `error`, and gained 1.55 points of all three and 6.7 points of whole samples over the fixed variant. So what helps is the rule as the place where the training starts, with the cells of a line end fixed. Keeping the waiting cells out of the training as well costs more than it gives.
 - **After the search the rule makes no difference that one seed can show.** The trainable variant with the search has 96.44 and 57.79 on its one seed, and row 5, the recipe's training and search without any hand-set cell, has 96.51 (96.37 to 96.63) and 55.59 (54.31 to 57.30). The search finds the lines by itself, as row 6 already said.
-- **The rule alone, as cells, is not the one rule.** Row (a) has 88.71 in all three, 2.74 below the one rule, since a cell cannot set the depth to 0 from depth 2 or more, and 43.74 in whole samples, 7.7 above it. And the rule is one sentence but 1,621 cells, of which 1,408 are only there because the recipe keeps the row of the state `error`.
+- **The rule alone, as cells, is not the one rule.** Row (a) has 88.71 in all three, 2.74 below the one rule, and 43.74 in whole samples, 7.7 above it. The two differ in what is named above: the cells do not cover an error at depth 2 or more, and they show the rest of the line of the error by the state that the grammar waits in. How much of the 2.74 points each of the two is was not measured. And the rule is one sentence but 1,621 cells, of which 1,408 are only there because the recipe keeps the row of the state `error`.
 
 What these numbers are not: a result on unseen data. The variant was thought of after the track's final scoring, the split is the validation split, and the two variants are read against each other on it. The depth 1 cells of the rule were also added after a look at it.
 
