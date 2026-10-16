@@ -1,0 +1,445 @@
+⟦repair model-and-paste-01⟧
+⟦aligned⟧
+⟦extra⟧2. In `fly.toml`, replace the old `[[services]]` block with this one:
+
+   ```toml
+   ⟦/⟧[http_service]
+   internal_port = 8080
+   force_https = true
+   auto_stop_machines = "stop"
+   auto_start_machines = true
+   min_machines_running = 0
+
+   [[http_service.checks]]
+   interval = "15s"
+   timeout = "2s"
+   path = "/healthz"⟦extra⟧
+   ```
+
+3. Run `fly deploy` again.⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-02⟧
+⟦aligned⟧
+[server]
+bind = "0.0.0.0:8443"
+workers = 4
+[retry]⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧max_attempts = 5⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧backoff_ms = 2000⟦extra⟧\n⟦/⟧⟦missing⟧
+⟦/⟧jitter = true⟦extra⟧\n⟦/⟧
+[limits]
+max_body_bytes = 1_048_576
+request_timeout = "30s"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-03⟧
+⟦aligned⟧
+⟦extra⟧Here is the maintenance window file with next week's entries added:
+
+⟦/⟧[[window]]
+service = "billing-api"
+start = 2024-06-03T22:00:00Z
+end = 2024-06-04T01:30:00Z
+reason = "Postgres 16 upgrade"
+
+[[window]]
+service = "search"
+start = 2024-06-06T23:00:00+02:00
+duration_minutes = 45
+notify = ["#ops", "search-oncall@ferry.example"]
+
+[[window]]
+service = "object-store"
+start = 2024-06-08T05:00:00Z
+end = 2024-06-08T05:20:00Z
+reason = "rotate the signing keys"
+freeze_deploys = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-04⟧
+⟦aligned⟧
+⟦extra⟧toml
+Copy code
+⟦/⟧[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["migrations", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ledgerkit"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-05⟧
+⟦aligned⟧
+[package]
+name = "skiff"
+version = "0.3.0"
+edition = "2021"
+⟦extra⟧```
+
+Then add both crates under the dependencies table:
+
+```toml
+⟦/⟧[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+anyhow = "1"⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-06⟧
+unsure: the payload holds two files, so the second file could be extra as a whole, by rule 10
+⟦aligned⟧
+⟦extra⟧**rustfmt.toml**
+
+```toml
+⟦/⟧max_width = 100
+use_small_heuristics = "Max"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+⟦extra⟧```
+
+**clippy.toml**
+
+```toml
+⟦/⟧msrv = "1.74"
+too-many-arguments-threshold = 8
+disallowed-names = ["tmp", "data2"]⟦extra⟧
+```⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-07⟧
+⟦aligned⟧
+⟦extra⟧```toml
+⟦/⟧# Telegraf: collect every 10 seconds, write to the v2 bucket
+[agent]
+interval = "10s"
+round_interval = true
+metric_batch_size = 1000
+flush_interval = "10s"
+
+[[inputs.cpu]]
+percpu = false
+totalcpu = true
+
+[[inputs.disk]]
+ignore_fs = ["tmpfs", "devtmpfs", "overlay"]
+
+[[outputs.influxdb_v2]]
+urls = ["http://influx.internal:8086"]
+token = "$INFLUX_TOKEN"
+organization = "plat⟦missing⟧"⟦/⟧
+⟦end⟧
+
+⟦repair model-and-paste-08⟧
+note: of the two profile.dev the first one stays, by rule 10
+⟦aligned⟧
+[package]
+name = "kelpie"
+version = "0.8.2"
+edition = "2021"
+
+[⟦extra⟧<http://⟦/⟧profile.dev⟦extra⟧|profile.dev>⟦/⟧]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.release]
+lto = "thin"
+strip = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-09⟧
+note: the remark after the arrow is taken as text around the document. Another reading keeps the remark as a comment, with a # missing before the arrow
+⟦aligned⟧
+concurrent = 4
+check_interval = 0
+
+[[runners]]
+  name = "docker-runner-02"
+  url = "https://gitlab.example.com/"
+  executor = "docker"
+  [runners.docker]
+    image = "alpine:3.19"
+    privileged = true   ⟦extra⟧<-- this is the line you need to change⟦/⟧
+    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+    shm_size = 0⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-10⟧
+⟦aligned⟧
+[build]
+command = "npm run build"
+publish = "dist"
+
+[build.environment]
+NPM_FLAGS = "--no-audit"
+
+[[redirects]]
+from = "/docs/*"
+to = "https://docs.tidewatch.example/:splat"
+⟦extra⟧**⟦/⟧status = 301⟦extra⟧**⟦/⟧
+force = true
+
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-11⟧
+⟦aligned⟧
+baseURL = "https://notes.example.org/"
+title = "Field Notes"
+theme = "paper"
+enableRobotsTXT = true
+
+⟦extra⟧\⟦/⟧[params⟦extra⟧\⟦/⟧]
+date⟦extra⟧\⟦/⟧_format = "2 January 2006"
+show⟦extra⟧\⟦/⟧_reading⟦extra⟧\⟦/⟧_time = true
+contact = "field⟦extra⟧\⟦/⟧_notes@example.org"
+
+⟦extra⟧\⟦/⟧[⟦extra⟧\⟦/⟧[menu.main⟦extra⟧\⟦/⟧]⟦extra⟧\⟦/⟧]
+name = "Archive"
+url = "/posts/"
+weight = 10⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-12⟧
+⟦aligned⟧
+[tools]
+node = "20.12"
+python = "3.12"
+
+⟦missing⟧#⟦/⟧Pin terraform until the provider upgrade lands
+terraform = "1.7.5"
+
+[env]
+AWS_PROFILE = "ferry-dev"
+
+⟦missing⟧#⟦/⟧Tasks that every service repo shares
+[tasks.lint]
+run = "ruff check ."
+[tasks.test]
+run = "pytest -q"
+depends = ["lint"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-13⟧
+note: the dots are taken as a mark for left-out lines, extra like a placeholder of rule 6. Another reading keeps the line as a comment, with a # missing
+⟦aligned⟧
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.9.2"
+license = "Apache-2.0"
+
+⟦extra⟧...
+⟦/⟧
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-14⟧
+note: the line in brackets is taken as a mark for left-out lines, which is no part of the document. Another reading keeps the line as a comment, with a # missing
+⟦aligned⟧
+[project]
+name = "tidewatch"
+version = "1.4.0"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+]
+
+⟦extra⟧[... build-system and tool sections unchanged ...]
+⟦/⟧
+[project.scripts]
+tidewatch = "tidewatch.cli:main"
+
+[project.urls]
+Changelog = "https://tidewatch.example/changelog"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-15⟧
+⟦aligned⟧
+model = "o4-mini"
+approval_policy = "on-request"
+
+[mcp_servers.docs]
+command = "npx"
+args = ["-y", "@ferry/docs-mcp"]
+
+⟦extra⟧//⟦/⟧⟦missing⟧#⟦/⟧ ... existing servers ...
+
+[mcp_servers.tickets]
+command = "uvx"
+args = ["tickets-mcp", "--readonly"]
+startup_timeout_sec = 20⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-16⟧
+⟦aligned⟧
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "celery.*", ⟦extra⟧...⟦/⟧]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-17⟧
+⟦aligned⟧
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+⟦extra⟧    …
+⟦/⟧    "Unicode-DFS-2016",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+skip = [{ name = "syn", version = "1.0.109" }]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-18⟧
+⟦aligned⟧
+[smtp]
+host = "smtp.mailgun.org"
+port = 587
+starttls = true
+
+[smtp.limits]
+per_minute = 60
+burst = 10
+
+[smtp.auth]
+username = "postmaster@mg.ferry.example"
+password = ⟦extra⟧...⟦/⟧⟦missing⟧""⟦/⟧
+mechanism = "plain"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-19⟧
+⟦aligned⟧
+# This file is automatically @generated by Cargo.
+version = 3
+
+[[package]]
+name = "itoa"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang⟦extra⟧…⟦/⟧⟦missing⟧"⟦/⟧
+checksum = "49f1f14873335454500d59611f1cf4a4b0f⟦extra⟧…⟦/⟧⟦missing⟧"⟦/⟧
+
+[[package]]
+name = "skiff-cli"
+version = "0.3.0"
+dependencies = [
+ "itoa",
+ "serde",
+]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-20⟧
+⟦aligned⟧
+[book]
+title = ⟦“ for "⟧Operating the Ledger⟦” for "⟧
+authors = [⟦“ for "⟧Priya Raman⟦” for "⟧, ⟦“ for "⟧Tom Okoye⟦” for "⟧]
+language = ⟦“ for "⟧en⟦” for "⟧
+src = ⟦“ for "⟧src⟦” for "⟧
+
+[build]
+build-dir = ⟦“ for "⟧book⟦” for "⟧
+create-missing = false
+
+[output.html]
+default-theme = ⟦“ for "⟧rust⟦” for "⟧
+git-repository-url = ⟦“ for "⟧https://github.com/ledgerworks/handbook⟦” for "⟧
+edit-url-template = ⟦“ for "⟧https://github.com/ledgerworks/handbook/edit/main/{path}⟦” for "⟧
+additional-css = []
+no-section-label = false⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-21⟧
+⟦aligned⟧
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "~=5.0"
+gunicorn = ⟦“ for "⟧>=22.0⟦” for "⟧
+psycopg = {extras = [⟦“ for "⟧binary⟦” for "⟧], version = "*"}
+
+[requires]
+python_version = "3.12"⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-22⟧
+⟦aligned⟧
+base_url = ⟦„ for "⟧https://werkstatt-notizen.example⟦“ for "⟧
+title = ⟦„ for "⟧Werkstattnotizen⟦“ for "⟧
+default_language = ⟦„ for "⟧de⟦“ for "⟧
+compile_sass = true
+
+[markdown]
+highlight_code = true
+smart_punctuation = false
+
+[extra]
+footer = ⟦„ for "⟧Gebaut mit Zola⟦“ for "⟧
+posts_per_page = 12⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-23⟧
+⟦aligned⟧
+[font]
+size = 11.5
+
+[shell]
+program = ⟦‘ for '⟧C:\Program Files\PowerShell\7\pwsh.exe⟦’ for '⟧
+args = [⟦‘ for '⟧-NoLogo⟦’ for '⟧, ⟦‘ for '⟧-NoProfile⟦’ for '⟧]
+
+[[hints.enabled]]
+regex = ⟦‘ for '⟧(https?://)[^\s<>]+⟦’ for '⟧
+command = ⟦‘ for '⟧explorer⟦’ for '⟧
+hyperlinks = true⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-24⟧
+⟦aligned⟧
+[tool.poetry]
+name = "harborline"
+version = "2.1.0"
+description = ⟦“ for "⟧⟦” for "⟧⟦” for "⟧
+Sync harbor schedules.
+Reads the port authority feed and writes iCal files.
+⟦“ for "⟧⟦” for "⟧⟦” for "⟧
+authors = ["Lena Fischer <lena@harborline.dev>"]
+readme = "README.md"
+packages = [{ include = "harborline", from = "src" }]⟦lf⟧
+⟦end⟧
+
+⟦repair model-and-paste-25⟧
+⟦aligned⟧
+[dependencies]
+axum = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-t⟦missing⟧"]}⟦/⟧
+⟦end⟧
