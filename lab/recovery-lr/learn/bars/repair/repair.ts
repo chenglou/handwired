@@ -7,14 +7,14 @@
 //
 // 1. The search. An edit puts a terminal in before a token, takes a token out, or reads a token as another
 //    terminal, e.g. `then` before the `else` of `if a else b`. Every edit costs 1. The search goes through the
-//    sequences of edits by cost, 1 first, and a sequence is a repair when the parser then shifts the rejected
-//    token's place and goes on: it shifts `shiftsNeeded` tokens after the last edit and gets as many tokens past
-//    the rejected one, or it accepts the end of the text. Edits may stand at the rejected token, after it as far as
-//    the parser gets, and at the `tokensBack` tokens before it: the parser has kept its stack before each of them,
-//    as Burke and Fisher's parser does, since an error often shows some tokens after the mistake, e.g. a missing
-//    `in` shows at the next `let`. Of the repairs of the lowest cost the search takes the one after which the
-//    parser gets furthest, then the one that takes out or reads anew the fewest tokens of the text, then the one
-//    that starts nearest to the rejected token.
+//    sequences of edits by cost, 1 first, and a sequence is a repair when the parser then goes on: it shifts
+//    `shiftsNeeded` tokens after the last edit and has then got through at least the `shiftsNeeded` tokens from
+//    the rejected one on, or it accepts the end of the text. Edits may stand at the rejected token, after it as
+//    far as the parser gets, and at the `tokensBack` tokens before it: the parser has kept its stack before each
+//    of them, as Burke and Fisher's parser does, since an error often shows some tokens after the mistake, e.g. a
+//    missing `in` shows at the next `let`. Of the repairs of the lowest cost the search takes the one after which
+//    the parser gets furthest, then the one that takes out or reads anew the fewest tokens of the text, then the
+//    one that starts nearest to the rejected token.
 // 2. When the search finds nothing within `maximumCost` edits and `maximumTries` tried edits: tokens are dropped
 //    from the rejected one on, as few as possible, and for that number the stack is cut down as little as
 //    possible, until the parser shifts `shiftsNeeded` tokens or accepts the end. This is panic mode with a look
@@ -31,8 +31,8 @@
 //   on every machine. Their values are the README's, with what other values give.
 //
 // A token that is taken out is a dropped token: it is shown with the stack as it is and with the display kind of
-// dropped-kinds.ts, the count that every bar may use. A token that is read as another terminal is shown as that
-// terminal.
+// dropped-kinds.json, the count that every bar may use. A token that is read as another terminal is shown as that
+// terminal, and the stack holds it as that terminal.
 //
 //   bun lab/recovery-lr/learn/bars/repair/repair.ts [--validation <samples>]
 import {join} from 'node:path'
