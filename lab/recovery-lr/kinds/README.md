@@ -8,7 +8,7 @@ The dataset's damage (`../damage.ts`) knows nothing of the language: ten edits o
 
 - `kinds.ts`: the 34 kinds, each with a name, who makes the mistake, an example, and the code that applies it to a valid program as edits on its code points. It also holds `scanProgram`, which reads from a program what the kinds need: the tokens, which bracket closes which, the definitions at the top, the local definitions with their `in`, the functions.
 - `mixed.ts`: `kindsSampleAt(seed, index)` makes the sample of this folder for a program, and `eachMixedSample`, `mixedPacked` and `prepareMixedRecipe` give the mixed set to the training.
-- `check.ts`: the checks of the mixed set. `bun lab/recovery-lr/kinds/check.ts` takes 13 s and ends with one line that says whether every check passed.
+- `check.ts`: the checks of the mixed set. `bun lab/recovery-lr/kinds/check.ts` takes 13 s on a machine that does nothing else and ends with one line that says whether every check passed.
 - `dump.ts`: `bun lab/recovery-lr/kinds/dump.ts <folder>` writes `samples.txt` with 300 samples of the kinds half for reading, at least three per kind, in the layout of `../dump.ts` with one more line per sample that says which variant of each kind it has.
 - `runs/`: the frozen recipe run on the mixed train split, see "The runs" below.
 
