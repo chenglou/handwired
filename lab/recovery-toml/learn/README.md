@@ -2,7 +2,7 @@
 
 The JSON experiment (`lab/recovery-parser/learn/`) trained the table cells that valid JSON never reads, so that the highlighter recovers after an error. This folder is that machinery for the TOML tables of the folder above: the same files, copied and adapted, so that the recipe that came out of the JSON experiment can run on TOML with no setting changed. `lab/recovery-parser/learn/README.md` and the READMEs of its folders `soft/`, `structure/`, `search/` and `arms/combined/` explain the ideas. This README says what is here, what differs, and how to run it.
 
-Nothing here has run on the dataset beyond loading it and scoring the parser as it is. The recipe itself has only run on a small set that a check makes, see [The check set](#the-check-set).
+Nothing here has run on the dataset beyond loading it, scoring the parser as it is and one rule without any training, and timing the search. The recipe itself has only run on a small set that a check makes, see [The check set](#the-check-set).
 
 ## Words
 
@@ -19,6 +19,7 @@ Nothing here has run on the dataset beyond loading it and scoring the parser as 
 | `recovery-parser.ts` | The exact parser for such tables | Other imports |
 | `data.ts` | Samples in typed arrays: `samplesOf(texts)` for any labeled texts, `loadSamples` for the dataset | Rewritten around a small type, see below |
 | `score.ts` | All three and whole over the code points after the first error | No bound of the plain table parser. The groups are the dataset's: the number of edits |
+| `restart-at-next-line.ts` | One rule without any training, as a row to read trained tables against, see [The row to read a result against](#the-row-to-read-a-result-against) | New. It stands where the JSON side has its 35 hand-written rules |
 | `soft/` | The trainable twin, its trainer and their checks | Other imports and names |
 | `search/` | The greedy search over cells, its parser loop and its worker | `search.ts` is `searchCells` of `arms/holes/restricted-search.ts`. The votes are not ported |
 | `recipe.ts` | The frozen recipe as `runRecipe`, and its parts | New file, each part a copy of a named JSON function |
@@ -67,18 +68,41 @@ Two things carry over as numbers and mean something else here:
 - **The share of 0.9 is a larger weight.** A tokenizer cell's next state has 111 choices where JSON has 26, so the base's choice starts 6.9 above the others where it starts 5.4 for JSON. A step of Adam moves a weight by about 0.05, so a cell needs more steps to snap to another choice. On a set of 2,000 texts, 68 steps, the training changes no cell.
 - **The rule's 100 samples** is a count, and the standard set is again the indexes 0 to 59,999.
 
+## The row to read a result against
+
+The JSON experiment had 35 hand-written recovery rules to hold its trained tables against. The TOML track has no such rules, and today's TOML tables, unlike the JSON ones, go on after their first error and show tokens by their kind. So the parser as it is starts high, and one rule without any training gets most of the rest: **after an error, the parser as it is starts anew at the next line** (the tokenizer between tokens, the grammar at the start of a line, no open container). E.g. after the colon of `port: 80`, the parser as it is counts the `[` of the next line's `[tls]` as the start of an array and shows `tls` as the start of a literal and a key, at depth 1, and the rule shows it as the name of a header. `restart-at-next-line.ts` holds the rule and says more.
+
+On the validation split of the standard set, 5,382 samples with 709,413 scored code points:
+
+| | all three | whole | display kind | depth | container |
+| --- | --- | --- | --- | --- | --- |
+| the parser as it is | 64.14 | 12.02 | 86.2 | 69.8 | 81.4 |
+| anew at the next line after an error | 91.45 | 36.03 | 93.9 | 95.7 | 97.3 |
+
+On the train split, 42,082 samples: 64.43 and 11.23 against 91.88 and 35.60.
+
+**A result of the recipe is read by what it adds to the second row, per kind of damage and in whole samples**, and not by what it adds to the first. The rule is no setting of the tables, since a cell can lower the depth by one level and the rule sets it to 0 from any depth, so the trained tables are not asked to hold it. The rule reads today's tables alone, so its row was fixed before any training ran.
+
+```sh
+bun lab/recovery-toml/learn/restart-at-next-line.ts      # both rows on the validation split, with every breakdown
+```
+
+`scoreRestartAtNextLine(samples, options)` gives the rule's score with the rows of `scoreTables`, and `runRestartAtNextLine(codePoints)` what the rule shows for one text.
+
 ## Step 1 on the dataset as it is
 
-With the dataset's key 2942d0e59ca7ebdf, which changes with every change of a `.ts` file of the folder above. Nothing was trained.
+With the dataset's key 314a0404b2bd51ba, which changes with every change of a `.ts` file of the folder above. Nothing was trained.
 
-- The standard set has 47,273 samples that are not in the test split: 41,872 train and 5,401 validation, with 6,231,653 scored code points. Every train sample gives the twin a step: 269 code points and 138 steps on average.
-- The rule picks 18 code points: `→`, `ß`, `ö`, and the capital letters A, B, G, I, J, L, M, O, P, Q, S, V, W, X, Y. The three first are 95% to 97% the content of a comment, where the rest of the class `other` is not. The capitals are mostly the content of a string, where the rest of `otherLetter` and `otherHexLetter`, i.e. the small letters, is mostly a key. K is the first that is not picked, at a distance of 0.49.
+- The standard set has 47,464 samples that are not in the test split: 42,082 train and 5,382 validation, with 6,291,635 scored code points. Every train sample gives the twin a step: 270 code points and 138 steps on average.
+- The rule of the classes picks 18 code points: `→`, `ß`, `ö`, and the capital letters A, B, G, I, J, L, M, O, P, Q, S, V, W, X, Y. The three first are 96% the content of a comment, where the rest of the class `other` is not. The capitals are mostly the content of a string, where the rest of `otherLetter` and `otherHexLetter`, i.e. the small letters, is mostly a key. K is the first that is not picked, at a distance of 0.49.
 - The base then has 65 classes and a class table of 8,597 entries: 7,215 tokenizer cells, 3,806 of them open, 5,622 open grammar cells, of which 378 are kept, 522 open display entries, and 1,234,935 weights. Both forms of the search for frozen cells find the same cells for these classes.
-- The parser as it is has 64.25% of all three and 12.50% of whole samples on the validation split.
+- The parser as it is has 64.14% of all three and 12.02% of whole samples on the validation split.
 
 ## Speed
 
-On an 18 core machine with other jobs running. One step of the twin at one code point, forward and backward, in one thread, with open display entries and the bit, at the start of a training: 113 microseconds, against 20.5 for the JSON twin. One batch of 32 samples with 4 worker threads, on the first train samples of each dataset: 204 ms against 31 ms, i.e. 157 samples per second against 1,038. Three passes over the 41,872 train samples then take about 13 minutes.
+On an 18 core machine with other jobs running. One step of the twin at one code point, forward and backward, in one thread, with open display entries and the bit, at the start of a training: 113 microseconds, against 20.5 for the JSON twin. One batch of 32 samples with 4 worker threads, on the first train samples of each dataset: 204 ms against 31 ms, i.e. 157 samples per second against 1,038. Three passes over the 42,082 train samples then take about 13 minutes.
+
+The search is fast next to the training. From the base of step 1, without a training before it, over the 9,050 cells that the recipe searches (3,806 tokenizer cells and 5,244 grammar cells) on the 42,082 train samples, with 4 worker threads: one pass takes 5 s and 19.9 million runs of a sample, and the recipe's four passes take 21 s and 74.5 million runs. The recipe runs the search from trained tables, which read other cells, so its time will differ, but not by the two orders that would make the search count beside 13 minutes of training. So the training's time alone decides the number of seeds.
 
 ## The check set
 
@@ -100,7 +124,7 @@ Run from the repo root. Each ends with "Every check passed." or with a count of 
 
 ```sh
 export RECOVERY_SCRATCH=<a folder outside the repo>
-bun lab/recovery-toml/learn/check-all.ts                 # the type check, the lint and the 8 checks, about a minute and a half
+bun lab/recovery-toml/learn/check-all.ts                 # the type check, the lint and the 9 checks, about a minute and a half
 ```
 
 - `check-tables.ts` (40 s): the counts above. Every frozen cell and every display entry that is not open has a text that today's parser reads without an error up to it. No text reads an open cell before its first error: 24,526 texts, among them valid ones with 16 levels and with 512 code points, and every text of up to 5 code points, 30 million with today's classes. Each cell, each entry and each bit of a mask is changed alone: a change of a frozen one is refused. All of it also with 8 added classes, open display entries, the bit and added states.
@@ -111,6 +135,7 @@ bun lab/recovery-toml/learn/check-all.ts                 # the type check, the l
 - `soft/check-train.ts` (20 s): threads, seeds, snapping, trainable masks, the errors of a wrong call, and a short training: three passes over 720 samples in batches of 8 lower the loss from 2.45 to 0.73, and the snapped tables have 88.8% of the scored code points right where the parser as it is has 63.4%.
 - `search/check.ts` (2 s): the search's parser loop counts what `score.ts` counts, and one pass of the search over 8,012 cells raises the check set's train samples from 71,760 to 108,242 of 113,577 scored code points.
 - `check-recipe.ts` (80 s): the three kept settings keep a too deep valid text as it is shown today, for random settings of every other cell. The count is the best kind per entry. The rule picks a code point that is made to stand out. The recipe runs in both rows and gives the same tables for the same seed.
+- `check-restart-at-next-line.ts` (1 s): the rule "anew at the next line after an error", which is written as runs of the exact parser on the rest of a text, shows what one loop over the tables of `../table-parser.ts` with one reset shows, at every code point of 4,000 texts of the check set and of the dataset's samples 0 to 3,999 outside the test split. Up to the end of the line of the first error it shows what the parser as it is shows. The row "all" of its score is counted a second time.
 
 ## Running the recipe
 
@@ -118,6 +143,7 @@ bun lab/recovery-toml/learn/check-all.ts                 # the type check, the l
 export RECOVERY_SCRATCH=<a folder outside the repo>
 bun lab/recovery-toml/learn/data.ts                      # makes the cache of the standard set
 bun lab/recovery-toml/learn/score.ts                     # the parser as it is on the validation split, every row
+bun lab/recovery-toml/learn/restart-at-next-line.ts      # the same beside the rule "anew at the next line after an error"
 bun lab/recovery-toml/learn/recipe.ts --seed 1           # both rows, saved to <scratch>/recipe/, scored on the validation split and on too deep valid texts
 bun lab/recovery-toml/learn/score.ts --tables $RECOVERY_SCRATCH/recipe/seed-1.primary.tables.json --cells
 ```
@@ -139,7 +165,9 @@ console.log(sharesOf(score.rows[0]!).allThree, sharesOf(score.rows[0]!).whole)
 
 ## Not done
 
-- **The real run.** The recipe has not trained on the dataset. Per seed it needs about 13 minutes of training, and the search after it was only timed on the check set, 3 s for 4,410 samples.
+- **The real run.** The recipe has not trained on the dataset. Per seed it needs about 13 minutes of training. The search after it was timed from the base alone, see [Speed](#speed): about 21 s for its four passes.
+- **The rule's row in the recipe's output.** `recipe.ts` prints the parser as it is and its own rows. The row of the rule "anew at the next line after an error" comes from `restart-at-next-line.ts`, and a table of results puts it beside them.
+- **A ceiling below 100.** The train and validation labels follow one rule, a kept code point has the label of its counterpart in the document, and a few percent of them are labels that no reader of the broken text would give, see the first of the dataset's known limits in the README of the folder above. So a validation number has a ceiling below 100, most of all for whole samples.
 - **The dataset's key** is a hash of every `.ts` file of the folder above, the checks and the statistics among them, as on the JSON side. A change of any of them gives another key: the cache is made again, and saved tables are then tables of another dataset.
 - **A table of scores as the JSON arms have it**: `recipe.ts` prints one line per row for one seed. Several seeds, their spread and a saved record are the caller's.
 - **The dataset as an import.** `data.ts` loads `../samples.ts` by its path when it is first needed. With the dataset in place, an import at the top does the same and lets the type check compare the two.

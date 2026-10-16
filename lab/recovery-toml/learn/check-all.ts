@@ -6,8 +6,8 @@
 //
 // It takes about a minute and a half on an 18 core machine with a few other jobs running (91 s in one run). Up to 4 commands run at a time, and
 // three of the checks use 4 worker threads each, soft/check-train.ts, search/check.ts and check-recipe.ts, so the
-// command stays within 13 threads. check-data.ts runs on the dataset when ../samples.ts is there, and says so when
-// it is not.
+// command stays within 13 threads. check-data.ts and check-restart-at-next-line.ts run on the dataset when
+// ../samples.ts is there, and say so when it is not.
 //
 // The type check is of this folder and of the files that it imports. The folder's own tsconfig.json keeps it from
 // failing for a file that another part of lab/recovery-toml/ is still writing.
@@ -21,7 +21,7 @@ import {optionOf, refuseUnknownOptions} from './options.ts'
 const root = resolve(import.meta.dir, '../../..')
 const here = relative(root, import.meta.dir)
 // check-recipe.ts takes the longest, so it comes first and the other checks run next to it.
-const checks = ['check-recipe.ts', 'soft/check-twin.ts', 'check-tables.ts', 'soft/check-gradient.ts', 'soft/check-train.ts', 'check-parser.ts', 'search/check.ts', 'check-data.ts']
+const checks = ['check-recipe.ts', 'soft/check-twin.ts', 'check-tables.ts', 'soft/check-gradient.ts', 'soft/check-train.ts', 'check-parser.ts', 'search/check.ts', 'check-data.ts', 'check-restart-at-next-line.ts']
 const commands: {name: string, command: string[], isCheck: boolean}[] = [
   {name: 'tsc', command: ['bunx', 'tsc', '-p', here], isCheck: false},
   {name: 'oxlint', command: ['bunx', 'oxlint', '--type-aware', here], isCheck: false},
