@@ -33,7 +33,7 @@ type TwinFactory = (layout: Layout, options?: Record<string, number>) => Twin
 - With `reading`, `places` holds one sample, and the twin fills in what it shows per token: a share per display kind, per depth (0 to 520) and per container. With exact tables every share is exactly 0 or 1.
 - The loss of a token is `-count × ln(share + 1e-6)` for each of the three labels of each group of its kept code points, where `share` is the twin's share of the label's value. White space and comments are shown as what they are, with the depth and the container of the stack as it is. The end of input takes no step: no label asks about it.
 
-A twin is named by the path of a module that exports `createTwin`, a `TwinFactory`: `train(model, samples, {twin: {module, options}})`, `recipe.ts --twin <module>`, `check-twin.ts --twin <module>` and `check-gradient.ts --twin <module>`. The trainer's worker threads import the module themselves. For a twin that reads cells with a share: `choicesOf(base, cell)` is the list that a cell's logits follow, `effectOf(choice, state)` of `../recovery-tables.ts` says what a choice does to the stack and the token, and the rules of a run (16 steps per token, 520 states) are in `../score.ts`.
+A twin is named by the path of a module that exports `createTwin`, a `TwinFactory`: `train(model, samples, {twin: {module, options}})`, `recipe.ts --twin <module>`, `check-twin.ts --twin <module>` and `check-gradient.ts --twin <module>`. `check-twin.ts --without-deep-texts` leaves out its three texts with almost 500 open brackets, for a twin that holds fewer levels of the stack. The first part of `check-gradient.ts` hands a twin the settings `{width: 2000, leastWeight: 0}`, which another twin ignores, and its second part allows for jumps that a twin without a cut does not have. The trainer's worker threads import the module themselves. For a twin that reads cells with a share: `choicesOf(base, cell)` is the list that a cell's logits follow, `effectOf(choice, state)` of `../recovery-tables.ts` says what a choice does to the stack and the token, and the rules of a run (16 steps per token, 520 states) are in `../score.ts`.
 
 ## The reference twin: a weighted set of exact stacks
 
@@ -68,6 +68,8 @@ Not ported from the prototype: its option to merge equal stacks, which it left o
 | gradient of a batch | divided by the batch's scored code points |
 | order | drawn anew for every pass from the seed and the pass |
 | threads | up to 4 worker threads, the parts of a batch added in the workers' order |
+
+**The number of worker threads is part of what a seed means.** Two runs with the same seed and the same number of threads end with the same logits bit for bit. With another number of threads the parts of a batch's gradient are added in another order, the last digit differs, and a stack at the cut is kept or dropped by it: on 3,000 samples and three passes, the tables of 0 and 2 worker threads differ in 139 cells or entries, and the ones of 0 and 4 in 185. The recipe uses 4 unless its caller asks for another number, so the runs of a result have to keep one number.
 
 Left out because the recipe never uses them: the temperature, the cost on a mix being far from one choice, the extra targets, keeping a run on track, and a "best" log point picked on half of the validation samples. The trainer cannot tell a train sample from a validation sample, since packed samples do not hold their split: the caller packs the train split.
 

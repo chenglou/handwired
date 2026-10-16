@@ -15,7 +15,9 @@
 //    mix, its stacks hold at least 90% of the weight at a token. The part also prints the loss next to the loss
 //    with 4,000 stacks.
 //
-// Run from the repo root: bun lab/recovery-lr/learn/soft/check-twin.ts [--twin <module that exports createTwin>] [--train <samples>]
+// Run from the repo root: bun lab/recovery-lr/learn/soft/check-twin.ts [--twin <module that exports createTwin>] [--train <samples>] [--without-deep-texts]
+// --without-deep-texts leaves the three texts with almost 500 open brackets out, for a twin that holds fewer levels
+// of the stack than a text can have. The limit of the stack is then not met.
 import {resolve} from 'node:path'
 import {defaultSeed, loadSamples} from '../../dataset.ts'
 import {containerCount, displayKindCount} from '../../labels.ts'
@@ -24,7 +26,7 @@ import {type Sample, alignmentOfTexts, makeSample} from '../../sample.ts'
 import {symbolOf} from '../../tables.ts'
 import {popTables, skipTables} from '../bars.ts'
 import {type PackedSamples, packSamples} from '../data.ts'
-import {numberOf, optionOf, refuseUnknownOptions} from '../options.ts'
+import {flagOf, numberOf, optionOf, refuseUnknownOptions} from '../options.ts'
 import {runRecoveryParserOnTokens} from '../recovery-parser.ts'
 import {type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, changeableCellsOf, checkTables, choicesOf, differencesOf, insertOf, randomizeOpenCells, withoutEndEarly} from '../recovery-tables.ts'
 import {scoreTables} from '../score.ts'
@@ -32,7 +34,7 @@ import {createModel, logitsOfTables, snappedTables} from './model.ts'
 import {kthLargest} from './stacks-twin.ts'
 import {type Twin, createReading, createTally, loadTwin, lossFloor, readingDepthCount, referenceTwin} from './twin.ts'
 
-refuseUnknownOptions('soft/check-twin.ts', ['--twin', '--train'])
+refuseUnknownOptions('soft/check-twin.ts', ['--twin', '--train'], ['--without-deep-texts'])
 const twinOption = optionOf('--twin')
 const twinChoice = twinOption === undefined ? referenceTwin : {module: resolve(twinOption)}
 const problems: string[] = []
@@ -49,7 +51,7 @@ const deepSamples = ['in in in 1', 'then = 1 in', '] ] else 1'].map((inside, ind
   if (typeof sample === 'string') throw new Error(`a deep text is no sample: ${sample}`)
   return sample
 })
-const samples = [...trainSamples, ...deepSamples]
+const samples = flagOf('--without-deep-texts') ? trainSamples : [...trainSamples, ...deepSamples]
 const picked = [{name: 'ampersand', codePoint: 0x26}, {name: 'colon', codePoint: 0x3a}, {name: 'backslash', codePoint: 0x5c}]
 const normal = (random: {next: () => number}) => Math.sqrt(-2 * Math.log(1 - random.next())) * Math.cos(2 * Math.PI * random.next())
 
@@ -126,7 +128,7 @@ function compareWithExactParser(name: string, twin: Twin, logits: Float64Array, 
     skippedByStepLimit += totals.tokensSkippedByStepLimit
     skippedByStackLimit += totals.tokensSkippedByStackLimit
   }
-  if (skippedByStepLimit === 0 || skippedByStackLimit === 0) problem('no run of these tables meets the limit of 16 steps, or the limit of the stack')
+  if (skippedByStepLimit === 0 || (skippedByStackLimit === 0 && !flagOf('--without-deep-texts'))) problem('no run of these tables meets the limit of 16 steps, or the limit of the stack')
   console.log(`1. With no trainable cell, ${settings.length} tables (the parser as it is, two bars, tables that insert an opening bracket wherever they can, 12 random settings in 4 layouts): the twin "${(await loadTwin(twinChoice, createModel(baseTables()).layout)).name}" shows what the exact parser shows at every token, with shares of exactly 0 and 1, and has the loss of those outputs. ${runsCompared} runs, ${tokensCompared} tokens, of which ${skippedByStepLimit} are skipped after 16 steps and ${skippedByStackLimit} at the limit of the stack.`)
 }
 

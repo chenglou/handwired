@@ -126,17 +126,18 @@ const started = performance.now()
     const twin = await loadTwin(smoothTwin, model.layout)
     const packed = packSamples(samples, base)
     // The samples whose runs split and drop no stack. With a least weight of 0, which stacks a run makes does not
-    // depend on the logits, so a run with moved logits drops none either.
+    // depend on the logits, so a run with moved logits drops none either. A twin that counts no stacks runs the
+    // first 16 samples.
     const places: number[] = []
     let tokens = 0, stacks = 0
     for (let place = 0; place < packed.sampleCount && places.length < 16; place++) {
       const tally = createTally()
       twin.run(model.logits, packed, [place], tally)
-      const {tokens: tokensOfRun = 0, stacksKept = 0, stacksDropped = 0} = tally.counters
+      const {tokens: tokensOfRun = 0, stacksKept, stacksDropped = 0} = tally.counters
       if (stacksDropped > 0 || stacksKept === tokensOfRun) continue
       places.push(place)
       tokens += tokensOfRun
-      stacks += stacksKept
+      stacks += stacksKept ?? 0
     }
     if (places.length < 16) {
       problem(`setting ${setting}: only ${places.length} samples split without a dropped stack`)
@@ -152,7 +153,7 @@ const started = performance.now()
       }
     }
     samplesUsed += places.length
-    stacksPerToken += stacks / tokens
+    stacksPerToken += tokens === 0 ? 0 : stacks / tokens
     settingsRun++
   }
   for (const kind of ['stop', 'skip', 'pop', 'reduce', 'insert', 'read as', 'end early']) if ((logitsWithGradient.get(kind) ?? 0) === 0) problem(`no logit of a choice "${kind}" has a gradient in the smooth settings`)
