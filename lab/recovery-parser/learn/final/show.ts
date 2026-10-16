@@ -10,8 +10,8 @@
 // for today's tables, stay, resync, words and lines for the dataset's hand rules, and hand-written for the 35 rules
 // of ../handwritten/rules.ts.
 //
-// --case shows a case of the written set by its id, e.g. hand-editing-07, and --sample a sample of the dataset by
-// its seed and index, e.g. 20261015:163. The rows, one column per code point (⏎ is a line feed, → a tab):
+// --case shows a case of the written set by its id, e.g. documents-and-web-01, and --sample a sample of the dataset
+// by its seed and index, e.g. 20261015:163. The rows, one column per code point (⏎ is a line feed, → a tab):
 //   text   the broken text, on one line
 //   want   the label's display kind: w white space, p punctuation, s string, e escape, n number, l literal, k key.
 //          Blank where the code point has no label, ? where the display kind is not scored.

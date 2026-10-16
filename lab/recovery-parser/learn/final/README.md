@@ -45,7 +45,7 @@ bun lab/recovery-parser/learn/final/check.ts                                # th
 bun lab/recovery-parser/learn/final/run.ts --dry-run <list.json>            # a dry run, a few seconds
 RECOVERY_FINAL=yes bun lab/recovery-parser/learn/final/run.ts <list.json>   # the final run, once
 
-bun lab/recovery-parser/learn/final/show.ts --case hand-editing-07 now lines                       # a case of the written set, with two of the five tables
+bun lab/recovery-parser/learn/final/show.ts --case documents-and-web-01 now lines                  # a case of the written set, with two of the five tables
 bun lab/recovery-parser/learn/final/show.ts --sample 20261015:163 --nesting hand-written mine=<tables.json>   # a sample that is not in the test split
 bun lab/recovery-parser/learn/final/show.ts --differs words lines words lines                      # the cases that one tables have whole and the other do not
 RECOVERY_FINAL=yes bun lab/recovery-parser/learn/final/show.ts --differs hand-written mine hand-written mine=<tables.json>
