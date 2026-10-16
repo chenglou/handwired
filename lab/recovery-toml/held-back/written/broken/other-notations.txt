@@ -1,0 +1,750 @@
+⟦case other-notations-01⟧
+⟦broken⟧
+baseURL: "https://lenavogt.example/"
+languageCode: "en-gb"
+title: "Lena Vogt, Letterpress"
+theme = "papermod"
+paginate = 12
+
+[params]
+  author = "Lena Vogt"
+  showReadingTime = true
+  dateFormat = "2 January 2006"
+
+[[menu.main]]
+  name = "Prints"
+  url = "/prints/"
+  weight = 10
+
+[[menu.main]]
+  name = "Workshops"
+  url = "/workshops/"
+  weight = 20⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-02⟧
+⟦broken⟧
+[project]
+name = "tidepool-ingest"
+version = "0.3.0"
+requires-python = ">=3.10"
+dependencies:
+  - "httpx>=0.27"
+  - "pydantic>=2.6"
+  - "structlog"
+
+[project.scripts]
+tidepool-ingest = "tidepool_ingest.cli:main"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-03⟧
+⟦broken⟧
+title = "Harbor Lane Wiki"
+base_url = "https://wiki.harborlane.example"
+
+database:
+  driver = "postgres"
+  host = "10.20.0.14"
+  port = 5432
+  pool_size = 8  # per worker
+
+mail:
+  smtp_host = "smtp.harborlane.example"
+  from = "wiki@harborlane.example"
+  use_tls = true⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-04⟧
+⟦broken⟧
+---
+[agent]
+  interval = "10s"
+  round_interval = yes
+  omit_hostname = no
+
+[[outputs.influxdb_v2]]
+  urls = ["http://127.0.0.1:8086"]
+  organization = "greenhouse"
+  bucket = "sensors"
+
+[[inputs.cpu]]
+  percpu = true
+  totalcpu = true
+
+[[inputs.mqtt_consumer]]
+  servers = ["tcp://10.0.4.2:1883"]
+  topics = ["greenhouse/+/temperature", "greenhouse/+/humidity"]
+  data_format = "json"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-05⟧
+⟦broken⟧
+[tasks.lint]
+run = "ruff check src tests"
+
+[tasks.release]
+description = "Build and upload the wheels"
+depends = ["lint"]
+run = |
+  python -m build
+  twine check dist/*
+  twine upload dist/*
+
+[tasks.docs]
+run = "mkdocs build --strict"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-06⟧
+⟦broken⟧
+[package]
+name = "tilecutter"
+version = "0.9.2"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+keywords = [gis, tiles, mbtiles]
+categories = ["command-line-utilities", "science::geo"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rusqlite = "0.31"
+# pinned until the GDAL bindings catch up
+gdal = "=0.16.0"
+
+[features]
+default = []⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-07⟧
+⟦broken⟧
+[window]
+opacity = 0.92
+decorations = buttonless
+startup_mode = "Maximized"
+padding = { x = 6, y = 4 }
+
+[font]
+size = 12.5
+
+[font.normal]
+family = JetBrainsMono Nerd Font
+style = "Regular"
+
+[font.offset]
+x = 0
+y = -1⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-08⟧
+⟦broken⟧
+concurrent = 4
+check_interval = 0
+
+runners:
+  - name = "docker-arm64"
+    url = "https://gitlab.pinecrest.example/"
+    executor = "docker"
+
+[session_server]
+  session_timeout = 1800⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-09⟧
+⟦broken⟧
+{
+  "printWidth": 100,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "plugins": ["prettier-plugin-toml"]
+}⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-10⟧
+⟦broken⟧
+[build]
+  publish = "public"
+  command = "hugo --minify"
+
+[context.production]
+  environment = {
+    HUGO_VERSION = "0.124.1",
+    HUGO_ENV = "production"
+  }
+
+[context.deploy-preview]
+  command = "hugo --buildFuture -b $DEPLOY_PRIME_URL"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-11⟧
+⟦broken⟧
+[project]
+name = "gravel-router"
+version = "1.4.2"
+authors = [{"name": "José Albuquerque", "email": "jose@gravel.example"}]
+description = """
+Plans gravel rides from open map data,
+with surface and gradient per segment."""
+readme = "README.md"
+
+[project.urls]
+Repository = "https://git.gravel.example/jose/gravel-router"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-12⟧
+⟦broken⟧
+[client]
+base_url = "https://api.fernhill.example/v2"
+timeout_ms = 8000
+proxy = { http = null, https = "http://proxy.fernhill.example:3128" }
+retries = 3
+
+[client.headers]
+Accept = "application/json"
+User-Agent = "fernhill-sync/2.3 (\"nightly\")"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-13⟧
+⟦broken⟧
+[package]
+productName = "Inkpot"
+version = "0.4.0"
+
+[tauri.bundle]
+active = true
+identifier = "example.inkpot.app"
+  "targets": ["deb", "appimage"],
+  "category": "Productivity"
+
+[tauri.security]
+csp = "default-src 'self'"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-14⟧
+⟦broken⟧
+; pooler for the reporting replicas
+[general]
+host = "0.0.0.0"
+port = 6432
+connect_timeout = 5000   ; milliseconds
+idle_timeout = 30000
+log_client_connections = on
+
+[pools.reporting]
+pool_mode = "transaction"
+default_role = "replica"
+
+[pools.reporting.users.0]
+username = "metabase"
+pool_size = 12
+
+[pools.reporting.shards.0]
+servers = [["10.4.0.21", 5432, "primary"], ["10.4.0.22", 5432, "replica"]]
+database = "reporting"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-15⟧
+⟦broken⟧
+[tools]
+node = "20.12"
+pnpm = "9"
+
+[env]
+export NODE_ENV="development"
+export DATABASE_URL="postgres://app:app@localhost:5432/orders_dev"
+REDIS_URL = "redis://localhost:6379/0"
+
+[tasks.dev]
+run = "pnpm dev"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-16⟧
+⟦broken⟧
+[Server Settings]
+name = "Pine Hollow Survival 🌲"
+motd = "Welcome back!\nBe kind to the new players."
+max_players = 16
+pvp = false
+
+[World Backup]
+interval_minutes = 30
+keep = 12
+directory = "/srv/pinehollow/backups"
+last_run = 2024-02-17T06:00:00Z⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-17⟧
+⟦broken⟧
+[listen]
+address "0.0.0.0"
+port 2222
+
+[auth]
+permit_root_login = false
+max_auth_tries = 3
+authorized_keys_file = ".ssh/authorized_keys"
+
+[log]
+level = "info"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-18⟧
+⟦broken⟧
+[build]
+target-dir = "target"
+rustflags = ["-C", "target-cpu=native"]
+
+# copied from .env, keep the two in step
+[env]
+SQLX_OFFLINE=true
+DATABASE_URL=postgres://postgres@localhost/ledger_dev
+RUST_LOG=info,sqlx=warn
+AWS_REGION = "eu-central-1"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-19⟧
+⟦broken⟧
+[tool.mypy]
+python_version = "3.12"
+strict = True
+warn_unused_ignores = False
+cache_dir = None
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "botocore.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*"]
+disallow_untyped_defs = false⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-20⟧
+⟦broken⟧
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ("E", "F", "I", "UP")
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+'tests/**' = ["S101"]
+
+[lint.isort]
+known-first-party = ("ledgerkit",)⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-21⟧
+⟦broken⟧
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = `go build -o ./tmp/server ./cmd/server`
+  bin = "tmp/server"
+  full_bin = `APP_ENV=dev ./tmp/server`
+  include_ext = ["go", "tmpl", "html"]
+  delay = 500⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-22⟧
+⟦broken⟧
+base_url = "https://kelpforest.example"
+title = "Kelp Forest Log"
+description = "Tide, swell and water temperature " +
+              "for small boat harbors"
+compile_sass = true
+build_search_index = false
+
+[markdown]
+highlight_code = true
+highlight_theme = "base16-ocean-dark"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-23⟧
+⟦broken⟧
+[server]
+bind = "0.0.0.0:7400"
+workers = 8
+request_timeout_ms = 30_000u64
+
+[cache]
+capacity_mb = 256
+ttl_secs = 900
+eviction_ratio = 0.25f32⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-24⟧
+⟦broken⟧
+[versions]
+kotlin = "1.9.23";
+ktor = "2.3.9";
+
+[libraries]
+# server
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-25⟧
+⟦broken⟧
+app = "inkpot-web"
+primary_region = "fra"
+
+http_service {
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  min_machines_running = 1
+}
+
+[env]
+  LOG_LEVEL = "info"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-26⟧
+⟦broken⟧
+/* flashing and RTT for the sensor board */
+[default.general]
+chip = "nRF52840_xxAA"
+
+[default.rtt]
+enabled = true
+up_mode = "NoBlockSkip"   /* drop lines when the host is slow */
+
+[default.gdb]
+enabled = false⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-27⟧
+⟦broken⟧
+name = "shortlinks"
+main = "src/worker.ts"
+compatibility_date = "2024-03-20"
+workers_dev = false
+services = [{ binding = "AUTH", service = "auth-gate", }]
+
+[[kv_namespaces]]
+binding = "LINKS"
+id = "6f1c2a9d4b7e4c0a9f3e5d2b8a1c7e40"
+
+[[d1_databases]]
+binding = "STATS"
+database_name = "shortlinks-stats"
+database_id = "0b7d4f1e-93a2-4c58-b6de-71f02c9a5e13"
+
+[[routes]]
+pattern = "sho.rt/*"
+zone_name = "sho.rt"
+
+// [triggers]
+// crons = ["0 4 * * *"]⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-28⟧
+⟦broken⟧
+[tool.black]
+line-length = 100
+extend-exclude = r"/(migrations|snapshots)/"
+target-version = ["py311", "py312"]⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-29⟧
+⟦broken⟧
+[user]
+name = "Tomas Halvorsen"
+email = "tomas@halvorsen.example"
+
+[ui]
+default-command = "log"
+diff-editor = "meld"
+
+[merge-tools "meld"]
+⟦tab⟧program = "/usr/bin/meld"
+⟦tab⟧merge-args = ["$left", "$base", "$right", "-o", "$output"]⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-30⟧
+⟦broken⟧
+[tasks.package]
+description = "Build the release archive"
+dependencies = ["build-release"]
+script = <<EOF
+mkdir -p dist
+cp target/release/portside dist/
+tar -czf dist/portside-linux-x64.tar.gz -C dist portside
+EOF
+
+[tasks.build-release]
+command = "cargo"
+args = ["build", "--release", "--locked"]⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-31⟧
+⟦broken⟧
+"ui.background" = { bg = "bg0" }
+"ui.text" = "fg1"
+"ui.selection" = { bg = "bg2" }
+"ui.cursor" = { fg = "bg0", bg = "fg1" }
+"comment" = { fg = "gray", modifiers = ["italic"] }
+"keyword" = { fg = "red", modifiers = ["bold"] }
+"string" = "green"
+
+[palette]
+bg0 = #1d2021
+bg2 = #504945
+fg1 = "#ebdbb2"
+gray = "#928374"
+red = "#cc241d"
+green = "#98971a"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-32⟧
+⟦broken⟧
+[project]
+name = "tidewatch"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tasks]
+test = "pytest -q"
+serve = "uvicorn tidewatch.app:app \
+         --reload --port 8010"
+lint = "ruff check src"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-33⟧
+⟦broken⟧
+[limits]
+max_upload_bytes = 10 * 1024 * 1024
+max_files_per_request = 20
+
+[cache]
+ttl_seconds = 60 * 60 * 24
+directory = "/var/cache/pressroom"
+gc.batch = 1_000
+gc.niceness = -5⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-34⟧
+⟦broken⟧
+[server]
+name = 'Copper Kettle'
+motd = 'Welcome to the Miner\'s Rest'
+max_players = 24
+
+[rules]
+difficulty = 'hard'
+keep_inventory = false⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-35⟧
+⟦broken⟧
+[audio]
+master_volume = .8
+music_volume = .5
+mute_on_focus_loss = true
+
+[video]
+resolution = [1920, 1080]
+vsync = true
+ui_scale = 1.
+gamma = 2.2
+frame_cap = 1.44e2
+
+[debug]
+seed = 0x51F7A3⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-36⟧
+⟦broken⟧
+[backup]
+source = "/srv/photos"
+destination = "/mnt/vault/photos"
+file_mode = 0640
+dir_mode = 0750
+compress = "zstd"  # level 3
+
+[schedule]
+daily = "03:15"
+keep_daily = 14⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-37⟧
+⟦broken⟧
+[upload]
+max_body_size = 25MB
+allowed_types = ["image/png", "image/jpeg", "application/pdf"]
+temp_dir = "/var/tmp/uploads"
+
+[timeouts]
+connect = 5s
+idle = 2m⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-38⟧
+⟦broken⟧
+[[release]]
+version = "3.2.0"
+date = 2024/03/09
+codename = "Larkspur"
+notes = "Adds the offline map cache."
+
+[[release]]
+version = "3.1.4"
+date = 2024-01-22
+codename = "Kestrel"
+notes = "Fixes the tile seam at zoom 14."⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-39⟧
+⟦broken⟧
+[quiet_hours]
+enabled = true
+start = 22:30
+end = 07:00
+timezone = "Europe/Lisbon"
+
+[digest]
+send_at = 08:15:00
+weekdays = ["mon", "tue", "wed", "thu", "fri"]⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-40⟧
+⟦broken⟧
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn =⟦sp⟧
+sqlalchemy = ">=2.0"
+
+[requires]
+python_version = "3.12"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-41⟧
+⟦broken⟧
+edition = "2021"
+max_width = 100
+use_small_heuristics = "Max"
+imports_gran
+group_imports = "StdExternalCrate"
+reorder_modules = true⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-42⟧
+⟦broken⟧
+[book]
+title = "The Saltline Handbook"
+description = "How to wire, calibrate and log a boat's NMEA
+authors = ["Maren Solheim"]
+language = "en"
+
+[output.html]
+git-repository-url = "https://git.saltline.example/handbook"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-43⟧
+⟦broken⟧
+[linters]
+disable-all = true
+enable = [
+    "errcheck",
+    "govet",
+    "staticcheck",   # replaces megacheck
+
+[linters-settings.govet]
+check-shadowing = true
+
+[issues]
+max-same-issues = 0⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-44⟧
+⟦broken⟧
+[files]
+extend-exclude = ["*.lock", "testdata/**", "vend]
+
+[default.extend-words]
+# the tide gauge at Ny-Alesund
+nd = "nd"
+alesund = "alesund"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-45⟧
+⟦broken⟧
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.
+source = ["src/quayside"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-46⟧
+⟦broken⟧
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, fea
+tracing = "0.1"
+
+[dev-dependencies]
+wiremock = "0.6"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-47⟧
+⟦broken⟧
+[feature_flags]
+new_checkout = true
+guest_wishlist = fal
+price_alerts = true
+saved_carts = false⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-48⟧
+⟦broken⟧
+[bot]
+name = "driftwood"
+prefix = "!"
+greeting = """
+Welcome to the survey channel. Post photos with
+admins = ["maren", "oskar"]
+log_level = "info"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-49⟧
+⟦broken⟧
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-3, "ISC", "Unicode-DFS-2016"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"⟦lf⟧
+⟦end⟧
+
+⟦case other-notations-50⟧
+⟦broken⟧
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+
+[dependencies.sqlx]
+version = "0.7", features = ["postgres", "runtime-tokio"]
+default-features = false
+
+[dev-dependencies]
+insta = "1.38"⟦lf⟧
+⟦end⟧
