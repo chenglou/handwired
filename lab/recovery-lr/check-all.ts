@@ -3,7 +3,8 @@
 //
 // Run from the repo root, with RECOVERY_LR_SCRATCH set to a folder outside the repo:
 //   bun lab/recovery-lr/check-all.ts [--only <part of a name>]
-// It takes about 20 s. Up to 4 commands run at a time, each in one thread.
+// It takes about a minute. The commands run one after another: a command of bun or of the type check uses more
+// than one thread, so 4 at a time were more than the 4 threads that the experiment's commands may use.
 //
 // check-tools.ts and check-changed.ts need bison 2.3, flex 2.6.4 and cc. Where the tools are missing, the two say
 // so and pass, since the committed grammar/tables.json needs no tool: the other checks still run.
@@ -60,7 +61,7 @@ async function runNext() {
     else if (output.includes('The tools are not here')) console.log(`    ${output.trimEnd().split('\n')[0]}`)
   }
 }
-await Promise.all(Array.from({length: 4}, runNext))
+await runNext()
 
 const failed = results.filter(result => !result.passed)
 console.log(`${results.length} commands in ${((performance.now() - started) / 1000).toFixed(0)} s. Their outputs are in ${outputFolder}.`)

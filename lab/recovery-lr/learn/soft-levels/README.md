@@ -127,7 +127,7 @@ So this twin is 30 to 60 times slower than the reference and two to three times 
 ## Checks
 
 ```sh
-bun lab/recovery-lr/learn/soft-levels/check-all.ts   # 90 s, four commands at once
+bun lab/recovery-lr/learn/soft-levels/check-all.ts   # 90 s, four commands at once, one thread each. ../check-all.ts runs the same four one after another
 ```
 
 - **With exact tables the twin is the exact parser** (`../soft/check-twin.ts --twin`, for `levels-twin.ts` and for `pusher-below-twin.ts`). 16 tables without a trainable cell, 19,248 runs and 1,313,648 tokens: every share is exactly 0 or 1, at the display kind, the depth and the container of `../recovery-parser.ts`, with the loss of those outputs. 30,925 of the tokens are skipped after 16 steps and 56 at the limit of the stack, in three texts with almost 500 open brackets. The snapped twin is the exact parser of the snapped tables in 9,624 runs.

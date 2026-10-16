@@ -97,7 +97,7 @@ What has no JSON setting to carry over: the JSON twin held a share per depth fro
 
 ## Checks
 
-Run from the repo root with `RECOVERY_LR_SCRATCH` set. Each ends with "Every check passed." or a count of problems. `../check-all.ts` type-checks and lints this folder, and does not run these three.
+Run from the repo root with `RECOVERY_LR_SCRATCH` set. Each ends with "Every check passed." or a count of problems. `../check-all.ts` type-checks and lints this folder and runs these three after its own checks.
 
 ```sh
 bun lab/recovery-lr/learn/soft/check-twin.ts      # 10 s

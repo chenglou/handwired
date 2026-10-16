@@ -81,7 +81,7 @@ bun test lab/recovery-lr                   # the invariants of the dataset on 2,
 ```sh
 export RECOVERY_LR_SCRATCH=<a folder outside the repo>
 bun lab/recovery-lr/grammar/build.ts       # bison, flex and cc; writes grammar/tables.json
-bun lab/recovery-lr/check-all.ts           # the type check, the lint, the test and every check, about 20 s
+bun lab/recovery-lr/check-all.ts           # the type check, the lint, the test and every check, one after another, about a minute
 ```
 
 `grammar/tables.json` is committed, so nothing but the build and two checks needs the tools. The generated C files go to the scratch folder.
