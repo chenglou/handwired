@@ -84,4 +84,4 @@ The two commits differ from `0110f29` only by the files of this folder. No file 
 
 `<scratch>/transfer/lr/runs/neutral/` holds the 18 tables `row-<row>.seed-<seed>.tables.json`, a record next to each, `logs/` with what every command printed, `table.md` with the output of `table.ts` as above, and `table.bars-5000.md` with the same when the counts of the bars are made on 5,000 train samples as in the command of `../bars.ts`: no bar moves by more than 0.03 of all three, and the whole samples of "skip every rejected token, with the count" go from 12.32 to 11.54.
 
-A saved table was checked by another route: `bun lab/recovery-lr/learn/score.ts --tables <the tables of row 9, seed 1>` gives the record's 84.25 and 37.78.
+A saved table was checked by another route: `bun lab/recovery-lr/learn/score.ts --tables <the tables of row 9, seed 1>` gives the record's 84.25 and 37.78. And seed 1 of the rows 9 and 10 was run a second time, alone on the machine (37 s), into another folder: both tables came out the same byte for byte, so running three seeds at once changed nothing.
