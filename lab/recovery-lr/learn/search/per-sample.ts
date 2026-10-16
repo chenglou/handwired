@@ -21,10 +21,7 @@ import {displayKind, displayKindCount} from '../../labels.ts'
 import {type PackedSamples, loadPacked, messageOf, packedComment, refuseOtherTerminals} from '../data.ts'
 import {flagOf, numberOf, optionOf, refuseUnknownOptions} from '../options.ts'
 import {containerOfStack, depthOfStack} from '../recovery-parser.ts'
-import {
-  type RecoveryTables, argumentOfChoice, baseTables, bison, bisonTerminalCount, choicesOf, droppedOfEndEarly, kindEndEarly, kindInsert, kindOfChoice, kindPop, kindReadAs, kindReduce, kindShift, kindSkip,
-  kindStop, loadTablesForReport, maximumStackHeight, maximumStepsPerToken, nonterminalOfEndEarly, withoutEndEarly,
-} from '../recovery-tables.ts'
+import {type RecoveryTables, applyChoice, baseTables, choiceStop, choicesOf, loadTablesForReport, maximumStepsPerToken, tokenSkipped, tokenStays, tokenTaken, withoutEndEarly} from '../recovery-tables.ts'
 import {runSample, scorePack, scoreTables, sharesOf} from '../score.ts'
 
 export const defaultWidth = 64
@@ -93,24 +90,13 @@ export function bestOfSample(samples: PackedSamples, sample: number, tables: Rec
         const cell = state * terminalCount + terminal
         const choices = tables.open[cell] === 1 ? choicesOf(tables, cell) : [tables.choice[cell]!]
         for (const choice of choices) {
-          const kind = kindOfChoice(choice), argument = argumentOfChoice(choice)
-          if (kind === kindStop) continue
+          if (choice === choiceStop) continue
           const child: Run = choices.length === 1 ? run : {stack: run.stack.slice(), right: run.right, steps: run.steps}
-          const {stack} = child
-          const pushes = kind === kindShift || kind === kindInsert || kind === kindReadAs || (kind === kindReduce && bison.ruleLength[argument] === 0)
-          if (kind === kindSkip || (pushes && stack.length >= maximumStackHeight)) finish(child, state * terminalCount + terminal)
-          else if (kind === kindShift || kind === kindReadAs) {
-            stack.push(kind === kindShift ? argument : bison.transition[state * bison.symbolCount + argument]!)
-            finish(child, stack.at(-1)! * terminalCount + terminal)
-          } else {
-            if (kind === kindPop) stack.pop()
-            else if (kind === kindInsert) stack.push(bison.transition[state * bison.symbolCount + argument]!)
-            else if (kind === kindReduce || kind === kindEndEarly) {
-              stack.length -= kind === kindReduce ? bison.ruleLength[argument]! : droppedOfEndEarly(choice)
-              stack.push(bison.gotoState[stack.at(-1)! * bison.nonterminalCount + (kind === kindReduce ? bison.ruleLhs[argument]! : nonterminalOfEndEarly(choice)) - bisonTerminalCount]!)
-            } else throw new Error(`the cell ${cell} holds ${choice}, which the search per sample does not know`)
-            goOn(child, next)
-          }
+          const became = applyChoice(child.stack, choice)
+          if (became === tokenStays) goOn(child, next)
+          // A skipped token is shown by the entry of the state on top, and a taken one by the entry of its new state.
+          else if (became === tokenSkipped || became === tokenTaken) finish(child, child.stack.at(-1)! * terminalCount + terminal)
+          else throw new Error(`the cell ${cell} holds ${choice}, which the search per sample does not know`)
         }
       }
       // Within a token the runs that are not done differ only in what they had right before it.

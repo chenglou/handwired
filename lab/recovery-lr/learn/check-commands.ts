@@ -45,7 +45,7 @@ if (searchOutput !== undefined) {
 const barsOutput = run('bars.ts', '--train', '300', '--validation', '300')
 if (barsOutput !== undefined) {
   const asItIs = scoreRow('the parser as it is', scoreTables(baseTables(), loadPacked('validation', 300)).score)
-  if (!barsOutput.includes(asItIs) || !barsOutput.includes('| panic mode, with the count |') || barsOutput.split('\n').filter(line => line.startsWith('| ')).length !== 9) problem('bars.ts does not print its seven rows, or another row for the parser as it is than scoreTables gives')
+  if (!barsOutput.includes(asItIs) || !barsOutput.includes('| panic mode, with the count |') || barsOutput.split('\n').filter(line => line.startsWith('| ')).length !== 10) problem('bars.ts does not print its eight rows, or another row for the parser as it is than scoreTables gives')
 }
 const pickedOutput = run('picked-terminals.ts', '--train', '3000')
 if (pickedOutput !== undefined && !pickedOutput.includes('The rule picks')) problem('picked-terminals.ts does not say what the rule picks')

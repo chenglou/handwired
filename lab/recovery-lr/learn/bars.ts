@@ -6,8 +6,8 @@
 // 3. Panic mode: at a token that the grammar's table has no action for, pop to the topmost state from which the
 //    token can be shifted, and skip the token when the stack has no such state. It is no table of this
 //    experiment, since it looks at the whole stack, so it is a parser of its own here and is scored by its output.
-//    Next to it stands the nearest table: `pop` in every open cell that holds `stop`, which pops down to the start
-//    state and skips there.
+//    Next to it stand a variant that keeps the reductions made at the rejected token, see panicMode, and the
+//    nearest table: `pop` in every open cell that holds `stop`, which pops down to the start state and skips there.
 // A dropped token is shown as an error. Each bar is also given with a count over train samples in place of that:
 // for the tables the count of search/count.ts, and for panic mode the kind that the most code points of the tokens
 // that it drops want, per terminal. A count needs no author either, and the hand-written bars use the same.
@@ -76,27 +76,34 @@ function feed(stacks: Stacks, terminal: number, token: number, reductions: Reduc
 // The parser knows nothing but the grammar's table: a token is fed to it, and where the table rejects the token,
 // the stack is cut down to the highest part from which the token can be shifted. Where no part can, the token is
 // dropped. At the end of input the stack is cut down to the highest part that accepts the end. The table is the
-// grammar's LALR(1) table, so the token is rejected at the first open cell, where bison would still reduce by
-// default in some states.
-export function panicMode(sample: Sample, kindOfDropped: ArrayLike<number>): ParserOutput {
+// grammar's LALR(1) table, so a token is rejected where it reads an open cell.
+//
+// An LALR parser reduces before it sees that a token has no action, e.g. it closes `f 1` as an expression at a
+// stray `)`. Without `keepReductions` the stack that is cut down is the one from before the token was read, so
+// those reductions are undone: of the two it is the bar with more right in all three. With `keepReductions` the
+// reductions stay, as bison leaves them, and the stack is cut down from there.
+export function panicMode(sample: Sample, kindOfDropped: ArrayLike<number>, keepReductions = false): ParserOutput {
   const {tokens} = sample
   const kind = new Int8Array(tokens.count), depth = new Int16Array(tokens.count), container = new Int8Array(tokens.count), stack = new Int32Array(tokens.count), taken = new Uint8Array(tokens.count)
   const reductions: Reduction[] = []
   let stacks: Stacks = {states: [bison.startState], firstToken: [-1], lastToken: [-1]}
-  // Feeds the terminal to the stack. Where the table rejects it, the reductions that were made up to there stay,
-  // as in bison, and the terminal is fed to a copy of the stack without its top state, then without its top two,
-  // and so on down. The first copy that shifts or accepts becomes the stack, with its reductions.
+  // Feeds the terminal to the stack, then to a copy of the stack without its top state, then without its top two,
+  // and so on down. The first try that shifts or accepts becomes the stack, with its reductions.
   const take = (terminal: number, token: number): number => {
-    const result = feed(stacks, terminal, token, reductions)
-    if (result !== rejected) return result
-    for (let height = stacks.states.length - 1; height >= 1; height--) {
+    let highest = stacks.states.length
+    if (keepReductions) {
+      const result = feed(stacks, terminal, token, reductions)
+      if (result !== rejected) return result
+      highest = stacks.states.length - 1
+    }
+    for (let height = highest; height >= 1; height--) {
       const attempt: Stacks = {states: stacks.states.slice(0, height), firstToken: stacks.firstToken.slice(0, height), lastToken: stacks.lastToken.slice(0, height)}
       const reductionsOfAttempt: Reduction[] = []
-      const resultOfAttempt = feed(attempt, terminal, token, reductionsOfAttempt)
-      if (resultOfAttempt === rejected) continue
+      const result = feed(attempt, terminal, token, reductionsOfAttempt)
+      if (result === rejected) continue
       stacks = attempt
       reductions.push(...reductionsOfAttempt)
-      return resultOfAttempt
+      return result
     }
     return rejected
   }
@@ -153,6 +160,9 @@ export function barRows(train: readonly Sample[], validation: readonly Sample[])
   rows.push({name: 'panic mode, dropped tokens shown as errors', score: scoreOutputs(validation, sample => panicMode(sample, errors))})
   const counted = kindsOfDroppedTokensByCount(train, panicMode)
   rows.push({name: 'panic mode, with the count', score: scoreOutputs(validation, sample => panicMode(sample, counted))})
+  const keeping = (sample: Sample, kindOfDropped: ArrayLike<number>) => panicMode(sample, kindOfDropped, true)
+  const countedKeeping = kindsOfDroppedTokensByCount(train, keeping)
+  rows.push({name: 'panic mode that keeps the reductions made at a rejected token, with the count', score: scoreOutputs(validation, sample => keeping(sample, countedKeeping))})
   tableRow('the nearest table to panic mode: pop where bison reports', popTables())
   return rows
 }

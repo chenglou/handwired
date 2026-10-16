@@ -204,24 +204,28 @@ const sameScore = (left: Score, right: Score): boolean => (Object.keys(left) as 
   const errors = new Int8Array(bisonTerminalCount).fill(displayKind.error)
   let tokensBefore = 0
   for (const sample of validation) {
-    const output = panicMode(sample, errors)
     const run = runRecoveryParserOnTokens(sample.codePoints, sample.tokens, baseTables())
-    for (let token = 0; token < sample.firstErrorToken; token++) {
-      tokensBefore++
-      if (output.kind[token] !== run.kind[token] || output.depth[token] !== run.depth[token] || output.container[token] !== run.container[token] || output.stack[token] !== run.stack[token]) {
-        problem(`panic mode, sample ${sample.id}: token ${token} before the first error is shown otherwise than by the parser`)
-        break
+    for (const keepReductions of [false, true]) {
+      const output = panicMode(sample, errors, keepReductions)
+      for (let token = 0; token < sample.firstErrorToken; token++) {
+        tokensBefore++
+        if (output.kind[token] !== run.kind[token] || output.depth[token] !== run.depth[token] || output.container[token] !== run.container[token] || output.stack[token] !== run.stack[token] || (output.taken[token] === 1) === isTrivia(sample.tokens.kind[token]!)) {
+          problem(`panic mode, sample ${sample.id}: token ${token} before the first error is shown otherwise than by the parser`)
+          break
+        }
       }
+      // The parser's reductions before the first error's token, and with `keepReductions` also the ones that it
+      // makes at that token before it reads the open cell.
+      const before = keepReductions ? prefixOf(sample).reductions : run.reductions.filter(reduction => reduction.atToken < sample.firstErrorToken), all = [...output.reductions]
+      if (!before.every((reduction, place) => all[place]?.nonterminal === reduction.nonterminal && all[place].firstToken === reduction.firstToken && all[place].lastToken === reduction.lastToken)) problem(`panic mode, sample ${sample.id}: its reductions before the first error are not the parser's`)
     }
-    const before = prefixOf(sample).reductions, all = [...output.reductions]
-    if (!before.every((reduction, place) => all[place]!.nonterminal === reduction.nonterminal && all[place]!.firstToken === reduction.firstToken && all[place]!.lastToken === reduction.lastToken)) problem(`panic mode, sample ${sample.id}: its reductions before the first error are not the parser's`)
   }
   const shownAsErrors = scoreOutputs(validation, sample => panicMode(sample, errors))
   const counted = kindsOfDroppedTokensByCount(train, panicMode)
   const withCount = scoreOutputs(train, sample => panicMode(sample, counted)), withoutCount = scoreOutputs(train, sample => panicMode(sample, errors))
   expect(withCount.allThreeRight >= withoutCount.allThreeRight && withCount.stackRight === withoutCount.stackRight && withCount.sharedConstituents === withoutCount.sharedConstituents, () => 'the count lowers the score of panic mode on the samples that it was made on, or changes what it does')
   expect(shownAsErrors.insertedTokens === 0 && shownAsErrors.allThreeRight > scoreTablesByExactParser(skipTables(), validation).allThreeRight, () => 'panic mode has no more right than skipping every rejected token')
-  console.log(`6. Panic mode on ${validation.length} validation samples: each of ${tokensBefore} tokens before a first error is shown as the parser shows it, with the parser's reductions. On the train samples the count raises its all three from ${sharesOf(withoutCount).allThree.toFixed(2)} to ${sharesOf(withCount).allThree.toFixed(2)}.`)
+  console.log(`6. Panic mode on ${validation.length} validation samples, in both variants: each of ${tokensBefore} tokens before a first error is shown as the parser shows it, with the parser's reductions. On the train samples the count raises its all three from ${sharesOf(withoutCount).allThree.toFixed(2)} to ${sharesOf(withCount).allThree.toFixed(2)}.`)
 }
 
 console.log(problems.length === 0 ? 'Every check passed.' : `${problems.length} problems.`)

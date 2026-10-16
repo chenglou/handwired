@@ -11,8 +11,8 @@
 // 2. With a random choice in every open cell and a random kind in every open display entry, 36 settings on every
 //    text: nothing before a text's first error changes, the first error stays where it is, the verdict stays, the
 //    stack is a path of the automaton after every step, with the state stopped only on top and at most 520
-//    states, no token takes more than 16 steps from the first error on, and effectOf says what every step does to
-//    the stack.
+//    states, no token takes more than 16 steps from the first error on, and effectOf and applyChoice say what
+//    every step does to the stack.
 // 3. The check can fail: tables with one frozen cell changed, which checkTables refuses and the parser is made to
 //    run all the same, give some text another output before its first error, or another verdict.
 //
@@ -25,8 +25,8 @@ import {handTexts, programTexts, randomTexts, sentenceTexts} from '../reference.
 import {commentKind, isTrivia} from '../tables.ts'
 import {type RecoveryRun, runRecoveryParserOnTokens, shownAsTrivia, shownShifted, shownSkipped, shownSkippedByStackLimit, shownSkippedByStepLimit} from './recovery-parser.ts'
 import {
-  type RecoveryTables, addFirstOnLineFlag, addTerminals, baseTables, bison, bisonTerminalCount, checkTables, choiceStop, copyTables, effectOf, kindAccept, kindOfChoice, kindSkip, maximumStackHeight,
-  maximumStepsPerToken, randomizeOpenCells, stateSymbol, stopped, withoutEndEarly,
+  type RecoveryTables, addFirstOnLineFlag, addTerminals, applyChoice, baseTables, bison, bisonTerminalCount, checkTables, choiceStop, copyTables, effectOf, kindAccept, kindOfChoice, kindSkip,
+  maximumStackHeight, maximumStepsPerToken, parseAccepted, randomizeOpenCells, stateSymbol, stopped, tokenTaken, withoutEndEarly,
 } from './recovery-tables.ts'
 
 const problems: string[] = []
@@ -164,7 +164,7 @@ function beforeFirstError(text: Text, plain: Plain, run: RecoveryRun): string {
       const plain = plains[index]!
       // Counted here, next to the parser's own counts: the cells read per token from the first error on.
       let readsOfToken = 0, tokenOfReads = -1, errorSeen = false
-      let expected: number[] | undefined
+      let expected: number[] | undefined, applied: number[] | undefined
       let why = ''
       const run = runRecoveryParserOnTokens(text.codePoints, text.tokens, tables, {
         read: (token, cell, stack) => {
@@ -178,10 +178,13 @@ function beforeFirstError(text: Text, plain: Plain, run: RecoveryRun): string {
             if (++readsOfToken > maximumStepsPerToken) why = `token ${token} takes more than ${maximumStepsPerToken} steps`
             steps++
           }
-          // The stack before a step is what effectOf said of the step before.
-          if (expected !== undefined && !sameList(stack, expected)) why = `the stack before a step of token ${token} is not what effectOf says`
+          // The stack before a step is what effectOf and applyChoice said of the step before.
+          if (expected !== undefined && (!sameList(stack, expected) || !sameList(stack, applied!))) why = `the stack before a step of token ${token} is not what effectOf and applyChoice say`
           const choice = tables.choice[cell]!
           const kind = kindOfChoice(choice)
+          applied = stack.slice()
+          const became = applyChoice(applied, choice)
+          if ((became === parseAccepted) !== (kind === kindAccept) || (became === tokenTaken && effectOf(choice, stack.at(-1)!).pushedState === -1)) why = `applyChoice says ${became} of the choice ${choice}`
           if (kind === kindAccept) return
           const effect = effectOf(choice, stack.at(-1)!)
           const grows = effect.dropped === 0 && (effect.gotoNonterminal !== -1 || effect.pushedState !== -1)
@@ -218,7 +221,7 @@ function beforeFirstError(text: Text, plain: Plain, run: RecoveryRun): string {
     })
   }
   if (stepLimitTokens === 0 || stackLimitTokens === 0 || highest !== maximumStackHeight) problem(`the runs do not meet both limits: ${stepLimitTokens} tokens skipped after ${maximumStepsPerToken} steps, ${stackLimitTokens} at the limit of the stack, the highest stack ${highest}`)
-  console.log(`2. ${settings} settings of every open cell and every open display entry, ${runs} runs of ${texts.length} texts: before a text's first error nothing changes, and the first error and the verdict stay. The stack is a path of the automaton after every step, the highest with ${highest} states, and effectOf says what each of ${effectsChecked} steps does to it. Of the ${steps} steps from a first error on, no token takes more than ${maximumStepsPerToken}. ${stepLimitTokens} tokens were skipped after ${maximumStepsPerToken} steps and ${stackLimitTokens} at the limit of the stack, and in ${textsWithChange} runs something after the first error is shown otherwise than as an error.`)
+  console.log(`2. ${settings} settings of every open cell and every open display entry, ${runs} runs of ${texts.length} texts: before a text's first error nothing changes, and the first error and the verdict stay. The stack is a path of the automaton after every step, the highest with ${highest} states, and effectOf and applyChoice say what each of ${effectsChecked} steps does to it. Of the ${steps} steps from a first error on, no token takes more than ${maximumStepsPerToken}. ${stepLimitTokens} tokens were skipped after ${maximumStepsPerToken} steps and ${stackLimitTokens} at the limit of the stack, and in ${textsWithChange} runs something after the first error is shown otherwise than as an error.`)
 }
 
 // 3. The check can fail.

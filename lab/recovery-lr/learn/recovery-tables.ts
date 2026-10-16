@@ -163,6 +163,36 @@ export function effectOf(choice: number, state: number): Effect {
   }
 }
 
+// What became of the token after a step.
+export const tokenStays = 0, tokenTaken = 1, tokenSkipped = 2, parseAccepted = 3
+// One step of the parser on a stack of states, in place: applies the choice that the cell of the state on top
+// holds, frozen or open, and says what became of the token. tokenStays: the parser reads the token again in the
+// new state. tokenTaken: a state for the token is on top. tokenSkipped: the stack is as it was, either by the
+// choice skip or because the choice would put more than 520 states on the stack. The caller counts the steps of a
+// token, and skips the token itself in place of a 17th step.
+export function applyChoice(stack: number[], choice: number): number {
+  const kind = kindOfChoice(choice), argument = argumentOfChoice(choice)
+  if (kind === kindReduce || kind === kindEndEarly) {
+    const dropped = kind === kindReduce ? bison.ruleLength[argument]! : argument >> 4
+    if (dropped === 0 && stack.length >= maximumStackHeight) return tokenSkipped
+    stack.length -= dropped
+    stack.push(bison.gotoState[stack[stack.length - 1]! * bison.nonterminalCount + (kind === kindReduce ? bison.ruleLhs[argument]! : bisonTerminalCount + (argument & 15)) - bisonTerminalCount]!)
+    return tokenStays
+  }
+  if (kind === kindPop) {
+    stack.length--
+    return tokenStays
+  }
+  if (kind === kindSkip) return tokenSkipped
+  if (kind === kindAccept) return parseAccepted
+  if (stack.length >= maximumStackHeight) return tokenSkipped
+  if (kind === kindShift) stack.push(argument)
+  else if (kind === kindStop) stack.push(stopped)
+  else if (kind === kindInsert || kind === kindReadAs) stack.push(bison.transition[stack[stack.length - 1]! * bison.symbolCount + argument]!)
+  else throw new Error(`${choice} is no choice`)
+  return kind === kindShift || kind === kindReadAs ? tokenTaken : tokenStays
+}
+
 // bison's action in a cell of a state of its own, as a choice.
 function bisonChoice(state: number, terminal: number): number {
   const cell = state * bisonTerminalCount + bisonTerminalOf(terminal)
