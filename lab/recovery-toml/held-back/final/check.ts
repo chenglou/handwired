@@ -1,7 +1,8 @@
 // The check of the final scoring's tooling. It scores only the parser as it is and the one rule on the held-back
 // sets, reads no sample of the dataset's test split, and prints counts and no text of a set.
 //
-// Run from the repo root: bun lab/recovery-toml/held-back/final/check.ts
+// Run from the repo root, with RECOVERY_SCRATCH set to the scratch folder of the TOML track, see list.ts:
+//   bun lab/recovery-toml/held-back/final/check.ts
 // It ends with "Every check passed." or with the number of failures. What it checks:
 // - The counts of count.ts for the parser as it is and for the rule are the numbers that ../README.md gives for the
 //   two held-back sets, and every count is the one of the set's own scorer. A count that is changed by one is noticed.
@@ -9,8 +10,9 @@
 //   `error` everywhere, no display kind is right and every added code point is shown as an error.
 // - The check against the parser as it is finds no difference for the parser as it is, and a difference at every
 //   code point of the valid documents for a parser that shows `error` everywhere.
-// - list.json is what the three lists of the training side give now. A list with another sha256, with a file left
-//   out, or of another dataset is refused, and so are tables with a changed frozen cell.
+// - list.json is what the three lists of the training side give now, and it holds its paths relative to the scratch
+//   folder. A list with another sha256, with a file left out, or of another dataset is refused, and so are tables
+//   with a changed frozen cell.
 // - The verdict's rule gives each of its four verdicts for numbers that are made up for it, and a row that is level
 //   with another row is not above it.
 // - The report of a final run can be written: with made-up counts in the rows 3 to 8, it has a verdict and no gap.
@@ -20,7 +22,7 @@ import {displayKind} from '../../kinds.ts'
 import {asIsTables, classNames, lexerStateNames, tablesFromJson, tablesToJson} from '../../learn/recovery-tables.ts'
 import {type Parser, type Shown, parserAsItIs, restartAtNextLine} from '../parsers.ts'
 import {type Counts, countsOf, countsOfText, differencesFromToday, labelKindCountsOf, parserOfCheckedTables, percentagesOf, scoredPerTextOf, todaysTracesOf} from './count.ts'
-import {type FinalList, listFile, problemsOfList, readList} from './list.ts'
+import {type FinalList, listFile, listFileText, problemsOfList, readList} from './list.ts'
 import {type FileCounts, type RowCounts, type RunFacts, type VerdictSet, describeReport, heldBackLine, mainRows, verdictOf, verdicts} from './report.ts'
 import {baseOf, countsFileText, finalRunsIn} from './run.ts'
 import {type Comparison, compareWithGeneratorScorer, compareWithWrittenScorer} from './second-count.ts'
@@ -126,6 +128,7 @@ for (const [name, set] of sets) {
 const list = readList()
 const fileCount = list.rows.reduce((total, row) => total + row.tables.length, 0)
 check(problemsOfList(list).length === 0 && fileCount === 24, `${listFile} names ${fileCount} files, is what the three lists give now, and every file has the bytes that its sha256 names`)
+check(listFileText(list) === readFileSync(listFile, 'utf8') && !readFileSync(listFile, 'utf8').includes('"path": "/'), 'list.json holds every path relative to the scratch folder: the list that was read, written again, is the text of the file')
 const changedList = (change: (copy: FinalList) => void) => {
   const copy = JSON.parse(JSON.stringify(list)) as FinalList
   change(copy)

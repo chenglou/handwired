@@ -46,13 +46,16 @@ Whole samples are reported and not required.
 
 `list.json` names the 24 files of saved tables with their row, seed and sha256. `list.ts` made it from the three lists that the training side left: `runs/neutral/tables.json` (rows 4, 5 and 6), `runs/mixed/tables.json` (rows 7 and 8) and `handwritten/tables.json` with the file `tables.json.sha256` beside it (row 3), all below `recovery-scratch/transfer/toml/`. A list is fixed once: `list.ts` refuses to write another list over it.
 
+The paths in `list.json` are relative to that folder, the scratch folder of the TOML track, and every command that reads the list takes the folder from the environment variable `RECOVERY_SCRATCH`. At the final run the file held full paths and had the sha256 `98d86bb47ba52e49a79e21ac9f01be7e7a9d9f7b60ad6557238fb36341f7fd69`, which the run's log and `final-report.md` name: the paths were made relative after the run, so that the published file names no folder of the machine, and the sha256 of every file of tables in the list is as it was.
+
 The review of the training made two tables by a search from the hand-written tables, which are about a point above row 3 on validation. They are not in the list: row 3 is the rules alone.
 
 ## Commands
 
-Run from the repo root. `<out>` is a folder below `recovery-scratch/transfer/toml/held-back/`, e.g. `.../held-back/final`.
+Run from the repo root. `RECOVERY_SCRATCH` is the scratch folder of the TOML track, i.e. the folder outside the repo that holds `runs/`, `handwritten/` and `held-back/`, which these pages name `recovery-scratch/transfer/toml/`. `<out>` is a folder below its `held-back/`, e.g. `$RECOVERY_SCRATCH/held-back/final`.
 
 ```sh
+export RECOVERY_SCRATCH=<the scratch folder of the TOML track>
 bun lab/recovery-toml/held-back/final/check.ts                                      # the check of this folder, about 6 s
 bun lab/recovery-toml/held-back/final/run.ts --dry-run --out <out>                  # a dry run, about 25 s
 RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/run.ts --out <out>         # the final run, once
@@ -102,4 +105,4 @@ A dry run needs no `RECOVERY_FINAL` and refuses to run with it. Every line of it
 - `report.ts`: the verdict, the report, and the command that writes the report of saved counts again.
 - `run.ts`: the dry run and the final run.
 - `check.ts`: the check of this folder, see its first comment.
-- `final-report.md`, `RESULTS.md`: a copy of the final run's report, and what it says. Both are added after the run.
+- `final-report.md`, `RESULTS.md`: a copy of the final run's report, and what it says. Both are added after the run. The copy writes the scratch folder as `<RECOVERY_SCRATCH>` and `list.json` by its path from the repo root, where the report of the run has full paths.

@@ -6,9 +6,10 @@ The final scoring (`../RESULTS.md`) gave one number per row and kind. This folde
 
 ## Commands
 
-Run from the repo root. The outputs show the held-back sets, so they go below `recovery-scratch/transfer/toml/held-back/`, e.g. into `.../held-back/final-where/`. The scripts ask for `RECOVERY_FINAL=yes`, since they run tables with changed cells on the held-back sets. Each takes about 5 seconds.
+Run from the repo root. The outputs show the held-back sets, so they go below `recovery-scratch/transfer/toml/held-back/`, e.g. into `.../held-back/final-where/`. The scripts ask for `RECOVERY_FINAL=yes`, since they run tables with changed cells on the held-back sets. All but the last also ask for `RECOVERY_SCRATCH`, the scratch folder of the TOML track (`recovery-scratch/transfer/toml/`), where they read the files of `../list.json` and the saved counts of the final run. Each takes about 5 seconds.
 
 ```sh
+export RECOVERY_SCRATCH=<the scratch folder of the TOML track>
 RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/where/report.ts > <out>/where.txt                 # every table, in six sections
 RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/where/report.ts --cases > <out>/written-cases.txt # the 150 written cases one by one
 RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/where/examples.ts > <out>/examples.txt            # six texts with two rows' outputs under them

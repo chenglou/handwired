@@ -2,7 +2,7 @@ HELD BACK: whoever builds the parser, the train data, the training or its machin
 
 # The final scores of the TOML track
 
-Scored at 2026-10-16T21:50:03.885Z by `RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/run.ts --out <scratch>/transfer/toml/held-back/final`, from the worktree at commit 469f614efaa7c4e48ba08c06022e52c17e594db4. Dataset 314a0404b2bd51ba. The list is <worktree>/lab/recovery-toml/held-back/final/list.json (sha256 98d86bb47ba52e49a79e21ac9f01be7e7a9d9f7b60ad6557238fb36341f7fd69). Every count is in <scratch>/transfer/toml/held-back/final/final.counts.json.
+Scored at 2026-10-16T21:50:03.885Z by `RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final/run.ts --out <RECOVERY_SCRATCH>/held-back/final`, from the worktree at commit 469f614efaa7c4e48ba08c06022e52c17e594db4. Dataset 314a0404b2bd51ba. The list is lab/recovery-toml/held-back/final/list.json (sha256 98d86bb47ba52e49a79e21ac9f01be7e7a9d9f7b60ad6557238fb36341f7fd69). Every count is in <RECOVERY_SCRATCH>/held-back/final/final.counts.json.
 
 Words: "all three" is the share of the scored code points with the display kind, the depth and the container right. A scored code point is one from the first error of the parser as it is on whose label has a scored value. "Whole" is the share of the texts with something to recover in which every scored code point is right. An "added" code point is one that the damage put into the text, which has no label. Where a row has several seeds, a number is the mean over the seeds, with the lowest and the highest in brackets. All shares are in percent.
 

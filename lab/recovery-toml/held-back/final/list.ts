@@ -10,12 +10,24 @@
 //   bun lab/recovery-toml/held-back/final/list.ts <neutral/tables.json> <mixed/tables.json> <handwritten/tables.json>
 // It prints the list. run.ts reads list.json, holds every file against its sha256, and holds the list against the
 // three lists as they are then, so a file that was made again after the list was fixed is refused.
+//
+// list.json holds every path relative to the scratch folder of the TOML track, which is the environment variable
+// RECOVERY_SCRATCH: the folder outside the repo that holds runs/, handwritten/ and held-back/, e.g.
+// runs/neutral/row-4.seed-1.tables.json. So the file names no folder of the machine that made it. Whatever reads the
+// list gets full paths from readList.
 import {createHash} from 'node:crypto'
 import {existsSync, readFileSync, writeFileSync} from 'node:fs'
-import {isAbsolute, join} from 'node:path'
+import {isAbsolute, join, relative, resolve, sep} from 'node:path'
 import {datasetKey} from '../../learn/dataset-key.ts'
 
 export const listFile = join(import.meta.dir, 'list.json')
+
+// The scratch folder of the TOML track, as a full path. Throws without the environment variable RECOVERY_SCRATCH.
+export function scratchFolder(): string {
+  const scratch = process.env['RECOVERY_SCRATCH']
+  if (scratch === undefined || scratch === '') throw new Error('set RECOVERY_SCRATCH to the scratch folder of the TOML track, i.e. the folder outside the repo that holds runs/, handwritten/ and held-back/: list.json names its files relative to that folder, and the saved counts of the final run are below it')
+  return resolve(scratch)
+}
 
 // The rows of the experiment that have files of tables, as the lead fixed them before any training on TOML. Rows 1
 // and 2 have no file: the parser as it is, and the one rule "after an error, start anew at the next line".
@@ -34,7 +46,8 @@ export type FinalList = {
   format: 'recovery-toml final list 1'
   // The key of the dataset's source files when the list was made, see ../../learn/dataset-key.ts.
   datasetKey: string
-  // The three lists that the files were taken from, as full paths.
+  // The three lists that the files were taken from. Like the path of every file below, a full path here, and a
+  // path relative to the scratch folder in list.json.
   sourceLists: {neutral: string, mixed: string, handwritten: string}
   rows: ListedRow[]
 }
@@ -80,11 +93,30 @@ export function listOf(sourceLists: FinalList['sourceLists']): FinalList {
 
 const listText = (list: FinalList) => `${JSON.stringify(list, null, 1)}\n`
 
-// The list of a file, e.g. of list.json. Throws for a file that is no such list.
+// A list with every path changed by `change`, and everything else as it is, also the order of the fields.
+const withPaths = (list: FinalList, change: (path: string) => string): FinalList => ({
+  ...list,
+  sourceLists: {neutral: change(list.sourceLists.neutral), mixed: change(list.sourceLists.mixed), handwritten: change(list.sourceLists.handwritten)},
+  rows: list.rows.map(row => ({...row, tables: row.tables.map(file => ({...file, path: change(file.path)}))})),
+})
+
+// The text of a list as list.json holds it: every path relative to the scratch folder. Throws for a path that is
+// not below that folder.
+export function listFileText(list: FinalList): string {
+  const scratch = scratchFolder()
+  return listText(withPaths(list, path => {
+    const fromScratch = relative(scratch, path)
+    if (fromScratch === '' || fromScratch.startsWith('..') || isAbsolute(fromScratch)) throw new Error(`${path} is not below the scratch folder ${scratch}, which RECOVERY_SCRATCH names: list.json holds paths relative to that folder`)
+    return fromScratch.split(sep).join('/')
+  }))
+}
+
+// The list of a file, e.g. of list.json, with full paths. A path of the file that is not a full path is read from
+// the scratch folder. Throws for a file that is no such list.
 export function readList(path: string = listFile): FinalList {
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<FinalList>
   if (parsed.format !== 'recovery-toml final list 1' || !Array.isArray(parsed.rows) || parsed.sourceLists === undefined || typeof parsed.datasetKey !== 'string') throw new Error(`${path} is no list of the final scoring: its format is ${JSON.stringify(parsed.format)}`)
-  return parsed as FinalList
+  return withPaths(parsed as FinalList, listed => isAbsolute(listed) ? listed : join(scratchFolder(), listed))
 }
 
 // What keeps a list from being scored, as sentences. An empty list means: the list is exactly what the three lists
@@ -110,12 +142,12 @@ export function problemsOfList(list: FinalList): string[] {
 
 if (import.meta.main) {
   const [neutral, mixed, handwritten] = process.argv.slice(2)
-  if (neutral === undefined || mixed === undefined || handwritten === undefined || process.argv.length !== 5) throw new Error('list.ts takes three full paths: <neutral/tables.json> <mixed/tables.json> <handwritten/tables.json>')
-  const list = listOf({neutral, mixed, handwritten})
+  if (neutral === undefined || mixed === undefined || handwritten === undefined || process.argv.length !== 5) throw new Error('list.ts takes three paths: <neutral/tables.json> <mixed/tables.json> <handwritten/tables.json>')
+  const list = listOf({neutral: resolve(neutral), mixed: resolve(mixed), handwritten: resolve(handwritten)})
   const problems = problemsOfList(list)
   if (problems.length > 0) throw new Error(`the list cannot be fixed: ${problems.join('; ')}`)
-  if (existsSync(listFile) && readFileSync(listFile, 'utf8') !== listText(list)) throw new Error(`${listFile} is there and holds another list. The list is fixed once: move the file away by hand to make it again.`)
-  writeFileSync(listFile, listText(list))
+  if (existsSync(listFile) && readFileSync(listFile, 'utf8') !== listFileText(list)) throw new Error(`${listFile} is there and holds another list. The list is fixed once: move the file away by hand to make it again.`)
+  writeFileSync(listFile, listFileText(list))
   for (const row of list.rows) console.log(`row ${row.row}, ${row.name}: ${row.tables.map(file => `${file.seed === null ? 'no seed' : `seed ${file.seed}`} ${file.sha256.slice(0, 12)}`).join(', ')}`)
   console.log(`${list.rows.reduce((total, row) => total + row.tables.length, 0)} files of tables in ${listFile}, each with the bytes that its sha256 names.`)
 }

@@ -77,5 +77,5 @@ The generator's set has 3,000 samples and 23,804 added code points. The written 
 
 ## Files
 
-- `final-report.md`: the report of the run, a copy of `final.report.md` in the scratch folder.
+- `final-report.md`: the report of the run, a copy of `final.report.md` in the scratch folder. The copy writes the scratch folder of the track, `recovery-scratch/transfer/toml/`, as `<RECOVERY_SCRATCH>`, and `list.json` by its path from the repo root.
 - `recovery-scratch/transfer/toml/held-back/final/`: `final.counts.json`, `final.report.md`, `final-runs.log`, `final.stdout.txt`, the dry run's files, `check.txt`, and `after.txt` with the numbers of this page that the report does not print. Its `README.txt` lists them.

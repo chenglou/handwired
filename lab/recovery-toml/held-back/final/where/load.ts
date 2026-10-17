@@ -9,19 +9,22 @@
 // with another result.
 //
 // Tables with a changed cell are scored on a held-back set, so loadAll asks for RECOVERY_FINAL=yes, as every such
-// command does.
+// command does. It also asks for RECOVERY_SCRATCH, the scratch folder of the TOML track: the files of ../list.json
+// and the saved counts of the final run, held-back/final/final.counts.json, are read from that folder.
 import {createHash} from 'node:crypto'
 import {readFileSync} from 'node:fs'
+import {join} from 'node:path'
 import {displayKind} from '../../../kinds.ts'
 import {requireFinal} from '../../../learn/data.ts'
 import {type RecoveryTrace, codePointsOf, createTrace, runRecoveryParserInto} from '../../../learn/recovery-parser.ts'
 import {type RecoveryTables, asIsTables, checkTables, loadTablesOfThisDataset} from '../../../learn/recovery-tables.ts'
 import {runRestartAtNextLine} from '../../../learn/restart-at-next-line.ts'
-import {readList} from '../list.ts'
+import {readList, scratchFolder} from '../list.ts'
 import {type ScoredText, generatorSet, writtenSet} from '../sets.ts'
 
 export const heldBackLine = 'HELD BACK: whoever builds the parser, the train data, the training or its machinery does not read this file.'
-export const savedCountsFile = '<scratch>/transfer/toml/held-back/final/final.counts.json'
+// The saved counts of the final run, in the scratch folder of the track.
+const savedCountsFile = () => join(scratchFolder(), 'held-back', 'final', 'final.counts.json')
 
 // The outcome of a code point for one parser.
 export const notCounted = 0
@@ -134,7 +137,7 @@ export function loadAll(): Loaded {
 
   // The saved counts of the final run: the same texts in the same order, the same number of counted code points, and
   // per parser the same number of right ones.
-  const saved = JSON.parse(readFileSync(savedCountsFile, 'utf8')) as SavedCounts
+  const saved = JSON.parse(readFileSync(savedCountsFile(), 'utf8')) as SavedCounts
   let compared = 0
   for (const key of setKeys) {
     const ids = sets[key].texts.map(text => text.id)

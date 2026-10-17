@@ -22,18 +22,20 @@
 // - "recount.txt": the output of the second count, read as text.
 // - "a file of the repo": a README or a report says the number, e.g. "39 rules".
 //
-// Run from the repo root:
+// Run from the repo root, with RECOVERY_SCRATCH set to the scratch folder of the TOML track, i.e. the folder outside
+// the repo that holds runs/, handwritten/ and held-back/:
 //   RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/results-check/check.ts [--final <folder>] [--recount <file>] [--results <file>]
 // RECOVERY_FINAL=yes is asked for because tables with changed cells are run on the held-back sets. No line is written
 // to the log of final runs. --final names the folder of the final run's outputs and --recount the second count's
-// recount.txt, both by default below recovery-scratch/transfer/toml/held-back/. --results names another file to
-// check in the place of RESULTS.md, e.g. a copy with one number changed, which has to fail. It takes about 10
-// seconds and ends with "Every check passed." or with the pieces that failed.
+// recount.txt, by default held-back/final/ and held-back/final-recount/recount.txt of the scratch folder. --results
+// names another file to check in the place of RESULTS.md, e.g. a copy with one number changed, which has to fail. It
+// takes about 10 seconds and ends with "Every check passed." or with the pieces that failed.
 import {readFileSync} from 'node:fs'
 import {join, resolve} from 'node:path'
 import {kinds as kindsOfTheMixedSet} from '../../kinds/list.ts'
 import {optionOf} from '../../learn/options.ts'
 import {grammarStateNames} from '../../learn/recovery-tables.ts'
+import {scratchFolder} from '../final/list.ts'
 import {type Loaded, type ScoredParser, type SetKey, headerNameKind, loadAll, notCounted, right, traceOf, wrong} from '../final/where/load.ts'
 import {parserNamed, placeOf, showText} from '../final/where/show.ts'
 import {writtenTags} from '../final/where/tags.ts'
@@ -41,9 +43,9 @@ import {kinds as kindsOfTheGenerator} from '../specific/mistakes.ts'
 import {couldComeFromEdits, neutralEditsOf} from '../written/neutral-edits.ts'
 
 const heldBackLine = 'HELD BACK: whoever builds the parser, the train data, the training or its machinery does not read this file.'
-const scratchFolder = '<scratch>/transfer/toml/held-back'
-const finalFolder = resolve(optionOf('--final') ?? join(scratchFolder, 'final'))
-const recountFile = resolve(optionOf('--recount') ?? join(scratchFolder, 'final-recount', 'recount.txt'))
+const heldBackScratchFolder = join(scratchFolder(), 'held-back')
+const finalFolder = resolve(optionOf('--final') ?? join(heldBackScratchFolder, 'final'))
+const recountFile = resolve(optionOf('--recount') ?? join(heldBackScratchFolder, 'final-recount', 'recount.txt'))
 const trackFolder = resolve(import.meta.dir, '..', '..')
 const resultsFile = resolve(optionOf('--results') ?? join(trackFolder, 'RESULTS.md'))
 const results = readFileSync(resultsFile, 'utf8')

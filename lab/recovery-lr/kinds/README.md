@@ -107,7 +107,7 @@ By reading: the author read three samples of every kind alone, cut to the column
 
 ## The runs
 
-The frozen recipe of `../learn/recipe.ts` was run on the mixed train split for the seeds 1 to 5, with no setting changed and nothing tuned: `runs/run.ts` calls the recipe's own `trainedTables`, `searchedTables` and `countedTables`, and the only difference from `../learn/runs/run.ts` is that the train samples come from `prepareMixedRecipe()`. One training per seed gives two rows: row 9 is the training then the count, row 10 is the training, then the search, then the count. The rule that picks code points for terminals of their own read the mixed train samples and picked `&` and `|`, the same two as on the dataset's train split, so 5,102 cells may change, as there.
+The frozen recipe of `../learn/recipe.ts` was run on the mixed train split for the seeds 1 to 5, with no setting changed and nothing tuned: `runs/run.ts` calls the recipe's own `trainedTables`, `searchedTables` and `countedTables`, and the only difference from `../learn/runs/run.ts` is that the train samples come from `prepareMixedRecipe()`. One training per seed gives two rows: row 9 is the training then the count, row 10 is the training, then the search, then the count. The rule that picks code points for terminals of their own read the mixed train samples and picked `&` and `|`, the same two as on the dataset's train split, so 5,102 cells may change, as there. In the commands and below, `<scratch>` stands for the experiment's scratch folder, which is outside the repo and which other pages name `recovery-scratch`.
 
 ```sh
 bun lab/recovery-lr/kinds/runs/run.ts --seed 1 --folder <scratch>/transfer/lr/runs/mixed

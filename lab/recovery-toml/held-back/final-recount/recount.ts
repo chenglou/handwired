@@ -16,13 +16,19 @@
 // It also prints the numbers behind the sentences of the report, per seed. It trains nothing, changes no file of the
 // final scoring, and writes no line to the log of final runs.
 //
-// Run from the repo root:
+// Run from the repo root, with RECOVERY_SCRATCH set to the scratch folder of the TOML track, i.e. the folder outside
+// the repo that holds runs/, handwritten/ and held-back/:
 //   RECOVERY_FINAL=yes bun lab/recovery-toml/held-back/final-recount/recount.ts --out <folder> [--final <folder>]
 // <folder> is below recovery-scratch/transfer/toml/held-back/, e.g. .../held-back/final-recount, and --final names the
 // folder of the final run's outputs, by default the folder `final` beside it. It writes recount.txt into <folder>.
+//
+// ../final/list.json and ../final/final-report.md name no folder of the machine of the run since they were
+// published: the list holds paths relative to the scratch folder, and the report writes that folder as
+// <RECOVERY_SCRATCH>. Both are held against the log and the report of the run with the full paths put back, so
+// these two checks pass only where the scratch folder is where it was at the run.
 import {createHash} from 'node:crypto'
 import {mkdirSync, readFileSync, statSync, writeFileSync} from 'node:fs'
-import {join, resolve} from 'node:path'
+import {isAbsolute, join, resolve} from 'node:path'
 import {kinds as kindsOfTheMixedSet} from '../../kinds/list.ts'
 import {mixedSamples} from '../../kinds/mixed.ts'
 import {kindsSampleAt} from '../../kinds/samples.ts'
@@ -67,6 +73,7 @@ function hold(heading: string, what: string, here: unknown, there: unknown) {
 }
 
 const sha256Of = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex')
+const sha256OfText = (text: string) => createHash('sha256').update(text).digest('hex')
 const withThousands = (value: number) => value.toLocaleString('en-US')
 const meanOf = (values: readonly number[]) => values.reduce((total, value) => total + value, 0) / values.length
 const lowestOf = (values: readonly number[]) => Math.min(...values)
@@ -84,10 +91,22 @@ const setsOrNone = (sets: readonly string[]) => sets.length > 0 ? sets.join(' an
 type ListedTables = {seed: number | null, path: string, sha256: string}
 type List = {datasetKey: string, sourceLists: Record<string, string>, rows: {row: number, name: string, tables: ListedTables[]}[]}
 const listPath = join(folderOfTheFinalScoring, 'list.json')
-const list = JSON.parse(readFileSync(listPath, 'utf8')) as List
+const scratchOfTheEnvironment = process.env['RECOVERY_SCRATCH']
+if (scratchOfTheEnvironment === undefined || scratchOfTheEnvironment === '') throw new Error('set RECOVERY_SCRATCH to the scratch folder of the TOML track, i.e. the folder outside the repo that holds runs/, handwritten/ and held-back/: ../final/list.json names its files relative to that folder')
+const scratchFolder = resolve(scratchOfTheEnvironment)
+// The list with full paths, as list.json held them at the final run. The order of the fields is the file's, so on
+// the machine of the run the text of this list is the text that the file had then.
+const fromScratch = (path: string) => isAbsolute(path) ? path : join(scratchFolder, path)
+const listOfTheFile = JSON.parse(readFileSync(listPath, 'utf8')) as List
+const list: List = {
+  ...listOfTheFile,
+  sourceLists: Object.fromEntries(Object.entries(listOfTheFile.sourceLists).map(([name, path]) => [name, fromScratch(path)])),
+  rows: listOfTheFile.rows.map(row => ({...row, tables: row.tables.map(tables => ({...tables, path: fromScratch(tables.path)}))})),
+}
+const listTextWithFullPaths = `${JSON.stringify(list, null, 1)}\n`
 const listedFiles = list.rows.flatMap(row => row.tables.map(tables => ({row: row.row, ...tables})))
 
-type LoggedRun = {time: string, commit: string, datasetKey: string, listSha256: string, tables: {row: number, seed: number | null, path: string, sha256: string}[]}
+type LoggedRun = {time: string, commit: string, datasetKey: string, list: string, listSha256: string, tables: {row: number, seed: number | null, path: string, sha256: string}[]}
 const logLines = readFileSync(join(finalFolder, 'final-runs.log'), 'utf8').split('\n').filter(line => line.startsWith('{'))
 const loggedRun = JSON.parse(logLines[0]!) as LoggedRun
 
@@ -99,7 +118,7 @@ note('# The files of tables')
 note()
 note(`The log of final runs holds ${logLines.length} run${logLines.length === 1 ? '' : 's'}: ${loggedRun.time}, commit ${loggedRun.commit}, dataset ${loggedRun.datasetKey}.`)
 hold('files', 'final runs in the log', logLines.length, 1)
-hold('files', 'the sha256 of list.json against the log', sha256Of(listPath), loggedRun.listSha256)
+hold('files', 'the sha256 of list.json with the full paths that it held at the run, against the log', sha256OfText(listTextWithFullPaths), loggedRun.listSha256)
 hold('files', 'the dataset key of the list against the dataset as it is', list.datasetKey, datasetKey())
 hold('files', 'the dataset key of the log against the dataset as it is', loggedRun.datasetKey, datasetKey())
 hold('files', 'files in the list', listedFiles.length, 24)
@@ -465,7 +484,10 @@ function holdReport(path: string) {
 }
 const linesOfRepoReport = holdReport(join(folderOfTheFinalScoring, 'final-report.md'))
 holdReport(join(finalFolder, 'final.report.md'))
-hold('files', 'final-report.md of the repo is the report of the run', sha256Of(join(folderOfTheFinalScoring, 'final-report.md')), sha256Of(join(finalFolder, 'final.report.md')))
+// The repo's copy of the report writes the scratch folder as <RECOVERY_SCRATCH> and list.json by its path from the
+// repo root. The report of the run names both by their full paths.
+const reportOfTheRunAsCopied = readFileSync(join(finalFolder, 'final.report.md'), 'utf8').replaceAll(loggedRun.list, 'lab/recovery-toml/held-back/final/list.json').replaceAll(scratchFolder, '<RECOVERY_SCRATCH>')
+hold('files', 'final-report.md of the repo is the report of the run, with the scratch folder and the path of list.json written without the folders of the machine', sha256Of(join(folderOfTheFinalScoring, 'final-report.md')), sha256OfText(reportOfTheRunAsCopied))
 
 // ---------------------------------------------------------------------------------------------------------------
 // The tables of RESULTS.md and of the report as it was sent, cell by cell.
