@@ -16,6 +16,7 @@ export type SitePage = {source: string, path: string}
 const publishedPages: SitePage[] = [
   {source: 'assets/demos.html', path: ''},
   {source: 'assets/index.html', path: 'os/'},
+  {source: 'assets/neural-lander.html', path: 'neural-lander/'},
   {source: 'assets/learned-gallery.html', path: 'learned-gallery/'},
 ]
 // A page of this list is built, served and checked only while its file exists. The list was made for the GPU search

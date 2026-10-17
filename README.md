@@ -39,6 +39,8 @@ This unlocks lots of funny use-cases, like:
 
 Try the demos live: https://chenglou.me/handwired/
 
+Neural Lander is a browser experiment that optimizes a rocket's thrust by differentiating through its physics. [Open the demo](https://chenglou.me/handwired/neural-lander/). Run it locally with `bun ./assets/neural-lander.html`; run its focused tests with `bun test --timeout 60000 ./tests/neural-lander/lander.test.ts`.
+
 `git clone && bun install`, then `bun start` to run them locally. Check `docs/`, `src/` and `template/` to get started! (`lab/` is a bunch of old experiments you can check or ignore)
 
 ![HandwiredOS](assets/demos-handwiredos.webp)
