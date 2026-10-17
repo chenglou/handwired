@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun scripts/serve-demo-site.ts",
     "start:candidates": "bun ./lab/candidate-gallery/candidate-gallery.html",
+    "start:doom": "bun ./scripts/serve-doom.ts",
     "start:hard-attend": "bun ./lab/hard-attend/hard-attend.html",
     "start:knuth-plass": "bun ./lab/knuth-plass/demo.html",
     "start:learning": "bun ./assets/learned-gallery.html",

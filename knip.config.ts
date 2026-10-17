@@ -15,6 +15,12 @@ const config = {
     'template/main.ts',
     // The template's switch in plain JavaScript, which only template/toggle.test.ts imports.
     'template/toggle-reference.ts',
+    // The Doom port's page loads main.ts, which starts worker.ts as a worker from a URL. package.json's start:doom
+    // runs its server, and the scripts that fetch a WAD and check the page in headless Chrome are run by hand.
+    'src/doom/main.ts',
+    'src/doom/worker.ts',
+    'scripts/fetch-doom-wad.ts',
+    'scripts/check-doom-page.ts',
   ],
   // lab/ holds standalone experiments that run as scripts or tests, so knip only checks src/, scripts/ and the template.
   project: ['*.ts', 'src/**/*.ts', 'scripts/*.ts', 'template/*.ts'],
