@@ -1,0 +1,753 @@
+⟦repair other-notations-01⟧
+⟦aligned⟧
+baseURL⟦: for =⟧ "https://lenavogt.example/"
+languageCode⟦: for =⟧ "en-gb"
+title⟦: for =⟧ "Lena Vogt, Letterpress"
+theme = "papermod"
+paginate = 12
+
+[params]
+  author = "Lena Vogt"
+  showReadingTime = true
+  dateFormat = "2 January 2006"
+
+[[menu.main]]
+  name = "Prints"
+  url = "/prints/"
+  weight = 10
+
+[[menu.main]]
+  name = "Workshops"
+  url = "/workshops/"
+  weight = 20⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-02⟧
+⟦aligned⟧
+[project]
+name = "tidepool-ingest"
+version = "0.3.0"
+requires-python = ">=3.10"
+dependencies⟦: for =⟧⟦missing⟧[⟦/⟧
+  ⟦extra⟧-⟦/⟧ "httpx>=0.27"⟦missing⟧,⟦/⟧
+  ⟦extra⟧-⟦/⟧ "pydantic>=2.6"⟦missing⟧,⟦/⟧
+  ⟦extra⟧-⟦/⟧ "structlog"⟦missing⟧]⟦/⟧
+
+[project.scripts]
+tidepool-ingest = "tidepool_ingest.cli:main"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-03⟧
+⟦aligned⟧
+title = "Harbor Lane Wiki"
+base_url = "https://wiki.harborlane.example"
+
+⟦missing⟧[⟦/⟧database⟦extra⟧:⟦/⟧⟦missing⟧]⟦/⟧
+  driver = "postgres"
+  host = "10.20.0.14"
+  port = 5432
+  pool_size = 8  # per worker
+
+⟦missing⟧[⟦/⟧mail⟦extra⟧:⟦/⟧⟦missing⟧]⟦/⟧
+  smtp_host = "smtp.harborlane.example"
+  from = "wiki@harborlane.example"
+  use_tls = true⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-04⟧
+⟦aligned⟧
+⟦extra⟧---
+⟦/⟧[agent]
+  interval = "10s"
+  round_interval = ⟦extra⟧yes⟦/⟧⟦missing⟧true⟦/⟧
+  omit_hostname = ⟦extra⟧no⟦/⟧⟦missing⟧false⟦/⟧
+
+[[outputs.influxdb_v2]]
+  urls = ["http://127.0.0.1:8086"]
+  organization = "greenhouse"
+  bucket = "sensors"
+
+[[inputs.cpu]]
+  percpu = true
+  totalcpu = true
+
+[[inputs.mqtt_consumer]]
+  servers = ["tcp://10.0.4.2:1883"]
+  topics = ["greenhouse/+/temperature", "greenhouse/+/humidity"]
+  data_format = "json"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-05⟧
+note: the three closing quotes could stand right after the last line of the script, with the line feed after that line outside the string
+⟦aligned⟧
+[tasks.lint]
+run = "ruff check src tests"
+
+[tasks.release]
+description = "Build and upload the wheels"
+depends = ["lint"]
+run = ⟦extra⟧|⟦/⟧⟦missing⟧"""⟦/⟧
+  python -m build
+  twine check dist/*
+  twine upload dist/*
+⟦missing⟧"""⟦/⟧
+[tasks.docs]
+run = "mkdocs build --strict"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-06⟧
+⟦aligned⟧
+[package]
+name = "tilecutter"
+version = "0.9.2"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+keywords = [⟦missing⟧"⟦/⟧gis⟦missing⟧"⟦/⟧, ⟦missing⟧"⟦/⟧tiles⟦missing⟧"⟦/⟧, ⟦missing⟧"⟦/⟧mbtiles⟦missing⟧"⟦/⟧]
+categories = ["command-line-utilities", "science::geo"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rusqlite = "0.31"
+# pinned until the GDAL bindings catch up
+gdal = "=0.16.0"
+
+[features]
+default = []⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-07⟧
+⟦aligned⟧
+[window]
+opacity = 0.92
+decorations = ⟦missing⟧"⟦/⟧buttonless⟦missing⟧"⟦/⟧
+startup_mode = "Maximized"
+padding = { x = 6, y = 4 }
+
+[font]
+size = 12.5
+
+[font.normal]
+family = ⟦missing⟧"⟦/⟧JetBrainsMono Nerd Font⟦missing⟧"⟦/⟧
+style = "Regular"
+
+[font.offset]
+x = 0
+y = -1⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-08⟧
+⟦aligned⟧
+concurrent = 4
+check_interval = 0
+
+⟦missing⟧[[⟦/⟧runners⟦extra⟧:⟦/⟧⟦missing⟧]]⟦/⟧
+  ⟦extra⟧-⟦/⟧ name = "docker-arm64"
+    url = "https://gitlab.pinecrest.example/"
+    executor = "docker"
+
+[session_server]
+  session_timeout = 1800⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-09⟧
+⟦aligned⟧
+⟦extra⟧{
+  ⟦/⟧"printWidth"⟦: for =⟧ 100⟦extra⟧,⟦/⟧
+  "singleQuote"⟦: for =⟧ true⟦extra⟧,⟦/⟧
+  "trailingComma"⟦: for =⟧ "all"⟦extra⟧,⟦/⟧
+  "plugins"⟦: for =⟧ ["prettier-plugin-toml"]⟦extra⟧
+}
+⟦/⟧
+⟦end⟧
+
+⟦repair other-notations-10⟧
+⟦aligned⟧
+[build]
+  publish = "public"
+  command = "hugo --minify"
+
+[context.production]
+  environment = {⟦lf for sp⟧    HUGO_VERSION = "0.124.1",⟦lf for sp⟧    HUGO_ENV = "production"⟦lf for sp⟧  }
+
+[context.deploy-preview]
+  command = "hugo --buildFuture -b $DEPLOY_PRIME_URL"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-11⟧
+⟦aligned⟧
+[project]
+name = "gravel-router"
+version = "1.4.2"
+authors = [{"name"⟦: for =⟧ "José Albuquerque", "email"⟦: for =⟧ "jose@gravel.example"}]
+description = """
+Plans gravel rides from open map data,
+with surface and gradient per segment."""
+readme = "README.md"
+
+[project.urls]
+Repository = "https://git.gravel.example/jose/gravel-router"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-12⟧
+⟦aligned⟧
+[client]
+base_url = "https://api.fernhill.example/v2"
+timeout_ms = 8000
+proxy = { http = ⟦extra⟧null⟦/⟧⟦missing⟧""⟦/⟧, https = "http://proxy.fernhill.example:3128" }
+retries = 3
+
+[client.headers]
+Accept = "application/json"
+User-Agent = "fernhill-sync/2.3 (\"nightly\")"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-13⟧
+⟦aligned⟧
+[package]
+productName = "Inkpot"
+version = "0.4.0"
+
+[tauri.bundle]
+active = true
+identifier = "example.inkpot.app"
+  "targets"⟦: for =⟧ ["deb", "appimage"]⟦extra⟧,⟦/⟧
+  "category"⟦: for =⟧ "Productivity"
+
+[tauri.security]
+csp = "default-src 'self'"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-14⟧
+⟦aligned⟧
+⟦extra⟧;⟦/⟧⟦missing⟧#⟦/⟧ pooler for the reporting replicas
+[general]
+host = "0.0.0.0"
+port = 6432
+connect_timeout = 5000   ⟦extra⟧;⟦/⟧⟦missing⟧#⟦/⟧ milliseconds
+idle_timeout = 30000
+log_client_connections = ⟦extra⟧on⟦/⟧⟦missing⟧true⟦/⟧
+
+[pools.reporting]
+pool_mode = "transaction"
+default_role = "replica"
+
+[pools.reporting.users.0]
+username = "metabase"
+pool_size = 12
+
+[pools.reporting.shards.0]
+servers = [["10.4.0.21", 5432, "primary"], ["10.4.0.22", 5432, "replica"]]
+database = "reporting"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-15⟧
+⟦aligned⟧
+[tools]
+node = "20.12"
+pnpm = "9"
+
+[env]
+⟦extra⟧export ⟦/⟧NODE_ENV="development"
+⟦extra⟧export ⟦/⟧DATABASE_URL="postgres://app:app@localhost:5432/orders_dev"
+REDIS_URL = "redis://localhost:6379/0"
+
+[tasks.dev]
+run = "pnpm dev"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-16⟧
+⟦aligned⟧
+[⟦missing⟧"⟦/⟧Server Settings⟦missing⟧"⟦/⟧]
+name = "Pine Hollow Survival 🌲"
+motd = "Welcome back!\nBe kind to the new players."
+max_players = 16
+pvp = false
+
+[⟦missing⟧"⟦/⟧World Backup⟦missing⟧"⟦/⟧]
+interval_minutes = 30
+keep = 12
+directory = "/srv/pinehollow/backups"
+last_run = 2024-02-17T06:00:00Z⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-17⟧
+⟦aligned⟧
+[listen]
+address ⟦missing⟧=⟦/⟧"0.0.0.0"
+port ⟦missing⟧=⟦/⟧2222
+
+[auth]
+permit_root_login = false
+max_auth_tries = 3
+authorized_keys_file = ".ssh/authorized_keys"
+
+[log]
+level = "info"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-18⟧
+⟦aligned⟧
+[build]
+target-dir = "target"
+rustflags = ["-C", "target-cpu=native"]
+
+# copied from .env, keep the two in step
+[env]
+SQLX_OFFLINE=true
+DATABASE_URL=⟦missing⟧"⟦/⟧postgres://postgres@localhost/ledger_dev⟦missing⟧"⟦/⟧
+RUST_LOG=⟦missing⟧"⟦/⟧info,sqlx=warn⟦missing⟧"⟦/⟧
+AWS_REGION = "eu-central-1"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-19⟧
+⟦aligned⟧
+[tool.mypy]
+python_version = "3.12"
+strict = ⟦extra⟧True⟦/⟧⟦missing⟧true⟦/⟧
+warn_unused_ignores = ⟦extra⟧False⟦/⟧⟦missing⟧false⟦/⟧
+cache_dir = ⟦extra⟧None⟦/⟧⟦missing⟧""⟦/⟧
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "botocore.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "scripts.*"]
+disallow_untyped_defs = false⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-20⟧
+⟦aligned⟧
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ⟦( for [⟧"E", "F", "I", "UP"⟦) for ]⟧
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+'tests/**' = ["S101"]
+
+[lint.isort]
+known-first-party = ⟦( for [⟧"ledgerkit",⟦) for ]⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-21⟧
+⟦aligned⟧
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = ⟦` for "⟧go build -o ./tmp/server ./cmd/server⟦` for "⟧
+  bin = "tmp/server"
+  full_bin = ⟦` for "⟧APP_ENV=dev ./tmp/server⟦` for "⟧
+  include_ext = ["go", "tmpl", "html"]
+  delay = 500⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-22⟧
+⟦aligned⟧
+base_url = "https://kelpforest.example"
+title = "Kelp Forest Log"
+description = "Tide, swell and water temperature ⟦extra⟧" +
+              "⟦/⟧for small boat harbors"
+compile_sass = true
+build_search_index = false
+
+[markdown]
+highlight_code = true
+highlight_theme = "base16-ocean-dark"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-23⟧
+unsure: the suffixes u64 and f32 could be extra, with the two numbers kept as numbers
+⟦aligned⟧
+[server]
+bind = "0.0.0.0:7400"
+workers = 8
+request_timeout_ms = ⟦missing⟧"⟦/⟧30_000u64⟦missing⟧"⟦/⟧
+
+[cache]
+capacity_mb = 256
+ttl_secs = 900
+eviction_ratio = ⟦missing⟧"⟦/⟧0.25f32⟦missing⟧"⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-24⟧
+⟦aligned⟧
+[versions]
+kotlin = "1.9.23"⟦extra⟧;⟦/⟧
+ktor = "2.3.9"⟦extra⟧;⟦/⟧
+
+[libraries]
+# server
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-25⟧
+unsure: the block could be an inline table, http_service = { … }, with a comma after each of its lines and the line feeds in the place of spaces
+⟦aligned⟧
+app = "inkpot-web"
+primary_region = "fra"
+
+⟦missing⟧[⟦/⟧http_service⟦missing⟧]⟦/⟧ ⟦extra⟧{⟦/⟧
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  min_machines_running = 1
+⟦extra⟧}
+⟦/⟧
+[env]
+  LOG_LEVEL = "info"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-26⟧
+⟦aligned⟧
+⟦extra⟧/*⟦/⟧⟦missing⟧#⟦/⟧ flashing and RTT for the sensor board ⟦extra⟧*/⟦/⟧
+[default.general]
+chip = "nRF52840_xxAA"
+
+[default.rtt]
+enabled = true
+up_mode = "NoBlockSkip"   ⟦extra⟧/*⟦/⟧⟦missing⟧#⟦/⟧ drop lines when the host is slow ⟦extra⟧*/⟦/⟧
+
+[default.gdb]
+enabled = false⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-27⟧
+⟦aligned⟧
+name = "shortlinks"
+main = "src/worker.ts"
+compatibility_date = "2024-03-20"
+workers_dev = false
+services = [{ binding = "AUTH", service = "auth-gate"⟦extra⟧,⟦/⟧ }]
+
+[[kv_namespaces]]
+binding = "LINKS"
+id = "6f1c2a9d4b7e4c0a9f3e5d2b8a1c7e40"
+
+[[d1_databases]]
+binding = "STATS"
+database_name = "shortlinks-stats"
+database_id = "0b7d4f1e-93a2-4c58-b6de-71f02c9a5e13"
+
+[[routes]]
+pattern = "sho.rt/*"
+zone_name = "sho.rt"
+
+⟦extra⟧//⟦/⟧⟦missing⟧#⟦/⟧ [triggers]
+⟦extra⟧//⟦/⟧⟦missing⟧#⟦/⟧ crons = ["0 4 * * *"]⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-28⟧
+⟦aligned⟧
+[tool.black]
+line-length = 100
+extend-exclude = ⟦extra⟧r⟦/⟧"/(migrations|snapshots)/"
+target-version = ["py311", "py312"]⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-29⟧
+⟦aligned⟧
+[user]
+name = "Tomas Halvorsen"
+email = "tomas@halvorsen.example"
+
+[ui]
+default-command = "log"
+diff-editor = "meld"
+
+[merge-tools ⟦missing⟧.⟦/⟧"meld"]
+⟦tab⟧program = "/usr/bin/meld"
+⟦tab⟧merge-args = ["$left", "$base", "$right", "-o", "$output"]⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-30⟧
+⟦aligned⟧
+[tasks.package]
+description = "Build the release archive"
+dependencies = ["build-release"]
+script = ⟦extra⟧<<EOF⟦/⟧⟦missing⟧"""⟦/⟧
+mkdir -p dist
+cp target/release/portside dist/
+tar -czf dist/portside-linux-x64.tar.gz -C dist portside
+⟦extra⟧EOF⟦/⟧⟦missing⟧"""⟦/⟧
+
+[tasks.build-release]
+command = "cargo"
+args = ["build", "--release", "--locked"]⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-31⟧
+⟦aligned⟧
+"ui.background" = { bg = "bg0" }
+"ui.text" = "fg1"
+"ui.selection" = { bg = "bg2" }
+"ui.cursor" = { fg = "bg0", bg = "fg1" }
+"comment" = { fg = "gray", modifiers = ["italic"] }
+"keyword" = { fg = "red", modifiers = ["bold"] }
+"string" = "green"
+
+[palette]
+bg0 = ⟦missing⟧"⟦/⟧#1d2021⟦missing⟧"⟦/⟧
+bg2 = ⟦missing⟧"⟦/⟧#504945⟦missing⟧"⟦/⟧
+fg1 = "#ebdbb2"
+gray = "#928374"
+red = "#cc241d"
+green = "#98971a"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-32⟧
+unsure: the string could be one of several lines, with three quotes at each end, in which the backslash and the line feed are an escape. Or the backslash, the line feed and the indentation after it could all be extra
+⟦aligned⟧
+[project]
+name = "tidewatch"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[tasks]
+test = "pytest -q"
+serve = "uvicorn tidewatch.app:app ⟦extra⟧\⟦/⟧⟦lf for sp⟧         --reload --port 8010"
+lint = "ruff check src"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-33⟧
+⟦aligned⟧
+[limits]
+max_upload_bytes = ⟦missing⟧"⟦/⟧10 * 1024 * 1024⟦missing⟧"⟦/⟧
+max_files_per_request = 20
+
+[cache]
+ttl_seconds = ⟦missing⟧"⟦/⟧60 * 60 * 24⟦missing⟧"⟦/⟧
+directory = "/var/cache/pressroom"
+gc.batch = 1_000
+gc.niceness = -5⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-34⟧
+note: the string could keep its single quotes as a string of several lines, with three single quotes at each end and the backslash as a part of it
+⟦aligned⟧
+[server]
+name = 'Copper Kettle'
+motd = ⟦' for "⟧Welcome to the Miner⟦extra⟧\⟦/⟧'s Rest⟦' for "⟧
+max_players = 24
+
+[rules]
+difficulty = 'hard'
+keep_inventory = false⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-35⟧
+⟦aligned⟧
+[audio]
+master_volume = ⟦missing⟧0⟦/⟧.8
+music_volume = ⟦missing⟧0⟦/⟧.5
+mute_on_focus_loss = true
+
+[video]
+resolution = [1920, 1080]
+vsync = true
+ui_scale = 1.⟦missing⟧0⟦/⟧
+gamma = 2.2
+frame_cap = 1.44e2
+
+[debug]
+seed = 0x51F7A3⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-36⟧
+⟦aligned⟧
+[backup]
+source = "/srv/photos"
+destination = "/mnt/vault/photos"
+file_mode = 0⟦missing⟧o⟦/⟧640
+dir_mode = 0⟦missing⟧o⟦/⟧750
+compress = "zstd"  # level 3
+
+[schedule]
+daily = "03:15"
+keep_daily = 14⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-37⟧
+⟦aligned⟧
+[upload]
+max_body_size = ⟦missing⟧"⟦/⟧25MB⟦missing⟧"⟦/⟧
+allowed_types = ["image/png", "image/jpeg", "application/pdf"]
+temp_dir = "/var/tmp/uploads"
+
+[timeouts]
+connect = ⟦missing⟧"⟦/⟧5s⟦missing⟧"⟦/⟧
+idle = ⟦missing⟧"⟦/⟧2m⟦missing⟧"⟦/⟧⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-38⟧
+⟦aligned⟧
+[[release]]
+version = "3.2.0"
+date = ⟦missing⟧"⟦/⟧2024/03/09⟦missing⟧"⟦/⟧
+codename = "Larkspur"
+notes = "Adds the offline map cache."
+
+[[release]]
+version = "3.1.4"
+date = 2024-01-22
+codename = "Kestrel"
+notes = "Fixes the tile seam at zoom 14."⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-39⟧
+⟦aligned⟧
+[quiet_hours]
+enabled = true
+start = 22:30⟦missing⟧:00⟦/⟧
+end = 07:00⟦missing⟧:00⟦/⟧
+timezone = "Europe/Lisbon"
+
+[digest]
+send_at = 08:15:00
+weekdays = ["mon", "tue", "wed", "thu", "fri"]⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-40⟧
+⟦aligned⟧
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = ⟦missing⟧""⟦/⟧
+sqlalchemy = ">=2.0"
+
+[requires]
+python_version = "3.12"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-41⟧
+⟦aligned⟧
+edition = "2021"
+max_width = 100
+use_small_heuristics = "Max"
+imports_gran⟦missing⟧=""⟦/⟧
+group_imports = "StdExternalCrate"
+reorder_modules = true⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-42⟧
+⟦aligned⟧
+[book]
+title = "The Saltline Handbook"
+description = "How to wire, calibrate and log a boat's NMEA⟦missing⟧"⟦/⟧
+authors = ["Maren Solheim"]
+language = "en"
+
+[output.html]
+git-repository-url = "https://git.saltline.example/handbook"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-43⟧
+⟦aligned⟧
+[linters]
+disable-all = true
+enable = [
+    "errcheck",
+    "govet",
+    "staticcheck",   # replaces megacheck
+⟦missing⟧]⟦/⟧
+[linters-settings.govet]
+check-shadowing = true
+
+[issues]
+max-same-issues = 0⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-44⟧
+⟦aligned⟧
+[files]
+extend-exclude = ["*.lock", "testdata/**", "vend⟦missing⟧"⟦/⟧]
+
+[default.extend-words]
+# the tide gauge at Ny-Alesund
+nd = "nd"
+alesund = "alesund"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-45⟧
+⟦aligned⟧
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.⟦missing⟧run]⟦/⟧
+source = ["src/quayside"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-46⟧
+⟦aligned⟧
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, fea⟦missing⟧=""}⟦/⟧
+tracing = "0.1"
+
+[dev-dependencies]
+wiremock = "0.6"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-47⟧
+⟦aligned⟧
+[feature_flags]
+new_checkout = true
+guest_wishlist = fal⟦missing⟧se⟦/⟧
+price_alerts = true
+saved_carts = false⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-48⟧
+⟦aligned⟧
+[bot]
+name = "driftwood"
+prefix = "!"
+greeting = """
+Welcome to the survey channel. Post photos with⟦missing⟧"""⟦/⟧
+admins = ["maren", "oskar"]
+log_level = "info"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-49⟧
+⟦aligned⟧
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-3⟦missing⟧"⟦/⟧, "ISC", "Unicode-DFS-2016"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"⟦lf⟧
+⟦end⟧
+
+⟦repair other-notations-50⟧
+⟦aligned⟧
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+
+[dependencies.sqlx]
+version = "0.7"⟦extra⟧,⟦/⟧⟦missing⟧
+⟦/⟧ features = ["postgres", "runtime-tokio"]
+default-features = false
+
+[dev-dependencies]
+insta = "1.38"⟦lf⟧
+⟦end⟧

@@ -1,0 +1,38 @@
+⟦repair examples-01⟧
+from: a Cargo.toml typed from memory, with a closing quote and a closing bracket forgotten
+unsure: the quote could be missing at the end of its line, with the remark as a part of the string
+⟦aligned⟧
+[package]
+name = "tide-gauge"
+authors = ["Mira Okafor <mira@tidegauge.dev>"⟦missing⟧]⟦/⟧
+version = "0.4.1⟦missing⟧"⟦/⟧  # bump before the release
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }⟦lf⟧
+⟦end⟧
+
+⟦repair examples-02⟧
+from: the settings of a web server, written by someone who knows YAML, JavaScript and Python better than TOML
+⟦aligned⟧
+[server]
+host⟦: for =⟧ "0.0.0.0"
+port⟦: for =⟧ 8080  ⟦extra⟧//⟦/⟧⟦missing⟧#⟦/⟧ behind the proxy
+debug⟦: for =⟧ ⟦extra⟧True⟦/⟧⟦missing⟧true⟦/⟧
+limits = {"burst"⟦: for =⟧ 20, "rate"⟦: for =⟧ 5}⟦lf⟧
+⟦end⟧
+
+⟦repair examples-03⟧
+from: the answer of a language model, with a sentence and a code fence around the file and a version without quotes
+⟦aligned⟧
+⟦extra⟧Here is the config with the new release channel:
+
+```toml
+⟦/⟧[release]
+version = ⟦missing⟧"⟦/⟧2.4.0-rc1⟦missing⟧"⟦/⟧
+channel = "stable"
+notify = ["ops@ledgersync.dev", "release-bot"]⟦extra⟧
+```
+
+Let me know if you want the old channel kept.⟦/⟧
+⟦end⟧

@@ -1,0 +1,207 @@
+[
+ {
+  "name": "search from the hand-written tables, the number to beat",
+  "description": "search/search.ts from the 35 hand-written rules, one search in one order, no training",
+  "tables": [
+   "search/search-from-handwritten.json"
+  ]
+ },
+ {
+  "name": "search from today's tables, no training",
+  "description": "search/search.ts from today's tables, order 1, no hand rule and no training",
+  "tables": [
+   "search/search-from-today-order-1.json"
+  ]
+ },
+ {
+  "name": "plain pass",
+  "description": "every open cell of today's tables trained, one pass, trainer defaults, seeds 1 to 5",
+  "tables": [
+   "arms/plain-pass/one-pass-of-the-trainer-from-today-s-tables-defaults/seed-1.tables.json",
+   "arms/plain-pass/one-pass-of-the-trainer-from-today-s-tables-defaults/seed-2.tables.json",
+   "arms/plain-pass/one-pass-of-the-trainer-from-today-s-tables-defaults/seed-3.tables.json",
+   "arms/plain-pass/one-pass-of-the-trainer-from-today-s-tables-defaults/seed-4.tables.json",
+   "arms/plain-pass/one-pass-of-the-trainer-from-today-s-tables-defaults/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "holes, every hand-written choice blanked, then trained",
+  "description": "arms/holes/: the cells of the 35 hand-written rules blanked (100%) and trained, seeds 1 to 5",
+  "tables": [
+   "arms/holes-100/100-blanked-trained/seed-1.tables.json",
+   "arms/holes-100/100-blanked-trained/seed-2.tables.json",
+   "arms/holes-100/100-blanked-trained/seed-3.tables.json",
+   "arms/holes-100/100-blanked-trained/seed-4.tables.json",
+   "arms/holes-100/100-blanked-trained/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "holes, a tenth of the hand-written choices blanked, then trained",
+  "description": "arms/holes/: 10% of the cells of the hand-written rules blanked and trained, seeds 1 to 5",
+  "tables": [
+   "arms/holes-10/10-blanked-trained/seed-1.tables.json",
+   "arms/holes-10/10-blanked-trained/seed-2.tables.json",
+   "arms/holes-10/10-blanked-trained/seed-3.tables.json",
+   "arms/holes-10/10-blanked-trained/seed-4.tables.json",
+   "arms/holes-10/10-blanked-trained/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "spare states, 4 tokenizer states",
+  "description": "arms/spare-states/: today's tables with 4 spare tokenizer states, one pass, seeds 1 to 5",
+  "tables": [
+   "arms/spare-states/4-spare-tokenizer-states-1-pass-from-the-base-s-choices/seed-1.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-1-pass-from-the-base-s-choices/seed-2.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-1-pass-from-the-base-s-choices/seed-3.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-1-pass-from-the-base-s-choices/seed-4.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-1-pass-from-the-base-s-choices/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "spare states beside the hand-written rules",
+  "description": "arms/spare-states/: the hand-written tables with 4 spare tokenizer and 2 spare grammar states, three passes from a uniform start, seeds 1 to 5",
+  "tables": [
+   "arms/spare-states/4-spare-tokenizer-states-and-2-spare-grammar-states-beside-the-hand-written-rules-3-passes-from-a-uniform-start/seed-1.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-and-2-spare-grammar-states-beside-the-hand-written-rules-3-passes-from-a-uniform-start/seed-2.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-and-2-spare-grammar-states-beside-the-hand-written-rules-3-passes-from-a-uniform-start/seed-3.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-and-2-spare-grammar-states-beside-the-hand-written-rules-3-passes-from-a-uniform-start/seed-4.tables.json",
+   "arms/spare-states/4-spare-tokenizer-states-and-2-spare-grammar-states-beside-the-hand-written-rules-3-passes-from-a-uniform-start/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "generic of round 1, training then a search",
+  "description": "arms/generic/: today's tables as they are, trained, then searched in order 1, seeds 1 to 5",
+  "tables": [
+   "arms/generic/1-pass-uniform-start-too-deep-cells-kept-no-event-of-a-text-s-end-4-times-the-samples-then-searched-order-1/seed-1.tables.json",
+   "arms/generic/1-pass-uniform-start-too-deep-cells-kept-no-event-of-a-text-s-end-4-times-the-samples-then-searched-order-1/seed-2.tables.json",
+   "arms/generic/1-pass-uniform-start-too-deep-cells-kept-no-event-of-a-text-s-end-4-times-the-samples-then-searched-order-1/seed-3.tables.json",
+   "arms/generic/1-pass-uniform-start-too-deep-cells-kept-no-event-of-a-text-s-end-4-times-the-samples-then-searched-order-1/seed-4.tables.json",
+   "arms/generic/1-pass-uniform-start-too-deep-cells-kept-no-event-of-a-text-s-end-4-times-the-samples-then-searched-order-1/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "extra facts of round 1, classes chosen by hand",
+  "description": "arms/extra-facts/: 15 classes chosen by hand, open display entries and the bit, three passes, seeds 1 to 5; confirmation seeds 11 to 15",
+  "tables": [
+   "arms/extra-facts-three-base/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-1.tables.json",
+   "arms/extra-facts-three-base/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-2.tables.json",
+   "arms/extra-facts-three-base/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-3.tables.json",
+   "arms/extra-facts-three-base/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-4.tables.json",
+   "arms/extra-facts-three-base/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-5.tables.json"
+  ],
+  "confirmationTables": [
+   "arms/extra-facts-three-base-seeds-11-12-13-14-15/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-11.tables.json",
+   "arms/extra-facts-three-base-seeds-11-12-13-14-15/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-12.tables.json",
+   "arms/extra-facts-three-base-seeds-11-12-13-14-15/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-13.tables.json",
+   "arms/extra-facts-three-base-seeds-11-12-13-14-15/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-14.tables.json",
+   "arms/extra-facts-three-base-seeds-11-12-13-14-15/classes-chosen-by-hand-open-display-entries-and-the-bit/seed-15.tables.json"
+  ]
+ },
+ {
+  "name": "extra facts of round 1, classes from the train samples",
+  "description": "arms/extra-facts/: classes picked by a rule from the train samples, open display entries and the bit, one pass, seeds 1 to 5",
+  "tables": [
+   "arms/extra-facts-plain/classes-chosen-from-the-train-samples-open-display-entries-and-the-bit/seed-1.tables.json",
+   "arms/extra-facts-plain/classes-chosen-from-the-train-samples-open-display-entries-and-the-bit/seed-2.tables.json",
+   "arms/extra-facts-plain/classes-chosen-from-the-train-samples-open-display-entries-and-the-bit/seed-3.tables.json",
+   "arms/extra-facts-plain/classes-chosen-from-the-train-samples-open-display-entries-and-the-bit/seed-4.tables.json",
+   "arms/extra-facts-plain/classes-chosen-from-the-train-samples-open-display-entries-and-the-bit/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "combined, generic, training alone",
+  "description": "arms/combined/: the generic candidate before its search and count, seeds 1 to 5",
+  "tables": [
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end/seed-1.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end/seed-2.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end/seed-3.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end/seed-4.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "combined, generic",
+  "description": "arms/combined/ candidate 1: nothing that a person knows about broken JSON; training, search, count, seeds 1 to 5; confirmation seeds 21 to 25",
+  "tables": [
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-1.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-2.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-3.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-4.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-5.tables.json"
+  ],
+  "confirmationTables": [
+   "arms/combined-confirmation/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-21.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-22.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-23.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-24.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-25.tables.json"
+  ]
+ },
+ {
+  "name": "combined, with the classes chosen by hand",
+  "description": "arms/combined/ candidate 2: as the generic candidate with the 15 classes chosen by hand, seeds 1 to 5; confirmation seeds 21 to 25",
+  "tables": [
+   "arms/combined/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-1.tables.json",
+   "arms/combined/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-2.tables.json",
+   "arms/combined/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-3.tables.json",
+   "arms/combined/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-4.tables.json",
+   "arms/combined/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-5.tables.json"
+  ],
+  "confirmationTables": [
+   "arms/combined-confirmation/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-21.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-22.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-23.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-24.tables.json",
+   "arms/combined-confirmation/today-s-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count-then-today-s-kinds-in-the-state-error/seed-25.tables.json"
+  ]
+ },
+ {
+  "name": "combined, from the hand-written tables",
+  "description": "arms/combined/ candidate 3: as candidate 2 started from the 35 hand-written rules, seeds 1 to 5; confirmation seeds 21 to 25",
+  "tables": [
+   "arms/combined/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-1.tables.json",
+   "arms/combined/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-2.tables.json",
+   "arms/combined/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-3.tables.json",
+   "arms/combined/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-4.tables.json",
+   "arms/combined/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-5.tables.json"
+  ],
+  "confirmationTables": [
+   "arms/combined-confirmation/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-21.tables.json",
+   "arms/combined-confirmation/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-22.tables.json",
+   "arms/combined-confirmation/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-23.tables.json",
+   "arms/combined-confirmation/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-24.tables.json",
+   "arms/combined-confirmation/the-hand-written-tables-classes-chosen-by-hand-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-then-searched-order-1-at-most-4-passes-then-the-display-entries-by-a-count/seed-25.tables.json"
+  ]
+ },
+ {
+  "name": "no gradient, search and count in turns",
+  "description": "arms/combined/ control: the generic candidate's additions without any training, the search and the count in turns, tuning seeds 11 to 13",
+  "tables": [
+   "arms/combined-tuning/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-no-training-too-deep-cells-kept-then-searched-order-1-then-the-display-entries-by-a-count-then-the-search-and-the-count-in-turns/seed-11.tables.json",
+   "arms/combined-tuning/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-no-training-too-deep-cells-kept-then-searched-order-1-then-the-display-entries-by-a-count-then-the-search-and-the-count-in-turns/seed-12.tables.json",
+   "arms/combined-tuning/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-no-training-too-deep-cells-kept-then-searched-order-1-then-the-display-entries-by-a-count-then-the-search-and-the-count-in-turns/seed-13.tables.json"
+  ]
+ },
+ {
+  "name": "combined, generic, added characters as an error, training alone",
+  "description": "arms/combined/: the generic training with the target that shows added code points as an error at the weight 0.1, seeds 1 to 5",
+  "tables": [
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1/seed-1.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1/seed-2.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1/seed-3.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1/seed-4.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1/seed-5.tables.json"
+  ]
+ },
+ {
+  "name": "combined, generic, added characters as an error, then searched",
+  "description": "arms/combined/: the row above, then the search of 4 passes, seeds 1 to 5",
+  "tables": [
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1-then-searched-order-1-at-most-4-passes/seed-1.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1-then-searched-order-1-at-most-4-passes/seed-2.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1-then-searched-order-1-at-most-4-passes/seed-3.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1-then-searched-order-1-at-most-4-passes/seed-4.tables.json",
+   "arms/combined/today-s-tables-classes-from-the-train-samples-open-display-entries-the-bit-3-passes-too-deep-cells-kept-no-event-of-a-text-s-end-added-code-points-as-an-error-at-the-weight-0.1-then-searched-order-1-at-most-4-passes/seed-5.tables.json"
+  ]
+ }
+]

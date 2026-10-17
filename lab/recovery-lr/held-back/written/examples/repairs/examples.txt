@@ -1,0 +1,39 @@
+⟦repair examples-01⟧
+from: a file edited by hand, with the `in` of a local definition and the closing quote of a string forgotten
+unsure: the quote could be missing at the end of its line, with the remark as a part of the string
+⟦aligned⟧
+(* Totals for the weekly report. *)
+let rec sum xs = if xs = [] then 0 else head xs + sum (tail xs)
+
+let average xs =
+  let total = sum xs
+  ⟦missing⟧in ⟦/⟧let count = length xs in
+  if count = 0 then 0 else total / count
+
+let heading = "Weekly average⟦missing⟧"⟦/⟧  (* shown above the table *)
+let () = print_string (heading ^ ": " ^ string_of_int (average [12; 15; 9]))⟦lf⟧
+⟦end⟧
+
+⟦repair examples-02⟧
+from: a file written by someone who knows OCaml better than miniml: types, `==`, `;;`, a list with commas and names with a module before them
+⟦aligned⟧
+let rec gcd ⟦added⟧(⟦/⟧a⟦added⟧ : int)⟦/⟧ ⟦added⟧(⟦/⟧b⟦added⟧ : int) : int⟦/⟧ =
+  if b =⟦added⟧=⟦/⟧ 0 then a else gcd b (a mod b)⟦added⟧;;⟦/⟧
+
+let scores = [72⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ 85⟦added⟧,⟦/⟧⟦missing⟧;⟦/⟧ 91]
+let best = List⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧fold_left max 0 scores⟦added⟧;;⟦/⟧
+let () = Printf⟦added⟧.⟦/⟧⟦missing⟧ ⟦/⟧printf "best: %d\n" best⟦lf⟧
+⟦end⟧
+
+⟦repair examples-03⟧
+from: a file after a merge that was not resolved, with both sides of the conflict and the three marker lines
+⟦aligned⟧
+let width = 72
+let rec repeat text count = if count = 0 then "" else text ^ repeat text (count - 1)
+⟦added⟧<<<<<<< HEAD
+⟦/⟧let indent depth = repeat "  " depth
+⟦added⟧=======
+let indent depth = repeat "\t" depth
+>>>>>>> use-tabs
+⟦/⟧let line depth text = indent depth ^ text⟦lf⟧
+⟦end⟧

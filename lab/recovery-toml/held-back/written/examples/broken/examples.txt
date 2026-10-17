@@ -1,0 +1,34 @@
+⟦case examples-01⟧
+⟦broken⟧
+[package]
+name = "tide-gauge"
+authors = ["Mira Okafor <mira@tidegauge.dev>"
+version = "0.4.1  # bump before the release
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }⟦lf⟧
+⟦end⟧
+
+⟦case examples-02⟧
+⟦broken⟧
+[server]
+host: "0.0.0.0"
+port: 8080  // behind the proxy
+debug: True
+limits = {"burst": 20, "rate": 5}⟦lf⟧
+⟦end⟧
+
+⟦case examples-03⟧
+⟦broken⟧
+Here is the config with the new release channel:
+
+```toml
+[release]
+version = 2.4.0-rc1
+channel = "stable"
+notify = ["ops@ledgersync.dev", "release-bot"]
+```
+
+Let me know if you want the old channel kept.
+⟦end⟧

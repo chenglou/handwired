@@ -1,0 +1,173 @@
+{
+ "format": "recovery-toml final list 1",
+ "datasetKey": "314a0404b2bd51ba",
+ "sourceLists": {
+  "neutral": "runs/neutral/tables.json",
+  "mixed": "runs/mixed/tables.json",
+  "handwritten": "handwritten/tables.json"
+ },
+ "rows": [
+  {
+   "row": 3,
+   "name": "hand-written rules",
+   "description": "the 39 recovery rules of learn/handwritten/rules.ts in the table form, written by hand with the train and validation samples of both train sets in view. The rules alone, with no search after them",
+   "tables": [
+    {
+     "seed": null,
+     "path": "handwritten/tables.json",
+     "sha256": "9483a6f2e6760651710559c5c20aecf32d29ef4d17dd0e3e6d49aecf4d7e4c36"
+    }
+   ]
+  },
+  {
+   "row": 4,
+   "name": "recipe on neutral damage, no search",
+   "description": "learn/recipe.ts on the dataset as it is, whose damage knows nothing of TOML: the training, the count and the last step. Seeds 1 to 5. The primary row",
+   "tables": [
+    {
+     "seed": 1,
+     "path": "runs/neutral/row-4.seed-1.tables.json",
+     "sha256": "a598dbcb329b6eac79d8f494b0331612384ccbe5d4285ab0e0d66d17e47a4e92"
+    },
+    {
+     "seed": 2,
+     "path": "runs/neutral/row-4.seed-2.tables.json",
+     "sha256": "d3aec2e2476facbde04b63fdb4d2d1aa27dcb2f70cbef1de72d6a06cfdde3d61"
+    },
+    {
+     "seed": 3,
+     "path": "runs/neutral/row-4.seed-3.tables.json",
+     "sha256": "d22336b01b07d66a244c01c5b30dc477bf7b658d90050977321393b0000e5162"
+    },
+    {
+     "seed": 4,
+     "path": "runs/neutral/row-4.seed-4.tables.json",
+     "sha256": "f9f327107e2028974a64586c52bf412ebeedadd882aca4d83a50996397cbea93"
+    },
+    {
+     "seed": 5,
+     "path": "runs/neutral/row-4.seed-5.tables.json",
+     "sha256": "90302b2fbd823644d69bd5d541230a5033bdca38a9ae0d5db1585cbb28121dbd"
+    }
+   ]
+  },
+  {
+   "row": 5,
+   "name": "recipe on neutral damage, with the search",
+   "description": "the same with the search before the count, seeds 1 to 5. This is the candidate \"generic\" with all five steps, as the JSON side scored it",
+   "tables": [
+    {
+     "seed": 1,
+     "path": "runs/neutral/row-5.seed-1.tables.json",
+     "sha256": "dd0c98577273ac4559741d41805fe0de740f7a9f9ae28a9d11757b76aa26d39f"
+    },
+    {
+     "seed": 2,
+     "path": "runs/neutral/row-5.seed-2.tables.json",
+     "sha256": "20a9803af908b869c77efcd0abfb489ec91df6633cc0cfaf63f085f93cb323e5"
+    },
+    {
+     "seed": 3,
+     "path": "runs/neutral/row-5.seed-3.tables.json",
+     "sha256": "36a88ecd0b055c79feddced4818bfffdee29191908efaa5c1dda7492b885560e"
+    },
+    {
+     "seed": 4,
+     "path": "runs/neutral/row-5.seed-4.tables.json",
+     "sha256": "49d378bed96daf281983d74f75118ac11a40d02d2896e84260f1c6ced8964133"
+    },
+    {
+     "seed": 5,
+     "path": "runs/neutral/row-5.seed-5.tables.json",
+     "sha256": "620a858c8130071d5160561e9ad44c3e6e95130e5779f1accea15d60431a1efb"
+    }
+   ]
+  },
+  {
+   "row": 6,
+   "name": "search and count, no training, neutral damage",
+   "description": "the recipe's base, its search and its count on the dataset as it is, without the training. Seeds 11 to 13",
+   "tables": [
+    {
+     "seed": 11,
+     "path": "runs/neutral/row-6.seed-11.tables.json",
+     "sha256": "3c6bf232254323ec11e268cb617af04d7707ca37e0e45801a818e41fdb286a41"
+    },
+    {
+     "seed": 12,
+     "path": "runs/neutral/row-6.seed-12.tables.json",
+     "sha256": "063624899fc6edf388a62a0e8ecefc661e4eac54b11e4ab1a96e75848d8e0553"
+    },
+    {
+     "seed": 13,
+     "path": "runs/neutral/row-6.seed-13.tables.json",
+     "sha256": "4e980076ba49b1cdd1ad8cd40659a2ba37369fc89e91de38de00326cb779f4cd"
+    }
+   ]
+  },
+  {
+   "row": 7,
+   "name": "recipe on the mixed set, no search",
+   "description": "learn/recipe.ts on train samples of which half have the dataset's damage and half have kinds of mistakes written for TOML: the training, the count and the last step. Seeds 1 to 5",
+   "tables": [
+    {
+     "seed": 1,
+     "path": "runs/mixed/row-7.seed-1.tables.json",
+     "sha256": "48dbcbe5704e8122a97a674e735e762586e14a25edb438a424e151181a950f9d"
+    },
+    {
+     "seed": 2,
+     "path": "runs/mixed/row-7.seed-2.tables.json",
+     "sha256": "bb30228e5383837d4e1c910c3bda6ea3a8c371e59c49c2608d88db233f76ebb3"
+    },
+    {
+     "seed": 3,
+     "path": "runs/mixed/row-7.seed-3.tables.json",
+     "sha256": "051994f79e1016c07e79c5ead4725844a25b63768dcf37b8abf08a78b2f3561e"
+    },
+    {
+     "seed": 4,
+     "path": "runs/mixed/row-7.seed-4.tables.json",
+     "sha256": "0c007138c35c2a8710fd029b02a372a833ac9080c1b267652af67d286dd294f8"
+    },
+    {
+     "seed": 5,
+     "path": "runs/mixed/row-7.seed-5.tables.json",
+     "sha256": "de04e29af6d4972e93586ecf66a31ccde965929b28ba0405e744b48729a27e79"
+    }
+   ]
+  },
+  {
+   "row": 8,
+   "name": "recipe on the mixed set, with the search",
+   "description": "the same with the search before the count, seeds 1 to 5",
+   "tables": [
+    {
+     "seed": 1,
+     "path": "runs/mixed/row-8.seed-1.tables.json",
+     "sha256": "a36c68c5b3cb92fe39dc192d78b2e109077ebc2fedc6fcfbdb7c7a81f9c7a8f5"
+    },
+    {
+     "seed": 2,
+     "path": "runs/mixed/row-8.seed-2.tables.json",
+     "sha256": "f8c9100389fe792fae4f868d80da9a8be2533978e73464ba3ad24fea17b66373"
+    },
+    {
+     "seed": 3,
+     "path": "runs/mixed/row-8.seed-3.tables.json",
+     "sha256": "82ea4e9b48edff829798ef245b5749cf101295a9f186019ac8f68ca51afec95a"
+    },
+    {
+     "seed": 4,
+     "path": "runs/mixed/row-8.seed-4.tables.json",
+     "sha256": "450a3eee5f4202ef7a7a0c0d536fc6838db5831b645b1a3089c67cca7819c95f"
+    },
+    {
+     "seed": 5,
+     "path": "runs/mixed/row-8.seed-5.tables.json",
+     "sha256": "01d447d4178bbced97b0f3e98e2bada9a9df1f2e3e5b24fab4a8ba36db315602"
+    }
+   ]
+  }
+ ]
+}

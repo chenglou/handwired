@@ -1,0 +1,602 @@
+⟦repair 8f17d75b⟧
+⟦repaired⟧
+{"os": ["ubuntu-latest", "macos-14"], "node": [18, 20, 22], "fail-fast": false}
+⟦end⟧
+
+⟦repair 74f556ff⟧
+⟦repaired⟧
+{
+  "name": "checkout-service",
+  "port": 8443,
+  "tls": {"cert": "/etc/ssl/checkout.pem", "minVersion": "1.2"}
+}
+⟦end⟧
+
+⟦repair 2286160e⟧
+⟦repaired⟧
+{"easing": [0.4, 0, 0.2, 1], "durationMs": 300, "delayMs": 0}
+⟦end⟧
+
+⟦repair 516e272c⟧
+unsure: 0xff8800 may be meant as a number, then it would be written as the decimal 16746496 instead of a string
+⟦repaired⟧
+{"color": "0xff8800", "opacity": 0.85, "transparent": true, "roughness": 0.4, "metalness": 0}
+⟦end⟧
+
+⟦repair fbdc703b⟧
+unsure: [Object] and [Array] could be kept as arrays holding one string each, ["Object"] and ["Array"]
+⟦repaired⟧
+{
+  "data": {
+    "user": { "id": 311, "name": "Lena", "profile": "[Object]", "roles": "[Array]" }
+  },
+  "status": 200
+}
+⟦end⟧
+
+⟦repair b92daf10⟧
+⟦repaired⟧
+{"user":{"id":5512,"prefs":{"theme":"dark","columns":["name","due","owner"]}},"next":"/tasks?page=2&sort=due"}
+⟦end⟧
+
+⟦repair 534b6583⟧
+⟦repaired⟧
+{"ticker": "ACME", "change": 2.15, "change_pct": 1.53}
+⟦end⟧
+
+⟦repair 154848f8⟧
+⟦repaired⟧
+{"query": "wireless headphones", "filters": {"brand": "Sony", "maxPrice": null}, "page": 1}
+⟦end⟧
+
+⟦repair dd7a4365⟧
+⟦repaired⟧
+{"level":"error","ts":"2026-10-14T22:01:13Z","msg":"upstream timeout","upstream":"10.0.3.17:9000","attempt":2,"timeout_ms":3000}
+⟦end⟧
+
+⟦repair bf026fd7⟧
+⟦repaired⟧
+{
+  "service": "billing",
+  "replicas": 3,
+  "regions": ["eu-west-1", "us-east-1"]
+}
+⟦end⟧
+
+⟦repair 764c23f1⟧
+unsure: ObjectId('...') and ISODate('...') could be kept whole as strings, "ObjectId('670e1f4a9c3b2a0012d4e8f1')"
+⟦repaired⟧
+{
+  "_id": "670e1f4a9c3b2a0012d4e8f1",
+  "sku": "TEA-250",
+  "name": "Sencha, 250 g",
+  "price": 12.5,
+  "stock": 1800,
+  "tags": [ "green", "loose-leaf" ],
+  "suppliers": [
+    { "name": "Uji Kōen", "country": "JP", "leadDays": 21 },
+    { "name": "Chá Camélia", "country": "PT", "leadDays": 6 }
+  ],
+  "updatedAt": "2026-10-14T16:20:05.000Z"
+}
+⟦end⟧
+
+⟦repair 2e05db21⟧
+⟦repaired⟧
+{"product": "AirBrush Pro", "reviews": [{"stars": 5, "quote": "Honestly the \"quiet mode\" is a game changer"}, {"stars": 2, "quote": "Stopped charging after a month"}]}
+⟦end⟧
+
+⟦repair 88bece1b⟧
+unsure: Some("WELCOME10") could be kept as an array, "coupon": [ "WELCOME10" ]
+⟦repaired⟧
+{
+    "id": 1042,
+    "status": "Shipped",
+    "items": [
+        "tea",
+        "filter"
+    ],
+    "total": 31.4,
+    "coupon": "WELCOME10",
+    "gift_note": null
+}
+⟦end⟧
+
+⟦repair 17c9eedb⟧
+⟦repaired⟧
+{"user_id": "%d", "email": "%s", "score": "%.2f", "verified": "%t"}
+⟦end⟧
+
+⟦repair 5e158bc5⟧
+unsure: the carriage return and line feed after the closing brace could be taken for damage too, then the text would end at the brace
+⟦repaired⟧
+{"ok":true,"version":"10.0.19045","elevated":false}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦repair 8709137f⟧
+⟦repaired⟧
+{
+  "smtp": {
+    "host": "smtp.fastmail.com",
+    "port": 465,
+    "user": "billing@kestrelbooks.example",
+    "password": "TODO get from 1Password"
+  },
+  "replyTo": "accounts@kestrelbooks.example"
+}
+⟦end⟧
+
+⟦repair 9f95e316⟧
+⟦repaired⟧
+{
+  "driver" : "mysql",
+  "host" : "127.0.0.1",
+  "port" : 3306,
+  "options" :⟦sp⟧
+  {
+    "charset" : "utf8mb4",
+    "strict" : true
+  }
+}
+⟦end⟧
+
+⟦repair 8b560645⟧
+unsure: the values could be numbers with the signs removed, 12.50 and 15
+⟦repaired⟧
+{"plan": "Team", "pricePerSeat": "$12.50", "annualDiscount": "15%", "trialDays": 14}
+⟦end⟧
+
+⟦repair 6cbded42⟧
+⟦repaired⟧
+{
+  "channel": "#deploys",
+  "text": "Deploy finished",
+  "build": {
+    "number": null,
+    "branch": "main",
+    "commit": "9f3c2ab"
+  },
+  "ok": true
+}
+⟦end⟧
+
+⟦repair 0881da46⟧
+unsure: payload may be meant as an object, then the two outer quotes are removed instead of escaping the inner ones
+⟦repaired⟧
+{
+  "id": "evt_3Kq81",
+  "type": "invoice.paid",
+  "payload": "{\"invoice\":\"in_8812\",\"amount\":4200,\"currency\":\"eur\"}",
+  "delivered": true
+}
+⟦end⟧
+
+⟦repair fb4fb2f1⟧
+⟦repaired⟧
+[
+  0.005,
+  0.01,
+  0.025,
+  0.05,
+  0.1,
+  0.25,
+  0.5,
+  1
+]⟦lf⟧
+⟦end⟧
+
+⟦repair e7812842⟧
+⟦repaired⟧
+{"data": {"invoice": "2026-0412",
+          "reasons": ["Payment failed: the card was declined by the issuing bank",
+                      "insufficient_funds"]},
+ "id": "evt_3PqLx2",
+ "livemode": false,
+ "retries": 2}
+⟦end⟧
+
+⟦repair 911f00e6⟧
+⟦repaired⟧
+{"service": "checkout", "replicas": "3", "image": "registry.example.com/checkout:1.8.2", "healthPath": "/healthz"}
+⟦end⟧
+
+⟦repair 418e0d41⟧
+⟦repaired⟧
+{"country": "Portugal", "population": 10467366, "area_km2": 92212, "capital": "Lisbon"}
+⟦end⟧
+
+⟦repair 69ef7c3b⟧
+unsure: the empty slot may be a missing number, then it gets null: [1920, 1600, 1366, null, 1024, ...]
+⟦repaired⟧
+[1920, 1600, 1366, 1024, 768, 480, 360]
+⟦end⟧
+
+⟦repair dbfb134d⟧
+⟦repaired⟧
+{"name": "status-page", "url": "https://status.example.com", "checkEvery": "00:05:00", "notify": true}
+⟦end⟧
+
+⟦repair 1045d7c4⟧
+⟦repaired⟧
+{"column": "latency_ms", "count": 0, "mean": null, "min": null, "max": null, "p95": null}
+⟦end⟧
+
+⟦repair ab004db1⟧
+unsure: the document could be the second side of the conflict, the one with printWidth 120 and trailingComma
+⟦repaired⟧
+{"semi": false, "singleQuote": true, "printWidth": 100}
+⟦end⟧
+
+⟦repair 894c9c2e⟧
+⟦repaired⟧
+{"query": "{search_term}", "page": "{page}", "per_page": 50, "filters": {"in_stock": true}}
+⟦end⟧
+
+⟦repair fa742836⟧
+⟦repaired⟧
+{"authenticity_token" : "[FILTERED]", "user" : {"email" : "kofi@example.com", "password" : "[FILTERED]", "remember_me" : "1"}, "commit" : "Log in"}
+⟦end⟧
+
+⟦repair 7ff3ed3a⟧
+⟦repaired⟧
+{"command": "deploy", "args": ["—force", "—env=staging"], "dryRun": false}
+⟦end⟧
+
+⟦repair 34a3c875⟧
+⟦repaired⟧
+{"sku": "TS-0042", "title": "T-shirt \"Classic\"", "sizes": ["S", "M", "L"], "price": 19.9}
+⟦end⟧
+
+⟦repair 3ac10f07⟧
+⟦repaired⟧
+{"orderId":58213, "status":"SHIPPED", "carrier":"DHL Express", "items":["TEA-250", "FLT-01"], "total":31.4}
+⟦end⟧
+
+⟦repair c20b857e⟧
+⟦repaired⟧
+{
+  "family": "orders-worker",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "${ECR_REPO}:${IMAGE_TAG}",
+      "cpu": "${TASK_CPU}",
+      "memory": "${TASK_MEMORY}",
+      "essential": true,
+      "environment": [
+        {"name": "QUEUE_URL", "value": "${QUEUE_URL}"},
+        {"name": "LOG_LEVEL", "value": "info"}
+      ]
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"]
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 3881e32f⟧
+⟦repaired⟧
+{"users": [{"id": 1, "name": "Alice Chen", "role": "admin"}, {"id": 2, "name": "Bob Okafor"}], "total": 57}
+⟦end⟧
+
+⟦repair 69fe5888⟧
+⟦repaired⟧
+{"to": "{{recipient_email}}", "template": "welcome", "locale": "pt-BR", "vars": {"first_name": "{{first_name}}"}}
+⟦end⟧
+
+⟦repair 9444e1f5⟧
+⟦repaired⟧
+{⟦cr⟧
+⟦tab⟧"printer": "HP-LJ-4th-floor",⟦cr⟧
+⟦tab⟧"duplex": true,⟦cr⟧
+⟦tab⟧"copies": 2,
+⟦tab⟧"tray": null,
+⟦tab⟧"margins": [12.5, 12.5, 15, 15]⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦repair 44d494d8⟧
+⟦repaired⟧
+{"error.network": "Can\"t reach the server", "error.auth": "That password isn\"t right", "action.retry": "Try again"}
+⟦end⟧
+
+⟦repair bdb4ce18⟧
+⟦repaired⟧
+{"name": "nightly backup", "schedule": "0 3 * * *", "targets": ["db-primary", "media"], "compress": true}
+⟦end⟧
+
+⟦repair 723b05bb⟧
+⟦repaired⟧
+{"name": "Rosa Delgado", "street": "41 Linnaean St", "city": "Cambridge", "state": "MA", "zip": "02138", "country": "US"}
+⟦end⟧
+
+⟦repair ad3e41e8⟧
+⟦repaired⟧
+{"branches": ["main", "next"], "plugins": ["@semantic-release/commit-analyzer", "@semantic-release/npm"]}
+⟦end⟧
+
+⟦repair 13cb1515⟧
+⟦repaired⟧
+{"jsonrpc":"2.0","id":17042,"method":"tools/call","params":{"name":"search_orders","arguments":{"customer":"C-2291","limit":5}}}
+⟦end⟧
+
+⟦repair 63134983⟧
+⟦repaired⟧
+{"plan":"free","referrer":"","utm":{"source":"newsletter","campaign":"autumn-26"},"trial_days":14}
+⟦end⟧
+
+⟦repair 39519b17⟧
+⟦repaired⟧
+{"door": "garage", "state": "open", "battery": 0.82}
+⟦end⟧
+
+⟦repair f4a7d4da⟧
+unsure: the line feed inside the string could be an escaped line feed, \n, instead of a space
+⟦repaired⟧
+[
+  {"host": "db-primary.internal", "role": "primary", "lagSeconds": 0},
+  {"host": "db-replica-2.internal", "role": "replica", "note": "resync after the storage failure on Tuesday night"}
+]
+⟦end⟧
+
+⟦repair e3e42a7d⟧
+⟦repaired⟧
+{"cart":"c_8812","items":[4411,4412,4420],"coupon":"AUTUMN26","gift_wrap":false,"note":"café blend"}
+⟦end⟧
+
+⟦repair 51574f32⟧
+⟦repaired⟧
+{"level":"error","time":"2026-10-14T22:01:07.412Z","msg":"payment declined","order_": null}
+⟦end⟧
+
+⟦repair 97af5a43⟧
+⟦repaired⟧
+"Thanks for your order!\nYour receipt is attached."
+⟦end⟧
+
+⟦repair a637a797⟧
+⟦repaired⟧
+{"@context":"https://schema.org","@type":"Recipe","name":"Lemon drizzle cake","author":{"@type":"Person","name":"Mary Ashdown"},"prepTime":"PT20M","recipeYield":8,"recipeIngredient":["225 g butter","225 g sugar","4 eggs","2 lemons"],"nutrition":{"@type":"NutritionInformation","calories":"320 kcal"}}
+⟦end⟧
+
+⟦repair bd2511ac⟧
+unsure: the half object line could be damage with nothing of the document in it, then the whole line is removed
+⟦repaired⟧
+[
+  {"sku": "TEA-001", "qty": 4},
+  {"sku": "KTL-207", "qty": null},
+  {"sku": "FLT-020", "qty": 1}
+]
+⟦end⟧
+
+⟦repair 402279f3⟧
+⟦repaired⟧
+"\ufefforder_id,total\r\n1042,31.40\r\n"
+⟦end⟧
+
+⟦repair 6f30faa8⟧
+unsure: the two parts may be one message, {"type":"heartbeat","seq":4412,"bids":[[101.25,300],[101.2,150]],"asks":[[101.31,200]]}
+⟦repaired⟧
+{"type":"heartbeat","seq":4412}
+⟦end⟧
+
+⟦repair 9b3d4ac4⟧
+⟦repaired⟧
+{"userId": null, "cart": [{"sku": "TEA-250", "qty": 2}], "coupon": "WELCOME10"}
+⟦end⟧
+
+⟦repair 71eda1cf⟧
+unsure: the line break inside the description may be a wrap of one line, then it is a space and the indentation after it is no part of the document
+⟦repaired⟧
+{
+  "manifest_version": 3,
+  "name": "Tab Sweeper",
+  "version": "0.4.0",
+  "description": "Closes the tabs you have not looked at for a week\n  and keeps a list of them, so nothing is lost.",
+  "permissions": ["tabs", "storage"]
+}
+⟦end⟧
+
+⟦repair 52bfacf2⟧
+⟦repaired⟧
+{⟦cr⟧
+  "retryDelaysMs": [⟦cr⟧
+    250,⟦cr⟧
+    1000,⟦cr⟧
+    4000,⟦cr⟧
+    15000⟦cr⟧
+  ],⟦cr⟧
+  "giveUpAfter": 4⟦cr⟧
+}⟦cr⟧⟦lf⟧
+⟦end⟧
+
+⟦repair 7a83ec4d⟧
+⟦repaired⟧
+{"user_id": 48213, "first_name": "Mei", "last_name": "Tanaka", "signup_date": "2023-11-02"}
+⟦end⟧
+
+⟦repair 36ae8a6d⟧
+⟦repaired⟧
+{"channel": "#deploys", "username": "release-bot", "icon_emoji": ":rocket:", "text": "Deployed billing 4.12.0 to production"}
+⟦end⟧
+
+⟦repair 274cc683⟧
+⟦repaired⟧
+{
+  "page": 1,
+  "totalPages": 12,
+  "results": [
+    {"id": 9001, "title": "Quarterly report", "owner": {}}
+  ]
+}
+⟦end⟧
+
+⟦repair a7592c50⟧
+⟦repaired⟧
+{
+  "questions": [
+    {
+      "question": "What is the capital of Australia?",
+      "options": ["Sydney", "Canberra", "Melbourne", "Perth"],
+      "answer": 1
+    },
+    {
+      "question": "Which planet has the most moons?",
+      "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+      "answer": 1
+    },
+    {
+      "question": "Who painted the Mo"}]}
+⟦end⟧
+
+⟦repair 6b4353fd⟧
+⟦repaired⟧
+{"is_valid": false, "errors": [{"line": 14, "message": "Unclosed <div> tag"}, {"line": 22, "message": "Attribute \"href\" is empty"}]}
+⟦end⟧
+
+⟦repair c296c181⟧
+⟦repaired⟧
+{"account": "Priya & Sons Ltd", "plan_ids": [3, 7], "csrf": "b7e1f0", "next": "/billing?tab=invoices&year=2024"}
+⟦end⟧
+
+⟦repair e997563d⟧
+⟦repaired⟧
+{"kind":"calendar#events","nextSyncToken":"CPDAlvWDx4YDEPDAlvWDx4YDGAU=","items":[{"id":"7ac81f0e","status":"confirmed","start":{"dateTime":"2026-10-16T09:30:00+02:00"},"attendees":[]}]}
+⟦end⟧
+
+⟦repair 53771acf⟧
+⟦repaired⟧
+{
+  "id": "ord_8Hk2",
+  "customer": { "name": "Mei Tanaka", "email": "mei@example.jp" },
+  "items": [ { "sku": "TEA-250", "qty": 2 }, { "sku": "FLT-01", "qty": 1 } ],
+  "total": 31.4,
+  "createdAt": "2026-10-14T16:20:05.120Z"
+}
+⟦end⟧
+
+⟦repair 4971b841⟧
+⟦repaired⟧
+{
+  "q": "green tea",
+  "page": "2",
+  "per-page": "24"
+}
+⟦end⟧
+
+⟦repair 141fcdb3⟧
+⟦repaired⟧
+[{"id":"job-18","state":"failed","error":"upstream timeout","ms":30000},{"id":"job-19","state":"do"}]
+⟦end⟧
+
+⟦repair cbaacdaf⟧
+⟦repaired⟧
+{
+  "root": true,
+  "env": {"browser": true, "es2022": true},
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "always"],
+    "no-unused-vars": "error"
+  }
+}
+⟦end⟧
+
+⟦repair a3b0ccca⟧
+⟦repaired⟧
+{"ID":1042, "Name":"Ada Lovelace", "Email":"ada@example.com", "Roles":["admin", "editor"], "Active":true}
+⟦end⟧
+
+⟦repair 382de30d⟧
+⟦repaired⟧
+{"firstName": "Marta", "lastName": "Kowalska", "title": "Head of \"People & Culture\"", "employeeId": 20417, "remote": false}
+⟦end⟧
+
+⟦repair 03400e4a⟧
+⟦repaired⟧
+{
+  "phase": "Running",
+  "podIP": "10.42.0.17",
+  "restarts": 7,
+  "ready": true,
+  "nominatedNode": null,
+  "containers": [
+    "app",
+    "sidecar"
+  ]
+}⟦lf⟧
+⟦end⟧
+
+⟦repair 33218516⟧
+⟦repaired⟧
+{"image": "worker:1.8", "mem_limit": "512m", "healthcheck": {"test": ["CMD", "curl", "-f", "http://localhost:8080/healthz"], "interval": "10s", "timeout": "2s", "retries": 3}}
+⟦end⟧
+
+⟦repair 39a01bfe⟧
+⟦repaired⟧
+{"filter": "state=open|blocked", "sort": "-updated", "limit": 50}
+⟦end⟧
+
+⟦repair 3b7cfed7⟧
+⟦repaired⟧
+{
+  "root": true,
+  "extends": ["eslint:recommended", "prettier"],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-console": "warn",
+    "eqeqeq": ["error", "always"]
+  }
+}⟦lf⟧
+⟦end⟧
+
+⟦repair f7f0c042⟧
+⟦repaired⟧
+"We couldn’t verify your card. Please try again."
+⟦end⟧
+
+⟦repair 6e8c04c4⟧
+⟦repaired⟧
+{"job":{"id":15,"status":"queued"},"eta_seconds":42,"links":["/jobs/15","/jobs/15/log"]}
+⟦end⟧
+
+⟦repair 72124b17⟧
+unsure: the quoted line is itself a valid JSON string, then only the prompt line is removed and the rest stays as it is
+⟦repaired⟧
+{"uid":812,"roles":["admin","billing"],"last_page":"\/account\/invoices","flash":"Saved \"Q3 report\"","exp":1760482800}
+⟦end⟧
+
+⟦repair 1ade7d8b⟧
+⟦repaired⟧
+{"id": 1042, "title": "Fix login redirect", "status": "open", "assignee": "mkowalski", "labels": ["bug", "auth"]}
+⟦end⟧
+
+⟦repair 5bef57de⟧
+⟦repaired⟧
+{"country": "Brazil", "capital": "Brasília", "population": 216422446, "area_km2": 8515767}
+⟦end⟧
+
+⟦repair a7c844eb⟧
+⟦repaired⟧
+{
+  "path": "/etc/nginx/conf.d/api.conf",
+  "owner": "www-data",
+  "backup": true,
+  "mode": "0644"
+}
+⟦end⟧
+
+⟦repair 52f124d8⟧
+unsure: the decimal commas may be meant as strings, "21,5" and "48,2"
+⟦repaired⟧
+{"station": "Köln-Stammheim", "temperatur": 21.5, "luftfeuchte": 48.2, "wind_kmh": 9}
+⟦end⟧
+
+⟦repair ebeeeed3⟧
+⟦repaired⟧
+{"event": "invoice.paid", "invoiceId": "in_1Qx7", "amount": 4900, "currency": "eur"}
+⟦end⟧

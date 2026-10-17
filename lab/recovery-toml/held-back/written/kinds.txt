@@ -1,0 +1,153 @@
+# For every case: the edits of the train data's damage that make its damage, by their names in lab/recovery-toml/damage.ts, one name per edit in text order. neutral-edits.ts derives the names from the writer's repair, and README.md says how, under "What the damage is".
+# A line: the id of the case, the names of the edits, each after a space, and for a case whose damage one to three edits do not make " new: " and the reason in a few words. The reason is the damage that no three edits make. Where the line starts it with a number of edits, every damaged place is what up to three edits make, and the edits are more than a sample of the train data has.
+
+hand-editing-01 new: an apostrophe in the place of the closing quote, and the document holds no apostrophe
+hand-editing-02 deleteCodePoint
+hand-editing-03 deleteCodePoint
+hand-editing-04 deleteCodePoint
+hand-editing-05 deleteCodePoint
+hand-editing-06 deleteCodePoint
+hand-editing-07 deleteCodePoint
+hand-editing-08 insertCodePoint
+hand-editing-09 deleteCodePoint
+hand-editing-10 insertCodePoint
+hand-editing-11 deleteRun
+hand-editing-12 deleteRun
+hand-editing-13 deleteCodePoint
+hand-editing-14 deleteCodePoint
+hand-editing-15 insertCodePoint
+hand-editing-16 insertCodePoint insertCodePoint insertCodePoint insertCodePoint new: 4 edits where a sample has at most 3: a quote too many at both ends of two strings
+hand-editing-17 deleteCodePoint deleteCodePoint
+hand-editing-18 deleteCodePoint deleteCodePoint
+hand-editing-19 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two pasted values are missing
+hand-editing-20 deleteCodePoint deleteCodePoint
+hand-editing-21 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 6 edits where a sample has at most 3: the quotes around three names with accented letters are missing
+hand-editing-22 deleteCodePoint deleteCodePoint
+hand-editing-23 replaceCodePoint
+hand-editing-24 deleteCodePoint
+hand-editing-25 deleteRun
+hand-editing-26 copyRun
+hand-editing-27 new: the old value left behind the new one, without its opening quote
+hand-editing-28 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 5 edits where a sample has at most 3: every backslash of two Windows paths lacks its second half
+hand-editing-29 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the four quotes inside a string lack their backslashes
+hand-editing-30 deleteCodePoint
+hand-editing-31 deleteCodePoint
+hand-editing-32 deleteCodePoint
+hand-editing-33 deleteCodePoint
+hand-editing-34 replaceCodePoint
+hand-editing-35 new: a comma in the place of the dot of a header, and the document holds no comma
+hand-editing-36 new: the letters of an editor command after a value, :wq
+hand-editing-37 new: a line that is an editor command, :%s/2021/2024/g
+hand-editing-38 insertCodePoint
+hand-editing-39 deleteCodePoint
+hand-editing-40 deleteCodePoint
+hand-editing-41 deleteCodePoint copyRun
+hand-editing-42 copyRun deleteCodePoint
+hand-editing-43 insertCodePoint insertCodePoint deleteCodePoint
+hand-editing-44 replaceCodePoint new: a comma and a closing brace left from an inline table, which the document does not hold, beside two lines joined
+hand-editing-45 deleteCodePoint
+hand-editing-46 insertCodePoint deleteCodePoint
+hand-editing-47 replaceCodePoint
+hand-editing-48 swapNeighbours
+hand-editing-49 insertCodePoint
+hand-editing-50 deleteCodePoint
+model-and-paste-01 new: the sentences of a numbered list and an indented code fence around the document
+model-and-paste-02 new: line ends written as a backslash and an n
+model-and-paste-03 new: a sentence before the document
+model-and-paste-04 new: the title and the button of a chat page's code block before the document
+model-and-paste-05 new: a closing fence, a sentence and an opening fence in the middle of the document, and a fence after it
+model-and-paste-06 new: two files in code fences with their names in bold, as one document
+model-and-paste-07 deleteCodePoint new: an opening code fence before the document, which is cut inside a string
+model-and-paste-08 new: the link form of a chat program around a part of a header's name
+model-and-paste-09 new: an arrow in the place of the comment sign before a remark
+model-and-paste-10 insertCodePoint insertCodePoint insertCodePoint insertCodePoint new: 4 edits where a sample has at most 3: the two marks of bold text at both ends of a line
+model-and-paste-11 new: a backslash before every square bracket and underscore, and the document holds no backslash
+model-and-paste-12 deleteRun deleteRun
+model-and-paste-13 new: a line of three dots for lines that are left out
+model-and-paste-14 new: a line of words in square brackets for lines that are left out
+model-and-paste-15 replaceCodePoint insertCodePoint
+model-and-paste-16 insertCodePoint insertCodePoint insertCodePoint
+model-and-paste-17 new: a line with an ellipsis character among the values of an array
+model-and-paste-18 new: three dots in the place of a value
+model-and-paste-19 new: an ellipsis character in the place of the cut end of two lines, with their closing quotes
+model-and-paste-20 new: a typographic quote in the place of every quote
+model-and-paste-21 new: typographic quotes around two values
+model-and-paste-22 new: the low and high typographic quotes of German around every string
+model-and-paste-23 new: typographic apostrophes around every string in apostrophes
+model-and-paste-24 new: typographic quotes in the place of the three quotes at both ends of a string of several lines
+model-and-paste-25 cutTail
+model-and-paste-26 copyRun copyRun
+model-and-paste-27 new: a sentence and an opening fence inside a string that was cut, and a fence after the document
+model-and-paste-28 deleteCodePoint
+model-and-paste-29 deleteCodePoint
+model-and-paste-30 new: the name lines of the command head before two files
+model-and-paste-31 new: a line number and a tab before every line
+model-and-paste-32 insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint insertCodePoint new: a line number right before every line
+model-and-paste-33 new: a line number and an arrow before two lines
+model-and-paste-34 new: the frame, the file's name and the line numbers of a terminal tool around every line
+model-and-paste-35 new: the line of a shell command before the document and a prompt after it
+model-and-paste-36 new: a shell command line and the sign of a continued line before every line of a here-document
+model-and-paste-37 new: the first line of a mail reply and the sign of quoted text before every line
+model-and-paste-38 new: the prompts of Python before every line of a string of several lines
+model-and-paste-39 new: the head of a diff and a plus sign before every line
+model-and-paste-40 new: a plus sign before three lines, and the document holds no plus sign
+model-and-paste-41 new: the head of a diff hunk, a removed line and the plus signs of two added lines
+model-and-paste-42 new: the JSON of a tool call around the document, with a backslash and an n for every line end and a backslash before every quote
+model-and-paste-43 new: the brackets, the apostrophes and the line ends of a printed Python list around every line
+model-and-paste-44 new: an opening code fence and the file's path before the document, and a fence after it
+model-and-paste-45 new: the foot of one page and the head of the next in the middle of the document
+model-and-paste-46 new: the date, the time and the sender of a chat message before the document, and a second message after it
+model-and-paste-47 insertCodePoint
+model-and-paste-48 new: what is left of a terminal's color codes around a header and every key
+model-and-paste-49 new: a dollar sign at every line end and ^I for every tab
+model-and-paste-50 new: the marker lines and the second side of a search and replace block
+other-notations-01 replaceCodePoint replaceCodePoint replaceCodePoint
+other-notations-02 replaceCodePoint deleteCodePoint insertCodePoint deleteCodePoint insertCodePoint deleteCodePoint insertCodePoint deleteCodePoint new: 8 edits where a sample has at most 3: a colon after a key, and a list of YAML with a dash before every item, without brackets and commas
+other-notations-03 deleteCodePoint replaceCodePoint deleteCodePoint replaceCodePoint new: 4 edits where a sample has at most 3: two sections written as a name with a colon
+other-notations-04 deleteRun insertCodePoint insertCodePoint new: the --- line of YAML, and the document holds no hyphen, with yes and no for true and false
+other-notations-05 deleteRun new: the | of YAML in the place of the three opening quotes of a string of several lines
+other-notations-06 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 6 edits where a sample has at most 3: the quotes around three words of an array are missing
+other-notations-07 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two values are missing
+other-notations-08 deleteRun deleteRun insertCodePoint insertCodePoint new: 4 edits where a sample has at most 3: an item of a YAML list under a name with a colon, in the place of a header in double brackets
+other-notations-09 new: the braces of JSON around the file, a colon after every key and a comma after every line
+other-notations-10 replaceCodePoint replaceCodePoint replaceCodePoint
+other-notations-11 replaceCodePoint replaceCodePoint
+other-notations-12 new: null in the place of a value
+other-notations-13 insertCodePoint new: a colon after two keys, and the document holds no colon, with a comma at a line's end
+other-notations-14 deleteRun copyRun new: a semicolon for the comment sign at two places, and the document holds no semicolon, with on for true
+other-notations-15 new: the word export before two keys
+other-notations-16 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two header names with a space are missing
+other-notations-17 deleteCodePoint deleteCodePoint
+other-notations-18 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two values are missing
+other-notations-19 new: True, False and None in the place of two literals and a value
+other-notations-20 new: round brackets around two arrays, and the document holds no round bracket
+other-notations-21 new: backticks around two strings, and the document holds no backtick
+other-notations-22 new: two strings joined by a plus sign over a line end
+other-notations-23 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two numbers with a type at their end are missing
+other-notations-24 new: a semicolon at the end of two lines, and the document holds no semicolon
+other-notations-25 deleteCodePoint deleteCodePoint new: the braces of a block of another notation in the place of the brackets of a header
+other-notations-26 new: /* and */ around two remarks
+other-notations-27 insertCodePoint replaceCodePoint insertCodePoint replaceCodePoint insertCodePoint new: 5 edits where a sample has at most 3: // in the place of the comment sign of two lines, and a comma before a closing brace
+other-notations-28 insertCodePoint
+other-notations-29 replaceCodePoint
+other-notations-30 deleteRun new: the first and the last line of a here-document in the place of the three quotes at both ends of a string
+other-notations-31 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two colors that start with # are missing
+other-notations-32 deleteRun deleteRun
+other-notations-33 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 4 edits where a sample has at most 3: the quotes around two products are missing
+other-notations-34 replaceCodePoint replaceCodePoint new: a backslash before an apostrophe inside a string in apostrophes, and the document holds no backslash
+other-notations-35 deleteCodePoint deleteCodePoint deleteCodePoint
+other-notations-36 deleteCodePoint deleteCodePoint
+other-notations-37 deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint deleteCodePoint new: 6 edits where a sample has at most 3: the quotes around three values with a unit are missing
+other-notations-38 deleteCodePoint deleteCodePoint
+other-notations-39 deleteRun deleteRun
+other-notations-40 deleteRun
+other-notations-41 deleteRun
+other-notations-42 deleteCodePoint
+other-notations-43 deleteCodePoint
+other-notations-44 deleteCodePoint
+other-notations-45 deleteRun
+other-notations-46 deleteRun
+other-notations-47 deleteRun
+other-notations-48 deleteRun
+other-notations-49 deleteCodePoint
+other-notations-50 insertCodePoint replaceCodePoint

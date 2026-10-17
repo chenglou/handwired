@@ -1,0 +1,546 @@
+⟦case model-output-01⟧
+from: a chat answer to a request for the fields of an invoice, with a sentence before the fenced document and an offer after it
+⟦intended⟧
+{
+  "invoice_number": "INV-2024-0312",
+  "vendor": "Northwind Traders",
+  "line_items": [
+    {"description": "Oak desk", "quantity": 2, "unit_price": 489.00},
+    {"description": "Delivery", "quantity": 1, "unit_price": 306.50}
+  ],
+  "total": 1284.50,
+  "currency": "EUR",
+  "due_date": "2024-04-15"
+}
+⟦broken⟧
+Here's the extracted information:
+
+```json
+{
+  "invoice_number": "INV-2024-0312",
+  "vendor": "Northwind Traders",
+  "line_items": [
+    {"description": "Oak desk", "quantity": 2, "unit_price": 489.00},
+    {"description": "Delivery", "quantity": 1, "unit_price": 306.50}
+  ],
+  "total": 1284.50,
+  "currency": "EUR",
+  "due_date": "2024-04-15"
+}
+```
+
+Let me know if you need anything else from the invoice.
+⟦end⟧
+
+⟦case model-output-02⟧
+from: a summary of product reviews, where the model quotes a customer's words inside a string and does not escape the quotes
+⟦intended⟧
+{"product": "AirBrush Pro", "reviews": [{"stars": 5, "quote": "Honestly the \"quiet mode\" is a game changer"}, {"stars": 2, "quote": "Stopped charging after a month"}]}
+⟦broken⟧
+{"product": "AirBrush Pro", "reviews": [{"stars": 5, "quote": "Honestly the "quiet mode" is a game changer"}, {"stars": 2, "quote": "Stopped charging after a month"}]}
+⟦end⟧
+
+⟦case model-output-03⟧
+from: a recipe that the model writes as JSON with a comma after the last entry of the array and of the object, as Python and JavaScript allow
+⟦intended⟧
+{
+    "name": "Lemon Garlic Pasta",
+    "servings": 4,
+    "ingredients": [
+        "200 g spaghetti",
+        "3 cloves garlic",
+        "1 lemon"
+    ],
+    "note": "Salt the water well.\nKeep a cup of it before draining."
+}
+⟦broken⟧
+{
+    "name": "Lemon Garlic Pasta",
+    "servings": 4,
+    "ingredients": [
+        "200 g spaghetti",
+        "3 cloves garlic",
+        "1 lemon",
+    ],
+    "note": "Salt the water well.\nKeep a cup of it before draining.",
+}
+⟦end⟧
+
+⟦case model-output-04⟧
+from: an answer that writes a quiz inside a code fence and stops at the token limit in the middle of a string, so the closing fence never comes
+⟦intended⟧
+{
+  "questions": [
+    {
+      "question": "What is the capital of Australia?",
+      "options": ["Sydney", "Canberra", "Melbourne", "Perth"],
+      "answer": 1
+    },
+    {
+      "question": "Which planet has the most moons?",
+      "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+      "answer": 1
+    },
+    {
+      "question": "Who painted the Mona Lisa?",
+      "options": ["Raphael", "Leonardo da Vinci", "Titian", "Donatello"],
+      "answer": 1
+    }
+  ]
+}
+⟦broken⟧
+```json
+{
+  "questions": [
+    {
+      "question": "What is the capital of Australia?",
+      "options": ["Sydney", "Canberra", "Melbourne", "Perth"],
+      "answer": 1
+    },
+    {
+      "question": "Which planet has the most moons?",
+      "options": ["Jupiter", "Saturn", "Uranus", "Neptune"],
+      "answer": 1
+    },
+    {
+      "question": "Who painted the Mo
+⟦end⟧
+
+⟦case model-output-05⟧
+from: an answer of a vision model that lists the objects in a picture as a Python literal, with tuples for the boxes and Python's words for true, false and null
+⟦intended⟧
+{"detections": [{"label": "dog", "bbox": [34, 120, 208, 365], "occluded": false}, {"label": "frisbee", "bbox": [190, 80, 244, 131], "occluded": true}], "caption": null}
+⟦broken⟧
+{"detections": [{"label": "dog", "bbox": (34, 120, 208, 365), "occluded": False}, {"label": "frisbee", "bbox": (190, 80, 244, 131), "occluded": True}], "caption": None}
+⟦end⟧
+
+⟦case model-output-06⟧
+from: an answer with nutrition facts, where the model explains a number in parentheses right after it
+⟦intended⟧
+{"dish": "Chicken Caesar Salad", "calories": 520, "protein_g": 31, "gluten_free": false}
+⟦broken⟧
+{"dish": "Chicken Caesar Salad", "calories": 520 (per serving), "protein_g": 31, "gluten_free": false}
+⟦end⟧
+
+⟦case model-output-07⟧
+from: an answer that gives three entries of a list and puts a comment where more could follow, after a comma that expects another entry
+⟦intended⟧
+{
+  "greeting": [
+    {"lang": "fr", "text": "Bienvenue"},
+    {"lang": "ja", "text": "ようこそ"},
+    {"lang": "de", "text": "Willkommen"}
+  ]
+}
+⟦broken⟧
+{
+  "greeting": [
+    {"lang": "fr", "text": "Bienvenue"},
+    {"lang": "ja", "text": "ようこそ"},
+    {"lang": "de", "text": "Willkommen"},
+    // add more languages here as needed
+  ]
+}
+⟦end⟧
+
+⟦case model-output-08⟧
+from: an answer that tags an article, where the model gives one key three strings and leaves out the brackets of the array
+note: the other repair makes the three strings one, "python, pandas, csv"
+debatable
+⟦intended⟧
+{"title": "Clean a CSV file with pandas", "tags": ["python", "pandas", "csv"], "difficulty": "easy", "minutes": 20}
+⟦broken⟧
+{"title": "Clean a CSV file with pandas", "tags": "python", "pandas", "csv", "difficulty": "easy", "minutes": 20}
+⟦end⟧
+
+⟦case model-output-09⟧
+from: a model that copies the doubled braces of its prompt, a template in which every brace of the example had to be written twice
+⟦intended⟧
+{"is_valid": false, "errors": [{"line": 14, "message": "Unclosed <div> tag"}, {"line": 22, "message": "Attribute \"href\" is empty"}]}
+⟦broken⟧
+{{"is_valid": false, "errors": [{{"line": 14, "message": "Unclosed <div> tag"}}, {{"line": 22, "message": "Attribute \"href\" is empty"}}]}}
+⟦end⟧
+
+⟦case model-output-10⟧
+from: a list of tasks with one object per line, where the model forgets the comma at the end of one line
+⟦intended⟧
+[
+  {"id": 1, "task": "Draft project proposal", "done": true},
+  {"id": 2, "task": "Review budget with finance", "done": false},
+  {"id": 3, "task": "Schedule kickoff meeting", "done": false},
+  {"id": 4, "task": "Order team laptops", "done": false}
+]
+⟦broken⟧
+[
+  {"id": 1, "task": "Draft project proposal", "done": true},
+  {"id": 2, "task": "Review budget with finance", "done": false}
+  {"id": 3, "task": "Schedule kickoff meeting", "done": false},
+  {"id": 4, "task": "Order team laptops", "done": false}
+]
+⟦end⟧
+
+⟦case model-output-11⟧
+from: a model that escapes every underscore with a backslash, as it would in Markdown, also inside the JSON that it writes
+⟦intended⟧
+{"user_id": 48213, "first_name": "Mei", "last_name": "Tanaka", "signup_date": "2023-11-02"}
+⟦broken⟧
+{"user\_id": 48213, "first\_name": "Mei", "last\_name": "Tanaka", "signup\_date": "2023-11-02"}
+⟦end⟧
+
+⟦case model-output-12⟧
+from: an answer to a request for a list of 20 numbers, where the model writes three dots in the place of the middle ones
+⟦intended⟧
+{"sequence": "fibonacci", "values": [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765], "count": 20}
+⟦broken⟧
+{"sequence": "fibonacci", "values": [1, 1, 2, 3, 5, 8, 13, 21, ..., 4181, 6765], "count": 20}
+⟦end⟧
+
+⟦case model-output-13⟧
+from: an answer that shows the options of a request as a JavaScript object and not as JSON: keys without quotes, strings in single quotes, a comma after the last entry
+⟦intended⟧
+{
+  "method": "POST",
+  "headers": {"Content-Type": "application/json"},
+  "timeout": 5000,
+  "retries": 3
+}
+⟦broken⟧
+{
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  timeout: 5000,
+  retries: 3,
+}
+⟦end⟧
+
+⟦case model-output-14⟧
+from: an answer that drafts an email as JSON and writes the line breaks of the body as they are, inside the string
+note: every line feed of the broken text stands where the intended text has \n
+⟦intended⟧
+{"to": "team@example.com", "subject": "Sync moved to Thursday", "body": "Hi all,\n\nthe weekly sync moves to Thursday at 10:00.\n\nBest,\nPriya"}
+⟦broken⟧
+{"to": "team@example.com", "subject": "Sync moved to Thursday", "body": "Hi all,
+
+the weekly sync moves to Thursday at 10:00.
+
+Best,
+Priya"}
+⟦end⟧
+
+⟦case model-output-15⟧
+from: an answer that turns a receipt into JSON and keeps the currency sign in front of every amount
+note: the other repair makes every amount a string, e.g. "$3.49"
+debatable
+⟦intended⟧
+{"store": "Corner Market", "items": [{"name": "Oat milk", "price": 3.49}, {"name": "Sourdough loaf", "price": 5.25}], "total": 8.74}
+⟦broken⟧
+{"store": "Corner Market", "items": [{"name": "Oat milk", "price": $3.49}, {"name": "Sourdough loaf", "price": $5.25}], "total": $8.74}
+⟦end⟧
+
+⟦case model-output-16⟧
+from: an answer with a confusion matrix, where the model closes the outer array one row too early and then goes on with the last row
+⟦intended⟧
+{"labels": ["cat", "dog", "bird"], "confusion_matrix": [[42, 3, 1], [5, 38, 2], [0, 4, 47]], "accuracy": 0.894}
+⟦broken⟧
+{"labels": ["cat", "dog", "bird"], "confusion_matrix": [[42, 3, 1], [5, 38, 2]], [0, 4, 47]], "accuracy": 0.894}
+⟦end⟧
+
+⟦case model-output-17⟧
+from: the raw output of a reasoning model, which holds the model's thoughts between think tags before the document
+⟦intended⟧
+{"people": ["Dr. Amara Nwosu", "Luis Ortega"], "organizations": ["Helix Biolabs", "Port of Rotterdam Authority"], "locations": ["Rotterdam"], "dates": ["next Friday"]}
+⟦broken⟧
+<think>
+The user wants the entities as JSON. The date is only given as "next Friday", so I keep it as text. Rotterdam is a place and a part of a name.
+</think>
+
+{"people": ["Dr. Amara Nwosu", "Luis Ortega"], "organizations": ["Helix Biolabs", "Port of Rotterdam Authority"], "locations": ["Rotterdam"], "dates": ["next Friday"]}
+⟦end⟧
+
+⟦case model-output-18⟧
+from: an answer that was streamed twice: the first try broke off in the middle of a string, and the client put the second try on the next line
+⟦intended⟧
+{"city": "Paris", "country": "France", "population": 2102650, "timezone": "Europe/Paris"}
+⟦broken⟧
+{"city": "Paris", "country": "Fr
+{"city": "Paris", "country": "France", "population": 2102650, "timezone": "Europe/Paris"}
+⟦end⟧
+
+⟦case model-output-19⟧
+from: an answer that proposes settings for a training run and explains two of them with a Python comment at the end of the line
+⟦intended⟧
+{
+  "learning_rate": 0.0003,
+  "batch_size": 64,
+  "epochs": 20,
+  "warmup_steps": 500,
+  "optimizer": "adamw"
+}
+⟦broken⟧
+{
+  "learning_rate": 0.0003,  # try 0.0001 if the loss is unstable
+  "batch_size": 64,
+  "epochs": 20,
+  "warmup_steps": 500,  # about 5% of all steps
+  "optimizer": "adamw"
+}
+⟦end⟧
+
+⟦case model-output-20⟧
+from: an answer with texts for an app's messages, where the model puts a backslash before every apostrophe, as it would inside a string in single quotes
+⟦intended⟧
+["Don't forget to save your changes", "You're all set!", "We couldn't find that page"]
+⟦broken⟧
+["Don\'t forget to save your changes", "You\'re all set!", "We couldn\'t find that page"]
+⟦end⟧
+
+⟦case model-output-21⟧
+from: a model that loses track of the open brackets deep in a document and closes the array of items with a brace
+⟦intended⟧
+{"order": {"id": "ORD-7731", "items": [{"sku": "A-1042", "qty": 2}, {"sku": "B-2210", "qty": 1}], "shipping": "express"}}
+⟦broken⟧
+{"order": {"id": "ORD-7731", "items": [{"sku": "A-1042", "qty": 2}, {"sku": "B-2210", "qty": 1}}, "shipping": "express"}}
+⟦end⟧
+
+⟦case model-output-22⟧
+from: a fenced answer with a deeply nested object, where the model leaves out the line that closes the array
+note: the tools take the last two braces for added text, like the closing fence after them. They are the closing braces of the user and of the document
+⟦intended⟧
+{
+  "user": {
+    "name": "Tomás Rivera",
+    "email": "tomas.rivera@example.com",
+    "teams": [
+      {
+        "id": "design",
+        "role": "lead",
+        "permissions": {
+          "publish": true,
+          "billing": false
+        }
+      }
+    ]
+  }
+}
+⟦broken⟧
+```json
+{
+  "user": {
+    "name": "Tomás Rivera",
+    "email": "tomas.rivera@example.com",
+    "teams": [
+      {
+        "id": "design",
+        "role": "lead",
+        "permissions": {
+          "publish": true,
+          "billing": false
+        }
+      }
+  }
+}
+```
+⟦end⟧
+
+⟦case model-output-23⟧
+from: an answer with a sample response of a login, where the model writes a number as the JavaScript expression that computes it
+⟦intended⟧
+{"access_token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0MiJ9", "token_type": "Bearer", "expires_in": 86400, "scope": "read write"}
+⟦broken⟧
+{"access_token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0MiJ9", "token_type": "Bearer", "expires_in": 60 * 60 * 24, "scope": "read write"}
+⟦end⟧
+
+⟦case model-output-24⟧
+from: an answer to a request for one translated sentence as a JSON string, where the sentence keeps its own quotes without backslashes
+⟦intended⟧
+"Elle a dit \"à demain\" et elle est partie."
+⟦broken⟧
+"Elle a dit "à demain" et elle est partie."
+⟦end⟧
+
+⟦case model-output-25⟧
+from: an answer that shows the body of a request and leaves a placeholder without quotes where the reader's secret goes
+⟦intended⟧
+{
+  "api_key": "<YOUR_API_KEY>",
+  "model": "whisper-large-v3",
+  "language": "en",
+  "response_format": "srt"
+}
+⟦broken⟧
+{
+  "api_key": <YOUR_API_KEY>,
+  "model": "whisper-large-v3",
+  "language": "en",
+  "response_format": "srt"
+}
+⟦end⟧
+
+⟦case model-output-26⟧
+from: an answer with a regular expression inside a string, where the model writes every backslash once
+note: \b is an escape that JSON knows (a backspace), so another repair leaves the two \b as they are and doubles only the backslash before each d
+debatable
+⟦intended⟧
+{"field": "invoice_date", "pattern": "\\b\\d{4}-\\d{2}-\\d{2}\\b", "example": "2024-03-15"}
+⟦broken⟧
+{"field": "invoice_date", "pattern": "\b\d{4}-\d{2}-\d{2}\b", "example": "2024-03-15"}
+⟦end⟧
+
+⟦case model-output-27⟧
+from: the raw completion of a model that runs on the caller's machine, with the tokens of the chat template left in: the header of the turn before the document and the end token after it
+⟦intended⟧
+{"intent": "book_flight", "slots": {"origin": "SFO", "destination": "NRT", "date": "2024-09-12", "passengers": 2}, "reply": "Searching flights SFO \u2192 NRT\u2026"}
+⟦broken⟧
+<|start_header_id|>assistant<|end_header_id|>
+
+{"intent": "book_flight", "slots": {"origin": "SFO", "destination": "NRT", "date": "2024-09-12", "passengers": 2}, "reply": "Searching flights SFO \u2192 NRT\u2026"}<|eot_id|>
+⟦end⟧
+
+⟦case model-output-28⟧
+from: an answer that breaks a long string over two lines with a plus sign, as JavaScript code would
+⟦intended⟧
+{
+  "role": "system",
+  "content": "You are a support agent for Brightline Internet. Answer in two sentences or fewer."
+}
+⟦broken⟧
+{
+  "role": "system",
+  "content": "You are a support agent for Brightline Internet. " +
+             "Answer in two sentences or fewer."
+}
+⟦end⟧
+
+⟦case model-output-29⟧
+from: an answer with facts about a country, where the model writes the large numbers with commas between the thousands
+⟦intended⟧
+{"country": "Brazil", "capital": "Brasília", "population": 216422446, "area_km2": 8515767}
+⟦broken⟧
+{"country": "Brazil", "capital": "Brasília", "population": 216,422,446, "area_km2": 8,515,767}
+⟦end⟧
+
+⟦case model-output-30⟧
+from: an answer that is a Python dict written by the model and not printed by Python, so a string in single quotes holds an apostrophe
+⟦intended⟧
+{"title": "Ocean's Eleven", "director": "Steven Soderbergh", "year": 2001, "rewatch": true}
+⟦broken⟧
+{'title': 'Ocean's Eleven', 'director': 'Steven Soderbergh', 'year': 2001, 'rewatch': True}
+⟦end⟧
+
+⟦case model-output-31⟧
+from: an answer where the caller wrote the opening brace for the model to force JSON, and the model started the document again with a code fence
+⟦intended⟧
+{
+  "status": "shipped",
+  "carrier": "DHL",
+  "tracking_number": "JD014600003828",
+  "estimated_delivery": "2024-07-03"
+}
+⟦broken⟧
+{```json
+{
+  "status": "shipped",
+  "carrier": "DHL",
+  "tracking_number": "JD014600003828",
+  "estimated_delivery": "2024-07-03"
+}
+```
+⟦end⟧
+
+⟦case model-output-32⟧
+from: an answer that lists the drugs of a medical note and writes N/A without quotes where the note says nothing
+note: the other repair writes null there
+debatable
+⟦intended⟧
+[{"drug": "Amoxicillin", "dose": "500 mg", "notes": "N/A"}, {"drug": "Ibuprofen", "dose": "400 mg", "notes": "take with food"}]
+⟦broken⟧
+[{"drug": "Amoxicillin", "dose": "500 mg", "notes": N/A}, {"drug": "Ibuprofen", "dose": "400 mg", "notes": "take with food"}]
+⟦end⟧
+
+⟦case model-output-33⟧
+from: a model that writes the document the way it stands inside a JSON string, with a backslash before every quote and \n for every line break, but without the string around it
+note: every \n of the broken text stands where the intended text has a line feed
+⟦intended⟧
+{
+  "query": "wireless headphones",
+  "max_price": 150,
+  "in_stock_only": true
+}
+⟦broken⟧
+{\n  \"query\": \"wireless headphones\",\n  \"max_price\": 150,\n  \"in_stock_only\": true\n}
+⟦end⟧
+
+⟦case model-output-34⟧
+from: a small model that forgets the closing quote of a string that ends with a punctuation mark
+⟦intended⟧
+{"greeting": "Welcome back, Sam!", "cta": "View your dashboard", "show_banner": false}
+⟦broken⟧
+{"greeting": "Welcome back, Sam!, "cta": "View your dashboard", "show_banner": false}
+⟦end⟧
+
+⟦case model-output-35⟧
+from: an answer that holds a piece of Python code as a string in three quotes, as Python writes a string of several lines
+⟦intended⟧
+{"language": "python", "code": "def greet(name):\n    return \"Hello, \" + name\n", "runs": true}
+⟦broken⟧
+{"language": "python", "code": """def greet(name):
+    return "Hello, " + name
+""", "runs": true}
+⟦end⟧
+
+⟦case model-output-36⟧
+from: an answer that shows what a response looks like and writes three dots for the rest of an object and for the rest of the list
+note: nobody can know the keys and the users that the dots stand for, so the intended text is the broken text without the dots
+⟦intended⟧
+{"users": [{"id": 1, "name": "Alice Chen", "role": "admin"}, {"id": 2, "name": "Bob Okafor"}], "total": 57}
+⟦broken⟧
+{"users": [{"id": 1, "name": "Alice Chen", "role": "admin"}, {"id": 2, "name": "Bob Okafor", ...}, ...], "total": 57}
+⟦end⟧
+
+⟦case model-output-37⟧
+from: a chat answer with a sentence before the document and no code fence, which stops at the token limit in the middle of a key
+⟦intended⟧
+{
+  "destination": "Kyoto",
+  "days": [
+    {"day": 1, "plan": "Fushimi Inari at sunrise, then Nishiki Market for lunch"},
+    {"day": 2, "plan": "Arashiyama bamboo grove and a tea ceremony"},
+    {"day": 3, "plan": "Day trip to Nara"}
+  ]
+}
+⟦broken⟧
+Sure! Here is a 3-day plan for Kyoto in the "days" format you asked for:
+
+{
+  "destination": "Kyoto",
+  "days": [
+    {"day": 1, "plan": "Fushimi Inari at sunrise, then Nishiki Market for lunch"},
+    {"day": 2, "plan": "Arashiyama bamboo grove and a tea ceremony"},
+    {"day": 3, "pl
+⟦end⟧
+
+⟦case model-output-38⟧
+from: an answer that pulls fields out of a text and leaves the value empty for a field that it did not find
+⟦intended⟧
+{"first_name": "Grace", "middle_name": null, "last_name": "Hopper"}
+⟦broken⟧
+{"first_name": "Grace", "middle_name": , "last_name": "Hopper"}
+⟦end⟧
+
+⟦case model-output-39⟧
+from: an answer with a stock quote, where the model writes a plus sign in front of a change that is positive
+⟦intended⟧
+{"ticker": "ACME", "change": 2.15, "change_pct": 1.53}
+⟦broken⟧
+{"ticker": "ACME", "change": +2.15, "change_pct": +1.53}
+⟦end⟧
+
+⟦case model-output-40⟧
+from: a tool call whose arguments are a JSON document inside a string, where the model does not escape the quotes of the inner document
+note: the other repair drops the two quotes around the inner object, so that the arguments are an object and not a string
+debatable
+⟦intended⟧
+{"tool": "run_query", "arguments": "{\"table\": \"orders\", \"status\": \"refunded\", \"limit\": 10}"}
+⟦broken⟧
+{"tool": "run_query", "arguments": "{"table": "orders", "status": "refunded", "limit": 10}"}
+⟦end⟧
