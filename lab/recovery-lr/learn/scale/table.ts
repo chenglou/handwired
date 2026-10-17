@@ -13,8 +13,9 @@ import type {ScaleRecord} from './run.ts'
 refuseUnknownOptions('scale/table.ts', ['--folder'])
 const folder = optionOf('--folder')
 if (folder === undefined) throw new Error('scale/table.ts needs --folder')
-const records = readdirSync(folder).filter(name => name.endsWith('.record.json')).map(name => JSON.parse(readFileSync(join(folder, name), 'utf8')) as ScaleRecord)
-for (const record of records) if (record.format !== 'recovery-lr scale record 1') throw new Error('a file of the folder is no record of scale/run.ts')
+const parsed = readdirSync(folder).filter(name => name.endsWith('.record.json')).map(name => JSON.parse(readFileSync(join(folder, name), 'utf8')) as {format?: unknown})
+if (parsed.some(record => record.format !== 'recovery-lr scale record 1')) throw new Error('a file of the folder is no record of scale/run.ts')
+const records = parsed as ScaleRecord[]
 
 // The rows in the order: the recipe's rate before another rate, the rows with a search last, fewer train samples
 // and fewer passes first.
