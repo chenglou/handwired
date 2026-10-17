@@ -1,0 +1,21 @@
+{
+  "browser": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "test": "actual WebGPU mixed-operation differential",
+  "date": "2026-10-16T18:35:03.262Z",
+  "ok": true,
+  "deviceLossCaught": true,
+  "mismatches": 0,
+  "maxError": 0,
+  "stateMismatches": 0,
+  "stateMaxError": 0,
+  "layerMismatches": 0,
+  "layerStateMismatches": 0,
+  "adapter": "Intel(R) UHD Graphics",
+  "testedSamples": 512,
+  "operationKinds": [
+    "affine",
+    "reglu",
+    "boolean",
+    "index"
+  ]
+}

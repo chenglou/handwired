@@ -1,0 +1,188 @@
+{
+  "browser": "/root/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+  "test": "actual WebGPU mixed-operation differential",
+  "date": "2026-10-17T07:12:55.567Z",
+  "ok": true,
+  "specializedMismatches": 0,
+  "specializedStateMismatches": 0,
+  "gridMismatches": 0,
+  "gridMaxError": 0,
+  "fp32Edges": {
+    "monolithic": {
+      "total": 95,
+      "signedZeros": 30,
+      "subnormals": 80,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    },
+    "layers": {
+      "total": 95,
+      "signedZeros": 30,
+      "subnormals": 80,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    },
+    "specialized": {
+      "total": 145,
+      "signedZeros": 80,
+      "subnormals": 130,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    }
+  },
+  "fallbackAdapterName": "SwiftShader Device (Subzero)",
+  "fallbackAdapterMismatches": 0,
+  "galleryCacheHit": true,
+  "cachedGalleryInitMs": 18.79999999998836,
+  "deviceLossCaught": true,
+  "galleryOperations": 2189,
+  "galleryLayerCount": 67,
+  "galleryMismatches": 0,
+  "galleryBitMismatches": 156,
+  "galleryMaxError": 0,
+  "galleryCachedBitMismatches": 156,
+  "galleryCachedMismatches": 0,
+  "galleryMismatchExamples": [
+    {
+      "strategy": "specialized-cached",
+      "wire": 966,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 969,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 973,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 976,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 981,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 984,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1007,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1010,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1014,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1017,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1022,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1025,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1418,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1421,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1425,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    },
+    {
+      "strategy": "specialized-cached",
+      "wire": 1428,
+      "kind": "reglu",
+      "expected": "0",
+      "actual": "-0"
+    }
+  ],
+  "integratedOperations": 800,
+  "integratedLayerCount": 67,
+  "integratedMismatches": 0,
+  "integratedBitMismatches": 2,
+  "integratedMaxError": 0,
+  "mismatches": 0,
+  "maxError": 0,
+  "stateMismatches": 0,
+  "stateMaxError": 0,
+  "layerMismatches": 0,
+  "layerStateMismatches": 0,
+  "adapter": "SwiftShader Device (Subzero)",
+  "testedSamples": 512,
+  "operationKinds": [
+    "affine",
+    "reglu",
+    "boolean",
+    "index"
+  ],
+  "adapterInfo": {
+    "vendor": "google",
+    "architecture": "swiftshader",
+    "device": "0xc0de",
+    "description": "SwiftShader Device (Subzero)",
+    "isFallbackAdapter": null
+  },
+  "suspectedSoftware": true,
+  "expectedVendor": null,
+  "nativeGpuProven": false
+}

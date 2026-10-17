@@ -1,0 +1,75 @@
+{
+  "browser": "/root/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+  "test": "actual WebGPU mixed-operation differential",
+  "date": "2026-10-17T07:10:25.285Z",
+  "ok": true,
+  "specializedMismatches": 0,
+  "specializedStateMismatches": 0,
+  "gridMismatches": 0,
+  "gridMaxError": 2.086162567138672e-7,
+  "fp32Edges": {
+    "monolithic": {
+      "total": 95,
+      "signedZeros": 30,
+      "subnormals": 80,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    },
+    "layers": {
+      "total": 95,
+      "signedZeros": 30,
+      "subnormals": 80,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    },
+    "specialized": {
+      "total": 99,
+      "signedZeros": 34,
+      "subnormals": 84,
+      "nonfinite": 15,
+      "maxFiniteError": 1.999989220222952e-40
+    }
+  },
+  "fallbackAdapterName": "SwiftShader Device (Subzero)",
+  "fallbackAdapterMismatches": 0,
+  "galleryCacheHit": true,
+  "cachedGalleryInitMs": 26.400000000023283,
+  "deviceLossCaught": true,
+  "galleryOperations": 2189,
+  "galleryLayerCount": 67,
+  "galleryMismatches": 0,
+  "galleryBitMismatches": 0,
+  "galleryMaxError": 0,
+  "galleryCachedBitMismatches": 0,
+  "galleryCachedMismatches": 0,
+  "galleryMismatchExamples": [],
+  "integratedOperations": 800,
+  "integratedLayerCount": 67,
+  "integratedMismatches": 0,
+  "integratedBitMismatches": 0,
+  "integratedMaxError": 0,
+  "mismatches": 0,
+  "maxError": 0.0000019073486328125,
+  "stateMismatches": 0,
+  "stateMaxError": 9.5367431640625e-7,
+  "layerMismatches": 0,
+  "layerStateMismatches": 0,
+  "adapter": "Tesla T4",
+  "testedSamples": 512,
+  "operationKinds": [
+    "affine",
+    "reglu",
+    "boolean",
+    "index"
+  ],
+  "adapterInfo": {
+    "vendor": "nvidia",
+    "architecture": "turing",
+    "device": "0x1eb8",
+    "description": "Tesla T4",
+    "isFallbackAdapter": null
+  },
+  "suspectedSoftware": false,
+  "expectedVendor": "nvidia",
+  "nativeGpuProven": true
+}

@@ -48,3 +48,6 @@ bun lab/runtime-cost/report.ts            # three programs' sizes and µs per ev
 - `tests/`: `tests/runtime/` runs programs, including seeded random ones, through a plain reference evaluator and the compiled one, and compares the results. The other folders hold each demo's tests, which run without a browser, e.g. JSON search's GPU code through an interpreter
 - `scripts/`: `check.ts` is what `bun run check` runs, and the other files are the demo site's server, build and check, which share the list of pages in `demo-site-pages.ts`. `.github/workflows/pages.yml` runs the build on pushes to main and publishes site/ to GitHub Pages
 - `lab/`: the experiments that the runtime and the demos came out of. You can build an app without reading them. Its READMEs describe the code as it was when each was written. [lab/status.md](../lab/status.md) lists measurements and the known issues in src/, and its section [The folders of lab/](../lab/status.md#the-folders-of-lab) says what each folder is. The lab's [guide](../lab/ui-exploration/guide/README.md) has longer explanations and more runnable examples
+
+- [General-purpose WebGPU backend](webgpu-backend.md): circuit execution, browser verification and profiling.
+
