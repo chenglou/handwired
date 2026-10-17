@@ -1,0 +1,118 @@
+/* The Doom page's stylesheet: the screen, the controls under it, the x-ray's strip and the inspector beside it. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0b0c; --panel: #111114; --line: #24242a; --text: #d4d4d8; --muted: #8a8a93; --faint: #5f5f68;
+  --amber: #f5a524; --blue: #38bdf8;
+  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* {box-sizing: border-box}
+body {margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 13px/1.45 var(--sans)}
+.layout {display: grid; grid-template-columns: minmax(0, 960px) 400px; gap: 20px; align-items: start; justify-content: center;
+  padding: 16px; max-width: 1420px; margin: 0 auto}
+.layout.inspector-hidden {grid-template-columns: minmax(0, 960px)}
+.layout.inspector-hidden .inspector {display: none}
+@media (max-width: 1100px) {.layout {grid-template-columns: minmax(0, 1fr)}}
+.game {display: grid; gap: 10px; min-width: 0}
+/* 320 × 200 Doom pixels, which a 4:3 screen shows 1.2 times as tall as wide. */
+.screen {position: relative}
+#screen {display: block; width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated; background: #000; cursor: crosshair}
+#message {position: absolute; inset: 0 0 16% 0; display: grid; place-content: center; color: #f2f2f2;
+  font: 600 clamp(14px, 2.4vw, 22px)/1.3 var(--mono); text-shadow: 0 2px 0 #000; pointer-events: none}
+/* The inspected column, over the view, placed by the page. */
+#column-outline {position: absolute; top: 0; box-sizing: border-box; border: 2px solid rgba(56, 189, 248, 0.75); pointer-events: none}
+.layout.inspector-hidden #column-outline {display: none}
+#stats, #status, #help, #gpu {font: 12px/1.5 var(--mono); color: var(--muted)}
+.readout {display: flex; align-items: center; justify-content: space-between; gap: 12px}
+.controls {display: inline-flex; flex: none; gap: 8px}
+.switch {display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden}
+.switch button {font: 11px/1 var(--mono); color: var(--muted); background: transparent; border: 0; padding: 5px 10px; cursor: pointer}
+.switch button + button {border-left: 1px solid var(--line)}
+.switch button[aria-pressed="true"] {color: var(--blue); background: rgba(56, 189, 248, 0.14)}
+.switch button:disabled {color: var(--faint); cursor: not-allowed}
+.switch button:focus-visible {outline: 2px solid var(--blue); outline-offset: -2px}
+.switch.amber button[aria-pressed="true"] {color: var(--amber); background: rgba(245, 165, 36, 0.14)}
+
+/* The x-ray: a strip of the pixel program's operations to scrub, one cell per operation, grouped by layer. */
+.xray {display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel)}
+.xray[hidden] {display: none}
+.xray-scrub {display: flex; align-items: center; gap: 6px}
+.xray-strip {flex: 1; min-width: 0; height: 30px; cursor: ew-resize; touch-action: none; border-radius: 4px; background: #0c0c0f}
+.xray-scrub button, .xray-chapters button {font: 11px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; cursor: pointer}
+.xray-scrub button[aria-pressed="true"], .xray-chapters button[aria-pressed="true"] {color: var(--amber); border-color: rgba(245, 165, 36, 0.5); background: rgba(245, 165, 36, 0.14)}
+.xray-scrub button:focus-visible, .xray-chapters button:focus-visible {outline: 2px solid var(--amber); outline-offset: -2px}
+.xray-readout {display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font: 12px/1.5 var(--mono); color: var(--text)}
+.xray-readout i {display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 5px 0 2px}
+.xray-range {color: var(--muted); display: inline-flex; align-items: center; gap: 6px}
+.xray-range b {display: inline-block; width: 64px; height: 8px; border-radius: 2px}
+.xray-chapters {display: flex; flex-wrap: wrap; gap: 4px}
+.xray-chapters button {padding: 3px 7px}
+#help {color: var(--faint)}
+
+.inspector {background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0;
+  position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; overscroll-behavior: contain}
+@media (max-width: 1100px) {.inspector {position: static; max-height: none}}
+.inspector-head {display: flex; align-items: baseline; justify-content: space-between}
+.inspector h2 {margin: 0; font-size: 15px; letter-spacing: 0.02em}
+.inspector .hint {color: var(--faint); font: 11px var(--mono)}
+.lede {margin: 0; color: var(--muted)}
+.totals {display: grid; grid-template-columns: 1fr 1fr; gap: 8px}
+.totals div {background: #0d0d10; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid}
+.totals b {font: 600 20px/1.2 var(--mono); color: #fafafa}
+.totals span {color: var(--muted); font-size: 11px}
+.legend {display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 11px}
+.legend i {display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px}
+.pipeline {display: grid; gap: 8px}
+.program {border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 5px}
+.program-head {display: flex; align-items: baseline; gap: 8px}
+.program h3 {margin: 0; font-size: 13px}
+.program .cadence {color: var(--muted); font-size: 11px; flex: 1}
+.program .time {font: 11px var(--mono); color: var(--amber)}
+.program .numbers {font: 11px var(--mono); color: var(--text)}
+.program p {margin: 0; color: var(--muted); font-size: 11.5px}
+.mix {display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px}
+.section {margin: 4px 0 0; font-size: 13px}
+.section small {color: var(--faint); font-weight: 400; margin-left: 6px}
+.inspect {display: grid; gap: 10px}
+.minimap {width: 100%; aspect-ratio: 3 / 2; border-radius: 8px; border: 1px solid var(--line)}
+.column-detail {display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: start}
+.column-detail figure {margin: 0; display: grid; gap: 4px; justify-items: center}
+.column-detail figcaption {color: var(--faint); font-size: 10px}
+.strip {height: 168px; image-rendering: pixelated; border: 1px solid var(--line)}
+.strip.intervals {width: 20px}
+.strip.pixels {width: 14px}
+.walk-text {display: grid; gap: 6px; color: var(--muted); font-size: 11.5px}
+.walk-text b {color: #fafafa; font-family: var(--mono)}
+.activations-figure {margin: 0; display: grid; gap: 6px}
+.activations-frame {position: relative}
+.activations {display: block; width: 100%; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--line); background: #0c0c0f; cursor: pointer}
+/* The operation the x-ray shows, over the pixel program's values. */
+.probe-marker {position: absolute; bottom: 0; min-width: 3px; box-sizing: border-box; border: 1px solid #fff; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.9), 0 0 8px rgba(255, 255, 255, 0.55)}
+.probe-marker[hidden] {display: none}
+.activations-figure figcaption {color: var(--faint); font-size: 11px}
+.gpu {display: grid; gap: 8px}
+.gpu-stage {border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px}
+.gpu-stage-head {display: flex; align-items: baseline; justify-content: space-between; gap: 8px}
+.gpu-stage-head b {font-size: 12.5px}
+.gpu-stage-head em {font: 11px var(--mono); font-style: normal; color: var(--amber); white-space: nowrap}
+.gpu-stage-meta {color: var(--muted); font: 11px var(--mono)}
+.gpu-stage[data-state="ready"] em {color: #4ade80}
+.gpu-stage[data-state="failed"] em {color: #f87171}
+.gpu-stage[data-state="waiting"] em {color: var(--faint)}
+.gpu-bar {height: 4px; border-radius: 2px; background: #27272a; overflow: hidden}
+.gpu-bar i {display: block; height: 100%; width: 0}
+.gpu-stage[data-state="compiling"] .gpu-bar i {width: 100%; background: repeating-linear-gradient(-45deg, var(--amber) 0 6px, #7c5310 6px 12px);
+  background-size: 17px 100%; animation: gpu-stripes 0.7s linear infinite}
+.gpu-stage[data-state="ready"] .gpu-bar i {width: 100%; background: #22c55e}
+.gpu-stage[data-state="failed"] .gpu-bar i {width: 100%; background: #ef4444}
+@keyframes gpu-stripes {to {background-position: 17px 0}}
+@media (prefers-reduced-motion: reduce) {.gpu-stage[data-state="compiling"] .gpu-bar i {animation: none}}
+.gpu-note {margin: 0; color: var(--muted); font-size: 11.5px}
+.monsters {list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow: auto}
+.monsters li {display: grid; grid-template-columns: 10px 1fr auto 52px; gap: 8px; align-items: center; font-size: 11.5px}
+.monsters .dot {width: 8px; height: 8px; border-radius: 50%}
+.monsters .mood {color: var(--muted)}
+.monsters .health {height: 4px; background: #27272a; border-radius: 2px; overflow: hidden}
+.monsters .health i {display: block; height: 100%; background: #ef4444}

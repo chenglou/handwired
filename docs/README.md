@@ -1,6 +1,6 @@
 # Docs
 
-With Handwired you write a numeric program: a fixed list of arithmetic operations over 32-bit floats, which these docs call FP32, mostly weighted sums and products with a ReLU. It is the neural net that the [README](../README.md) describes. You write it in builder code, i.e. ordinary JavaScript that runs once and appends the operations to a `Circuit`. No tool converts existing JavaScript source into a program. The runtime evaluates a program in JavaScript on the CPU, and only the JSON search demo runs on WebGPU.
+With Handwired you write a numeric program: a fixed list of arithmetic operations over 32-bit floats, which these docs call FP32, mostly weighted sums and products with a ReLU. It is the neural net that the [README](../README.md) describes. You write it in builder code, i.e. ordinary JavaScript that runs once and appends the operations to a `Circuit`. No tool converts existing JavaScript source into a program. The runtime evaluates a program in JavaScript on the CPU, and only the JSON search demo and the Doom port run on WebGPU.
 
 [template/](../template/) is a toggle switch written as one numeric program and checked against the same switch in plain JavaScript, to copy as the start of a new app. Read the docs in this order:
 
@@ -28,7 +28,9 @@ The repo needs [Bun](https://bun.sh), and is tested with Bun 1.4.3.
 bun install
 bun start                                 # the demo site at http://127.0.0.1:3000/: the landing page, and the demos at /os/, /learned-gallery/ and /json-search/
 bun run start:template                    # the template app, a toggle switch, at http://localhost:3000/
-bun run test                              # every test in tests/, template/ and lab/, in about 3 minutes
+bun scripts/fetch-doom-wad.ts             # Doom's shareware WAD, which the Doom port and its tests need, into .cache/doom/
+bun run start:doom                        # the Doom port, at http://127.0.0.1:3001/
+bun run test                              # every test in tests/, template/ and lab/, in about 3 minutes; the Doom port's only with its WAD
 bun test tests/runtime                    # one folder's tests, in about 2 s
 bun run check                             # type-checks and lints src/, tests/, scripts/, template/ and lab/, in about 3 s
 bun run site:build                        # the demo site as static files in site/
@@ -43,8 +45,9 @@ bun lab/runtime-cost/report.ts            # three programs' sizes and µs per ev
 
 - `src/runtime/`: what every program is built and run with. `numeric-ui-core.ts` has the `Circuit` class, the builder functions, the compiler and the evaluators. `cells.ts` declares a program's cells and checks their values. `host-timing.ts` plans a frame's evaluations and spring steps, in plain JavaScript. `prefix-networks.ts` computes every prefix of a list under an associative combine, e.g. running totals of row heights
 - `src/handwiredos/`, `src/learned-gallery/` and `src/json-search/`: the three demos, each with a README that names its files. HandwiredOS is a small desktop with three windows and a dock, run by one program. The learned gallery is a photo layout computed by a small network inside a program, whose coefficients are trained with the program's own gradients. JSON search searches 100,000 JSON documents at each keystroke, with two programs that it writes as WebGPU shaders
-- `assets/`: the demo site's pages, stylesheets and images, e.g. `demos.html` for the landing page and `index.html` for HandwiredOS
+- `src/doom/`: Doom's E1M1 as five programs, the game, a frame's tables, a column's walk, a pixel and the status bar, with a README that names its files. Its page, `assets/doom.html`, isn't on the demo site, since it needs Doom's shareware WAD, which the repo doesn't carry
+- `assets/`: the demo site's pages, stylesheets and images, e.g. `demos.html` for the landing page and `index.html` for HandwiredOS, and the Doom port's page
 - `template/`: the toggle switch to start an app from
 - `tests/`: `tests/runtime/` runs programs, including seeded random ones, through a plain reference evaluator and the compiled one, and compares the results. The other folders hold each demo's tests, which run without a browser, e.g. JSON search's GPU code through an interpreter
-- `scripts/`: `check.ts` is what `bun run check` runs, and the other files are the demo site's server, build and check, which share the list of pages in `demo-site-pages.ts`. `.github/workflows/pages.yml` runs the build on pushes to main and publishes site/ to GitHub Pages
+- `scripts/`: `check.ts` is what `bun run check` runs, `serve-doom.ts`, `fetch-doom-wad.ts` and `check-doom-page.ts` are the Doom port's server, WAD download and page check, and the other files are the demo site's server, build and check, which share the list of pages in `demo-site-pages.ts`. `.github/workflows/pages.yml` runs the build on pushes to main and publishes site/ to GitHub Pages
 - `lab/`: the experiments that the runtime and the demos came out of. You can build an app without reading them. Its READMEs describe the code as it was when each was written. [lab/status.md](../lab/status.md) lists measurements and the known issues in src/, and its section [The folders of lab/](../lab/status.md#the-folders-of-lab) says what each folder is. The lab's [guide](../lab/ui-exploration/guide/README.md) has longer explanations and more runnable examples

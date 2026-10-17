@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doom's E1M1 · Handwired</title>
+  <link rel="stylesheet" href="./doom.css">
+</head>
+<body>
+  <main class="layout">
+    <section class="game">
+      <div class="screen"><canvas id="screen" width="320" height="200"></canvas><div id="column-outline"></div><div id="message"></div></div>
+      <div class="readout">
+        <div id="stats"></div>
+        <div class="controls">
+          <div class="switch amber"><button type="button" data-xray-toggle aria-pressed="false" title="Show one operation of the pixel program at every pixel (X)">X-ray</button></div>
+          <div class="switch" role="group" aria-label="Where the columns and pixels run"><button type="button" data-columns="GPU">GPU</button><button type="button" data-columns="CPU">CPU</button></div>
+        </div>
+      </div>
+      <section class="xray" data-xray hidden aria-label="X-ray of the pixel program">
+        <div class="xray-scrub">
+          <button type="button" data-xray-step="-1" title="Previous operation (Z, with Shift the previous layer)" aria-label="Previous operation">‹</button>
+          <canvas class="xray-strip" data-xray-strip role="img" aria-label="The pixel program's operations, by layer: drag to pick one"></canvas>
+          <button type="button" data-xray-step="1" title="Next operation (C, with Shift the next layer)" aria-label="Next operation">›</button>
+          <button type="button" data-xray-sweep aria-pressed="false" title="Step to the last operation from the shown one, pausing at the named stops (P)">sweep</button>
+        </div>
+        <div class="xray-readout"><span data-xray-operation></span><span class="xray-range" data-xray-range></span></div>
+        <div class="xray-chapters" data-xray-chapters></div>
+      </section>
+      <div id="gpu"></div>
+      <div id="status">loading</div>
+      <div id="help">W/S or ↑/↓ move · ←/→ turn · A/D strafe · Shift run · Ctrl, F or click fire · Space or E use · 1 fist, 2 pistol, 3 shotgun · G columns on the GPU or the CPU · X x-rays the pixel program, Z/C step an operation, with Shift a layer, P sweeps · Tab shows or hides what's under the hood</div>
+    </section>
+    <aside class="inspector" id="inspector"></aside>
+  </main>
+  <script type="module" src="../src/doom/main.ts"></script>
+</body>
+</html>

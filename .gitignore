@@ -3,3 +3,5 @@ node_modules/
 .DS_Store
 # The demo site that `bun run site:build` builds.
 site/
+# The Doom port's WADs, which scripts/fetch-doom-wad.ts downloads into .cache/doom/ and the repo doesn't carry.
+.cache/
