@@ -2,7 +2,7 @@
 
 **Do not read this folder if you build the parser, the train data, the training or its machinery.** See `../README.md`.
 
-`run.ts` ran once, on 2026-10-16 at 21:50 UTC, from the worktree at commit 469f614, and ended without a problem. It scored the 24 files of `list.json` and the rows 1 and 2 on the generator's set, on the written set and on the dataset's test split. `final-report.md` is a copy of its report with every breakdown, and every count is in `recovery-scratch/transfer/toml/held-back/final/final.counts.json`. Nothing was trained, searched or changed, and no table was scored on a held-back set before or after that run. The numbers below that the report does not print come from the file of counts alone, by `scripts/after.ts` in the same scratch folder.
+`run.ts` ran once, on 2026-10-16 at 21:50 UTC, from the worktree at commit 6a3e159, and ended without a problem. It scored the 24 files of `list.json` and the rows 1 and 2 on the generator's set, on the written set and on the dataset's test split. `final-report.md` is a copy of its report with every breakdown, and every count is in `recovery-scratch/transfer/toml/held-back/final/final.counts.json`. Nothing was trained, searched or changed, and no table was scored on a held-back set before or after that run. The numbers below that the report does not print come from the file of counts alone, by `scripts/after.ts` in the same scratch folder.
 
 A cell is "all three / whole" in percent, with the mean of a row's seeds and the lowest and the highest seed in brackets. The words are those of `README.md`.
 

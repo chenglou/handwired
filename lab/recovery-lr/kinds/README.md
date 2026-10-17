@@ -114,7 +114,7 @@ bun lab/recovery-lr/kinds/runs/run.ts --seed 1 --folder <scratch>/transfer/lr/ru
 RECOVERY_LR_SCRATCH=<the scratch folder of ../learn/runs/README.md> bun lab/recovery-lr/kinds/runs/table.ts --mixed <that folder> --neutral <scratch>/transfer/lr/runs/neutral
 ```
 
-The tables and a record per row and seed are in `<scratch>/transfer/lr/runs/mixed/`, with the logs in its folder `logs`. `runs/table.ts` scores every saved table itself on four sets of validation samples, also the tables of `../learn/runs/` that were trained on the dataset's train split, and it throws when a score that it makes for one of those on the dataset's validation split is not the one in that run's record. The bars are the ones of `../learn/runs/table.ts`, as the code had them at the commit 22e8a43, with their counts made on the dataset's train samples.
+The tables and a record per row and seed are in `<scratch>/transfer/lr/runs/mixed/`, with the logs in its folder `logs`. `runs/table.ts` scores every saved table itself on four sets of validation samples, also the tables of `../learn/runs/` that were trained on the dataset's train split, and it throws when a score that it makes for one of those on the dataset's validation split is not the one in that run's record. The bars are the ones of `../learn/runs/table.ts`, as the code had them at the commit 8233c23, with their counts made on the dataset's train samples.
 
 The four sets: the mixed validation split (5000 samples, 773663 scored code points), its half with the dataset's damage (2500 samples, 336530 scored code points), its half with the kinds (2500 samples, 437133 scored code points), the dataset's own validation split (5000 samples, 678386 scored code points). A number with brackets is the mean of the seeds with the lowest and the highest. Every number is a percentage. The scores of the rows trained on the dataset's train split on the dataset's own validation split are the ones in their records.
 
@@ -148,16 +148,16 @@ The runs one by one, from their records:
 
 | row | seed | all three: mixed validation | its half with the dataset's damage | its half with the kinds | the dataset's own validation | all three on the mixed train split | cells changed | display entries changed | training, s | search, s | commit | sha256 of the tables |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 9 | 1 | 88.19 | 81.59 | 93.27 | 81.79 | 89.10 | 1890 | 2275 | 22 | 0 | 44e74e6 | d424381ac6e31e59 |
-| 9 | 2 | 88.26 | 80.20 | 94.47 | 81.09 | 89.07 | 1872 | 2241 | 25 | 0 | 44e74e6 | 6e81225046066a3c |
-| 9 | 3 | 88.65 | 81.07 | 94.49 | 81.65 | 89.41 | 1913 | 2254 | 23 | 0 | 44e74e6 | 36c22bf0628ae53d |
-| 9 | 4 | 88.79 | 81.75 | 94.22 | 82.16 | 89.86 | 1904 | 2290 | 49 | 0 | cb420a7 | 14155e6e915298fd |
-| 9 | 5 | 88.63 | 81.64 | 94.01 | 81.99 | 89.23 | 1977 | 2230 | 55 | 0 | cb420a7 | 501bf6f05641d04e |
-| 10 | 1 | 91.74 | 86.09 | 96.10 | 86.65 | 93.11 | 2298 | 2267 | 22 | 19 | 44e74e6 | 02ffc8bafbe20637 |
-| 10 | 2 | 92.07 | 86.67 | 96.22 | 87.01 | 93.17 | 2362 | 2235 | 25 | 21 | 44e74e6 | 8af4596dec8f5a67 |
-| 10 | 3 | 91.81 | 86.12 | 96.19 | 86.74 | 93.10 | 2384 | 2236 | 23 | 21 | 44e74e6 | fe77c040b1c85147 |
-| 10 | 4 | 91.93 | 86.49 | 96.12 | 87.00 | 93.20 | 2360 | 2276 | 49 | 30 | cb420a7 | 211caab628d3773d |
-| 10 | 5 | 92.14 | 86.76 | 96.28 | 87.22 | 93.26 | 2377 | 2220 | 55 | 31 | cb420a7 | 3c4bbb75a8b3326c |
+| 9 | 1 | 88.19 | 81.59 | 93.27 | 81.79 | 89.10 | 1890 | 2275 | 22 | 0 | d2fa1f7 | d424381ac6e31e59 |
+| 9 | 2 | 88.26 | 80.20 | 94.47 | 81.09 | 89.07 | 1872 | 2241 | 25 | 0 | d2fa1f7 | 6e81225046066a3c |
+| 9 | 3 | 88.65 | 81.07 | 94.49 | 81.65 | 89.41 | 1913 | 2254 | 23 | 0 | d2fa1f7 | 36c22bf0628ae53d |
+| 9 | 4 | 88.79 | 81.75 | 94.22 | 82.16 | 89.86 | 1904 | 2290 | 49 | 0 | 12ba316 | 14155e6e915298fd |
+| 9 | 5 | 88.63 | 81.64 | 94.01 | 81.99 | 89.23 | 1977 | 2230 | 55 | 0 | 12ba316 | 501bf6f05641d04e |
+| 10 | 1 | 91.74 | 86.09 | 96.10 | 86.65 | 93.11 | 2298 | 2267 | 22 | 19 | d2fa1f7 | 02ffc8bafbe20637 |
+| 10 | 2 | 92.07 | 86.67 | 96.22 | 87.01 | 93.17 | 2362 | 2235 | 25 | 21 | d2fa1f7 | 8af4596dec8f5a67 |
+| 10 | 3 | 91.81 | 86.12 | 96.19 | 86.74 | 93.10 | 2384 | 2236 | 23 | 21 | d2fa1f7 | fe77c040b1c85147 |
+| 10 | 4 | 91.93 | 86.49 | 96.12 | 87.00 | 93.20 | 2360 | 2276 | 49 | 30 | 12ba316 | 211caab628d3773d |
+| 10 | 5 | 92.14 | 86.76 | 96.28 | 87.22 | 93.26 | 2377 | 2220 | 55 | 31 | 12ba316 | 3c4bbb75a8b3326c |
 
 ### Per kind
 
@@ -210,8 +210,8 @@ The samples of the mixed validation split that have one kind alone, and in the l
 
 Notes on the runs:
 
-- The seeds 1 to 3 ran at the commit 44e74e6 and the seeds 4 and 5 at cb420a7. Between the two, another agent added the folder `../learn/scale/` and changed no file that the recipe or this folder reads. The folder `runs/` itself was not committed yet when the runs started, which is why every record lists it among the files that differ from the commit.
+- The seeds 1 to 3 ran at the commit d2fa1f7 and the seeds 4 and 5 at 12ba316. Between the two, another agent added the folder `../learn/scale/` and changed no file that the recipe or this folder reads. The folder `runs/` itself was not committed yet when the runs started, which is why every record lists it among the files that differ from the commit.
 - The seeds 4 and 5 took twice as long because other runs were using the machine at that time.
 - While the table was being made, another agent had uncommitted changes in `../learn/data.ts` and `../learn/score.ts`. They change the upper bound that a score prints next to its row and add a counter, and not the columns of this table: the table's command checked that its scores of the dataset's rows on the dataset's validation split are the ones in their records, to four decimals of "all three".
-- The yacc bar was changed by its author today (commit b3ead3c), so its numbers here can differ from an older table in `../learn/runs/README.md`.
-- Seed 1 was run a second time, into `<scratch>/transfer/lr/runs/mixed-again/`, at the commit 22e8a43 and with those uncommitted changes of the other agent loaded. The tables of both rows are the same byte for byte as the first time (sha256 d424381ac6e31e59… for row 9 and 02ffc8bafbe20637… for row 10). The other seeds were run once.
+- The yacc bar was changed by its author today (commit 2d51c26), so its numbers here can differ from an older table in `../learn/runs/README.md`.
+- Seed 1 was run a second time, into `<scratch>/transfer/lr/runs/mixed-again/`, at the commit 8233c23 and with those uncommitted changes of the other agent loaded. The tables of both rows are the same byte for byte as the first time (sha256 d424381ac6e31e59… for row 9 and 02ffc8bafbe20637… for row 10). The other seeds were run once.

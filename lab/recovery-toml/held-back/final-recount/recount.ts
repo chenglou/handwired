@@ -486,7 +486,11 @@ const linesOfRepoReport = holdReport(join(folderOfTheFinalScoring, 'final-report
 holdReport(join(finalFolder, 'final.report.md'))
 // The repo's copy of the report writes the scratch folder as <RECOVERY_SCRATCH> and list.json by its path from the
 // repo root. The report of the run names both by their full paths.
-const reportOfTheRunAsCopied = readFileSync(join(finalFolder, 'final.report.md'), 'utf8').replaceAll(loggedRun.list, 'lab/recovery-toml/held-back/final/list.json').replaceAll(scratchFolder, '<RECOVERY_SCRATCH>')
+// The history was rewritten when it was published, to take out the folders of the machine, so the commit of the run
+// has another hash there. The repo's copy of the report names the commit by its published hash, the log by its hash
+// before.
+const publishedCommitOf: Record<string, string> = {'469f614efaa7c4e48ba08c06022e52c17e594db4': '6a3e1595c2b661703d07f3dd76802bd4d2c9dcc1'}
+const reportOfTheRunAsCopied = readFileSync(join(finalFolder, 'final.report.md'), 'utf8').replaceAll(loggedRun.list, 'lab/recovery-toml/held-back/final/list.json').replaceAll(scratchFolder, '<RECOVERY_SCRATCH>').replaceAll(loggedRun.commit, publishedCommitOf[loggedRun.commit] ?? loggedRun.commit)
 hold('files', 'final-report.md of the repo is the report of the run, with the scratch folder and the path of list.json written without the folders of the machine', sha256Of(join(folderOfTheFinalScoring, 'final-report.md')), sha256OfText(reportOfTheRunAsCopied))
 
 // ---------------------------------------------------------------------------------------------------------------
