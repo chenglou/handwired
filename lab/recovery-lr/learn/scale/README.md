@@ -6,7 +6,7 @@ The frozen recipe of `../recipe.ts` trains for 3 passes over 40,000 train sample
 
 ## Commands
 
-Run from the repo root. `RECOVERY_LR_SCRATCH` is a folder outside the repo.
+Run from the repo root. `RECOVERY_LR_SCRATCH` is a folder outside the repo. `<scratch>` stands for the experiment's scratch folder, which is outside the repo and which other pages name `recovery-scratch`.
 
 ```sh
 export RECOVERY_LR_SCRATCH=<scratch>/transfer/lr/build/runs
@@ -80,6 +80,8 @@ All three of the snapped tables on the validation split after every pass, before
 - seed 1: 82.34 85.04 84.18 84.97 84.97 84.17 82.65 85.64 85.08 84.66 83.87 84.82 85.39 84.69 83.96 84.31 84.46 82.94 83.54 83.43 82.73 82.66 83.94 84.58 84.56 84.76 83.82 83.63 84.54 85.03
 - seed 2: 80.75 81.40 81.56 82.11 82.38 82.58 82.20 81.12 82.25 77.52 82.66 83.67 81.86 81.97 81.98 82.97 83.04 82.71 79.07 83.46 81.10 82.25 82.68 83.26 82.86 83.35 83.58 83.33 82.06 82.32
 - seed 3: 80.15 82.47 83.23 82.64 82.04 82.25 82.31 82.54 83.21 83.42 83.46 80.92 82.30 82.50 79.27 80.70 81.44 81.78 83.29 81.87 82.68 81.37 82.79 82.51 81.01 82.17 81.27 82.23 81.84 83.20
+
+The bar of yacc error productions in the table is the one of `../runs/README.md`. A review made it stronger after these runs: 84.45 / 39.28 on the same samples, see `../bars/yacc/README.md`. Every setting of gradient training alone stays below it.
 
 ## What the numbers say
 

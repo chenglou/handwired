@@ -6,7 +6,7 @@ The recipe of `../recipe.ts` was run with no setting changed, on the first 40,00
 
 ## Commands
 
-Run from the repo root. `RECOVERY_LR_SCRATCH` is a folder outside the repo. The tables and records go to `--folder`, or to `<RECOVERY_LR_SCRATCH>/runs/neutral`.
+Run from the repo root. `RECOVERY_LR_SCRATCH` is a folder outside the repo. The tables and records go to `--folder`, or to `<RECOVERY_LR_SCRATCH>/runs/neutral`. `<scratch>` stands for the experiment's scratch folder, which is outside the repo and which other pages name `recovery-scratch`.
 
 ```sh
 export RECOVERY_LR_SCRATCH=<scratch>/transfer/lr/build/runs
@@ -44,6 +44,8 @@ Dataset `60c821012d537395`, the 5,000 validation samples with 678,386 scored cod
 | row 10: training, then the search, then the count | 1, 2, 3, 4, 5 | 88.10 (87.71 to 88.50) | 48.37 (47.62 to 49.84) | 95.7 (95.5 to 95.9) | 90.0 (89.7 to 90.4) | 94.3 (94.2 to 94.4) | 78.49 (77.36 to 79.27) | 26.78 (25.32 to 27.52) | 93.7 (93.5 to 93.9) | 95.7 (95.5 to 95.9) | 1.84 (1.58 to 2.09) |
 | row 11: the search and the count, without training | 11, 12, 13 | 87.40 (87.33 to 87.54) | 44.51 (43.38 to 45.84) | 95.0 (94.9 to 95.2) | 89.7 (89.6 to 90.0) | 94.0 (93.8 to 94.1) | 80.78 (80.15 to 81.39) | 29.83 (28.94 to 31.46) | 93.2 (93.0 to 93.5) | 95.7 (95.6 to 95.8) | 1.67 (1.56 to 1.81) |
 | row 12: training, then the count, without "end an item early" | 1, 2, 3, 4, 5 | 75.05 (72.16 to 76.70) | 30.47 (27.78 to 34.60) | 94.8 (94.0 to 95.2) | 78.2 (75.6 to 80.0) | 90.6 (89.1 to 92.2) | 66.25 (63.50 to 67.91) | 16.84 (14.90 to 18.88) | 88.7 (87.1 to 91.1) | 94.4 (94.0 to 94.7) | 4.91 (3.64 to 6.03) |
+
+**Two bars are stronger since these runs.** A review of the machinery, after the runs, gave yacc error productions one more rule and panic mode with a hand-written list one more choice. On the same validation samples they now have 84.45 / 39.28 and 78.88 / 35.56 (all three / whole), see `../bars/yacc/README.md` and `../bars/panic/README.md`. The table above and the bullets below keep the numbers of the bars as they were when the runs were made. With the stronger yacc bar, row 9 is 1.6 points below it in all three, not level with it.
 
 Per run. "All three" and "whole" are of the validation split unless the column says otherwise.
 
