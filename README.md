@@ -31,8 +31,8 @@ Because we basically only use these 2 primitives:
 - existing gpu techniques, such as fusion, sparsity, reordering, have a great time optimizing such minimal primitives
 
 This unlocks lots of funny use-cases, like:
-- unfreezing the weights and train them (what does that even do? Let's find out!)
-- attaching a specific frozen program to a generic neural net and train end-to-end (now a nanoGPT can do both Shakespeare and your particular UI?)
+- unfreezing the weights and training them (what does that even do? Let's find out!)
+- attaching a specific frozen program to a generic neural net and training end-to-end (now a nanoGPT can do both Shakespeare and your particular UI?)
 - achieving GPU-level of parallelism with JS code that was written in a traditional single-threaded way (see the JSON search demo that runs in milliseconds over 100k documents)
 
 ## Play With It
