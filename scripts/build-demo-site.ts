@@ -8,9 +8,12 @@
 //    page's HTML at its path in the repo, e.g. site/assets/index.html.
 // 3. Move each page's HTML to its folder on the site. The URLs in its <link>, <script> and <img> tags are relative
 //    to the HTML file, so they are rewritten for the new folder. Links between pages stay as written, since the
-//    pages write them for the site's layout already, e.g. "../learned-gallery/". Every page gets the site's icon.
+//    pages write them for the site's layout already, e.g. "../learned-gallery/". Every page gets the site's icon,
+//    and the tags that search engines and link previews read: a canonical link, and Open Graph and Twitter tags made
+//    from the page's own <title> and description, with the preview picture of demo-site-pages.ts.
 // 4. Build each script that a page starts as a worker, as one file next to its page, e.g. site/json-search/demo-worker.js.
-// 5. Check the result, and fail when a page is missing, when a page loads a file or links to a page that isn't in
+// 5. Copy the preview picture, and write sitemap.xml, which lists every page by its full address.
+// 6. Check the result, and fail when a page is missing, when a page loads a file or links to a page that isn't in
 //    site/, when a page loads anything from another host, or when a URL starts with "/". The site is served under
 //    a path prefix, e.g. https://example.com/handwired/, where a URL like "/os/" leaves the site. The check reads
 //    the HTML and CSS files, and the CSS inside the HTML, e.g. a style attribute. scripts/check-demo-site.ts loads
@@ -19,12 +22,13 @@ import {createHash} from 'node:crypto'
 import {existsSync} from 'node:fs'
 import {mkdir, readdir, readFile, rm, rmdir, stat, writeFile} from 'node:fs/promises'
 import path from 'node:path'
-import {iconLinkTag, repoRoot, siteFoldersNotBuilt, sitePages, siteWorkers} from './demo-site-pages.ts'
+import {iconLinkTag, repoRoot, siteFoldersNotBuilt, sitePages, siteUrl, siteWorkers, socialImage} from './demo-site-pages.ts'
 
 const outdir = path.join(repoRoot, 'site')
 const problems: string[] = []
 const pagesWithSeveralStylesheets: string[] = []
 const pagesWithTheirOwnIcon: string[] = []
+const pagesWithTheirOwnSearchTags: string[] = []
 
 // The tags whose URL names a file that the page loads. Bun points these URLs at the files it wrote.
 const loadingTags = /<(?:link|script|img)\b[^>]*>/g
@@ -49,6 +53,31 @@ async function copyImageThatBunLeft(sourceFile: string): Promise<string> {
   const copy = path.join(outdir, `${name}-${hash}${ext}`)
   await writeFile(copy, bytes)
   return copy
+}
+
+// The tags that a search engine and a link preview read, for the page at `sitePath`. A tag that the page writes
+// itself, e.g. its own og:title, is kept, and this one is left out.
+function searchTags(source: string, html: string, sitePath: string): string {
+  const title = /<title>([^<]*)<\/title>/.exec(html)?.[1]?.trim()
+  const description = /<meta\s+name="description"\s+content="([^"]*)"/.exec(html)?.[1]
+  if (title === undefined || title === '') problems.push(`${source}: the page has no <title>, which search results and link previews show`)
+  if (description === undefined) problems.push(`${source}: the page has no <meta name="description">, which search results and link previews show`)
+  const tags: [string, string][] = [
+    ['rel="canonical"', `<link rel="canonical" href="${siteUrl}${sitePath}">`],
+    ['property="og:type"', `<meta property="og:type" content="website">`],
+    ['property="og:site_name"', `<meta property="og:site_name" content="Handwired">`],
+    ['property="og:url"', `<meta property="og:url" content="${siteUrl}${sitePath}">`],
+    ['property="og:title"', `<meta property="og:title" content="${(title ?? '').replaceAll('"', '&quot;')}">`],
+    ['property="og:description"', `<meta property="og:description" content="${description ?? ''}">`],
+    ['property="og:image"', `<meta property="og:image" content="${siteUrl}${socialImage.path}">`],
+    ['property="og:image:width"', `<meta property="og:image:width" content="${socialImage.width}">`],
+    ['property="og:image:height"', `<meta property="og:image:height" content="${socialImage.height}">`],
+    ['property="og:image:alt"', `<meta property="og:image:alt" content="${socialImage.alt.replaceAll('"', '&quot;')}">`],
+    ['name="twitter:card"', `<meta name="twitter:card" content="summary_large_image">`],
+  ]
+  const missing = tags.filter(([attribute]) => !html.includes(attribute))
+  if (missing.length < tags.length) pagesWithTheirOwnSearchTags.push(source)
+  return missing.map(([, tag]) => tag).join('\n')
 }
 
 async function movePage(source: string, sitePath: string) {
@@ -91,6 +120,7 @@ async function movePage(source: string, sitePath: string) {
   // icon itself keeps it.
   if (/<link\b[^>]*\brel="icon"/.test(html)) pagesWithTheirOwnIcon.push(source)
   else html = html.replace('</head>', `${iconLinkTag}\n</head>`)
+  html = html.replace('</head>', `${searchTags(source, html, sitePath)}\n</head>`)
 
   await mkdir(path.dirname(targetFile), {recursive: true})
   await writeFile(targetFile, html)
@@ -122,7 +152,9 @@ function urlsOf(name: string, text: string): FoundUrl[] {
   const html = text.replace(/<!--[\s\S]*?-->/g, '')
   for (const [tag, tagName] of html.matchAll(/<([a-z][a-z0-9]*)\b[^>]*>/gi)) {
     for (const [, url] of tag.matchAll(/\b(?:src|href|action|poster)="([^"]*)"/g)) {
-      urls.push({url: url!, where: tag, loadsAFile: tagName!.toLowerCase() !== 'a', hidden: /\shidden(?=[\s>=])/.test(tag)})
+      // A canonical link names the page's own address for search engines, and loads nothing.
+      const loadsAFile = tagName!.toLowerCase() !== 'a' && !/\brel="canonical"/.test(tag)
+      urls.push({url: url!, where: tag, loadsAFile, hidden: /\shidden(?=[\s>=])/.test(tag)})
     }
     // The CSS that a tag carries, e.g. style="background: url(/photo.webp)".
     for (const [, css] of tag.matchAll(/\sstyle="([^"]*)"/g)) urls.push(...urlsOfCss(css!))
@@ -201,9 +233,21 @@ for (const worker of siteWorkers) {
 for (const name of await readdir(outdir)) {
   if (name.endsWith('.js') && (await stat(path.join(outdir, name))).size === 0) await rm(path.join(outdir, name))
 }
+await Bun.write(path.join(outdir, socialImage.path), Bun.file(path.join(repoRoot, socialImage.source)))
+const sitemap = [
+  '<?xml version="1.0" encoding="UTF-8"?>',
+  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+  ...sitePages.map(page => `  <url><loc>${siteUrl}${page.path}</loc></url>`),
+  '</urlset>',
+  '',
+].join('\n')
+await writeFile(path.join(outdir, 'sitemap.xml'), sitemap)
 const {fileCount, byteCount} = await checkSite()
 if (pagesWithTheirOwnIcon.length > 0) {
   console.warn(`Note: these pages have an icon link of their own and keep it, so they don't get the site's icon from scripts/demo-site-pages.ts: ${pagesWithTheirOwnIcon.join(', ')}.`)
+}
+if (pagesWithTheirOwnSearchTags.length > 0) {
+  console.warn(`Note: these pages write some of the canonical, Open Graph or Twitter tags themselves and keep them: ${pagesWithTheirOwnSearchTags.join(', ')}.`)
 }
 if (pagesWithSeveralStylesheets.length > 0) {
   console.warn(`Note: these pages link more than one stylesheet: ${pagesWithSeveralStylesheets.join(', ')}. Bun's development server writes several stylesheet links in the reverse of the page's order (seen in Bun 1.4.3), and this build keeps the page's order. So a rule that overrides a rule of an earlier stylesheet at the same specificity applies in the built site and loses while developing. A page that links one stylesheet, which starts with an @import of the others, looks the same in both.`)

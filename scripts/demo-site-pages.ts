@@ -6,6 +6,13 @@ import {resolve} from 'node:path'
 
 export const repoRoot = resolve(import.meta.dir, '..')
 
+// The site's address, which search engines and link previews need whole: a page's canonical link, its og:url and
+// og:image, and the sitemap name pages by it. The site itself never loads from it, since its links are relative.
+export const siteUrl = 'https://chenglou.me/handwired/'
+// The picture that a link preview shows for every page, e.g. on Hacker News, Slack or X: the index's screenshot of
+// HandwiredOS as a JPEG, which more previewers read than WebP. The build copies it to the site's root as `path`.
+export const socialImage = {source: 'assets/social-preview.jpg', path: 'social-preview.jpg', width: 1520, height: 800, alt: 'A screenshot of HandwiredOS: three windows on a desk, with a grid of photos in front.'}
+
 // `source` is the page's file in the repo, and `path` is its folder on the site, relative to the site's root, e.g.
 // 'os/' is served at <site>/os/ and built as site/os/index.html. The site is served under a path prefix, e.g.
 // https://example.com/handwired/, so every link between pages is relative and written for these paths: the index
