@@ -1,0 +1,18 @@
+{
+  "browser": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "test": "GPU/CPU visual-swarm benchmark",
+  "date": "2026-10-16T18:30:59.035Z",
+  "ok": true,
+  "samples": 8192,
+  "steps": 128,
+  "cpuMs": 1401.6999999955297,
+  "jsMs": 47.600000001490116,
+  "gpuMs": 35.30000000447035,
+  "layeredMs": 36.20000000298023,
+  "layerCount": 3,
+  "speedup": 39.708215292295186,
+  "layeredSpeedup": 38.720994471826856,
+  "mismatches": 0,
+  "jsMismatches": 0,
+  "maxDifference": 0
+}

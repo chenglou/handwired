@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Handwired · CPU / WebGPU swarms</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,Arial,sans-serif;background:#070d1b;color:#e7edff}
+    body{max-width:1080px;padding:24px;margin:32px auto}
+    h1{font-size:clamp(26px,4vw,44px);margin:8px 0}
+    p{color:#9db0d5;line-height:1.6}
+    .eyebrow{letter-spacing:.2em;text-transform:uppercase;color:#99ffda;font-size:12px;font-weight:700}
+    .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:26px 0}
+    select,button{font-size:16px;border-radius:11px;padding:11px 18px}
+    button{border:0;color:#081226;background:#a6f5da;font-weight:800;cursor:pointer}
+    button:disabled{opacity:.5}
+    select{color:#e7edff;background:#162038;border:1px solid #334362}
+    .panel{border:1px solid #2b3a5c;border-radius:18px;overflow:hidden;background:#0b172d}
+    canvas{display:block;width:100%;height:auto}
+    #results{padding:18px 20px;color:#e9f9ff;line-height:1.8;border-top:1px solid #2b3a5c;font-variant-numeric:tabular-nums}
+    small{color:#9db0d5}
+    pre{display:none;white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#111c33;border-radius:12px}
+    body[data-debug="true"] pre{display:block}
+  </style>
+</head>
+<body>
+  <div class="eyebrow">Handwired · backend laboratory</div>
+  <h1>One circuit. Two execution engines.</h1>
+  <p>8,192 moving particles, generated from the same Handwired FP32 circuit. Left is the CPU reference, right is WebGPU. Source and state persist between simulation steps. Timings include host-side work and GPU readback, not pipeline compilation.</p>
+  <div class="controls">
+    <label>Simulation steps <select id="steps"><option value="1">1</option><option value="8" selected>8</option><option value="32">32</option><option value="128">128</option></select></label>
+    <button id="run" type="button">Run CPU ↔ GPU comparison</button>
+    <span id="status">Initializing execution engines...</span>
+  </div>
+  <div class="panel">
+    <canvas id="swarm" width="1000" height="420" aria-label="Two views of the same particle simulation"></canvas>
+    <div id="results">Run a comparison to display measurements.</div>
+  </div>
+  <p><small>Verification mode: append <code>?smoke=1</code> to the URL to run a 512-sample differential test covering affine, ReGLU, boolean, and indexed reads. GPU floating-point agreement may depend on adapter and driver.</small></p>
+  <pre id="smoke"></pre>
+  <script type="module" src="./handwired-webgpu.ts"></script>
+</body>
+</html>

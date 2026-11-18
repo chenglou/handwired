@@ -1,0 +1,24 @@
+{
+  "browser": "/root/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+  "test": "native hardware WebGPU compute probe",
+  "adapterInfo": {
+    "vendor": "nvidia",
+    "architecture": "turing",
+    "device": "0x1eb8",
+    "description": "Tesla T4"
+  },
+  "nativeGpuProven": true,
+  "suspectedSoftware": false,
+  "expectedVendor": "nvidia",
+  "computeProof": {
+    "computed": 42,
+    "valid": true,
+    "adapterInfo": {
+      "vendor": "nvidia",
+      "architecture": "turing",
+      "device": "0x1eb8",
+      "description": "Tesla T4"
+    }
+  },
+  "ok": true
+}
